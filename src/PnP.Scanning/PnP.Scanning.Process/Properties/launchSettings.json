@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "PnP.Scanning.Process": {
+      "commandName": "Project"
+    }
+  }
+}
