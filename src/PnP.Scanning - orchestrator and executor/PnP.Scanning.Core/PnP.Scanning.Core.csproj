@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="envdte" Version="17.0.31902.203" />
+		<PackageReference Include="Grpc.AspNetCore" Version="2.41.0" />
+		<PackageReference Include="Grpc.Net.Client" Version="2.41.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProtoBuf Include=".\gRPC\scanner.proto" GrpcServices="Both" Link="Proto\scanner.proto" />
+	</ItemGroup>
+
+</Project>
