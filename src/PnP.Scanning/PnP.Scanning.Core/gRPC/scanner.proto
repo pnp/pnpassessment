@@ -1,33 +1,17 @@
 ﻿syntax = "proto3";
 
-package scanner;
+import "google/protobuf/empty.proto";
 
-service ExecutorService {
-	rpc Init (InitRequest) returns (InitReply);
-	rpc Start (StartRequest) returns (StartReply);
-}
+package PnP.Scanning.Core.Services;
 
-message InitRequest {
-	string DbName = 1;
-	string Mode = 2;
-}
-
-message InitReply {
-	bool Success = 1;
-	string Error = 2;
-}
-
-message StartRequest {
-	string Mode = 1;
-}
-
-message StartReply {
-	bool Success = 1;
-}
-
-service OrchestratorService {
+service PnPScanner {
 	rpc Status (StatusRequest) returns (StatusReply);
-	rpc Start (OrchestratorStartRequest) returns (OrchestratorStartReply);
+	rpc Start (StartRequest) returns (StartReply);
+	rpc StartStreaming (StartRequest) returns (stream StartStatus);
+	rpc ScanSite (ScanSiteRequest) returns (ScanSiteReply);
+	rpc ScanSiteStreaming (ScanSiteRequest) returns (stream StartStatus);
+	rpc Stop (StopRequest) returns (StopReply);
+	//rpc Stop (google.protobuf.Empty) returns (StopReply);
 }
 
 message StatusRequest {
@@ -38,10 +22,30 @@ message StatusReply {
 	bool Success = 1;
 }
 
-message OrchestratorStartRequest {
+message StartRequest {
 	string Mode = 1;
 }
 
-message OrchestratorStartReply {
+message StartReply {
+	bool Success = 1;
+}
+
+message StartStatus {
+	string Status = 1;
+}
+
+message ScanSiteRequest {
+	string Site = 1;
+}
+
+message ScanSiteReply {
+	bool Success = 1;
+}
+
+message StopRequest {
+	string Site = 1;
+}
+
+message StopReply {
 	bool Success = 1;
 }

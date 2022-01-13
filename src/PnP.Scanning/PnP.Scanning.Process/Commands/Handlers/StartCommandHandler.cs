@@ -1,4 +1,5 @@
-﻿using Grpc.Net.Client;
+﻿using Grpc.Core;
+using Grpc.Net.Client;
 using PnP.Scanning.Core.Services;
 using System.CommandLine;
 
@@ -70,28 +71,38 @@ namespace PnP.Scanning.Process.Commands
             });
 
             var startBinder = new StartBinder(authenticationModeOption, certPathOption, fileInfoOption);
-            cmd.SetHandler((StartOptions instance) => 
-            { 
-                Handle(instance);
+            cmd.SetHandler(async (StartOptions instance) => 
+            {
+                await HandleAsync(instance);
+
+                //_ = Task.Run(async () =>
+                //{
+                //    await HandleAsync(instance);
+                //});
+
             }, startBinder);            
 
             return cmd;
         }
 
-        private void Handle(StartOptions arguments)
+        private async Task HandleAsync(StartOptions arguments)
         {
-            // Launch the orchestrator
-            var orchestratorPort = processManager.LaunchOrchestrator("bla");
+            // Launch the scanner
+            var scannerPort = processManager.LaunchScannerProcess("bla");
 
-            // Give orchestrator some time to initialize
+            // Give scanner some time to initialize
             // TODO: do some "ping" call to verify the grpc server is up
             Thread.Sleep(5000);
 
-            // Setup grpc client to the orchestrator
-            var orchestratorClient = new Scanner.OrchestratorService.OrchestratorServiceClient(GrpcChannel.ForAddress($"http://localhost:{orchestratorPort}"));
+            // Setup grpc client to the scanner
+            var client = new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"http://localhost:{scannerPort}"));
 
             // Kick off a scan
-            var result = orchestratorClient.Start(new Scanner.OrchestratorStartRequest() { Mode = "Workflow" });
+            var call = client.StartStreaming(new StartRequest() { Mode = "Workflow" });
+            await foreach (var message in call.ResponseStream.ReadAllAsync())
+            {
+                Console.WriteLine($"Status: {message.Status}");
+            }
         }
     }
 }

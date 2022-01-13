@@ -14,8 +14,7 @@ namespace PnP.Scanning.Process
         {
             bool isCliProcess = true;
 
-            if (args.Length > 0 && (args[0].Equals("orchestrator", StringComparison.InvariantCultureIgnoreCase) ||
-                                    args[0].Equals("executor", StringComparison.InvariantCultureIgnoreCase)))
+            if (args.Length > 0 && (args[0].Equals("scanner", StringComparison.InvariantCultureIgnoreCase)))
             {
                 isCliProcess = false;
             }
@@ -51,67 +50,29 @@ namespace PnP.Scanning.Process
             }
             else
             {
-                bool runningOrchestrator = false;
-
-                if (args[0].Equals("orchestrator", StringComparison.InvariantCultureIgnoreCase))
+                // Get port on which the orchestrator has to listen
+                int orchestratorPort = ProcessManager.DefaultScannerPort;
+                if (args.Length >= 2)
                 {
-                    runningOrchestrator = true;
+                    if (int.TryParse(args[1], out int providedPort))
+                    {
+                        orchestratorPort = providedPort;
+                    }
                 }
 
-                if (runningOrchestrator)
-                {
-                    // Get port on which the orchestrator has to listen
-                    int orchestratorPort = ProcessManager.DefaultOrchestratorPort;
-                    if (args.Length >= 2)
-                    {
-                        if (int.TryParse(args[1], out int providedPort))
-                        {
-                            orchestratorPort = providedPort;
-                        }
-                    }
+                // Add and configure needed services
+                var host = ConfigureProcessHost(args, orchestratorPort);
 
-                    // Add and configure needed services
-                    var host = ConfigureProcessHost(args, orchestratorPort, -1, runningOrchestrator);
+                // Register the port with the process manager as the part is passed down to the executors
+                var processManager = host.Services.GetRequiredService<ProcessManager>();
+                processManager.RegisterScannerProcessForCli(Environment.ProcessId, orchestratorPort, host);
 
-                    // Register the port with the process manager as the part is passed down to the executors
-                    var processManager = host.Services.GetRequiredService<ProcessManager>();
-                    processManager.RegisterOrchestrator(Environment.ProcessId, orchestratorPort);
+                Console.WriteLine($"Running scanner on port: {orchestratorPort}");
 
-                    Console.WriteLine($"Running Orchestrator on port: {orchestratorPort}");
-
-                    await host.RunAsync();
-                }
-                else
-                {
-                    // Get port on which the executor has to listen and port of the orchestrator to work with
-                    int executorPort = ProcessManager.DefaultExecutorPort;
-                    if (args.Length >= 2)
-                    {
-                        if (int.TryParse(args[1], out int providedPort))
-                        {
-                            executorPort = providedPort;
-                        }
-                    }
-
-                    int orchestratorPort = ProcessManager.DefaultOrchestratorPort;
-                    if (args.Length >= 3)
-                    {
-                        if (int.TryParse(args[2], out int providedPort))
-                        {
-                            orchestratorPort = providedPort;
-                        }
-                    }
-
-                    // Add and configure needed services
-                    var host = ConfigureProcessHost(args, orchestratorPort, executorPort, runningOrchestrator);
-
-                    Console.WriteLine($"Running Executor on port: {executorPort}");
-                    Console.WriteLine($"Using Orchestrator running on port: {orchestratorPort}");
-
-                    await host.RunAsync();
-                }
+                await host.RunAsync();
             }
         }
+
 
         private static IHost ConfigureCliHost(string[] args)
         {
@@ -124,24 +85,16 @@ namespace PnP.Scanning.Process
                        .Build();
         }
 
-        private static IHost ConfigureProcessHost(string[] args, int orchestratorPort, int executorPort, bool runningOrchestrator)
+        private static IHost ConfigureProcessHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)
                   .ConfigureWebHostDefaults(webBuilder =>
                   {
-                      if (runningOrchestrator)
-                      {
-                          webBuilder.UseStartup<Startup<Core.Orchestrator.Orchestrator>>();
-                          executorPort = orchestratorPort;
-                      }
-                      else
-                      {
-                          webBuilder.UseStartup<Startup<Core.Executor.Executor>>();
-                      }
+                      webBuilder.UseStartup<Startup<Scanner>>();
 
                       webBuilder.ConfigureKestrel(options =>
                       {
-                          options.ListenLocalhost(executorPort, listenOptions =>
+                          options.ListenLocalhost(orchestratorPort, listenOptions =>
                           {
                               listenOptions.Protocols = HttpProtocols.Http2;
                           });
@@ -149,19 +102,7 @@ namespace PnP.Scanning.Process
 
                       webBuilder.ConfigureServices(services =>
                       {
-                          if (runningOrchestrator)
-                          {
                               services.AddSingleton<ProcessManager>();
-                          }
-                          else
-                          {
-                            // Inject a grpc client for talking to the orchestrator service
-                            services.AddGrpcClient<Scanner.OrchestratorService.OrchestratorServiceClient>(configureClient =>
-                              {
-                                  configureClient.Address = new Uri($"http://localhost:{orchestratorPort}");
-                              });
-
-                          }
                       });
 
                   })

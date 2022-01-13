@@ -1,6 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using PnP.Scanning.Core.Executor;
-using PnP.Scanning.Core.Orchestrator;
+﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -9,77 +8,43 @@ namespace PnP.Scanning.Core.Services
 {
     internal sealed class ProcessManager
     {
-        public const int DefaultOrchestratorPort = 25010;
-        public const int DefaultExecutorPort = 26010;
+        public const int DefaultScannerPort = 25010;
 
-        private readonly List<ExecutorProcess> executorProcesses = new();
-        private readonly List<OrchestratorProcess> orchestratorProcesses = new();
+        private readonly List<ScannerProcess> scannerProcesses = new();
 
         private readonly ILogger logger;
 
-        public ProcessManager(ILoggerFactory loggerFactory)
+        private IHost kestrelWebServer;
+
+        public ProcessManager(ILoggerFactory loggerFactory, IHost host)
         {
             logger = loggerFactory.CreateLogger<ProcessManager>();
+            kestrelWebServer = host;
         }
 
-        public int LaunchExecutor(string scope)
+        public int LaunchScannerProcess(string scope)
         {
-            int port = GetFreeExecutorPort();
-            int orchestratorPort = GetRunningOrchestrator().Port;
+            int port = GetFreeScannerPort();
 
             ProcessStartInfo startInfo = new()
             {
                 FileName = "PnP.Scanning.Process.exe",
-                Arguments = $"executor {port} {orchestratorPort}",
+                Arguments = $"scanner {port}",
                 UseShellExecute = true
 #if !DEBUG
                 ,WindowStyle = ProcessWindowStyle.Hidden
 #endif
             };
 
-            Process? executorProcess = Process.Start(startInfo);
+            Process? scannerProcess = Process.Start(startInfo);
 
-            if (executorProcess != null && !executorProcess.HasExited)
+            if (scannerProcess != null && !scannerProcess.HasExited)
             {
 
-                executorProcesses.Add(new ExecutorProcess(executorProcess.Id, port, scope));
+                scannerProcesses.Add(new ScannerProcess(scannerProcess.Id, port, kestrelWebServer, scope));
 
 #if DEBUG
-                AttachDebugger(executorProcess);
-#endif
-
-                return port;
-            }
-            else
-            {
-                return -1;
-            }
-
-        }
-
-        public int LaunchOrchestrator(string scope)
-        {
-            int port = GetFreeOrchestratorPort();
-
-            ProcessStartInfo startInfo = new()
-            {
-                FileName = "PnP.Scanning.Process.exe",
-                Arguments = $"orchestrator {port}",
-                UseShellExecute = true
-#if !DEBUG
-                ,WindowStyle = ProcessWindowStyle.Hidden
-#endif
-            };
-
-            Process? executorProcess = Process.Start(startInfo);
-
-            if (executorProcess != null && !executorProcess.HasExited)
-            {
-
-                orchestratorProcesses.Add(new OrchestratorProcess(executorProcess.Id, port, scope));
-
-#if DEBUG
-                AttachDebugger(executorProcess);
+                AttachDebugger(scannerProcess);
 #endif
 
                 return port;
@@ -90,38 +55,26 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        public void RegisterOrchestrator(long processId, int port)
+        public void RegisterScannerProcessForCli(long processId, int port, IHost kestrelWebServer)
         {
-            orchestratorProcesses.Add(new OrchestratorProcess(processId, port, null));
+            scannerProcesses.Add(new ScannerProcess(processId, port, kestrelWebServer, ""));
         }
 
-        private int GetFreeExecutorPort()
+        private int GetFreeScannerPort()
         {
-            if (!executorProcesses.Any())
+            if (!scannerProcesses.Any())
             {
-                return DefaultExecutorPort;
+                return DefaultScannerPort;
             }
             else
             {
-                return GetAvailablePort(DefaultExecutorPort);
+                return GetAvailablePort(DefaultScannerPort);
             }
         }
 
-        private int GetFreeOrchestratorPort()
+        public ScannerProcess GetRunningScanner()
         {
-            if (!orchestratorProcesses.Any())
-            {
-                return DefaultOrchestratorPort;
-            }
-            else
-            {
-                return GetAvailablePort(DefaultOrchestratorPort);
-            }
-        }
-
-        private OrchestratorProcess GetRunningOrchestrator()
-        {
-            return orchestratorProcesses.First();
+            return scannerProcesses.First();
         }
 
         /// <summary>
