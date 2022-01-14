@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using PnP.Scanning.Core.Scanners;
 using System.Threading.Tasks.Dataflow;
 
 namespace PnP.Scanning.Core.Queues
@@ -6,13 +7,16 @@ namespace PnP.Scanning.Core.Queues
     internal sealed class WebQueue : QueueBase<WebQueue>
     {
         // Queue containting the tasks to process
-        private ActionBlock<string>? websToScan;
+        private ActionBlock<WebQueueItem>? websToScan;
+
+        private readonly ILoggerFactory loggerFactory;
 
         public WebQueue(ILoggerFactory loggerFactory): base(loggerFactory)
         {
+            this.loggerFactory = loggerFactory;
         }
 
-        internal async Task EnqueueAsync(string webUrl)
+        internal async Task EnqueueAsync(WebQueueItem web)
         {
             if (websToScan == null)
             {
@@ -22,29 +26,30 @@ namespace PnP.Scanning.Core.Queues
                 };
 
                 // Configure the site collection scanning queue
-                websToScan = new ActionBlock<string>(async (webUrl) => await ProcessWebAsync(webUrl)
+                websToScan = new ActionBlock<WebQueueItem>(async (web) => await ProcessWebAsync(web)
                                                                 , executionDataflowBlockOptions);
             }
 
             // Send the request into the queue
-            await websToScan.SendAsync(webUrl);
+            await websToScan.SendAsync(web);
         }
 
-        private async Task ProcessWebAsync(string webUrl)
+        private async Task ProcessWebAsync(WebQueueItem web)
         {
-            LogWarning($"Started for {webUrl} ThreadId : {Environment.CurrentManagedThreadId}");
-            int delay = new Random().Next(500, 1000);
-            await Task.Delay(delay);
+            ScannerBase? scanner = null;
+            if (web.OptionsBase is TestOptions testOptions)
+            {
+                scanner = new TestScanner(loggerFactory, web.WebUrl, testOptions);
+            }
 
-            LogWarning($"Step 1 Delay {webUrl} ThreadId : {Environment.CurrentManagedThreadId}");
-            delay = new Random().Next(500, 1000);
-            await Task.Delay(delay);
-
-            LogWarning($"Step 2 Delay {webUrl} ThreadId : {Environment.CurrentManagedThreadId}");
-            delay = new Random().Next(500, 1000);
-            await Task.Delay(delay);
-
-            LogWarning($"Step 3 Delay {webUrl} ThreadId : {Environment.CurrentManagedThreadId}");
+            if (scanner != null)
+            {
+                await scanner.ExecuteAsync();
+            }
+            else
+            {
+                throw new Exception("Unknown options class specified");
+            }
         }
         
     }

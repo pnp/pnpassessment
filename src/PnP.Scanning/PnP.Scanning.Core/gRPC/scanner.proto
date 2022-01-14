@@ -11,6 +11,7 @@ service PnPScanner {
 	rpc Ping (google.protobuf.Empty) returns (PingReply);
 }
 
+// Status
 message StatusRequest {
 	string Message = 1;
 }
@@ -19,6 +20,7 @@ message StatusReply {
 	bool Success = 1;
 }
 
+// StartStreaming
 message StartRequest {
 	string Mode = 1;
 }
@@ -27,14 +29,12 @@ message StartStatus {
 	string Status = 1;
 }
 
+// Stop
 message StopRequest {
 	string Site = 1;
 }
 
-message StopReply {
-	bool Success = 1;
-}
-
+// Ping
 message PingReply {
 	bool UpAndRunning = 1;
 }

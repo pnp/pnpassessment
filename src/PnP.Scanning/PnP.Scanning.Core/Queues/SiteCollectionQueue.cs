@@ -6,7 +6,7 @@ namespace PnP.Scanning.Core.Queues
     internal sealed class SiteCollectionQueue : QueueBase<SiteCollectionQueue>
     {
         // Queue containting the tasks to process
-        private ActionBlock<string>? siteCollectionsToScan;
+        private ActionBlock<SiteCollectionQueueItem>? siteCollectionsToScan;
         private readonly ILoggerFactory loggerFactory;
 
         public SiteCollectionQueue(ILoggerFactory loggerFactory) : base(loggerFactory)
@@ -14,7 +14,7 @@ namespace PnP.Scanning.Core.Queues
             this.loggerFactory = loggerFactory;
         }
 
-        internal async Task EnqueueAsync(string siteCollectionUrl)
+        internal async Task EnqueueAsync(SiteCollectionQueueItem siteCollection)
         {
             if (siteCollectionsToScan == null)
             {
@@ -24,26 +24,28 @@ namespace PnP.Scanning.Core.Queues
                 };
 
                 // Configure the site collection scanning queue
-                siteCollectionsToScan = new ActionBlock<string>(async (siteCollectionUrl) => await ProcessSiteCollectionAsync(siteCollectionUrl)
+                siteCollectionsToScan = new ActionBlock<SiteCollectionQueueItem>(async (siteCollection) => await ProcessSiteCollectionAsync(siteCollection)
                                                                 , executionDataflowBlockOptions);
             }
             
             // Send the request into the queue
-            await siteCollectionsToScan.SendAsync(siteCollectionUrl);
+            await siteCollectionsToScan.SendAsync(siteCollection);
         }
 
-        private async Task ProcessSiteCollectionAsync(string siteCollectionUrl)
+        private async Task ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection)
         {
             // Get the sub sites in the given site collection
-            List<string> webToScan = new();
+            List<WebQueueItem> webToScan = new();
 
             for (int i = 0; i < new Random().Next(10); i++)
             {
-                webToScan.Add($"{siteCollectionUrl}/subsite{i}");
+                webToScan.Add(new WebQueueItem(siteCollection.OptionsBase, 
+                                               siteCollection.SiteCollectionUrl, 
+                                               $"{siteCollection.SiteCollectionUrl}/subsite{i}"));
             }
 
             // Start parallel execution per web in this site collection
-            var webQueue = new WebQueue(this.loggerFactory);
+            var webQueue = new WebQueue(loggerFactory);
             webQueue.ConfigureQueue(1);
             foreach (var web in webToScan)
             {

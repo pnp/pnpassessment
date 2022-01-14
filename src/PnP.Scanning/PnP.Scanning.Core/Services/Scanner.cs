@@ -3,6 +3,7 @@ using Grpc.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PnP.Scanning.Core.Queues;
+using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Services
 {
@@ -79,11 +80,14 @@ namespace PnP.Scanning.Core.Services
                 Status = "Sites to scan are defined"
             });
 
-            // 3. Start parallel execution per site collection
+            // 3. Get scan configuration
+            OptionsBase options = OptionsBase.FromGrpcInput(request);
+
+            // 4. Start parallel execution per site collection
             siteCollectionQueue.ConfigureQueue(1);
             foreach(var site in sitesToScan)
             {
-                await siteCollectionQueue.EnqueueAsync(site);
+                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site));
             }
              
             await responseStream.WriteAsync(new StartStatus

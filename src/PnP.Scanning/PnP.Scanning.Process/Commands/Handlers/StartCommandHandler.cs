@@ -1,5 +1,4 @@
 ﻿using Grpc.Core;
-using Grpc.Net.Client;
 using PnP.Scanning.Core.Services;
 using System.CommandLine;
 
@@ -23,6 +22,16 @@ namespace PnP.Scanning.Process.Commands
             var cmd = new Command("start", "starts a scan");
 
             // Configure options for start command
+
+            var modeOption = new Option<Mode>(
+                "--mode",
+                getDefaultValue: () => Mode.Test,
+                description: "Scanner mode"
+                )
+            {
+                IsRequired = true,
+            };
+            cmd.AddOption(modeOption);
 
             var authenticationModeOption = new Option<AuthenticationMode>(
                     "--authmode",
@@ -71,7 +80,7 @@ namespace PnP.Scanning.Process.Commands
             });
 
             // Binder approach as that one can handle an unlimited number of command line arguments
-            var startBinder = new StartBinder(authenticationModeOption, certPathOption, fileInfoOption);
+            var startBinder = new StartBinder(modeOption, authenticationModeOption, certPathOption, fileInfoOption);
             cmd.SetHandler(async (StartOptions arguments) => 
             {
                 await HandleStartAsync(arguments);
@@ -90,7 +99,7 @@ namespace PnP.Scanning.Process.Commands
             var client = processManager.GetScannerClient();
 
             // Kick off a scan
-            var call = client.StartStreaming(new StartRequest() { Mode = "Workflow" });
+            var call = client.StartStreaming(new StartRequest() { Mode = arguments.Mode.ToString() });
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
                 Console.WriteLine($"Status: {message.Status}");

@@ -3,6 +3,7 @@
     internal enum AuthenticationMode
     {
         Interactive,
+        Device,
         Application
     }
 }
