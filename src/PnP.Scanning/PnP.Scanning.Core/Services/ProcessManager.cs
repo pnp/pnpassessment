@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Net;
@@ -14,15 +14,12 @@ namespace PnP.Scanning.Core.Services
 
         private readonly ILogger logger;
 
-        private IHost kestrelWebServer;
-
-        public ProcessManager(ILoggerFactory loggerFactory, IHost host)
+        public ProcessManager(ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<ProcessManager>();
-            kestrelWebServer = host;
         }
 
-        public int LaunchScannerProcess(string scope)
+        internal async Task<int> LaunchScannerProcessAsync()
         {
             int port = GetFreeScannerPort();
 
@@ -40,12 +37,14 @@ namespace PnP.Scanning.Core.Services
 
             if (scannerProcess != null && !scannerProcess.HasExited)
             {
-
-                scannerProcesses.Add(new ScannerProcess(scannerProcess.Id, port, kestrelWebServer, scope));
+                RegisterScannerProcess(scannerProcess.Id, port);
 
 #if DEBUG
                 AttachDebugger(scannerProcess);
 #endif
+
+                // perform a ping to verify when the grpc server is up
+                await WaitForGrpcServerToBeUpAsync(port, logger);
 
                 return port;
             }
@@ -55,9 +54,44 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        public void RegisterScannerProcessForCli(long processId, int port, IHost kestrelWebServer)
+        internal void RegisterScannerProcess(long processId, int port)
         {
-            scannerProcesses.Add(new ScannerProcess(processId, port, kestrelWebServer, ""));
+            scannerProcesses.Add(new ScannerProcess(processId, port));
+        }
+
+        private async Task WaitForGrpcServerToBeUpAsync(int port, ILogger logger)
+        {
+            // Setup grpc client to the scanner
+            var client = GetScannerClient();
+
+            bool isGrpcUpAndRunning = false;
+            var retryAttempt = 1;
+            do
+            {
+                try
+                {
+                    // Wait 1 second in between pings
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    
+                    // Ping to see if the server is up
+                    var response = await client.PingAsync(new Google.Protobuf.WellKnownTypes.Empty());
+                    if (response != null)
+                    {
+                        isGrpcUpAndRunning = response.UpAndRunning;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Eat all exceptions
+                    logger.LogWarning($"GRPC server ping: {ex.Message}");
+                }
+            }
+            while (!isGrpcUpAndRunning && retryAttempt <= 10);
+
+            if (!isGrpcUpAndRunning)
+            {
+                throw new Exception("Scanner server did not start timely");
+            }
         }
 
         private int GetFreeScannerPort()
@@ -72,16 +106,23 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        public ScannerProcess GetRunningScanner()
+        internal PnPScanner.PnPScannerClient GetScannerClient()
         {
-            return scannerProcesses.First();
+            if (scannerProcesses.Any())
+            {
+                return new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"http://localhost:{scannerProcesses.First().Port}"));
+            }
+            else
+            {
+                throw new Exception("No scanner process was running");
+            }
         }
 
         /// <summary>
         /// checks for used ports and retrieves the first free port
         /// </summary>
         /// <returns>the free port or 0 if it did not find a free port</returns>
-        public static int GetAvailablePort(int startingPort)
+        private static int GetAvailablePort(int startingPort)
         {
             IPEndPoint[] endPoints;
             List<int> portArray = new();
@@ -120,13 +161,13 @@ namespace PnP.Scanning.Core.Services
         }
 
 #if DEBUG
-        internal static void AttachDebugger(Process processToAttachTo)
+        private static void AttachDebugger(Process processToAttachTo)
         {
             var vsProcess = VisualStudioAttacher.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
 
             if (vsProcess != null)
             {
-                VisualStudioAttacher.AttachVisualStudioToProcess(vsProcess, processToAttachTo /*Process.GetCurrentProcess()*/);
+                VisualStudioAttacher.AttachVisualStudioToProcess(vsProcess, processToAttachTo);
             }
             else
             {
@@ -134,10 +175,9 @@ namespace PnP.Scanning.Core.Services
                 Debugger.Launch();
             }
 
-            // ReSharper disable once ConditionIsAlwaysTrueOrFalse
             if (Debugger.IsAttached)
             {
-
+                // log something
             }
         }
 #endif

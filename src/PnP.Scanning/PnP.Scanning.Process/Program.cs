@@ -2,8 +2,9 @@
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using PnP.Scanning.Process.Commands;
 using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Queues;
+using PnP.Scanning.Process.Commands;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process
@@ -14,32 +15,35 @@ namespace PnP.Scanning.Process
         {
             bool isCliProcess = true;
 
-            if (args.Length > 0 && (args[0].Equals("scanner", StringComparison.InvariantCultureIgnoreCase)))
+            if (args.Length > 0 && args[0].Equals("scanner", StringComparison.OrdinalIgnoreCase))
             {
                 isCliProcess = false;
             }
 
+            // Launching PnP.Scanning.Process.exe as CLI
             if (isCliProcess)
             {
                 // Configure needed services
                 var host = ConfigureCliHost(args);
-                // Get ProcessManager
+                
+                // Get ProcessManager instance from the cli executable
                 var processManager = host.Services.GetRequiredService<ProcessManager>();
-
 
                 if (args.Length == 0)
                 {
                     Console.WriteLine("Welcome to the PnP Scanning CLI!");
-
+                    Console.WriteLine("--------------------------------");
+                    Console.WriteLine("");
                     Console.WriteLine("Enter the command you want to execute:");
-                    var input = Console.ReadLine();
+                    var consoleInput = Console.ReadLine();
 
-                    while (!string.IsNullOrEmpty(input))
+                    while (!string.IsNullOrEmpty(consoleInput))
                     {
-                        await new RootCommandHandler(processManager).Create().InvokeAsync(input);
+                        await new RootCommandHandler(processManager).Create().InvokeAsync(consoleInput);
 
+                        Console.WriteLine("");
                         Console.WriteLine("Enter the command you want to execute:");
-                        input = Console.ReadLine();
+                        consoleInput = Console.ReadLine();
                     }
                 }
                 else
@@ -50,6 +54,8 @@ namespace PnP.Scanning.Process
             }
             else
             {
+                // Launching PnP.Scanning.Process.exe as Kestrel web server to which we'll communicate via gRPC
+
                 // Get port on which the orchestrator has to listen
                 int orchestratorPort = ProcessManager.DefaultScannerPort;
                 if (args.Length >= 2)
@@ -65,7 +71,7 @@ namespace PnP.Scanning.Process
 
                 // Register the port with the process manager as the part is passed down to the executors
                 var processManager = host.Services.GetRequiredService<ProcessManager>();
-                processManager.RegisterScannerProcessForCli(Environment.ProcessId, orchestratorPort, host);
+                processManager.RegisterScannerProcess(Environment.ProcessId, orchestratorPort);
 
                 Console.WriteLine($"Running scanner on port: {orchestratorPort}");
 
@@ -102,7 +108,8 @@ namespace PnP.Scanning.Process
 
                       webBuilder.ConfigureServices(services =>
                       {
-                              services.AddSingleton<ProcessManager>();
+                          services.AddSingleton<ProcessManager>();
+                          services.AddSingleton<SiteCollectionQueue>();
                       });
 
                   })

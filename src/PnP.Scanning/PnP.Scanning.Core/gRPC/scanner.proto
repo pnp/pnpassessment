@@ -6,12 +6,9 @@ package PnP.Scanning.Core.Services;
 
 service PnPScanner {
 	rpc Status (StatusRequest) returns (StatusReply);
-	rpc Start (StartRequest) returns (StartReply);
 	rpc StartStreaming (StartRequest) returns (stream StartStatus);
-	rpc ScanSite (ScanSiteRequest) returns (ScanSiteReply);
-	rpc ScanSiteStreaming (ScanSiteRequest) returns (stream StartStatus);
-	rpc Stop (StopRequest) returns (StopReply);
-	//rpc Stop (google.protobuf.Empty) returns (StopReply);
+	rpc Stop (StopRequest) returns (google.protobuf.Empty);
+	rpc Ping (google.protobuf.Empty) returns (PingReply);
 }
 
 message StatusRequest {
@@ -26,20 +23,8 @@ message StartRequest {
 	string Mode = 1;
 }
 
-message StartReply {
-	bool Success = 1;
-}
-
 message StartStatus {
 	string Status = 1;
-}
-
-message ScanSiteRequest {
-	string Site = 1;
-}
-
-message ScanSiteReply {
-	bool Success = 1;
 }
 
 message StopRequest {
@@ -48,4 +33,8 @@ message StopRequest {
 
 message StopReply {
 	bool Success = 1;
+}
+
+message PingReply {
+	bool UpAndRunning = 1;
 }

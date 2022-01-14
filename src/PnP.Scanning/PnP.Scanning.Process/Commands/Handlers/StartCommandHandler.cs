@@ -70,32 +70,24 @@ namespace PnP.Scanning.Process.Commands
                 return null;
             });
 
+            // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(authenticationModeOption, certPathOption, fileInfoOption);
-            cmd.SetHandler(async (StartOptions instance) => 
+            cmd.SetHandler(async (StartOptions arguments) => 
             {
-                await HandleAsync(instance);
-
-                //_ = Task.Run(async () =>
-                //{
-                //    await HandleAsync(instance);
-                //});
+                await HandleStartAsync(arguments);
 
             }, startBinder);            
 
             return cmd;
         }
 
-        private async Task HandleAsync(StartOptions arguments)
+        private async Task HandleStartAsync(StartOptions arguments)
         {
             // Launch the scanner
-            var scannerPort = processManager.LaunchScannerProcess("bla");
-
-            // Give scanner some time to initialize
-            // TODO: do some "ping" call to verify the grpc server is up
-            Thread.Sleep(5000);
+            await processManager.LaunchScannerProcessAsync();
 
             // Setup grpc client to the scanner
-            var client = new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"http://localhost:{scannerPort}"));
+            var client = processManager.GetScannerClient();
 
             // Kick off a scan
             var call = client.StartStreaming(new StartRequest() { Mode = "Workflow" });

@@ -1,171 +1,95 @@
-﻿using Grpc.Core;
-using Grpc.Net.Client;
+﻿using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PnP.Scanning.Core.Queues;
 
 namespace PnP.Scanning.Core.Services
 {
-    internal sealed class Scanner: PnPScanner.PnPScannerBase
-    {
+    /// <summary>
+    /// Scanner GRPC server
+    /// </summary>
+    internal sealed class Scanner : PnPScanner.PnPScannerBase
+    {        
         private readonly ILogger logger;
-        private ProcessManager processManager;
-        private PnPScanner.PnPScannerClient client;
+        private readonly SiteCollectionQueue siteCollectionQueue;
+        private readonly IHost kestrelWebServer;
 
-        public Scanner(ILoggerFactory loggerFactory, ProcessManager processManagerInstance)
+        public Scanner(ILoggerFactory loggerFactory, SiteCollectionQueue siteScanQueue, IHost host)
         {
+            // Configure logging
             logger = loggerFactory.CreateLogger<Scanner>();
-            processManager = processManagerInstance;
-            var scannerPort = processManager.GetRunningScanner().Port;
-            client = new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"http://localhost:{scannerPort}"));
+            // Kestrel
+            kestrelWebServer = host;
+            // Site collection queue
+            siteCollectionQueue = siteScanQueue;
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             logger.LogInformation($"Status {request.Message} received");
             return new StatusReply() { Success = true };
         }
 
-        public override async Task<StopReply> Stop(StopRequest request, ServerCallContext context)
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            _ = Task.Run(async () => {
-                await processManager.GetRunningScanner().KestrelWebServer.StopAsync();
+            // Run the stop in a separate thread so that the GRPc client still gets a response
+            _ = Task.Run(async () =>
+            {
+                await kestrelWebServer.StopAsync();
             });
-            return new StopReply() { Success = true };
+            return new Empty();
+        }
+
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        public async override Task<PingReply> Ping(Empty request, ServerCallContext context)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+        {
+            return new PingReply() { UpAndRunning = true };
         }
 
         public override async Task StartStreaming(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
         {
-            var doneTcs = new TaskCompletionSource<bool>(); // bool is a dummy type
-
             await responseStream.WriteAsync(new StartStatus
-            {                
+            {
                 Status = "Starting"
             });
 
-            for (int i = 0; i < 20; i++)
-            {
-                _ = Task.Run(async () =>
-                {
-                    var call = client.ScanSiteStreaming(new ScanSiteRequest() { Site = $"Site{i}" });
-                    await foreach (var message in call.ResponseStream.ReadAllAsync())
-                    {
-                        Console.WriteLine($"Status: {message.Status}");
-                    }
-                });
+            // 1. Handle auth
 
-                await responseStream.WriteAsync(new StartStatus
-                {
-                    Status = $"Site{i} scan launched"
-                });
+            await responseStream.WriteAsync(new StartStatus
+            {
+                Status = "Authenticated"
+            });
+
+            // 2. Build list of sites to scan
+            List<string> sitesToScan = new();
+
+            for (int i = 0; i < 10; i++)
+            {
+                sitesToScan.Add($"https://bertonline.sharepoint.com/sites/prov-{i}");
             }
 
-            doneTcs.SetResult(true);
-
-            await doneTcs.Task;
-        }
-
-        public override async Task<StartReply> Start(StartRequest request, ServerCallContext context)
-        {
-            logger.LogWarning($"Scanner start requested for mode {request.Mode}");
-
-            //await client.ScanSiteAsync(new ScanSiteRequest() { Site = "Workflow2013_0" }, new CallOptions().WithWaitForReady(false));
-            //await client.ScanSiteAsync(new ScanSiteRequest() { Site = "Workflow2013_1" }, new CallOptions().WithWaitForReady(false));
-            //await client.ScanSiteAsync(new ScanSiteRequest() { Site = "Workflow2013_2" }, new CallOptions().WithWaitForReady(false));
-
-            // Kick off 3 parallel tasks on the executor service
-            _ = Task.Run(async () => { await client.ScanSiteAsync(new ScanSiteRequest() { Site = "Workflow2013_0" }); });
-            _ = Task.Run(async () => { await client.ScanSiteAsync(new ScanSiteRequest() { Site = "Workflow2013_1" }); });
-            _ = Task.Run(async () => { await client.ScanSiteAsync(new ScanSiteRequest() { Site = "Workflow2013_2" }); });
-
-            return new StartReply() { Success = true };
-            //return base.Start(request, context);
-        }
-
-        public override async Task ScanSiteStreaming(ScanSiteRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
-        {
-            var doneTcs = new TaskCompletionSource<bool>(); // bool is a dummy type
-
-            //logger.LogWarning($"Started for {request.Site} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
             await responseStream.WriteAsync(new StartStatus
             {
-                Status = $"{request.Site} : Start. ThreadId : {Thread.CurrentThread.Name}"
+                Status = "Sites to scan are defined"
             });
 
-            int delay = new Random().Next(500, 10000);
-            await Task.Delay(delay);
-
-            //logger.LogWarning($"Step 1 Delay {delay} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-            await responseStream.WriteAsync(new StartStatus
+            // 3. Start parallel execution per site collection
+            siteCollectionQueue.ConfigureQueue(1);
+            foreach(var site in sitesToScan)
             {
-                Status = $"{request.Site} : Step 1 Delay {delay}. ThreadId : {Thread.CurrentThread.Name}"
-            });
-
-            await client.StatusAsync(new StatusRequest() { Message = $"Step 1 - Executor ThreadId : {Thread.CurrentThread.ManagedThreadId}" });
-
-            delay = new Random().Next(500, 10000);
-            await Task.Delay(delay);
-
-            //logger.LogWarning($"Step 2 Delay {delay} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-            await responseStream.WriteAsync(new StartStatus
-            {
-                Status = $"{request.Site} : Step 2 Delay {delay}. ThreadId : {Thread.CurrentThread.Name}"
-            });
-            await client.StatusAsync(new StatusRequest() { Message = $"Step 2 - Executor ThreadId : {Thread.CurrentThread.ManagedThreadId}" });
-
-            delay = new Random().Next(500, 10000);
-            await Task.Delay(delay);
-
-            //logger.LogWarning($"Step 3 Delay {delay} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-            await responseStream.WriteAsync(new StartStatus
-            {
-                Status = $"{request.Site} : Step 3 Delay {delay}. ThreadId : {Thread.CurrentThread.Name}"
-            });
-            await client.StatusAsync(new StatusRequest() { Message = $"Step 3 - Executor ThreadId : {Thread.CurrentThread.ManagedThreadId}" });
-
-            await responseStream.WriteAsync(new StartStatus
-            {
-                Status = $"{request.Site} : Done!. ThreadId : {Thread.CurrentThread.Name}"
-            });
-
-            await doneTcs.Task;
-        }
-
-
-        public override async Task<ScanSiteReply> ScanSite(ScanSiteRequest request, ServerCallContext context)
-        {
-            try
-            {
-
-                logger.LogWarning($"Started for {request.Site} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-
-                int delay = new Random().Next(500, 10000);
-                await Task.Delay(delay);
-
-                logger.LogWarning($"Step 1 Delay {delay} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-                await client.StatusAsync(new StatusRequest() { Message = $"Step 1 - Executor ThreadId : {Thread.CurrentThread.ManagedThreadId}" });
-
-                delay = new Random().Next(500, 10000);
-                await Task.Delay(delay);
-
-                logger.LogWarning($"Step 2 Delay {delay} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-                await client.StatusAsync(new StatusRequest() { Message = $"Step 2 - Executor ThreadId : {Thread.CurrentThread.ManagedThreadId}" });
-
-                delay = new Random().Next(500, 10000);
-                await Task.Delay(delay);
-
-                logger.LogWarning($"Step 3 Delay {delay} ThreadId : {Thread.CurrentThread.ManagedThreadId}");
-                await client.StatusAsync(new StatusRequest() { Message = $"Step 3 - Executor ThreadId : {Thread.CurrentThread.ManagedThreadId}" });                
+                await siteCollectionQueue.EnqueueAsync(site);
             }
-            catch (Exception ex)
+             
+            await responseStream.WriteAsync(new StartStatus
             {
-                //await orchestratorClient.StatusAsync(new StatusRequest() { Message = ex.ToString() });
-                return new ScanSiteReply() { Success = false };
-            }
-
-            //return base.Start(request, context);
-            return new ScanSiteReply() { Success = true };
-
-            //return base.ScanSite(request, context);
+                Status = "Sites to scan are queued up"
+            });
         }
-
     }
 }
