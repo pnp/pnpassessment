@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using PnP.Scanning.Core.Services;
 using System.Threading.Tasks.Dataflow;
 
 namespace PnP.Scanning.Core.Queues
@@ -9,10 +10,13 @@ namespace PnP.Scanning.Core.Queues
         private ActionBlock<SiteCollectionQueueItem>? siteCollectionsToScan;
         private readonly ILoggerFactory loggerFactory;
 
-        public SiteCollectionQueue(ILoggerFactory loggerFactory) : base(loggerFactory)
+        public SiteCollectionQueue(ILoggerFactory loggerFactory, ScanManager scanManager) : base(loggerFactory)
         {
             this.loggerFactory = loggerFactory;
+            ScanManager = scanManager;
         }
+
+        private ScanManager ScanManager { get; set; }
 
         internal async Task EnqueueAsync(SiteCollectionQueueItem siteCollection)
         {
@@ -20,6 +24,7 @@ namespace PnP.Scanning.Core.Queues
             {
                 var executionDataflowBlockOptions = new ExecutionDataflowBlockOptions()
                 {
+                    SingleProducerConstrained = true,
                     MaxDegreeOfParallelism = ParallelThreads,
                 };
 
@@ -37,7 +42,10 @@ namespace PnP.Scanning.Core.Queues
             // Get the sub sites in the given site collection
             List<WebQueueItem> webToScan = new();
 
-            for (int i = 0; i < new Random().Next(10); i++)
+            int numberOfWebs = new Random().Next(10);
+            Logger.LogWarning($"Number of webs to scan: {numberOfWebs}");
+
+            for (int i = 0; i < numberOfWebs; i++)
             {
                 webToScan.Add(new WebQueueItem(siteCollection.OptionsBase, 
                                                siteCollection.SiteCollectionUrl, 
@@ -46,12 +54,20 @@ namespace PnP.Scanning.Core.Queues
 
             // Start parallel execution per web in this site collection
             var webQueue = new WebQueue(loggerFactory);
-            webQueue.ConfigureQueue(1);
+            // Use two parallel threads per running site collection task for processing the webs
+            webQueue.ConfigureQueue(2);
+
             foreach (var web in webToScan)
             {
                 await webQueue.EnqueueAsync(web);
-            }            
-        }
+            }
+
+            // Wait until the queue is completely drained
+            webQueue.WaitForCompletion();
+
+            // Increase the site collections scanned in memory counter
+            ScanManager.SiteCollectionScanned();
+        }        
 
     }
 }

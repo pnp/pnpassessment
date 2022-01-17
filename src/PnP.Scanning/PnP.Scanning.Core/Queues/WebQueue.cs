@@ -22,6 +22,7 @@ namespace PnP.Scanning.Core.Queues
             {
                 var executionDataflowBlockOptions = new ExecutionDataflowBlockOptions()
                 {
+                    SingleProducerConstrained = true,
                     MaxDegreeOfParallelism = ParallelThreads,
                 };
 
@@ -32,6 +33,15 @@ namespace PnP.Scanning.Core.Queues
 
             // Send the request into the queue
             await websToScan.SendAsync(web);
+        }
+
+        internal void WaitForCompletion()
+        {
+            if (websToScan != null)
+            {
+                websToScan.Complete();
+                websToScan.Completion.Wait();
+            }
         }
 
         private async Task ProcessWebAsync(WebQueueItem web)

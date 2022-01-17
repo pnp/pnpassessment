@@ -111,6 +111,7 @@ namespace PnP.Scanning.Process
                       webBuilder.ConfigureServices(services =>
                       {
                           services.AddSingleton<ProcessManager>();
+                          services.AddSingleton<ScanManager>();
                           services.AddSingleton<SiteCollectionQueue>();
                       });
 

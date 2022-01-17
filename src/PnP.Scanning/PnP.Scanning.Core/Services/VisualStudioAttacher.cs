@@ -20,56 +20,6 @@ namespace PnP.Scanning.Core.Services
         [DllImport("ole32.dll")]
         public static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable prot);
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        public static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        public static extern IntPtr SetFocus(IntPtr hWnd);
-
-        public static string GetSolutionForVisualStudio(Process visualStudioProcess)
-        {
-            _DTE visualStudioInstance;
-            if (TryGetVsInstance(visualStudioProcess.Id, out visualStudioInstance))
-            {
-                try
-                {
-                    return visualStudioInstance.Solution.FullName;
-                }
-                catch (Exception)
-                {
-                }
-            }
-
-            return null;
-        }
-
-        public static Process GetAttachedVisualStudio(Process applicationProcess)
-        {
-            IEnumerable<Process> visualStudios = GetVisualStudioProcesses();
-
-            foreach (Process visualStudio in visualStudios)
-            {
-                if (TryGetVsInstance(visualStudio.Id, out _DTE visualStudioInstance))
-                {
-                    try
-                    {
-                        foreach (Process debuggedProcess in visualStudioInstance.Debugger.DebuggedProcesses)
-                        {
-                            if (debuggedProcess.Id == applicationProcess.Id)
-                            {
-                                return debuggedProcess;
-                            }
-                        }
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-            }
-
-            return null;
-        }
-
         /// <summary>
         /// The method to use to attach visual studio to a specified process.
         /// </summary>
@@ -84,29 +34,37 @@ namespace PnP.Scanning.Core.Services
         /// </exception>
         public static void AttachVisualStudioToProcess(Process visualStudioProcess, Process applicationProcess)
         {
-            _DTE visualStudioInstance;
+            _DTE? visualStudioInstance;
 
             if (TryGetVsInstance(visualStudioProcess.Id, out visualStudioInstance))
             {
-                // Find the process you want the VS instance to attach to...
-                DTEProcess processToAttachTo =
-                    visualStudioInstance.Debugger.LocalProcesses.Cast<DTEProcess>()
-                                        .FirstOrDefault(process => process.ProcessID == applicationProcess.Id);
-
-                // Attach to the process.
-                if (processToAttachTo != null)
+                if (visualStudioInstance != null)
                 {
-                    processToAttachTo.Attach();
+                    // Find the process you want the VS instance to attach to...
+                    DTEProcess? processToAttachTo =
+                        visualStudioInstance.Debugger.LocalProcesses.Cast<DTEProcess>()
+                                            .FirstOrDefault(process => process.ProcessID == applicationProcess.Id);
 
-                    //ShowWindow((int)visualStudioProcess.MainWindowHandle, 3);
-                    //SetForegroundWindow(visualStudioProcess.MainWindowHandle);
+                    // Attach to the process.
+                    if (processToAttachTo != null)
+                    {
+                        processToAttachTo.Attach();
+
+                        //ShowWindow((int)visualStudioProcess.MainWindowHandle, 3);
+                        //SetForegroundWindow(visualStudioProcess.MainWindowHandle);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "Visual Studio process cannot find specified application '" + applicationProcess.Id + "'");
+                    }
                 }
                 else
                 {
                     throw new InvalidOperationException(
-                        "Visual Studio process cannot find specified application '" + applicationProcess.Id + "'");
+                            "Visual Studio process cannot find specified application '" + applicationProcess.Id + "'");
                 }
-            }
+            }            
         }
 
         /// <summary>
@@ -118,11 +76,11 @@ namespace PnP.Scanning.Core.Services
         /// <returns>
         /// The <see cref="Process"/>.
         /// </returns>
-        public static Process GetVisualStudioForSolutions(List<string> solutionNames)
+        public static Process? GetVisualStudioForSolutions(List<string> solutionNames)
         {
             foreach (string solution in solutionNames)
             {
-                Process visualStudioForSolution = GetVisualStudioForSolution(solution);
+                Process? visualStudioForSolution = GetVisualStudioForSolution(solution);
                 if (visualStudioForSolution != null)
                 {
                     return visualStudioForSolution;
@@ -141,24 +99,27 @@ namespace PnP.Scanning.Core.Services
         /// <returns>
         /// The visual studio <see cref="Process"/> with the specified solution name.
         /// </returns>
-        public static Process GetVisualStudioForSolution(string solutionName)
+        public static Process? GetVisualStudioForSolution(string solutionName)
         {
             IEnumerable<Process> visualStudios = GetVisualStudioProcesses();
 
             foreach (Process visualStudio in visualStudios)
             {
-                if (TryGetVsInstance(visualStudio.Id, out _DTE visualStudioInstance))
+                if (TryGetVsInstance(visualStudio.Id, out _DTE? visualStudioInstance))
                 {
                     try
                     {
-                        string actualSolutionName = Path.GetFileName(visualStudioInstance.Solution.FullName);
-
-                        if (string.Compare(
-                            actualSolutionName,
-                            solutionName,
-                            StringComparison.InvariantCultureIgnoreCase) == 0)
+                        if (visualStudioInstance != null)
                         {
-                            return visualStudio;
+                            string actualSolutionName = Path.GetFileName(visualStudioInstance.Solution.FullName);
+
+                            if (string.Compare(
+                                actualSolutionName,
+                                solutionName,
+                                StringComparison.InvariantCultureIgnoreCase) == 0)
+                            {
+                                return visualStudio;
+                            }
                         }
                     }
                     catch (Exception)
@@ -171,16 +132,13 @@ namespace PnP.Scanning.Core.Services
             return null;
         }
 
-        [DllImport("User32")]
-        private static extern int ShowWindow(int hwnd, int nCmdShow);
-
         private static IEnumerable<Process> GetVisualStudioProcesses()
         {
             Process[] processes = Process.GetProcesses();
             return processes.Where(o => o.ProcessName.Contains("devenv"));
         }
 
-        private static bool TryGetVsInstance(int processId, out _DTE instance)
+        private static bool TryGetVsInstance(int processId, out _DTE? instance)
         {
             IntPtr numFetched = IntPtr.Zero;
             IMoniker[] monikers = new IMoniker[1];
@@ -191,8 +149,7 @@ namespace PnP.Scanning.Core.Services
 
             while (monikerEnumerator.Next(1, monikers, numFetched) == 0)
             {
-                IBindCtx ctx;
-                CreateBindCtx(0, out ctx);
+                _ = CreateBindCtx(0, out IBindCtx ctx);
 
                 monikers[0].GetDisplayName(ctx, null, out string runningObjectName);
 

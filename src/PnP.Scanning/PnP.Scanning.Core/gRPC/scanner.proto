@@ -17,7 +17,8 @@ message StatusRequest {
 }
 
 message StatusReply {
-	bool Success = 1;
+	bool AllSiteCollectionsProcessed = 1;
+	int32 PendingSiteCollections = 2;
 }
 
 // StartStreaming

@@ -4,6 +4,9 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal sealed class TestScanner: ScannerBase
     {
+        private const int minDelay = 500;
+        private const int maxDelay = 10000;
+
         internal TestScanner(ILoggerFactory loggerFactory, string webUrl, TestOptions options) : base(loggerFactory.CreateLogger<TestScanner>())
         {
             WebUrl = webUrl;
@@ -17,15 +20,15 @@ namespace PnP.Scanning.Core.Scanners
         internal async override Task ExecuteAsync()
         {
             LogWarning($"Started for {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
-            int delay = new Random().Next(500, 1000);
+            int delay = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay);
 
             LogWarning($"Step 1 Delay {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
-            delay = new Random().Next(500, 1000);
+            delay = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay);
 
             LogWarning($"Step 2 Delay {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
-            delay = new Random().Next(500, 1000);
+            delay = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay);
 
             LogWarning($"Step 3 Delay {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");

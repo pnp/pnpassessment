@@ -17,4 +17,8 @@
 		<ProtoBuf Include=".\gRPC\scanner.proto" GrpcServices="Both" Link="Proto\scanner.proto" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Authentication\" />
+	</ItemGroup>
+
 </Project>

@@ -7,15 +7,14 @@ namespace PnP.Scanning.Core.Scanners
         internal ScannerBase(ILogger logger)
         {
             Logger = logger;
-
         }
+
         internal ILogger Logger { get; set; }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal virtual async Task ExecuteAsync()
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            // to override by the actual scanner
         }
 
         internal void LogWarning(string? message)

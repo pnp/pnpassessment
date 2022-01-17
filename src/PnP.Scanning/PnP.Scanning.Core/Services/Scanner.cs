@@ -14,9 +14,10 @@ namespace PnP.Scanning.Core.Services
     {        
         private readonly ILogger logger;
         private readonly SiteCollectionQueue siteCollectionQueue;
+        private readonly ScanManager scanManager;
         private readonly IHost kestrelWebServer;
 
-        public Scanner(ILoggerFactory loggerFactory, SiteCollectionQueue siteScanQueue, IHost host)
+        public Scanner(ILoggerFactory loggerFactory, SiteCollectionQueue siteScanQueue, ScanManager siteScanManager, IHost host)
         {
             // Configure logging
             logger = loggerFactory.CreateLogger<Scanner>();
@@ -24,6 +25,8 @@ namespace PnP.Scanning.Core.Services
             kestrelWebServer = host;
             // Site collection queue
             siteCollectionQueue = siteScanQueue;
+            // Scan manager
+            scanManager = siteScanManager;
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -31,7 +34,11 @@ namespace PnP.Scanning.Core.Services
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             logger.LogInformation($"Status {request.Message} received");
-            return new StatusReply() { Success = true };
+            return new StatusReply
+            { 
+                AllSiteCollectionsProcessed = scanManager.SiteCollectionsToScan - scanManager.SiteCollectionsScanned == 0,
+                PendingSiteCollections = scanManager.SiteCollectionsToScan - scanManager.SiteCollectionsScanned
+            };
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -84,16 +91,18 @@ namespace PnP.Scanning.Core.Services
             OptionsBase options = OptionsBase.FromGrpcInput(request);
 
             // 4. Start parallel execution per site collection
-            siteCollectionQueue.ConfigureQueue(1);
+            scanManager.SiteCollectionsToScan = sitesToScan.Count;
+
+            siteCollectionQueue.ConfigureQueue(4);
             foreach(var site in sitesToScan)
             {
                 await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site));
             }
-             
+
             await responseStream.WriteAsync(new StartStatus
             {
                 Status = "Sites to scan are queued up"
-            });
+            });            
         }
     }
 }
