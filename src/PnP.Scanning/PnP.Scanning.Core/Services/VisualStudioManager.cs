@@ -12,7 +12,7 @@ namespace PnP.Scanning.Core.Services
     /// <summary>
     /// Example taken from <a href="https://gist.github.com/3813175">this gist</a>.
     /// </summary>
-    internal static class VisualStudioAttacher
+    internal static class VisualStudioManager
     {
         [DllImport("ole32.dll")]
         public static extern int CreateBindCtx(int reserved, out IBindCtx ppbc);

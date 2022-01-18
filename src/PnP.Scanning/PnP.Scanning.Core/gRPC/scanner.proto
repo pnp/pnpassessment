@@ -4,6 +4,8 @@ import "google/protobuf/empty.proto";
 
 package PnP.Scanning.Core.Services;
 
+// Language guide: https://developers.google.com/protocol-buffers/docs/proto3
+
 service PnPScanner {
 	rpc Status (StatusRequest) returns (StatusReply);
 	rpc StartStreaming (StartRequest) returns (stream StartStatus);
@@ -17,8 +19,14 @@ message StatusRequest {
 }
 
 message StatusReply {
-	bool AllSiteCollectionsProcessed = 1;
-	int32 PendingSiteCollections = 2;
+	repeated ScanStatusReply Status = 1;
+}
+
+message ScanStatusReply {
+	string Id = 1;
+	string Status = 2;
+	int32 SiteCollectionsToScan = 3;
+	int32 SiteCollectionsScanned = 4;
 }
 
 // StartStreaming

@@ -16,7 +16,7 @@ namespace PnP.Scanning.Process.Commands
         {
             var cmd = new Command("status", "status of the current scan");
 
-            // Configure options for stop
+            // Configure options for status
 
             cmd.SetHandler(async () => await HandleStatusAsync());
 
@@ -26,14 +26,20 @@ namespace PnP.Scanning.Process.Commands
         private async Task HandleStatusAsync()
         {
             var status = await (await processManager.GetScannerClientAsync()).StatusAsync(new StatusRequest() { Message = "bla" });
-            if (status.AllSiteCollectionsProcessed)
+
+            if (status.Status.Count == 0)
             {
-                Console.WriteLine("Scanner is done!");
+                Console.WriteLine("There are no running scans anymore!");
             }
             else
             {
-                Console.WriteLine($"Scanner is still running, {status.PendingSiteCollections} pending scanning");
-            }            
+                Console.WriteLine($"There are {status.Status.Count} scans still running:");
+                foreach(var statusMesage in status.Status)
+                {
+                    double procentDone = (double)statusMesage.SiteCollectionsScanned / statusMesage.SiteCollectionsToScan * 100;
+                    Console.WriteLine($"Scan ({statusMesage.Id}) is {statusMesage.Status}, {statusMesage.SiteCollectionsScanned}/{statusMesage.SiteCollectionsToScan} ({procentDone}%) site collections done");
+                }
+            }
         }
     }
 }

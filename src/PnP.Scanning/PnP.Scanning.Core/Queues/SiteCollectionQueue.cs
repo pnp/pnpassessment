@@ -8,15 +8,18 @@ namespace PnP.Scanning.Core.Queues
     {
         // Queue containting the tasks to process
         private ActionBlock<SiteCollectionQueueItem>? siteCollectionsToScan;
-        private readonly ILoggerFactory loggerFactory;
+        private readonly ILoggerFactory loggerFactory;        
 
-        public SiteCollectionQueue(ILoggerFactory loggerFactory, ScanManager scanManager) : base(loggerFactory)
+        public SiteCollectionQueue(ILoggerFactory loggerFactory, ScanManager scanManager, Guid scanId) : base(loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             ScanManager = scanManager;
+            ScanId = scanId;
         }
 
         private ScanManager ScanManager { get; set; }
+
+        private Guid ScanId { get; set; }
 
         internal async Task EnqueueAsync(SiteCollectionQueueItem siteCollection)
         {
@@ -39,6 +42,9 @@ namespace PnP.Scanning.Core.Queues
 
         private async Task ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection)
         {
+            // Mark the scan status as running
+            ScanManager.UpdateScanStatus(ScanId, ScanStatus.Running);
+
             // Get the sub sites in the given site collection
             List<WebQueueItem> webToScan = new();
 
@@ -66,7 +72,7 @@ namespace PnP.Scanning.Core.Queues
             webQueue.WaitForCompletion();
 
             // Increase the site collections scanned in memory counter
-            ScanManager.SiteCollectionScanned();
+            ScanManager.SiteCollectionScanned(ScanId);
         }        
 
     }

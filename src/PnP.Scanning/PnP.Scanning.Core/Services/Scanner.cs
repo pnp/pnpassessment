@@ -2,8 +2,6 @@
 using Grpc.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using PnP.Scanning.Core.Queues;
-using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Services
 {
@@ -13,32 +11,23 @@ namespace PnP.Scanning.Core.Services
     internal sealed class Scanner : PnPScanner.PnPScannerBase
     {        
         private readonly ILogger logger;
-        private readonly SiteCollectionQueue siteCollectionQueue;
         private readonly ScanManager scanManager;
         private readonly IHost kestrelWebServer;
 
-        public Scanner(ILoggerFactory loggerFactory, SiteCollectionQueue siteScanQueue, ScanManager siteScanManager, IHost host)
+        public Scanner(ILoggerFactory loggerFactory, ScanManager siteScanManager, IHost host)
         {
             // Configure logging
             logger = loggerFactory.CreateLogger<Scanner>();
             // Kestrel
             kestrelWebServer = host;
-            // Site collection queue
-            siteCollectionQueue = siteScanQueue;
             // Scan manager
             scanManager = siteScanManager;
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             logger.LogInformation($"Status {request.Message} received");
-            return new StatusReply
-            { 
-                AllSiteCollectionsProcessed = scanManager.SiteCollectionsToScan - scanManager.SiteCollectionsScanned == 0,
-                PendingSiteCollections = scanManager.SiteCollectionsToScan - scanManager.SiteCollectionsScanned
-            };
+            return await scanManager.GetScanStatusAsync();
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -87,21 +76,12 @@ namespace PnP.Scanning.Core.Services
                 Status = "Sites to scan are defined"
             });
 
-            // 3. Get scan configuration
-            OptionsBase options = OptionsBase.FromGrpcInput(request);
-
-            // 4. Start parallel execution per site collection
-            scanManager.SiteCollectionsToScan = sitesToScan.Count;
-
-            siteCollectionQueue.ConfigureQueue(4);
-            foreach(var site in sitesToScan)
-            {
-                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site));
-            }
+            // 3. Start the scan
+            var scanId = await scanManager.StartScanAsync(request, sitesToScan);
 
             await responseStream.WriteAsync(new StartStatus
             {
-                Status = "Sites to scan are queued up"
+                Status = $"Sites to scan are queued up. Scan id = {scanId}"
             });            
         }
     }

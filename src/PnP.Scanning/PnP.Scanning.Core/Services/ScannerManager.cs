@@ -67,7 +67,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal void RegisterScanner(int port)
+        private void RegisterScanner(int port)
         {
             CurrentScannerPort = port;
         }
@@ -255,11 +255,11 @@ namespace PnP.Scanning.Core.Services
 #if DEBUG
         private static void AttachDebugger(Process processToAttachTo)
         {
-            var vsProcess = VisualStudioAttacher.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
+            var vsProcess = VisualStudioManager.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
 
             if (vsProcess != null)
             {
-                VisualStudioAttacher.AttachVisualStudioToProcess(vsProcess, processToAttachTo);
+                VisualStudioManager.AttachVisualStudioToProcess(vsProcess, processToAttachTo);
             }
             else
             {

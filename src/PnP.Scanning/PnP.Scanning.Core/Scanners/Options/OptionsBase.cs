@@ -4,7 +4,7 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class OptionsBase
     {
-        internal static OptionsBase FromGrpcInput(StartRequest request)
+        internal static OptionsBase FromScannerInput(StartRequest request)
         {
             var options = NewOptions(request.Mode);
 

@@ -71,10 +71,6 @@ namespace PnP.Scanning.Process
                 // Add and configure needed services
                 var host = ConfigureScannerHost(args, orchestratorPort);
 
-                // Register the port with the process manager as the part is passed down to the executors
-                var processManager = host.Services.GetRequiredService<ScannerManager>();
-                processManager.RegisterScanner(orchestratorPort);
-
                 Console.WriteLine($"Started scanner on port {orchestratorPort}");
 
                 await host.RunAsync();
@@ -110,9 +106,7 @@ namespace PnP.Scanning.Process
 
                       webBuilder.ConfigureServices(services =>
                       {
-                          services.AddSingleton<ScannerManager>();
                           services.AddSingleton<ScanManager>();
-                          services.AddSingleton<SiteCollectionQueue>();
                       });
 
                   })
