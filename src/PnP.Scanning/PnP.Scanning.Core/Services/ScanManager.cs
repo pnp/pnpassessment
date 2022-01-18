@@ -2,6 +2,7 @@
 
 namespace PnP.Scanning.Core.Services
 {
+    // Class for in memory tracking the running scans
     internal sealed class ScanManager
     {
         private readonly ILogger logger;

@@ -4,6 +4,9 @@ using System.Diagnostics;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Class responsible for getting a connection to an an up and running scanner process (= GRPC server)
+    /// </summary>
     internal sealed class ScannerManager
     {
         private readonly ILogger logger;
@@ -13,60 +16,11 @@ namespace PnP.Scanning.Core.Services
             logger = loggerFactory.CreateLogger<ScannerManager>();
         }
 
-        internal int DefaultScannerPort { get; } = 25010;
+        internal static string DefaultScannerHost { get; } = "http://localhost";
+
+        internal static int DefaultScannerPort { get; } = 25010;
 
         internal int CurrentScannerPort { get; private set; }           
-
-        internal async Task<int> LaunchScannerAsync()
-        {
-            int port = DefaultScannerPort;
-
-            // First check if we can identify an existing running scanning process
-            if (await CanConnectRunningScannerAsync(port))
-            {
-                RegisterScanner(port);
-                return port;
-            }
-            else
-            {
-                Console.WriteLine("No scanner found, starting one...");
-
-                ProcessStartInfo startInfo = new()
-                {
-                    FileName = "PnP.Scanning.Process.exe",
-                    Arguments = $"scanner {port}",
-                    UseShellExecute = true
-#if !DEBUG
-                ,WindowStyle = ProcessWindowStyle.Hidden
-#endif
-                };
-
-                Process? scannerProcess = Process.Start(startInfo);
-
-                if (scannerProcess != null && !scannerProcess.HasExited)
-                {
-                    RegisterScanner(port);
-
-#if DEBUG
-                    AttachDebugger(scannerProcess);
-#endif
-
-                    // perform a ping to verify when the grpc server is up
-                    await WaitForScannerToBeUpAsync(logger);
-
-                    return port;
-                }
-                else
-                {
-                    return -1;
-                }
-            }
-        }
-
-        internal void RegisterScanner(int port)
-        {
-            CurrentScannerPort = port;
-        }
 
         internal async Task<PnPScanner.PnPScannerClient> GetScannerClientAsync()
         {
@@ -109,6 +63,57 @@ namespace PnP.Scanning.Core.Services
                         // Seems like we didn't manage to get the server up and running
                         throw;
                     }
+                }
+            }
+        }
+
+        internal void RegisterScanner(int port)
+        {
+            CurrentScannerPort = port;
+        }
+
+        private async Task<int> LaunchScannerAsync()
+        {
+            int port = DefaultScannerPort;
+
+            // First check if we can identify an existing running scanning process
+            if (await CanConnectRunningScannerAsync(port))
+            {
+                RegisterScanner(port);
+                return port;
+            }
+            else
+            {
+                Console.WriteLine("No scanner found, starting one...");
+
+                ProcessStartInfo startInfo = new()
+                {
+                    FileName = "PnP.Scanning.Process.exe",
+                    Arguments = $"scanner {port}",
+                    UseShellExecute = true
+#if !DEBUG
+                    ,WindowStyle = ProcessWindowStyle.Hidden
+#endif
+                };
+
+                Process? scannerProcess = Process.Start(startInfo);
+
+                if (scannerProcess != null && !scannerProcess.HasExited)
+                {
+                    RegisterScanner(port);
+
+#if DEBUG
+                    AttachDebugger(scannerProcess);
+#endif
+
+                    // perform a ping to verify when the grpc server is up
+                    await WaitForScannerToBeUpAsync(logger);
+
+                    return port;
+                }
+                else
+                {
+                    return -1;
                 }
             }
         }
@@ -182,7 +187,7 @@ namespace PnP.Scanning.Core.Services
 
         private static PnPScanner.PnPScannerClient CreateClient(int port)
         {
-            return new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"http://localhost:{port}"));
+            return new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"{DefaultScannerHost}:{port}"));
         }
 
         private async static Task<PingReply?> PingScannerAsync(PnPScanner.PnPScannerClient client)
