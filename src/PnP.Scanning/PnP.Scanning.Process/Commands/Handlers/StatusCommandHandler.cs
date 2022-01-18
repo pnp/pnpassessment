@@ -5,9 +5,9 @@ namespace PnP.Scanning.Process.Commands
 {
     internal sealed class StatusCommandHandler
     {
-        private readonly ProcessManager processManager;
+        private readonly ScannerManager processManager;
 
-        public StatusCommandHandler(ProcessManager processManagerInstance)
+        public StatusCommandHandler(ScannerManager processManagerInstance)
         {
             processManager = processManagerInstance;
         }
@@ -25,7 +25,7 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStatusAsync()
         {
-            var status = await processManager.GetScannerClient().StatusAsync(new StatusRequest() { Message = "bla" });
+            var status = await (await processManager.GetScannerClientAsync()).StatusAsync(new StatusRequest() { Message = "bla" });
             if (status.AllSiteCollectionsProcessed)
             {
                 Console.WriteLine("Scanner is done!");

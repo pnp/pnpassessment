@@ -5,9 +5,9 @@ namespace PnP.Scanning.Process.Commands
 {
     internal sealed class StopCommandHandler
     {
-        private readonly ProcessManager processManager;
+        private readonly ScannerManager processManager;
 
-        public StopCommandHandler(ProcessManager processManagerInstance)
+        public StopCommandHandler(ScannerManager processManagerInstance)
         {
             processManager = processManagerInstance;
         }
@@ -28,7 +28,7 @@ namespace PnP.Scanning.Process.Commands
             try
             {
                 Console.WriteLine("Requesting the scanner server to shutdown...");
-                await processManager.GetScannerClient().StopAsync(new StopRequest() { Site = "bla" });
+                await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "bla" });
             }
             catch
             {

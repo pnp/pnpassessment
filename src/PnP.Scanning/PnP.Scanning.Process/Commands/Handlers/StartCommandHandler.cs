@@ -6,9 +6,9 @@ namespace PnP.Scanning.Process.Commands
 {
     internal class StartCommandHandler
     {
-        private readonly ProcessManager processManager;
+        private readonly ScannerManager processManager;
 
-        public StartCommandHandler(ProcessManager processManagerInstance)
+        public StartCommandHandler(ScannerManager processManagerInstance)
         {
             processManager = processManagerInstance;
         }
@@ -92,11 +92,8 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(StartOptions arguments)
         {
-            // Launch the scanner
-            await processManager.LaunchScannerProcessAsync();
-
-            // Setup grpc client to the scanner
-            var client = processManager.GetScannerClient();
+            // Setup client to talk to scanner
+            var client = await processManager.GetScannerClientAsync();
 
             // Kick off a scan
             var call = client.StartStreaming(new StartRequest() { Mode = arguments.Mode.ToString() });

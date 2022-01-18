@@ -27,7 +27,7 @@ namespace PnP.Scanning.Process
                 var host = ConfigureCliHost(args);
                 
                 // Get ProcessManager instance from the cli executable
-                var processManager = host.Services.GetRequiredService<ProcessManager>();
+                var processManager = host.Services.GetRequiredService<ScannerManager>();
 
                 if (args.Length == 0)
                 {
@@ -59,7 +59,7 @@ namespace PnP.Scanning.Process
                 // Launching PnP.Scanning.Process.exe as Kestrel web server to which we'll communicate via gRPC
 
                 // Get port on which the orchestrator has to listen
-                int orchestratorPort = ProcessManager.DefaultScannerPort;
+                int orchestratorPort = ScannerManager.DefaultScannerPort;
                 if (args.Length >= 2)
                 {
                     if (int.TryParse(args[1], out int providedPort))
@@ -69,13 +69,13 @@ namespace PnP.Scanning.Process
                 }
 
                 // Add and configure needed services
-                var host = ConfigureProcessHost(args, orchestratorPort);
+                var host = ConfigureScannerHost(args, orchestratorPort);
 
                 // Register the port with the process manager as the part is passed down to the executors
-                var processManager = host.Services.GetRequiredService<ProcessManager>();
-                processManager.RegisterScannerProcess(Environment.ProcessId, orchestratorPort);
+                var processManager = host.Services.GetRequiredService<ScannerManager>();
+                processManager.RegisterScanner(orchestratorPort);
 
-                Console.WriteLine($"Running scanner on port: {orchestratorPort}");
+                Console.WriteLine($"Started scanner on port {orchestratorPort}");
 
                 await host.RunAsync();
             }
@@ -87,13 +87,13 @@ namespace PnP.Scanning.Process
             return Host.CreateDefaultBuilder(args)
                        .ConfigureServices(services =>
                        {
-                           services.AddSingleton<ProcessManager>();
+                           services.AddSingleton<ScannerManager>();
                        })
                        .UseConsoleLifetime()
                        .Build();
         }
 
-        private static IHost ConfigureProcessHost(string[] args, int orchestratorPort)
+        private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)
                   .ConfigureWebHostDefaults(webBuilder =>
@@ -110,7 +110,7 @@ namespace PnP.Scanning.Process
 
                       webBuilder.ConfigureServices(services =>
                       {
-                          services.AddSingleton<ProcessManager>();
+                          services.AddSingleton<ScannerManager>();
                           services.AddSingleton<ScanManager>();
                           services.AddSingleton<SiteCollectionQueue>();
                       });

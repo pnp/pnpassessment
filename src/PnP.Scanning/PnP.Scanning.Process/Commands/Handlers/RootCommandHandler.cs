@@ -5,9 +5,9 @@ namespace PnP.Scanning.Process.Commands
 {
     internal sealed class RootCommandHandler
     {
-        private readonly ProcessManager processManager;
+        private readonly ScannerManager processManager;
 
-        public RootCommandHandler(ProcessManager processManagerInstance)
+        public RootCommandHandler(ScannerManager processManagerInstance)
         {
             processManager = processManagerInstance;
         }

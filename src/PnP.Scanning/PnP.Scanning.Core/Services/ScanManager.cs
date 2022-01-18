@@ -9,7 +9,7 @@ namespace PnP.Scanning.Core.Services
 
         public ScanManager(ILoggerFactory loggerFactory)
         {
-            logger = loggerFactory.CreateLogger<ProcessManager>();
+            logger = loggerFactory.CreateLogger<ScanManager>();
         }
 
         internal int SiteCollectionsToScan { get; set; }
