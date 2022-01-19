@@ -1,5 +1,6 @@
 ﻿using Grpc.Core;
 using PnP.Scanning.Core.Services;
+using PnP.Scanning.Process.Services;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -99,7 +100,7 @@ namespace PnP.Scanning.Process.Commands
             var call = client.StartStreaming(new StartRequest() { Mode = arguments.Mode.ToString() });
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
-                Console.WriteLine($"Status: {message.Status}");
+                ColorConsole.WriteInfo($"Status: {message.Status}");
             }
         }
     }

@@ -1,8 +1,9 @@
 ﻿using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
+using PnP.Scanning.Core.Services;
 using System.Diagnostics;
 
-namespace PnP.Scanning.Core.Services
+namespace PnP.Scanning.Process.Services
 {
     /// <summary>
     /// Class responsible for getting a connection to an an up and running scanner process (= GRPC server)
@@ -84,7 +85,7 @@ namespace PnP.Scanning.Core.Services
             }
             else
             {
-                Console.WriteLine("No scanner found, starting one...");
+                ColorConsole.WriteWarning("No scanner found, starting one...");
 
                 ProcessStartInfo startInfo = new()
                 {
@@ -96,7 +97,7 @@ namespace PnP.Scanning.Core.Services
 #endif
                 };
 
-                Process? scannerProcess = Process.Start(startInfo);
+                System.Diagnostics.Process? scannerProcess = System.Diagnostics.Process.Start(startInfo);
 
                 if (scannerProcess != null && !scannerProcess.HasExited)
                 {
@@ -139,10 +140,8 @@ namespace PnP.Scanning.Core.Services
                         isGrpcUpAndRunning = response.UpAndRunning;
                     }
                 }
-                catch (Exception ex)
+                catch 
                 {
-                    // Eat all exceptions
-                    logger.LogWarning($"Scanner ping failure: {ex.Message}");
                 }
             }
             while (!isGrpcUpAndRunning && retryAttempt <= 20);
@@ -155,7 +154,7 @@ namespace PnP.Scanning.Core.Services
 
         private static async Task<bool> CanConnectRunningScannerAsync(int port)
         {
-            Console.WriteLine($"Pinging scanner on port {port}...");
+            ColorConsole.WriteInfo($"Pinging scanner on port {port}...");
 
             var retryAttempt = 0;
             do
@@ -168,7 +167,7 @@ namespace PnP.Scanning.Core.Services
                     var response = await PingScannerAsync(client);
                     if (response != null && response.UpAndRunning)
                     {
-                        Console.WriteLine($"Scanner detected on {port}");
+                        ColorConsole.WriteInfo($"Scanner detected on {port}");
                         return true;
                     }
                 }
@@ -253,7 +252,7 @@ namespace PnP.Scanning.Core.Services
         #endregion
 
 #if DEBUG
-        private static void AttachDebugger(Process processToAttachTo)
+        private static void AttachDebugger(System.Diagnostics.Process processToAttachTo)
         {
             var vsProcess = VisualStudioManager.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
 

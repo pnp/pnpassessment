@@ -1,4 +1,5 @@
 ﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Process.Services;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -29,16 +30,23 @@ namespace PnP.Scanning.Process.Commands
 
             if (status.Status.Count == 0)
             {
-                Console.WriteLine("There are no running scans anymore!");
+                ColorConsole.WriteLine("There are no running scans anymore!", ConsoleColor.Green);
             }
             else
             {
-                Console.WriteLine($"There are {status.Status.Count} scans still running:");
-                foreach(var statusMesage in status.Status)
+                ColorConsole.WriteEmbeddedColorLine($"There are [green]{status.Status.Count}[/green] scans still running:");
+                ColorConsole.WriteLine("");
+                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
+                ColorConsole.WriteLine($"Scan id".PadRight(36) + " | Site collection scan status");
+                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
+
+                foreach (var statusMesage in status.Status)
                 {
                     double procentDone = (double)statusMesage.SiteCollectionsScanned / statusMesage.SiteCollectionsToScan * 100;
-                    Console.WriteLine($"Scan ({statusMesage.Id}) is {statusMesage.Status}, {statusMesage.SiteCollectionsScanned}/{statusMesage.SiteCollectionsToScan} ({procentDone}%) site collections done");
+                    ColorConsole.WriteEmbeddedColorLine(string.Format("{0} | [green]{1}[/green]/[green]{2}[/green] ([green]{3}%[/green]) site collections done", 
+                        statusMesage.Id, statusMesage.SiteCollectionsScanned, statusMesage.SiteCollectionsToScan, procentDone));
                 }
+                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
             }
         }
     }

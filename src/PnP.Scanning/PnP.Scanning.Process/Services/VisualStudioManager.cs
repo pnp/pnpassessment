@@ -4,9 +4,8 @@ using EnvDTE;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using DTEProcess = EnvDTE.Process;
-using Process = System.Diagnostics.Process;
 
-namespace PnP.Scanning.Core.Services
+namespace PnP.Scanning.Process.Services
 {
 
     /// <summary>
@@ -32,7 +31,7 @@ namespace PnP.Scanning.Core.Services
         /// <exception cref="InvalidOperationException">
         /// Thrown when the application process is null.
         /// </exception>
-        public static void AttachVisualStudioToProcess(Process visualStudioProcess, Process applicationProcess)
+        public static void AttachVisualStudioToProcess(System.Diagnostics.Process visualStudioProcess, System.Diagnostics.Process applicationProcess)
         {
             _DTE? visualStudioInstance;
 
@@ -76,11 +75,11 @@ namespace PnP.Scanning.Core.Services
         /// <returns>
         /// The <see cref="Process"/>.
         /// </returns>
-        public static Process? GetVisualStudioForSolutions(List<string> solutionNames)
+        public static System.Diagnostics.Process? GetVisualStudioForSolutions(List<string> solutionNames)
         {
             foreach (string solution in solutionNames)
             {
-                Process? visualStudioForSolution = GetVisualStudioForSolution(solution);
+                System.Diagnostics.Process? visualStudioForSolution = GetVisualStudioForSolution(solution);
                 if (visualStudioForSolution != null)
                 {
                     return visualStudioForSolution;
@@ -99,11 +98,11 @@ namespace PnP.Scanning.Core.Services
         /// <returns>
         /// The visual studio <see cref="Process"/> with the specified solution name.
         /// </returns>
-        public static Process? GetVisualStudioForSolution(string solutionName)
+        public static System.Diagnostics.Process? GetVisualStudioForSolution(string solutionName)
         {
-            IEnumerable<Process> visualStudios = GetVisualStudioProcesses();
+            IEnumerable<System.Diagnostics.Process> visualStudios = GetVisualStudioProcesses();
 
-            foreach (Process visualStudio in visualStudios)
+            foreach (System.Diagnostics.Process visualStudio in visualStudios)
             {
                 if (TryGetVsInstance(visualStudio.Id, out _DTE? visualStudioInstance))
                 {
@@ -132,9 +131,9 @@ namespace PnP.Scanning.Core.Services
             return null;
         }
 
-        private static IEnumerable<Process> GetVisualStudioProcesses()
+        private static IEnumerable<System.Diagnostics.Process> GetVisualStudioProcesses()
         {
-            Process[] processes = Process.GetProcesses();
+            System.Diagnostics.Process[] processes = System.Diagnostics.Process.GetProcesses();
             return processes.Where(o => o.ProcessName.Contains("devenv"));
         }
 

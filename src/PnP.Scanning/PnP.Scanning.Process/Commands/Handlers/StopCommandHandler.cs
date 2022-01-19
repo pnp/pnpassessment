@@ -1,4 +1,5 @@
 ﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Process.Services;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -27,7 +28,7 @@ namespace PnP.Scanning.Process.Commands
         {
             try
             {
-                Console.WriteLine("Requesting the scanner server to shutdown...");
+                ColorConsole.WriteWarning("Requesting the scanner server to shutdown...");
                 await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "bla" });
             }
             catch

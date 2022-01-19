@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PnP.Scanning.Core.Services;
-using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Process.Commands;
+using PnP.Scanning.Process.Services;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process
@@ -33,18 +33,17 @@ namespace PnP.Scanning.Process
                 {
                     // Sample input:
                     // start --mode test --authmode application --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1"
-                    Console.WriteLine("Welcome to the PnP Scanning CLI!");
-                    Console.WriteLine("--------------------------------");
-                    Console.WriteLine("");
-                    Console.WriteLine("Enter the command you want to execute (<enter> to quit):");
+                    ColorConsole.WriteWrappedHeader("Welcome to the PnP Scanning CLI!");
+                    ColorConsole.WriteInfo("");
+                    ColorConsole.WriteInfo("Enter the command you want to execute (<enter> to quit):");
                     var consoleInput = Console.ReadLine();
 
                     while (!string.IsNullOrEmpty(consoleInput))
                     {
                         await new RootCommandHandler(processManager).Create().InvokeAsync(consoleInput);
 
-                        Console.WriteLine("");
-                        Console.WriteLine("Enter the command you want to execute (<enter> to quit):");
+                        ColorConsole.WriteInfo("");
+                        ColorConsole.WriteInfo("Enter the command you want to execute (<enter> to quit):");
                         consoleInput = Console.ReadLine();
                     }
                 }
@@ -71,7 +70,7 @@ namespace PnP.Scanning.Process
                 // Add and configure needed services
                 var host = ConfigureScannerHost(args, orchestratorPort);
 
-                Console.WriteLine($"Started scanner on port {orchestratorPort}");
+                ColorConsole.WriteInfo($"Started scanner on port {orchestratorPort}");
 
                 await host.RunAsync();
             }

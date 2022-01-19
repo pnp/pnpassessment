@@ -70,17 +70,13 @@ namespace PnP.Scanning.Core.Services
 
             foreach (var runningScan in scans)
             {
-                // Only return status information for running scans
-                //if (runningScan.Value.SiteCollectionsToScan - runningScan.Value.SiteCollectionsScanned > 0)
-                //{
-                    statusReply.Status.Add(new ScanStatusReply
-                    {
-                        Id = runningScan.Value.Id.ToString(),
-                        Status = runningScan.Value.Status.ToString(),
-                        SiteCollectionsToScan = runningScan.Value.SiteCollectionsToScan,
-                        SiteCollectionsScanned = runningScan.Value.SiteCollectionsScanned,
-                    });
-                //}
+                statusReply.Status.Add(new ScanStatusReply
+                {
+                    Id = runningScan.Value.Id.ToString(),
+                    Status = runningScan.Value.Status.ToString(),
+                    SiteCollectionsToScan = runningScan.Value.SiteCollectionsToScan,
+                    SiteCollectionsScanned = runningScan.Value.SiteCollectionsScanned,
+                });
             }
 
             return statusReply;
