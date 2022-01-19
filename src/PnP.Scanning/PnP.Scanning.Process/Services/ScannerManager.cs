@@ -1,5 +1,4 @@
 ﻿using Grpc.Net.Client;
-using Microsoft.Extensions.Logging;
 using PnP.Scanning.Core.Services;
 using System.Diagnostics;
 
@@ -10,11 +9,8 @@ namespace PnP.Scanning.Process.Services
     /// </summary>
     internal sealed class ScannerManager
     {
-        private readonly ILogger logger;
-
-        public ScannerManager(ILoggerFactory loggerFactory)
+        public ScannerManager()
         {
-            logger = loggerFactory.CreateLogger<ScannerManager>();
         }
 
         internal static string DefaultScannerHost { get; } = "http://localhost";
@@ -108,7 +104,7 @@ namespace PnP.Scanning.Process.Services
 #endif
 
                     // perform a ping to verify when the grpc server is up
-                    await WaitForScannerToBeUpAsync(logger);
+                    await WaitForScannerToBeUpAsync();
 
                     return port;
                 }
@@ -119,7 +115,7 @@ namespace PnP.Scanning.Process.Services
             }
         }
 
-        private async Task WaitForScannerToBeUpAsync(ILogger logger)
+        private async Task WaitForScannerToBeUpAsync()
         {
             var client = CreateClient(CurrentScannerPort);
 
