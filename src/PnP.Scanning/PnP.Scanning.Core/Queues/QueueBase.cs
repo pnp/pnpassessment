@@ -1,30 +1,20 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Serilog;
 
 namespace PnP.Scanning.Core.Queues
 {
     internal abstract class QueueBase<T>
     {
-        internal QueueBase(ILoggerFactory loggerFactory)
+        internal QueueBase()
         {
-            Logger = loggerFactory.CreateLogger<T>();
             ParallelThreads = 1;
         }
-
-        internal ILogger Logger { get; set; }
 
         internal int ParallelThreads { get; set; }
 
         internal void ConfigureQueue(int parallelThreads)
         {
+            Log.Information("Configuring {ParallelThreads} parallel threads for this queue", parallelThreads);
             ParallelThreads = parallelThreads;
-        }
-
-        internal void LogWarning(string? message)
-        {
-            if (Logger != null && message != null)
-            {
-                Logger.LogWarning(message);
-            }
         }
     }
 }

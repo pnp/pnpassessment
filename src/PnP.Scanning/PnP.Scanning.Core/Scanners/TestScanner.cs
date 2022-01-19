@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Serilog;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -6,11 +6,11 @@ namespace PnP.Scanning.Core.Scanners
     {
         private const int minDelay = 500;
         private const int maxDelay = 10000;
-
-        internal TestScanner(ILoggerFactory loggerFactory, string webUrl, TestOptions options) : base(loggerFactory.CreateLogger<TestScanner>())
+        
+        internal TestScanner(Guid scanId, string webUrl, TestOptions options) : base(scanId)
         {
             WebUrl = webUrl;
-            Options = options;
+            Options = options;            
         }
 
         internal string WebUrl { get; set; }
@@ -18,20 +18,20 @@ namespace PnP.Scanning.Core.Scanners
         internal TestOptions Options { get; set; }
 
         internal async override Task ExecuteAsync()
-        {
-            LogWarning($"Started for {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
+        {            
+            Logger.Information("Started for {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
             int delay = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay);
 
-            LogWarning($"Step 1 Delay {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
+            Logger.Information("Step 1 Delay {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
             delay = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay);
 
-            LogWarning($"Step 2 Delay {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
+            Logger.Information("Step 2 Delay {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
             delay = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay);
 
-            LogWarning($"Step 3 Delay {WebUrl} ThreadId : {Environment.CurrentManagedThreadId}");
+            Logger.Information("Step 3 Delay {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
         }
     }
 }

@@ -1,5 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.Scanners;
+using Serilog;
 using System.Threading.Tasks.Dataflow;
 
 namespace PnP.Scanning.Core.Queues
@@ -9,12 +9,12 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<WebQueueItem>? websToScan;
 
-        private readonly ILoggerFactory loggerFactory;
-
-        public WebQueue(ILoggerFactory loggerFactory): base(loggerFactory)
+        public WebQueue(Guid scanId): base()
         {
-            this.loggerFactory = loggerFactory;
+            ScanId = scanId;
         }
+
+        private Guid ScanId { get; set; }
 
         internal async Task EnqueueAsync(WebQueueItem web)
         {
@@ -49,7 +49,7 @@ namespace PnP.Scanning.Core.Queues
             ScannerBase? scanner = null;
             if (web.OptionsBase is TestOptions testOptions)
             {
-                scanner = new TestScanner(loggerFactory, web.WebUrl, testOptions);
+                scanner = new TestScanner(ScanId, web.WebUrl, testOptions);
             }
 
             if (scanner != null)
@@ -58,7 +58,8 @@ namespace PnP.Scanning.Core.Queues
             }
             else
             {
-                throw new Exception("Unknown options class specified");
+                Log.Error("Unknown options class specified for scan {ScanId}", ScanId);
+                throw new Exception($"Unknown options class specified for scan {ScanId}");
             }
         }
         

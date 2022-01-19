@@ -1,7 +1,7 @@
 ﻿using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace PnP.Scanning.Core.Services
 {
@@ -10,14 +10,11 @@ namespace PnP.Scanning.Core.Services
     /// </summary>
     internal sealed class Scanner : PnPScanner.PnPScannerBase
     {        
-        private readonly ILogger logger;
         private readonly ScanManager scanManager;
         private readonly IHost kestrelWebServer;
 
-        public Scanner(ILoggerFactory loggerFactory, ScanManager siteScanManager, IHost host)
+        public Scanner(ScanManager siteScanManager, IHost host)
         {
-            // Configure logging
-            logger = loggerFactory.CreateLogger<Scanner>();
             // Kestrel
             kestrelWebServer = host;
             // Scan manager
@@ -26,7 +23,7 @@ namespace PnP.Scanning.Core.Services
 
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
         {
-            logger.LogInformation($"Status {request.Message} received");
+            Log.Information("Status {Message} received", request.Message);
             return await scanManager.GetScanStatusAsync();
         }
 
@@ -51,6 +48,7 @@ namespace PnP.Scanning.Core.Services
 
         public override async Task StartStreaming(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
         {
+            Log.Information("Starting scan");
             await responseStream.WriteAsync(new StartStatus
             {
                 Status = "Starting"
@@ -64,6 +62,7 @@ namespace PnP.Scanning.Core.Services
             });
 
             // 2. Build list of sites to scan
+            Log.Information("Building list of site collections to scan");
             List<string> sitesToScan = new();
 
             for (int i = 0; i < 10; i++)
@@ -71,18 +70,23 @@ namespace PnP.Scanning.Core.Services
                 sitesToScan.Add($"https://bertonline.sharepoint.com/sites/prov-{i}");
             }
 
+            Log.Information("Scan scope defined: {SitesToScan} site collections will be scanned", sitesToScan.Count);
+
             await responseStream.WriteAsync(new StartStatus
             {
                 Status = "Sites to scan are defined"
             });
 
             // 3. Start the scan
+            Log.Information("Launch scan job by enqueueing the sites to scan");
             var scanId = await scanManager.StartScanAsync(request, sitesToScan);
 
             await responseStream.WriteAsync(new StartStatus
             {
                 Status = $"Sites to scan are queued up. Scan id = {scanId}"
-            });            
+            });
+
+            Log.Information("Scan job started");
         }
     }
 }

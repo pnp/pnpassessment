@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Commands;
 using PnP.Scanning.Process.Services;
+using Serilog;
+using Serilog.Events;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process
@@ -55,24 +57,44 @@ namespace PnP.Scanning.Process
             }
             else
             {
-                // Launching PnP.Scanning.Process.exe as Kestrel web server to which we'll communicate via gRPC
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
+                Log.Logger = new LoggerConfiguration()
+                           .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                           .Enrich.FromLogContext()
+                           .WriteTo.Console()
+                           .WriteTo.File($"log_{timestamp}.txt")
+                           .CreateLogger();
 
-                // Get port on which the orchestrator has to listen
-                int orchestratorPort = ScannerManager.DefaultScannerPort;
-                if (args.Length >= 2)
+                try
                 {
-                    if (int.TryParse(args[1], out int providedPort))
+                    // Launching PnP.Scanning.Process.exe as Kestrel web server to which we'll communicate via gRPC
+                    // Get port on which the orchestrator has to listen
+                    int orchestratorPort = ScannerManager.DefaultScannerPort;
+                    if (args.Length >= 2)
                     {
-                        orchestratorPort = providedPort;
+                        if (int.TryParse(args[1], out int providedPort))
+                        {
+                            orchestratorPort = providedPort;
+                        }
                     }
+
+                    Log.Information($"Starting scanner on port {orchestratorPort}");
+
+                    // Add and configure needed services
+                    var host = ConfigureScannerHost(args, orchestratorPort);
+
+                    Log.Information($"Started scanner on port {orchestratorPort}");
+
+                    await host.RunAsync();
                 }
-
-                // Add and configure needed services
-                var host = ConfigureScannerHost(args, orchestratorPort);
-
-                ColorConsole.WriteInfo($"Started scanner on port {orchestratorPort}");
-
-                await host.RunAsync();
+                catch (Exception ex)
+                {
+                    Log.Fatal(ex, "Scanner terminated unexpectedly");
+                }
+                finally
+                {
+                    Log.CloseAndFlush();
+                }
             }
         }
 
@@ -91,6 +113,7 @@ namespace PnP.Scanning.Process
         private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)
+                  .UseSerilog() 
                   .ConfigureWebHostDefaults(webBuilder =>
                   {
                       webBuilder.UseStartup<Startup<Scanner>>();

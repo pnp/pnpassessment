@@ -1,5 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using PnP.Scanning.Core.Services;
+﻿using PnP.Scanning.Core.Services;
+using Serilog;
 using System.Threading.Tasks.Dataflow;
 
 namespace PnP.Scanning.Core.Queues
@@ -8,11 +8,9 @@ namespace PnP.Scanning.Core.Queues
     {
         // Queue containting the tasks to process
         private ActionBlock<SiteCollectionQueueItem>? siteCollectionsToScan;
-        private readonly ILoggerFactory loggerFactory;        
 
-        public SiteCollectionQueue(ILoggerFactory loggerFactory, ScanManager scanManager, Guid scanId) : base(loggerFactory)
+        public SiteCollectionQueue(ScanManager scanManager, Guid scanId) : base()
         {
-            this.loggerFactory = loggerFactory;
             ScanManager = scanManager;
             ScanId = scanId;
         }
@@ -31,9 +29,13 @@ namespace PnP.Scanning.Core.Queues
                     MaxDegreeOfParallelism = ParallelThreads,
                 };
 
+                Log.Information("Configuring site collection queue for scan {ScanId} with {MaxDegreeOfParallelism} max degree of parallelism", ScanId, executionDataflowBlockOptions.MaxDegreeOfParallelism);
+
                 // Configure the site collection scanning queue
                 siteCollectionsToScan = new ActionBlock<SiteCollectionQueueItem>(async (siteCollection) => await ProcessSiteCollectionAsync(siteCollection)
                                                                 , executionDataflowBlockOptions);
+
+                Log.Information("site collection queue for scan {ScanId} setup", ScanId);
             }
             
             // Send the request into the queue
@@ -49,7 +51,7 @@ namespace PnP.Scanning.Core.Queues
             List<WebQueueItem> webToScan = new();
 
             int numberOfWebs = new Random().Next(10);
-            Logger.LogWarning($"Number of webs to scan: {numberOfWebs}");
+            Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs);
 
             for (int i = 0; i < numberOfWebs; i++)
             {
@@ -59,7 +61,7 @@ namespace PnP.Scanning.Core.Queues
             }
 
             // Start parallel execution per web in this site collection
-            var webQueue = new WebQueue(loggerFactory);
+            var webQueue = new WebQueue(ScanId);
             // Use two parallel threads per running site collection task for processing the webs
             webQueue.ConfigureQueue(2);
 

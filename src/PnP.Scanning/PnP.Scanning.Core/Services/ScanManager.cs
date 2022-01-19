@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
-using PnP.Scanning.Core.Queues;
+﻿using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
+using Serilog;
 using System.Collections.Concurrent;
 
 namespace PnP.Scanning.Core.Services
@@ -9,15 +9,10 @@ namespace PnP.Scanning.Core.Services
     internal sealed class ScanManager
     {
         private object updateLock = new object();
-        private readonly ILoggerFactory loggerFactory;
-        private readonly ILogger logger;
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(ILoggerFactory loggerFactory)
+        public ScanManager()
         {
-            this.loggerFactory = loggerFactory;
-            logger = loggerFactory.CreateLogger<ScanManager>();
-
             // Launch a thread that will monitor and update the list of scans
             Task.Run(() => AutoUpdateRunningScans());
         }
@@ -26,15 +21,20 @@ namespace PnP.Scanning.Core.Services
 
         internal async Task<Guid> StartScanAsync(StartRequest start, List<string> siteCollectionList)
         {
+            Log.Information("Starting the scan job");
+
             if (NumberOfScansRunning() >= MaxParallelScans)
             {
+                Log.Error("Max number of parallel scans reached");
                 throw new Exception("Max number of parallel scans reached");
             }
 
             Guid scanId = Guid.NewGuid();
 
+            Log.Information("Scan id is {ScanId}", scanId);
+
             // Launch a queue to handle this scan
-            var siteCollectionQueue = new SiteCollectionQueue(loggerFactory, this, scanId);
+            var siteCollectionQueue = new SiteCollectionQueue(this, scanId);
 
             // Configure the queue
             siteCollectionQueue.ConfigureQueue(4);
@@ -42,11 +42,14 @@ namespace PnP.Scanning.Core.Services
             // Get the scan configuration options to use
             OptionsBase options = OptionsBase.FromScannerInput(start);
 
+            Log.Information("Start enqueuing {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
             // Enqueue the received site collections
             foreach (var site in siteCollectionList)
             {
                 await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site));
             }
+
+            Log.Information("Enqueued {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
 
             var scan = new Scan(scanId, siteCollectionQueue, options)
             {
@@ -56,8 +59,11 @@ namespace PnP.Scanning.Core.Services
 
             if (!scans.TryAdd(scanId, scan))
             {
+                Log.Error("Scan request was not added to the list of running scans");
                 throw new Exception("Scan request was not added to the list of running scans");
             }
+
+            Log.Information("Scan started for scan {ScanId}!", scanId);
 
             return scanId;
         }
@@ -84,6 +90,8 @@ namespace PnP.Scanning.Core.Services
 
         internal void UpdateScanStatus(Guid scanId, ScanStatus scanStatus)
         {
+            Log.Information("Updating scan status for scan {ScanId} to {ScanStatus}", scanId, scanStatus);
+
             lock (updateLock)
             {
                 scans[scanId].Status = scanStatus;
@@ -93,6 +101,7 @@ namespace PnP.Scanning.Core.Services
         internal void SiteCollectionScanned(Guid scanId)
         {
             scans[scanId].SiteCollectionWasScanned();
+            Log.Information("A site collection was fully scanned for scan {ScanId}", scanId);
         }
 
         internal int NumberOfScansRunning()
