@@ -1,4 +1,5 @@
 ﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Threading.Tasks.Dataflow;
 
@@ -9,7 +10,7 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<SiteCollectionQueueItem>? siteCollectionsToScan;
 
-        public SiteCollectionQueue(ScanManager scanManager, Guid scanId) : base()
+        public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId) : base(storageManager)
         {
             ScanManager = scanManager;
             ScanId = scanId;
@@ -45,23 +46,36 @@ namespace PnP.Scanning.Core.Queues
         private async Task ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection)
         {
             // Mark the scan status as running
-            ScanManager.UpdateScanStatus(ScanId, ScanStatus.Running);
+            ScanManager.UpdateScanStatus(ScanId, Services.ScanStatus.Running);
+
+            await StorageManager.StartSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
 
             // Get the sub sites in the given site collection
             List<WebQueueItem> webToScan = new();
+            List<string> webUrlsToScan = new();
 
+            // Add root web
+            webUrlsToScan.Add($"/");
+            webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
+                                           siteCollection.SiteCollectionUrl,
+                                           $"/"));
+
+            // Randomly add up to 10 sub sites
             int numberOfWebs = new Random().Next(10);
-            Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs);
+            Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs + 1);
 
             for (int i = 0; i < numberOfWebs; i++)
             {
+                webUrlsToScan.Add($"/subsite{i}");
                 webToScan.Add(new WebQueueItem(siteCollection.OptionsBase, 
                                                siteCollection.SiteCollectionUrl, 
-                                               $"{siteCollection.SiteCollectionUrl}/subsite{i}"));
+                                               $"/subsite{i}"));
             }
 
+            await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan);
+
             // Start parallel execution per web in this site collection
-            var webQueue = new WebQueue(ScanId);
+            var webQueue = new WebQueue(StorageManager, ScanId);
             // Use two parallel threads per running site collection task for processing the webs
             webQueue.ConfigureQueue(2);
 
@@ -75,6 +89,8 @@ namespace PnP.Scanning.Core.Queues
 
             // Increase the site collections scanned in memory counter
             ScanManager.SiteCollectionScanned(ScanId);
+
+            await StorageManager.EndSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
         }        
 
     }

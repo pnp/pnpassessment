@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Process.Commands;
 using PnP.Scanning.Process.Services;
 using Serilog;
@@ -57,6 +58,9 @@ namespace PnP.Scanning.Process
             }
             else
             {
+                // Tracking issue
+                // https://github.com/serilog/serilog-expressions/issues/60
+
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
                 Log.Logger = new LoggerConfiguration()
                            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -128,6 +132,7 @@ namespace PnP.Scanning.Process
 
                       webBuilder.ConfigureServices(services =>
                       {
+                          services.AddSingleton<StorageManager>();
                           services.AddSingleton<ScanManager>();
                       });
 

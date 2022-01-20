@@ -42,7 +42,7 @@ namespace PnP.Scanning.Process.Commands
 
                 foreach (var statusMesage in status.Status)
                 {
-                    double procentDone = (double)statusMesage.SiteCollectionsScanned / statusMesage.SiteCollectionsToScan * 100;
+                    double procentDone = Math.Round((double)statusMesage.SiteCollectionsScanned / statusMesage.SiteCollectionsToScan * 100);
                     ColorConsole.WriteEmbeddedColorLine(string.Format("{0} | [green]{1}[/green]/[green]{2}[/green] ([green]{3}%[/green]) site collections done", 
                         statusMesage.Id, statusMesage.SiteCollectionsScanned, statusMesage.SiteCollectionsToScan, procentDone));
                 }

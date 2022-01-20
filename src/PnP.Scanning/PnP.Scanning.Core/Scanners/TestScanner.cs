@@ -1,4 +1,4 @@
-﻿using Serilog;
+﻿using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -7,7 +7,7 @@ namespace PnP.Scanning.Core.Scanners
         private const int minDelay = 500;
         private const int maxDelay = 10000;
         
-        internal TestScanner(Guid scanId, string webUrl, TestOptions options) : base(scanId)
+        internal TestScanner(StorageManager storageManager, Guid scanId, string webUrl, TestOptions options) : base(storageManager, scanId)
         {
             WebUrl = webUrl;
             Options = options;            

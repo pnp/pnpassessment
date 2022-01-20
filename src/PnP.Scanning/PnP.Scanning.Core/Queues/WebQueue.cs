@@ -1,4 +1,5 @@
 ﻿using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Threading.Tasks.Dataflow;
 
@@ -9,7 +10,7 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<WebQueueItem>? websToScan;
 
-        public WebQueue(Guid scanId): base()
+        public WebQueue(StorageManager storageManager, Guid scanId): base(storageManager)
         {
             ScanId = scanId;
         }
@@ -46,10 +47,12 @@ namespace PnP.Scanning.Core.Queues
 
         private async Task ProcessWebAsync(WebQueueItem web)
         {
+            await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
+
             ScannerBase? scanner = null;
             if (web.OptionsBase is TestOptions testOptions)
             {
-                scanner = new TestScanner(ScanId, web.WebUrl, testOptions);
+                scanner = new TestScanner(StorageManager, ScanId, web.WebUrl, testOptions);
             }
 
             if (scanner != null)
@@ -61,6 +64,8 @@ namespace PnP.Scanning.Core.Queues
                 Log.Error("Unknown options class specified for scan {ScanId}", ScanId);
                 throw new Exception($"Unknown options class specified for scan {ScanId}");
             }
+
+            await StorageManager.EndWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
         }
         
     }

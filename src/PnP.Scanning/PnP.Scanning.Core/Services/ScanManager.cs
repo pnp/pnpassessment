@@ -1,5 +1,6 @@
 ﻿using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Collections.Concurrent;
 
@@ -11,11 +12,15 @@ namespace PnP.Scanning.Core.Services
         private object updateLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager()
+        public ScanManager(StorageManager storageManager)
         {
+            StorageManager = storageManager;
+
             // Launch a thread that will monitor and update the list of scans
-            Task.Run(() => AutoUpdateRunningScans());
+            Task.Run(async () => await AutoUpdateRunningScansAsync());
         }
+
+        internal StorageManager StorageManager { get; private set; }
 
         internal int MaxParallelScans { get; private set; } = 3;
 
@@ -33,8 +38,10 @@ namespace PnP.Scanning.Core.Services
 
             Log.Information("Scan id is {ScanId}", scanId);
 
+            await StorageManager.LaunchNewScanAsync(scanId, siteCollectionList);
+
             // Launch a queue to handle this scan
-            var siteCollectionQueue = new SiteCollectionQueue(this, scanId);
+            var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
             // Configure the queue
             siteCollectionQueue.ConfigureQueue(4);
@@ -119,12 +126,12 @@ namespace PnP.Scanning.Core.Services
             return running;
         }
 
-        private void AutoUpdateRunningScans()
+        private async Task AutoUpdateRunningScansAsync()
         {
             bool busy = true;
             while (busy)
             {
-                Thread.Sleep(TimeSpan.FromMilliseconds(500));
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
 
                 foreach (var scan in scans.ToList())
                 {
@@ -132,6 +139,8 @@ namespace PnP.Scanning.Core.Services
                          scan.Value.SiteCollectionsScanned == scan.Value.SiteCollectionsToScan)
                     {
                         UpdateScanStatus(scan.Value.Id, ScanStatus.Finished);
+
+                        await StorageManager.EndScanAsync(scan.Value.Id);
                     }
                 }
 

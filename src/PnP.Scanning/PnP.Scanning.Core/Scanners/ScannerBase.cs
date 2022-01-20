@@ -1,16 +1,18 @@
-﻿using Serilog;
+﻿using PnP.Scanning.Core.Storage;
+using Serilog;
 
 namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class ScannerBase
     {
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-        internal ScannerBase(Guid scanId)
-#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+        internal ScannerBase(StorageManager storageManager, Guid scanId)
         {
+            StorageManager = storageManager;
             ScanId = scanId;
             Logger = Log.ForContext("ScanId", scanId);
         }
+
+        internal StorageManager StorageManager { get; private set; }
 
         internal Guid ScanId { get; set; }
 
