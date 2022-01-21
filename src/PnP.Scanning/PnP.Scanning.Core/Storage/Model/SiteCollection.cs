@@ -11,7 +11,5 @@
         public DateTime EndDate { get; set; }
 
         public ScanStatus Status { get; set; }
-
-        public List<Web> Webs { get; set; } = new();
     }
 }

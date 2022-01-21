@@ -8,18 +8,25 @@ namespace PnP.Scanning.Core.Scanners
         {
             var options = NewOptions(request.Mode);
 
+#if DEBUG
             // Assign other inputs
-            // ...
+            if (request.Mode.Equals("test", StringComparison.OrdinalIgnoreCase))
+            {
+                (options as TestOptions).TestNumberOfSites = int.Parse(request.Properties.First().Value);
+            }
+#endif
 
             return options;
         }
 
         private static OptionsBase NewOptions(string mode)
         {
+#if DEBUG
             if (mode.Equals("test", StringComparison.OrdinalIgnoreCase))
             {
                 return new TestOptions();
             }
+#endif
 
             throw new Exception("Unsupported scan mode passed in");
         }

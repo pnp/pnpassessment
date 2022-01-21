@@ -21,5 +21,9 @@
         public FileInfo? CertFile { get; set; }
 
         public string? CertPassword { get; set; }
+
+#if DEBUG
+        public int TestNumberOfSites { get; set; }
+#endif
     }
 }

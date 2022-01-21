@@ -67,20 +67,32 @@ namespace PnP.Scanning.Core.Services
             // 2. Build list of sites to scan
             List<string> sitesToScan = await siteEnumerationManager.EnumerateSiteCollectionsToScanAsync(request);
 
-            await responseStream.WriteAsync(new StartStatus
+            if (sitesToScan.Count == 0)
             {
-                Status = "Sites to scan are defined"
-            });
+                await responseStream.WriteAsync(new StartStatus
+                {
+                    Status = "No sites to scan defined"
+                });
 
-            // 3. Start the scan
-            var scanId = await scanManager.StartScanAsync(request, sitesToScan);
-
-            await responseStream.WriteAsync(new StartStatus
+                Log.Information("No sites to scan defined");
+            }
+            else
             {
-                Status = $"Sites to scan are queued up. Scan id = {scanId}"
-            });
+                await responseStream.WriteAsync(new StartStatus
+                {
+                    Status = "Sites to scan are defined"
+                });
 
-            Log.Information("Scan job started");
+                // 3. Start the scan
+                var scanId = await scanManager.StartScanAsync(request, sitesToScan);
+
+                await responseStream.WriteAsync(new StartStatus
+                {
+                    Status = $"Sites to scan are queued up. Scan id = {scanId}"
+                });
+
+                Log.Information("Scan job started");
+            }
         }
     }
 }

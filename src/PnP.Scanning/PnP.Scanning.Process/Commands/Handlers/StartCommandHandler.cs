@@ -1,4 +1,5 @@
 ﻿using Grpc.Core;
+using PnP.Scanning.Core;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
 using System.CommandLine;
@@ -20,6 +21,10 @@ namespace PnP.Scanning.Process.Commands
         private Option<string> certPathOption;
         private Option<FileInfo> certPfxFileInfoOption;
         private Option<string> certPfxFilePasswordOption;
+#if DEBUG
+        // Specific options for the test handler
+        private Option<int> testNumberOfSitesOption;
+#endif
 
         public StartCommandHandler(ScannerManager processManagerInstance)
         {
@@ -33,7 +38,7 @@ namespace PnP.Scanning.Process.Commands
 
             // Scanner mode
             modeOption = new(
-                name: "--mode",
+                name: $"--{Constants.StartMode}",
                 getDefaultValue: () => Mode.Test,
                 description: "Scanner mode"
                 )
@@ -43,7 +48,7 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(modeOption);
 
             tenantOption = new(
-                name: "--tenant", 
+                name: $"--{Constants.StartTenant}",
                 description: "Name of the tenant that will be scanned (e.g. contoso.sharepoint.com)")
             {
                 IsRequired = false
@@ -51,7 +56,7 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(tenantOption);
 
             environmentOption = new(
-                name: "--environment",
+                name: $"--{Constants.StartEnvironment}",
                 getDefaultValue: () => Microsoft365Environment.Production,
                 description: "The cloud environment you're scanning")
             {
@@ -60,7 +65,7 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(environmentOption);
 
             sitesListOption = new(
-                name: "--siteslist",
+                name: $"--{Constants.StartSitesList}",
                 parseArgument: (result) =>
                 {
                     // https://github.com/dotnet/command-line-api/issues/1287
@@ -69,14 +74,14 @@ namespace PnP.Scanning.Process.Commands
 #pragma warning restore CS8604 // Possible null reference argument.
                     if (siteFile != null)
                     {
-                        result.ErrorMessage = "the --siteslist option is mutually exclusive with the --sitesfile option";
+                        result.ErrorMessage = $"the --{Constants.StartSitesList} option is mutually exclusive with the --{Constants.StartSitesFile} option";
 #pragma warning disable CS8603 // Possible null reference return.
                         return null;
 #pragma warning restore CS8603 // Possible null reference return.
                     }
 
                     return result.Tokens.Select(t => t.Value).ToList();
-                }, 
+                },
                 description: "List with site collections to scan")
             {
                 IsRequired = false
@@ -84,13 +89,13 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(sitesListOption);
 
             sitesFileOption = new(
-                name: "--sitesfile",
+                name: $"--{Constants.StartSitesFile}",
                 parseArgument: (result) =>
                 {
                     var siteList = result.FindResultFor(sitesListOption);
                     if (siteList != null)
                     {
-                        result.ErrorMessage = "the --sitesfile option is mutually exclusive with the --siteslist option";
+                        result.ErrorMessage = $"the --{Constants.StartSitesFile} option is mutually exclusive with the --{Constants.StartSitesList} option";
 #pragma warning disable CS8603 // Possible null reference return.
                         return null;
 #pragma warning restore CS8603 // Possible null reference return.
@@ -112,7 +117,7 @@ namespace PnP.Scanning.Process.Commands
 
             // Authentication mode
             authenticationModeOption = new(
-                    name: "--authmode",
+                    name: $"--{Constants.StartAuthMode}",
                     getDefaultValue: () => AuthenticationMode.Interactive,
                     description: "Authentication mode used for the scan")
             {
@@ -123,7 +128,7 @@ namespace PnP.Scanning.Process.Commands
 
             // Application id
             applicationIdOption = new(
-                name: "--applicationid",
+                name: $"--{Constants.StartApplicationId}",
                 // Default application to use is the PnP Management shell application
                 getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
                 description: "Azure AD application id to use for authenticating the scan")
@@ -134,14 +139,14 @@ namespace PnP.Scanning.Process.Commands
 
             // Certificate path
             certPathOption = new(
-                name: "--certpath",
+                name: $"--{Constants.StartCertPath}",
                 parseArgument: (result) =>
                 {
                     // https://github.com/dotnet/command-line-api/issues/1287
                     var authenticationMode = result.FindResultFor(authenticationModeOption);
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
-                        result.ErrorMessage = "--certpath can only be used with --authmode application";
+                        result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
                         return "";
                     }
 
@@ -158,24 +163,24 @@ namespace PnP.Scanning.Process.Commands
                 string? input = val.GetValueOrDefault<string>();
                 if (input != null && input.Split("|", StringSplitOptions.RemoveEmptyEntries).Length == 3)
                 {
-                    return null;
+                    return "";
                 }
                 else
                 {
-                    return "Invalid certpath value";
+                    return $"Invalid --{Constants.StartCertPath} value";
                 }
             });
             cmd.AddOption(certPathOption);
 
             // Certificate PFX file
             certPfxFileInfoOption = new(
-                name: "--certfile",
+                name: $"--{Constants.StartCertFile}",
                 parseArgument: (result) =>
                 {
                     var authenticationMode = result.FindResultFor(authenticationModeOption);
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
-                        result.ErrorMessage = "--certpath can only be used with --authmode application";
+                        result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
 #pragma warning disable CS8603 // Possible null reference return.
                         return null;
 #pragma warning restore CS8603 // Possible null reference return.
@@ -184,7 +189,7 @@ namespace PnP.Scanning.Process.Commands
 #pragma warning disable CS8604 // Possible null reference argument.
                     if (result.FindResultFor(certPfxFilePasswordOption) is { })
                     {
-                        result.ErrorMessage = "using --certfile also requires using --certpassword";
+                        result.ErrorMessage = $"using --{Constants.StartCertFile} also requires using --{Constants.StartCertPassword}";
 #pragma warning disable CS8603 // Possible null reference return.
                         return null;
 #pragma warning restore CS8603 // Possible null reference return.
@@ -204,19 +209,19 @@ namespace PnP.Scanning.Process.Commands
 
             // Certificate PFX file password
             certPfxFilePasswordOption = new(
-                name: "--certpassword",
+                name: $"--{Constants.StartCertPassword}",
                 parseArgument: (result) =>
                 {
                     var authenticationMode = result.FindResultFor(authenticationModeOption);
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
-                        result.ErrorMessage = "--certpassword can only be used with --authmode application";
+                        result.ErrorMessage = $"--{Constants.StartCertPassword} can only be used with --{Constants.StartAuthMode} application";
                         return "";
                     }
 
                     if (result.FindResultFor(certPfxFileInfoOption) is { })
                     {
-                        result.ErrorMessage = "using --certpassword also requires using --certfile";
+                        result.ErrorMessage = $"using --{Constants.StartCertPassword} also requires using --{Constants.StartCertFile}";
                         return "";
                     }
 
@@ -227,6 +232,40 @@ namespace PnP.Scanning.Process.Commands
                 IsRequired = false
             };
             cmd.AddOption(certPfxFilePasswordOption);
+
+            #endregion
+
+            #region Scan component specific handlers
+
+#if DEBUG
+            testNumberOfSitesOption = new(
+                name: $"--{Constants.StartTestNumberOfSites}",
+                parseArgument: (result) =>
+                {
+                    var mode = result.FindResultFor(modeOption);
+                    if (mode != null && mode.GetValueOrDefault<Mode>() != Mode.Test)
+                    {
+                        result.ErrorMessage = $"--{Constants.StartTestNumberOfSites} can only be used with --{Constants.StartMode} test";
+                        return 10;
+                    }
+
+                    int numberOfSites = int.Parse(result.Tokens[0].Value);
+
+                    // Set default value if needed
+                    if (numberOfSites <= 0)
+                    {
+                        numberOfSites = 10;
+                    }
+
+                    return numberOfSites;
+                },
+                description: "Number of site collections to emulate for dummy scanning")
+            {
+                IsRequired = false
+            };
+            testNumberOfSitesOption.SetDefaultValue(10);
+            cmd.AddOption(testNumberOfSitesOption);
+#endif
 
             #endregion
 
@@ -253,7 +292,11 @@ namespace PnP.Scanning.Process.Commands
 
             // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
-                                              authenticationModeOption, applicationIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption);
+                                              authenticationModeOption, applicationIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption
+#if DEBUG                                              
+                                              , testNumberOfSitesOption
+#endif
+                                              );
             cmd.SetHandler(async (StartOptions arguments) =>
             {
                 await HandleStartAsync(arguments);
@@ -269,16 +312,30 @@ namespace PnP.Scanning.Process.Commands
             var client = await processManager.GetScannerClientAsync();
 
             // Kick off a scan
-            var call = client.StartStreaming(new StartRequest
-            { 
+            var start = new StartRequest
+            {
                 Mode = arguments.Mode.ToString(),
                 Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
                 Environment = arguments.Environment.ToString(),
-                SitesList = arguments.SitesList !=  null ? string.Join(",", arguments.SitesList) : "",
+                SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
                 SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName.ToString() : "",
                 AuthMode = arguments.AuthMode.ToString(),
                 ApplicationId = arguments.ApplicationId.ToString(),
-            });
+            };
+
+#if DEBUG
+            if (arguments.Mode == Mode.Test)
+            {
+                start.Properties.Add(new PropertyRequest
+                {
+                    Property = testNumberOfSitesOption.Name.TrimStart('-'),
+                    Type = "int",
+                    Value = arguments.TestNumberOfSites.ToString(),
+                });
+            }
+#endif
+
+            var call = client.StartStreaming(start);
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
                 ColorConsole.WriteInfo($"Status: {message.Status}");

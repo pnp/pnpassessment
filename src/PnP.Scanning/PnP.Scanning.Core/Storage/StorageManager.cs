@@ -30,6 +30,20 @@ namespace PnP.Scanning.Core.Storage
                     CLIApplicationId = start.ApplicationId,
                 });
 
+                if (start.Properties.Count > 0)
+                {
+                    foreach(var property in start.Properties)
+                    {
+                        dbContext.Properties.Add(new Property
+                        {
+                            ScanId = scanId,
+                            Name = property.Property,
+                            Type = property.Type,
+                            Value = property.Value
+                        });
+                    }
+                }
+
                 await dbContext.SaveChangesAsync();
 
                 // Perform bulk insert to increase performance
@@ -142,7 +156,9 @@ namespace PnP.Scanning.Core.Storage
                 var siteToUpdate = dbContext.SiteCollections.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    siteToUpdate.Status = ScanStatus.Finished;
+                    var failedWeb = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == ScanStatus.Failed);
+
+                    siteToUpdate.Status = failedWeb != null ? ScanStatus.Failed : ScanStatus.Finished;
                     siteToUpdate.EndDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
@@ -175,7 +191,29 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        private async Task CheckPointDatabaseAsync(ScanContext? dbContext)
+        internal async Task EndWebScanWithErrorAsync(Guid scanId, string siteCollectionUrl, string webUrl, Exception ex)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                if (webToUpdate != null)
+                {
+                    webToUpdate.Status = ScanStatus.Failed;
+                    webToUpdate.EndDate = DateTime.Now;
+                    webToUpdate.Error = ex?.Message;
+                    webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
+
+                    await dbContext.SaveChangesAsync();
+                }
+                else
+                {
+                    Log.Error("No web row for {SiteCollectionUrl}{WebUrl} found to update", siteCollectionUrl, webUrl);
+                    throw new Exception($"No web row for {siteCollectionUrl}{webUrl} found to update");
+                }
+            }
+        }
+
+        internal async Task CheckPointDatabaseAsync(ScanContext? dbContext)
         {
             if (dbContext != null)
             {
@@ -189,6 +227,32 @@ namespace PnP.Scanning.Core.Storage
         {
             return Path.Join(AppDomain.CurrentDomain.BaseDirectory, scanId.ToString());
         }
+
+        #region Scanner specific operations
+
+#if DEBUG
+
+        internal async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                dbContext.TestDelays.Add(new TestDelay
+                {
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = webUrl,
+                    Delay1 = delay1,
+                    Delay2 = delay2,
+                    Delay3 = delay3,
+                });
+
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
+#endif
+
+        #endregion
 
     }
 }

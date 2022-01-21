@@ -52,20 +52,29 @@ namespace PnP.Scanning.Core.Queues
             ScannerBase? scanner = null;
             if (web.OptionsBase is TestOptions testOptions)
             {
-                scanner = new TestScanner(StorageManager, ScanId, web.WebUrl, testOptions);
+                scanner = new TestScanner(StorageManager, ScanId, web.SiteCollectionUrl, web.WebUrl, testOptions);
             }
 
-            if (scanner != null)
-            {
-                await scanner.ExecuteAsync();
-            }
-            else
+            if (scanner == null)
             {
                 Log.Error("Unknown options class specified for scan {ScanId}", ScanId);
                 throw new Exception($"Unknown options class specified for scan {ScanId}");
             }
 
-            await StorageManager.EndWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
+            try
+            {
+                // Execute the actual scan logic
+                await scanner.ExecuteAsync();
+                
+                // Mark the web was scanned
+                await StorageManager.EndWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
+            }
+            catch (Exception ex)
+            {
+                // The web scan failed, log accordingly
+                Log.Error(ex, "Scan of {SiteUrl}{WebUrl} failed with  scan component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
+                await StorageManager.EndWebScanWithErrorAsync(ScanId, web.SiteCollectionUrl, web.WebUrl, ex);
+            }
         }
         
     }

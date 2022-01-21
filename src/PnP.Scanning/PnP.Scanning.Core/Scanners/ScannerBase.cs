@@ -5,12 +5,18 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class ScannerBase
     {
-        internal ScannerBase(StorageManager storageManager, Guid scanId)
+        internal ScannerBase(StorageManager storageManager, Guid scanId, string siteUrl, string webUrl)
         {
             StorageManager = storageManager;
             ScanId = scanId;
+            SiteUrl = siteUrl;
+            WebUrl = webUrl;
             Logger = Log.ForContext("ScanId", scanId);
         }
+
+        internal string WebUrl { get; set; }
+
+        internal string SiteUrl { get; set; }
 
         internal StorageManager StorageManager { get; private set; }
 

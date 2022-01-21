@@ -2,6 +2,6 @@
 {
     internal class TestOptions : OptionsBase
     {
-
+        internal int TestNumberOfSites { get; set; }
     }
 }

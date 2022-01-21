@@ -6,32 +6,39 @@ namespace PnP.Scanning.Core.Scanners
     {
         private const int minDelay = 500;
         private const int maxDelay = 10000;
-        
-        internal TestScanner(StorageManager storageManager, Guid scanId, string webUrl, TestOptions options) : base(storageManager, scanId)
+
+        internal TestScanner(StorageManager storageManager, Guid scanId, string siteUrl, string webUrl, TestOptions options) : base(storageManager, scanId, siteUrl, webUrl)
         {
-            WebUrl = webUrl;
             Options = options;            
         }
-
-        internal string WebUrl { get; set; }
 
         internal TestOptions Options { get; set; }
 
         internal async override Task ExecuteAsync()
-        {            
+        {
             Logger.Information("Started for {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
-            int delay = new Random().Next(minDelay, maxDelay);
-            await Task.Delay(delay);
+            int delay1 = new Random().Next(minDelay, maxDelay);
+            await Task.Delay(delay1);
 
             Logger.Information("Step 1 Delay {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
-            delay = new Random().Next(minDelay, maxDelay);
-            await Task.Delay(delay);
+            var delay2 = new Random().Next(minDelay, maxDelay);
+            await Task.Delay(delay2);
+
+            // Logic that randomly throws an error
+            int throwException = new Random().Next(1, 20);
+            if (throwException == 10)
+            {
+                throw new Exception($"Something went wrong in the test scanner with options {Options.TestNumberOfSites}!!");
+            }
 
             Logger.Information("Step 2 Delay {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
-            delay = new Random().Next(minDelay, maxDelay);
-            await Task.Delay(delay);
+            var delay3 = new Random().Next(minDelay, maxDelay);
+            await Task.Delay(delay3);
 
             Logger.Information("Step 3 Delay {WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", WebUrl, ScanId, Environment.CurrentManagedThreadId);
+
+            // Save of the scanner outcome
+            await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3);
         }
     }
 }

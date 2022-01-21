@@ -3,13 +3,19 @@ using System.Reflection;
 
 namespace PnP.Scanning.Core.Storage
 {
-    internal sealed class ScanContext : DbContext
+    internal class ScanContext : DbContext
     {
         internal DbSet<Scan>? Scans { get; set; }
+
+        internal DbSet<Property>? Properties { get; set; }
 
         internal DbSet<SiteCollection>? SiteCollections { get; set; }
 
         internal DbSet<Web>? Webs { get; set; }
+
+#if DEBUG
+        internal DbSet<TestDelay>? TestDelays { get; set; }
+#endif
 
         internal string DbPath { get; }
 
@@ -66,7 +72,15 @@ namespace PnP.Scanning.Core.Storage
                 entity.HasIndex(e => e.Status);
             });
 
+#if DEBUG
+            modelBuilder.Entity<TestDelay>().ToTable("TestDelays");
+            modelBuilder.Entity<TestDelay>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
+                entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
+            });
             base.OnModelCreating(modelBuilder);
+#endif
         }
     }
 }

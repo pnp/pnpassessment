@@ -38,6 +38,13 @@ message StartRequest {
 	string SitesFile = 5;
 	string AuthMode = 6;
 	string ApplicationId = 7;
+	repeated PropertyRequest Properties = 8;
+}
+
+message PropertyRequest {
+	string Property = 1;
+	string Type = 2;
+	string Value = 3;
 }
 
 message StartStatus {

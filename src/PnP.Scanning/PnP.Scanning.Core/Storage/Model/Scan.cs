@@ -25,7 +25,5 @@
         public string? CLIAuthMode { get; set; }
 
         public string? CLIApplicationId { get; set; }
-
-        public List<SiteCollection> SiteCollections { get; set; } = new();
     }
 }

@@ -16,7 +16,10 @@ namespace PnP.Scanning.Core.Services
             if (!string.IsNullOrEmpty(start.SitesList))
             {
                 Log.Information("Building list of site collections: using sites list");
-                list.AddRange(LoadSitesFromList(start.SitesList, new char[] { ',' }));
+                foreach (var site in LoadSitesFromList(start.SitesList, new char[] { ',' }))
+                {
+                    list.Add(site.TrimEnd('/'));
+                }
             }
             else if (!string.IsNullOrEmpty(start.SitesFile))
             {
@@ -25,7 +28,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     if (!string.IsNullOrEmpty(row[0]))
                     {
-                        list.Add(row[0].ToString());
+                        list.Add(row[0].ToString().TrimEnd('/'));
                     }
                 }
             }
@@ -40,7 +43,15 @@ namespace PnP.Scanning.Core.Services
                 start.Mode.Equals("test", StringComparison.OrdinalIgnoreCase) &&
                 list.Count == 0)
             {
-                for (int i = 0; i < 10; i++)
+                int sitesToScan = 10;
+                var numberOfSitesProperty = start.Properties.FirstOrDefault(p => p.Property == Constants.StartTestNumberOfSites);
+
+                if (numberOfSitesProperty != null)
+                {
+                    sitesToScan = int.Parse(numberOfSitesProperty.Value);
+                }
+
+                for (int i = 0; i < sitesToScan; i++)
                 {
                     list.Add($"https://bertonline.sharepoint.com/sites/prov-{i}");
                 }
