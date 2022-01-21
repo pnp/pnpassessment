@@ -1,11 +1,13 @@
 ﻿using EFCore.BulkExtensions;
+using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Services;
 using Serilog;
 
 namespace PnP.Scanning.Core.Storage
 {
     internal sealed class StorageManager
     {
-        internal async Task LaunchNewScanAsync(Guid scanId, List<string> siteCollectionList)
+        internal async Task LaunchNewScanAsync(Guid scanId, StartRequest start, List<string> siteCollectionList)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -17,7 +19,15 @@ namespace PnP.Scanning.Core.Storage
                 { 
                     ScanId = scanId, 
                     StartDate = DateTime.Now, 
-                    Status = ScanStatus.Running 
+                    Version = VersionManager.GetCurrentVersion(),
+                    Status = ScanStatus.Running,
+                    CLIMode = start.Mode,
+                    CLIEnvironment = start.Environment,
+                    CLITenant = start.Tenant,
+                    CLISiteList = start.SitesList,
+                    CLISiteFile = start.SitesFile,
+                    CLIAuthMode = start.AuthMode,
+                    CLIApplicationId = start.ApplicationId,
                 });
 
                 await dbContext.SaveChangesAsync();
@@ -51,6 +61,9 @@ namespace PnP.Scanning.Core.Storage
                     scan.Status = ScanStatus.Finished;
 
                     await dbContext.SaveChangesAsync();
+
+                    // Checkpoint the database as the scan is done
+                    await CheckPointDatabaseAsync(dbContext);
                 }
                 else
                 {
@@ -159,6 +172,16 @@ namespace PnP.Scanning.Core.Storage
                     Log.Error("No web row for {SiteCollectionUrl}{WebUrl} found to update", siteCollectionUrl, webUrl);
                     throw new Exception($"No web row for {siteCollectionUrl}{webUrl} found to update");
                 }
+            }
+        }
+
+        private async Task CheckPointDatabaseAsync(ScanContext? dbContext)
+        {
+            if (dbContext != null)
+            {
+                // Force a SQLite checkpoint to ensure all transactions are checkpointed from the wal file into the
+                // the main DB file https://www.sqlite.org/pragma.html#pragma_wal_checkpoint
+                await dbContext.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(RESTART);");
             }
         }
 

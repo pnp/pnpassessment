@@ -38,7 +38,7 @@ namespace PnP.Scanning.Core.Services
 
             Log.Information("Scan id is {ScanId}", scanId);
 
-            await StorageManager.LaunchNewScanAsync(scanId, siteCollectionList);
+            await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
 
             // Launch a queue to handle this scan
             var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);

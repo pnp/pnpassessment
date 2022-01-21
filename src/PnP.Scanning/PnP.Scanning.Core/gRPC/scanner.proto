@@ -32,6 +32,12 @@ message ScanStatusReply {
 // StartStreaming
 message StartRequest {
 	string Mode = 1;
+	string Tenant = 2;
+	string Environment = 3;
+	string SitesList = 4;
+	string SitesFile = 5;
+	string AuthMode = 6;
+	string ApplicationId = 7;
 }
 
 message StartStatus {

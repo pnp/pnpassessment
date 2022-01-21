@@ -10,6 +10,22 @@
 
         public ScanStatus Status { get; set; }
 
+        public string? Version { get; set; }
+
+        public string? CLIMode { get; set; }
+
+        public string? CLITenant { get; set; }
+
+        public string? CLIEnvironment { get; set; }
+
+        public string? CLISiteList { get; set; }   
+
+        public string? CLISiteFile { get; set; }
+
+        public string? CLIAuthMode { get; set; }
+
+        public string? CLIApplicationId { get; set; }
+
         public List<SiteCollection> SiteCollections { get; set; } = new();
     }
 }

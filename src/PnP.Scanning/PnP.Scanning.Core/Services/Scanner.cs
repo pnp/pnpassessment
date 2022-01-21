@@ -11,14 +11,17 @@ namespace PnP.Scanning.Core.Services
     internal sealed class Scanner : PnPScanner.PnPScannerBase
     {        
         private readonly ScanManager scanManager;
+        private readonly SiteEnumerationManager siteEnumerationManager;
         private readonly IHost kestrelWebServer;
 
-        public Scanner(ScanManager siteScanManager, IHost host)
+        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, IHost host)
         {
             // Kestrel
             kestrelWebServer = host;
             // Scan manager
             scanManager = siteScanManager;
+            // Site enumeration
+            siteEnumerationManager = siteEnumeration;
         }
 
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
@@ -62,15 +65,7 @@ namespace PnP.Scanning.Core.Services
             });
 
             // 2. Build list of sites to scan
-            Log.Information("Building list of site collections to scan");
-            List<string> sitesToScan = new();
-
-            for (int i = 0; i < 10; i++)
-            {
-                sitesToScan.Add($"https://bertonline.sharepoint.com/sites/prov-{i}");
-            }
-
-            Log.Information("Scan scope defined: {SitesToScan} site collections will be scanned", sitesToScan.Count);
+            List<string> sitesToScan = await siteEnumerationManager.EnumerateSiteCollectionsToScanAsync(request);
 
             await responseStream.WriteAsync(new StartStatus
             {
@@ -78,7 +73,6 @@ namespace PnP.Scanning.Core.Services
             });
 
             // 3. Start the scan
-            Log.Information("Launch scan job by enqueueing the sites to scan");
             var scanId = await scanManager.StartScanAsync(request, sitesToScan);
 
             await responseStream.WriteAsync(new StartStatus
