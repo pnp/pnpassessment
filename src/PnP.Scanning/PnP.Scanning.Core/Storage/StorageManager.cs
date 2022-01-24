@@ -7,6 +7,8 @@ namespace PnP.Scanning.Core.Storage
 {
     internal sealed class StorageManager
     {
+        internal static string DbName => "scan.db";
+
         internal async Task LaunchNewScanAsync(Guid scanId, StartRequest start, List<string> siteCollectionList)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -213,6 +215,75 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        internal async Task<ScanResultFromDatabase?> GetScanResultAsync(Guid scanId)
+        {
+            try
+            {
+                using (var dbContext = new ScanContext(scanId))
+                {
+                    var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
+
+                    if (scan != null)
+                    {
+                        int total = 0;
+                        int queued = 0;
+                        int running = 0;
+                        int paused = 0;
+                        int finished = 0;
+                        int failed = 0;
+
+                        foreach (var site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId).ToListAsync())
+                        {
+
+                            switch (site.Status)
+                            {
+                                case ScanStatus.Queued:
+                                    total++;
+                                    queued++;
+                                    break;
+                                case ScanStatus.Running:
+                                    total++;
+                                    running++;
+                                    break;
+                                case ScanStatus.Finished:
+                                    total++;
+                                    finished++;
+                                    break;
+                                case ScanStatus.Paused:
+                                    total++;
+                                    paused++;
+                                    break;
+                                case ScanStatus.Failed:
+                                    total++;
+                                    failed++;
+                                    break;
+                            }
+                        }
+
+                        var result = new ScanResultFromDatabase(scan.ScanId, scan.Status, total)
+                        {
+                            SiteCollectionsQueued = queued,
+                            SiteCollectionsRunning = running,
+                            SiteCollectionsPaused = paused,
+                            SiteCollectionsFinished = finished,
+                            SiteCollectionsFailed = failed,
+                        };
+
+                        result.StartDate = scan.StartDate.ToUniversalTime();
+                        result.EndDate = scan.EndDate.ToUniversalTime();
+
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not get results for scan {ScanId}. Error: {Error}", scanId, ex.Message);
+            }
+
+            return null;
+        }
+
         internal async Task CheckPointDatabaseAsync(ScanContext? dbContext)
         {
             if (dbContext != null)
@@ -225,7 +296,12 @@ namespace PnP.Scanning.Core.Storage
 
         internal static string GetScanDataFolder(Guid scanId)
         {
-            return Path.Join(AppDomain.CurrentDomain.BaseDirectory, scanId.ToString());
+            return Path.Join(GetScannerFolder(), scanId.ToString());
+        }
+
+        internal static string GetScannerFolder()
+        {
+            return AppDomain.CurrentDomain.BaseDirectory;
         }
 
         #region Scanner specific operations

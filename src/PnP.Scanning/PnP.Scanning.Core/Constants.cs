@@ -16,6 +16,11 @@
 
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
+        internal const string ListRunning = "running";
+        internal const string ListPaused = "paused";
+        internal const string ListFinished = "finished";
+        internal const string ListFailed = "failed";
+
         #endregion
     }
 }

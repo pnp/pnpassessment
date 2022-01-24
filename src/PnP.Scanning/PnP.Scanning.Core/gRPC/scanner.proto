@@ -1,6 +1,7 @@
 ﻿syntax = "proto3";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 package PnP.Scanning.Core.Services;
 
@@ -11,6 +12,7 @@ service PnPScanner {
 	rpc StartStreaming (StartRequest) returns (stream StartStatus);
 	rpc Stop (StopRequest) returns (google.protobuf.Empty);
 	rpc Ping (google.protobuf.Empty) returns (PingReply);
+	rpc List (ListRequest) returns (ListReply);
 }
 
 // Status
@@ -59,4 +61,25 @@ message StopRequest {
 // Ping
 message PingReply {
 	bool UpAndRunning = 1;
+}
+
+// List
+message ListRequest {
+	bool Running = 1;
+	bool Paused = 2;
+	bool Finished = 3;
+	bool Failed = 4;
+}
+
+message ListReply {
+	repeated ListScanResponse Status = 1;
+}
+
+message ListScanResponse {
+	string Id = 1;
+	string Status = 2;
+	int32 SiteCollectionsToScan = 3;
+	int32 SiteCollectionsScanned = 4;
+	google.protobuf.Timestamp ScanStarted = 5;
+	google.protobuf.Timestamp ScanEnded = 6;
 }

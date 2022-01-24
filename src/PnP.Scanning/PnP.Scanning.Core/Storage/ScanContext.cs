@@ -4,7 +4,8 @@ using System.Reflection;
 namespace PnP.Scanning.Core.Storage
 {
     internal class ScanContext : DbContext
-    {
+    {        
+
         internal DbSet<Scan>? Scans { get; set; }
 
         internal DbSet<Property>? Properties { get; set; }
@@ -26,7 +27,7 @@ namespace PnP.Scanning.Core.Storage
             // Ensure path exists
             Directory.CreateDirectory(path);
 
-            DbPath = Path.Join(path, "scan.db");
+            DbPath = Path.Join(path, StorageManager.DbName);
         }
 
         // The following configures EF to create a Sqlite database file

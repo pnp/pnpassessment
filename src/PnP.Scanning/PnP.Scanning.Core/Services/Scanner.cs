@@ -30,6 +30,12 @@ namespace PnP.Scanning.Core.Services
             return await scanManager.GetScanStatusAsync();
         }
 
+        public override async Task<ListReply> List(ListRequest request, ServerCallContext context)
+        {
+            Log.Information("List request received");
+            return await scanManager.GetScanListAsync(request);
+        }
+
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously

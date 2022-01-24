@@ -5,6 +5,8 @@ namespace PnP.Scanning.Process.Services
     /// <summary>
     /// Console Color Helper class that provides coloring to individual commands
     /// Copied from https://gist.github.com/RickStrahl/52c9ee43bd2723bcdf7bf4d24b029768
+    /// 
+    /// Alterantive to evaluate: https://spectreconsole.net/
     /// </summary>
     internal static class ColorConsole
     {

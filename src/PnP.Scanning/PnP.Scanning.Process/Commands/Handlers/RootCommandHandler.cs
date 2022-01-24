@@ -16,7 +16,7 @@ namespace PnP.Scanning.Process.Commands
         {
             var rootCommand = new RootCommand();
 
-            rootCommand.AddCommand(new ListCommandHandler().Create());
+            rootCommand.AddCommand(new ListCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StartCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());

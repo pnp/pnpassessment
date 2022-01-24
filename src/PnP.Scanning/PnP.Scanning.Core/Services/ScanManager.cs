@@ -95,6 +95,20 @@ namespace PnP.Scanning.Core.Services
             return statusReply;
         }
 
+        internal async Task<ListReply> GetScanListAsync(ListRequest request)
+        {
+            // When nothing was requested we default to returning all
+            if (!request.Running && !request.Paused && !request.Finished && !request.Failed)
+            {
+                request.Running = true;
+                request.Paused = true;
+                request.Finished = true;
+                request.Failed = true;
+            }
+
+            return await ScanEnumerationManager.EnumerateScansFromDiskAsync(StorageManager, request.Running, request.Paused, request.Finished, request.Failed);
+        }
+
         internal void UpdateScanStatus(Guid scanId, ScanStatus scanStatus)
         {
             Log.Information("Updating scan status for scan {ScanId} to {ScanStatus}", scanId, scanStatus);

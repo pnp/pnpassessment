@@ -34,8 +34,6 @@ namespace PnP.Scanning.Process
 
                 if (args.Length == 0)
                 {
-                    // Sample input:
-                    // start --mode test --authmode application --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1"
                     ColorConsole.WriteWrappedHeader("Welcome to the PnP Scanning CLI!");
                     ColorConsole.WriteInfo("");
                     ColorConsole.WriteInfo("Enter the command you want to execute (<enter> to quit):");
