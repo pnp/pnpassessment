@@ -1,4 +1,5 @@
-﻿using PnP.Scanning.Core.Queues;
+﻿using Microsoft.Extensions.Hosting;
+using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
@@ -7,13 +8,19 @@ using System.Collections.Concurrent;
 namespace PnP.Scanning.Core.Services
 {
     // Class for in memory tracking the running scans
-    internal sealed class ScanManager
+    internal sealed class ScanManager : IHostedService
     {
+        private readonly IHostApplicationLifetime hostApplicationLifetime;
         private object updateLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(StorageManager storageManager)
+        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager)
         {
+            this.hostApplicationLifetime = hostApplicationLifetime;
+            // Hook the application stopping as that allows for cleanup 
+            this.hostApplicationLifetime.ApplicationStopping.Register(OnStopping);
+            this.hostApplicationLifetime.ApplicationStopped.Register(OnStopped);
+
             StorageManager = storageManager;
 
             // Launch a thread that will monitor and update the list of scans
@@ -138,6 +145,22 @@ namespace PnP.Scanning.Core.Services
             }
 
             return running;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+        private void OnStopping()
+        {
+            Log.Warning("Kestrel is stopping");
+        }
+
+        private void OnStopped()
+        {
+            Log.Warning("Kestrel stopped");
         }
 
         private async Task AutoUpdateRunningScansAsync()

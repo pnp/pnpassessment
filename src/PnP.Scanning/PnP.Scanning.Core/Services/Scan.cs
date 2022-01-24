@@ -1,5 +1,6 @@
 ﻿using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Services
 {

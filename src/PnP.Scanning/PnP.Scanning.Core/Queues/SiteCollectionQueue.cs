@@ -46,7 +46,7 @@ namespace PnP.Scanning.Core.Queues
         private async Task ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection)
         {
             // Mark the scan status as running
-            ScanManager.UpdateScanStatus(ScanId, Services.ScanStatus.Running);
+            ScanManager.UpdateScanStatus(ScanId, ScanStatus.Running);
 
             await StorageManager.StartSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
 

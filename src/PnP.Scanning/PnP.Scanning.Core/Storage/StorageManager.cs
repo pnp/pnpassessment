@@ -22,7 +22,7 @@ namespace PnP.Scanning.Core.Storage
                     ScanId = scanId, 
                     StartDate = DateTime.Now, 
                     Version = VersionManager.GetCurrentVersion(),
-                    Status = ScanStatus.Running,
+                    Status = ScanStatus.Queued,
                     CLIMode = start.Mode,
                     CLIEnvironment = start.Environment,
                     CLITenant = start.Tenant,
@@ -58,7 +58,7 @@ namespace PnP.Scanning.Core.Storage
                     {
                         ScanId = scanId,
                         SiteUrl = site,
-                        Status = ScanStatus.Queued,
+                        Status = SiteWebStatus.Queued,
                     });
                 }
 
@@ -96,7 +96,7 @@ namespace PnP.Scanning.Core.Storage
                 var siteToUpdate = dbContext.SiteCollections.FirstOrDefault(p=>p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    siteToUpdate.Status = ScanStatus.Running;
+                    siteToUpdate.Status = SiteWebStatus.Running;
                     siteToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
@@ -123,7 +123,7 @@ namespace PnP.Scanning.Core.Storage
                         ScanId = scanId,
                         SiteUrl = siteCollectionUrl,
                         WebUrl = webUrl,
-                        Status = ScanStatus.Queued
+                        Status = SiteWebStatus.Queued
                     });                    
                 }
                 
@@ -138,7 +138,7 @@ namespace PnP.Scanning.Core.Storage
                 var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
-                    webToUpdate.Status = ScanStatus.Running;
+                    webToUpdate.Status = SiteWebStatus.Running;
                     webToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
@@ -158,9 +158,9 @@ namespace PnP.Scanning.Core.Storage
                 var siteToUpdate = dbContext.SiteCollections.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    var failedWeb = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == ScanStatus.Failed);
+                    var failedWeb = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
 
-                    siteToUpdate.Status = failedWeb != null ? ScanStatus.Failed : ScanStatus.Finished;
+                    siteToUpdate.Status = failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished;
                     siteToUpdate.EndDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
@@ -180,7 +180,7 @@ namespace PnP.Scanning.Core.Storage
                 var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
-                    webToUpdate.Status = ScanStatus.Finished;
+                    webToUpdate.Status = SiteWebStatus.Finished;
                     webToUpdate.EndDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
@@ -200,7 +200,7 @@ namespace PnP.Scanning.Core.Storage
                 var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
-                    webToUpdate.Status = ScanStatus.Failed;
+                    webToUpdate.Status = SiteWebStatus.Failed;
                     webToUpdate.EndDate = DateTime.Now;
                     webToUpdate.Error = ex?.Message;
                     webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
@@ -237,23 +237,23 @@ namespace PnP.Scanning.Core.Storage
 
                             switch (site.Status)
                             {
-                                case ScanStatus.Queued:
+                                case SiteWebStatus.Queued:
                                     total++;
                                     queued++;
                                     break;
-                                case ScanStatus.Running:
+                                case SiteWebStatus.Running:
                                     total++;
                                     running++;
                                     break;
-                                case ScanStatus.Finished:
+                                case SiteWebStatus.Finished:
                                     total++;
                                     finished++;
                                     break;
-                                case ScanStatus.Paused:
+                                case SiteWebStatus.Paused:
                                     total++;
                                     paused++;
                                     break;
-                                case ScanStatus.Failed:
+                                case SiteWebStatus.Failed:
                                     total++;
                                     failed++;
                                     break;

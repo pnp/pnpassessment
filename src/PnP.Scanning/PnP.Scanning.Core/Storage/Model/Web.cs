@@ -6,7 +6,7 @@
 
         public DateTime EndDate { get; set; }
 
-        public ScanStatus Status { get; set; }
+        public SiteWebStatus Status { get; set; }
 
         public string? Error { get; set; }
 
