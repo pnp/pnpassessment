@@ -335,7 +335,7 @@ namespace PnP.Scanning.Process.Commands
             }
 #endif
 
-            var call = client.StartStreaming(start);
+            var call = client.Start(start);
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
                 ColorConsole.WriteInfo($"Status: {message.Status}");

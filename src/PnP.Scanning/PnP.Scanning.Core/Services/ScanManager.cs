@@ -14,7 +14,7 @@ namespace PnP.Scanning.Core.Services
         private object scanListLock = new object();        
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager)
+        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             // Hook the application stopping as that allows for cleanup 
@@ -23,14 +23,21 @@ namespace PnP.Scanning.Core.Services
 
             StorageManager = storageManager;
 
+            SiteEnumerationManager = siteEnumerationManager;
+
             // Launch a thread that will mark the running scans as terminated
             Task.Run(async () => await MarkRunningScansAsTerminatedAsync());
 
             // Launch a thread that will monitor and update the list of scans
             Task.Run(async () => await AutoUpdateRunningScansAsync());
+
+            // Launch a thread that once a minute will clean up finished scans from the in-memory list
+            Task.Run(async () => await ClearFinishedScansFromMemoryAsync());
         }
 
         internal StorageManager StorageManager { get; private set; }
+
+        internal SiteEnumerationManager SiteEnumerationManager { get; private set; }
 
         internal int MaxParallelScans { get; private set; } = 3;
 
@@ -87,6 +94,88 @@ namespace PnP.Scanning.Core.Services
             return scanId;
         }
 
+        internal async Task RestartScanAsync(Guid scanId)
+        {
+            Log.Information("Restarting scan {ScanId}", scanId);
+
+            var listedScans = await GetScanListAsync(new ListRequest());
+            var scanToRestart = listedScans.Status.FirstOrDefault(p => p.Id.Equals(scanId.ToString(), StringComparison.OrdinalIgnoreCase));
+            if (scanToRestart == null)
+            {
+                Log.Warning("Cannot restart scan {ScanId} as it's unknown", scanId);
+                return;
+            }
+
+            var scanStatus = (ScanStatus)Enum.Parse(typeof(ScanStatus), scanToRestart.Status);
+
+            if (scanStatus == ScanStatus.Paused)
+            {
+                // Handle the scan restart
+                await ProcessScanRestartAsync(scanId);
+            }
+            else if (scanStatus == ScanStatus.Terminated)
+            {
+                // When a scan is terminated only the scan table status is set to Terminated, everything else 
+                // just is what it was when the process terminated. First ensure the database is "consolidated"
+                // before restarting the terminated scan
+                await StorageManager.ConsolidatedScanToEnableRestartAsync(scanId);
+
+                // Handle the scan restart
+                await ProcessScanRestartAsync(scanId);
+            }
+            else
+            {
+                Log.Warning("Cannot restart scan {ScanId} as it's status is {Status}", scanId, scanStatus);
+                return;
+            }
+        }
+
+        private async Task ProcessScanRestartAsync(Guid scanId)
+        {
+            // Update scan status in database
+            var start = await StorageManager.RestartScanAsync(scanId);
+
+            // Get site collections to enqueue (as they were not previously finished
+            var siteCollectionList = await StorageManager.SiteCollectionsToRestartScanningAsync(scanId);
+
+            if (siteCollectionList.Count > 0)
+            {
+                // Launch a queue to handle this scan
+                var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
+
+                // Configure the queue
+                siteCollectionQueue.ConfigureQueue(ParallelThreads);
+
+                // Get the scan configuration options to use
+                OptionsBase options = OptionsBase.FromScannerInput(start);
+
+                Log.Information("Start enqueuing {SiteCollectionCount} site collections for restarting scan {ScanId}", siteCollectionList.Count, scanId);
+                // Enqueue the received site collections
+                foreach (var site in siteCollectionList)
+                {
+                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site) { Restart = true });
+                }
+
+                Log.Information("Enqueued {SiteCollectionCount} site collections for restarting scan {ScanId}", siteCollectionList.Count, scanId);
+
+                var scan = new Scan(scanId, siteCollectionQueue, options)
+                {
+                    SiteCollectionsToScan = siteCollectionList.Count,
+                    Status = ScanStatus.Queued,
+                };
+
+                if (!scans.TryAdd(scanId, scan))
+                {
+                    Log.Error("Scan restart request was not added to the list of running scans");
+                    throw new Exception("Scan restart request was not added to the list of running scans");
+                }
+            }
+            else
+            {
+                Log.Information("No pending site collections to be scanned when restarting scan {ScanId}", scanId);
+            }
+        }
+
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal async Task<StatusReply> GetScanStatusAsync()
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -121,7 +210,7 @@ namespace PnP.Scanning.Core.Services
             return await ScanEnumerationManager.EnumerateScansFromDiskAsync(StorageManager, request.Running, request.Paused, request.Finished, request.Terminated);
         }
 
-        internal async Task SetPausingBitAsync(Guid scanId, bool all, ScanStatus pauseMode)
+        internal async Task SetPausingStatusAsync(Guid scanId, bool all, ScanStatus pauseMode)
         {
             List<Guid> scansToPause = new();
             if (all)
@@ -187,7 +276,7 @@ namespace PnP.Scanning.Core.Services
 
             foreach(var scan in scansToPause)
             {
-                await StorageManager.PauseScanAsync(scan);
+                await StorageManager.ConsolidatedScanToEnableRestartAsync(scan);
             }
         }
 
@@ -264,19 +353,24 @@ namespace PnP.Scanning.Core.Services
 
         internal void SiteCollectionScanned(Guid scanId)
         {
-            scans[scanId].SiteCollectionWasScanned();
+            lock (scanListLock)
+            {
+                scans[scanId].SiteCollectionWasScanned();
+            }
             Log.Information("A site collection was fully scanned for scan {ScanId}", scanId);
         }
 
         internal int NumberOfScansRunning()
         {
             int running = 0;
-
-            foreach (var scan in scans)
+            lock (scanListLock)
             {
-                if (scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running)
+                foreach (var scan in scans)
                 {
-                    running++;
+                    if (scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running)
+                    {
+                        running++;
+                    }
                 }
             }
 
@@ -338,6 +432,34 @@ namespace PnP.Scanning.Core.Services
             }
 
             Log.Information("{Count} scans are marked as terminated", count);
+        }
+
+        private async Task ClearFinishedScansFromMemoryAsync()
+        {
+            bool busy = true;
+            while (busy)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1));
+
+                foreach (var scan in scans.ToList())
+                {
+                    if (scan.Value.Status == ScanStatus.Finished)
+                    {
+                        lock (scanListLock)
+                        {
+                            if (scans.TryRemove(scan))
+                            {
+                                Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
+                            }
+                            else
+                            {
+                                Log.Warning("Failed removing finished scan {ScanId} from the memory list", scan.Key);
+                            }
+                        }
+                    }
+                }
+
+            }
         }
 
     }

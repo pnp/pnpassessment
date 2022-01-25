@@ -36,7 +36,7 @@ namespace PnP.Scanning.Core.Services
             return await scanManager.GetScanListAsync(request);
         }
 
-        public override async Task PauseStreaming(PauseRequest request, IServerStreamWriter<PauseStatus> responseStream, ServerCallContext context)
+        public override async Task Pause(PauseRequest request, IServerStreamWriter<PauseStatus> responseStream, ServerCallContext context)
         {
             if (!Guid.TryParse(request.Id, out Guid scanId))
             {
@@ -65,7 +65,7 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // Start the pausing 
-                await scanManager.SetPausingBitAsync(scanId, request.All, Storage.ScanStatus.Pausing);
+                await scanManager.SetPausingStatusAsync(scanId, request.All, Storage.ScanStatus.Pausing);
 
                 await responseStream.WriteAsync(new PauseStatus
                 {
@@ -94,13 +94,51 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // Finalized the pausing 
-                await scanManager.SetPausingBitAsync(scanId, request.All, Storage.ScanStatus.Paused);
+                await scanManager.SetPausingStatusAsync(scanId, request.All, Storage.ScanStatus.Paused);
 
                 await responseStream.WriteAsync(new PauseStatus
                 {
                     Status = "Pausing done"
                 });
             }
+        }
+
+        public override async Task Restart(RestartRequest request, IServerStreamWriter<RestartStatus> responseStream, ServerCallContext context)
+        {
+            await responseStream.WriteAsync(new RestartStatus
+            {
+                Status = "Restarting scan"
+            });
+
+            if (!Guid.TryParse(request.Id, out Guid scanId))
+            {
+                await responseStream.WriteAsync(new RestartStatus
+                {
+                    Status = $"Passed scan id {request.Id} is invalid"
+                });
+
+                return;
+            }
+
+            if (scanManager.ScanExists(scanId))
+            {
+                await responseStream.WriteAsync(new RestartStatus
+                {
+                    Status = $"Provided scan id {scanId} is already running or finished"
+                });
+
+                Log.Warning("Provided scan id {ScanId} is already running or finished", scanId);
+
+                return;
+            }
+
+            // Restart the scan
+            await scanManager.RestartScanAsync(scanId);
+
+            await responseStream.WriteAsync(new RestartStatus
+            {
+                Status = "Scan restarted"
+            });
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -122,7 +160,7 @@ namespace PnP.Scanning.Core.Services
             return new PingReply() { UpAndRunning = true };
         }
 
-        public override async Task StartStreaming(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
+        public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
         {
             Log.Information("Starting scan");
             await responseStream.WriteAsync(new StartStatus

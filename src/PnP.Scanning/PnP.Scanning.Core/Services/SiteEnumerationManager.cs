@@ -1,9 +1,18 @@
-﻿using Serilog;
+﻿using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Storage;
+using Serilog;
 
 namespace PnP.Scanning.Core.Services
 {
     internal sealed class SiteEnumerationManager
     {
+
+        public SiteEnumerationManager(StorageManager storageManager)
+        {
+            StorageManager = storageManager;
+        }
+
+        internal StorageManager StorageManager { get; private set; }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start)
@@ -39,6 +48,7 @@ namespace PnP.Scanning.Core.Services
             }
 
 #if DEBUG
+            // Insert a set of dummy site collections for testing purposes
             if (!string.IsNullOrEmpty(start.Mode) && 
                 start.Mode.Equals("test", StringComparison.OrdinalIgnoreCase) &&
                 list.Count == 0)
@@ -60,6 +70,41 @@ namespace PnP.Scanning.Core.Services
             Log.Information("Scan scope defined: {SitesToScan} site collections will be scanned", list.Count);
 
             return list;
+        }
+
+        internal async Task<List<string>> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, bool isRestart)
+        {
+            List<string> webUrlsToScan = new();
+            
+            if (isRestart)
+            {
+                // When we're enumerating webs for a scan restart we might already have done this 
+                // previously and so only the webs not processed should be handled again
+                var websToRestart = await StorageManager.WebsToRestartScanningAsync(scanId, siteCollectionUrl);
+                if (websToRestart != null && websToRestart.Count > 0)
+                {
+                    return websToRestart;
+                }
+            }
+
+#if DEBUG
+            // Insert dummy webs
+            if (options is TestOptions testOptions)
+            {
+                // Add root web
+                webUrlsToScan.Add($"/");
+
+                int numberOfWebs = new Random().Next(10);
+                Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs + 1);
+
+                for (int i = 0; i < numberOfWebs; i++)
+                {
+                    webUrlsToScan.Add($"/subsite{i}");
+                }
+            }
+#endif
+
+            return webUrlsToScan;
         }
 
         /// <summary>

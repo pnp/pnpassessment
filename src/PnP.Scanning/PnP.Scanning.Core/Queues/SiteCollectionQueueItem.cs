@@ -10,5 +10,7 @@ namespace PnP.Scanning.Core.Queues
         }
 
         internal string SiteCollectionUrl { get; set; }
+
+        internal bool Restart { get; set; }
     }
 }

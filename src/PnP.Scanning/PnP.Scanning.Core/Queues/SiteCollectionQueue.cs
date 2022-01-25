@@ -55,31 +55,25 @@ namespace PnP.Scanning.Core.Queues
                 await StorageManager.StartSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
 
                 // Get the sub sites in the given site collection
+                
+                // Enumerate the webs to scan
+                var webUrlsToScan = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase, siteCollection.Restart);
+                
+                // Build list of web queue items to be processed
                 List<WebQueueItem> webToScan = new();
-                List<string> webUrlsToScan = new();
-
-                // Add root web
-                webUrlsToScan.Add($"/");
-                webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
-                                               siteCollection.SiteCollectionUrl,
-                                               $"/"));
-
-                // Randomly add up to 10 sub sites
-                int numberOfWebs = new Random().Next(10);
-                Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs + 1);
-
-                for (int i = 0; i < numberOfWebs; i++)
+                foreach (var web in webUrlsToScan)
                 {
-                    webUrlsToScan.Add($"/subsite{i}");
                     webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
                                                    siteCollection.SiteCollectionUrl,
-                                                   $"/subsite{i}"));
+                                                   web));
                 }
-
-                await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan);
+            
+                // Store the webs to be processed, for a restart the webs might already be there
+                await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
 
                 // Start parallel execution per web in this site collection
                 var webQueue = new WebQueue(ScanManager, StorageManager, ScanId);
+                
                 // Use two parallel threads per running site collection task for processing the webs
                 webQueue.ConfigureQueue(2);
 

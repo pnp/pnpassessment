@@ -9,11 +9,12 @@ package PnP.Scanning.Core.Services;
 
 service PnPScanner {
 	rpc Status (StatusRequest) returns (StatusReply);
-	rpc StartStreaming (StartRequest) returns (stream StartStatus);
+	rpc Start (StartRequest) returns (stream StartStatus);
 	rpc Stop (StopRequest) returns (google.protobuf.Empty);
 	rpc Ping (google.protobuf.Empty) returns (PingReply);
 	rpc List (ListRequest) returns (ListReply);
-	rpc PauseStreaming (PauseRequest) returns (stream PauseStatus);
+	rpc Pause (PauseRequest) returns (stream PauseStatus);
+	rpc Restart (RestartRequest) returns (stream RestartStatus);
 }
 
 // Status
@@ -85,12 +86,21 @@ message ListScanResponse {
 	google.protobuf.Timestamp ScanEnded = 6;
 }
 
-// Paused
+// Pause
 message PauseRequest {
 	string Id = 1;
 	bool All = 2;
 }
 
 message PauseStatus {
+	string Status = 1;
+}
+
+// Restart
+message RestartRequest {
+	string Id = 1;
+}
+
+message RestartStatus {
 	string Status = 1;
 }

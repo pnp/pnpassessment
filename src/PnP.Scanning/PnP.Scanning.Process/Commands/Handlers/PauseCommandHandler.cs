@@ -74,7 +74,7 @@ namespace PnP.Scanning.Process.Commands
             var client = await processManager.GetScannerClientAsync();
 
             // Start the pausing work
-            var call = client.PauseStreaming(new Core.Services.PauseRequest {  Id = scanId.ToString(), All = all });
+            var call = client.Pause(new Core.Services.PauseRequest {  Id = scanId.ToString(), All = all });
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
                 ColorConsole.WriteInfo($"Status: {message.Status}");
