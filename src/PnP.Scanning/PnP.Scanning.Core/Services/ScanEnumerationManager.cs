@@ -7,7 +7,7 @@ namespace PnP.Scanning.Core.Services
 {
     internal static class ScanEnumerationManager
     {
-        internal static async Task<ListReply> EnumerateScansFromDiskAsync(StorageManager storageManager, bool running, bool paused, bool finished, bool failed)
+        internal static async Task<ListReply> EnumerateScansFromDiskAsync(StorageManager storageManager, bool running, bool paused, bool finished, bool terminated)
         {
             ListReply scans = new();
 
@@ -37,19 +37,19 @@ namespace PnP.Scanning.Core.Services
                         scanResult.SiteCollectionsScanned = scanResultFromDatabase.SiteCollectionsFinished + scanResultFromDatabase.SiteCollectionsFailed;
 
                         bool add = false;
-                        if (running && scanResultFromDatabase.Status == Storage.ScanStatus.Running)
+                        if (running && scanResultFromDatabase.Status == ScanStatus.Running)
                         {
                             add = true;
                         }
-                        else if (paused && scanResultFromDatabase.Status == Storage.ScanStatus.Paused)
+                        else if (paused && (scanResultFromDatabase.Status == ScanStatus.Paused || scanResultFromDatabase.Status == ScanStatus.Pausing))
                         {
                             add = true;
                         }
-                        else if (finished && scanResultFromDatabase.Status == Storage.ScanStatus.Finished)
+                        else if (finished && scanResultFromDatabase.Status == ScanStatus.Finished)
                         {
                             add = true;
                         }
-                        else if (failed && scanResultFromDatabase.Status == Storage.ScanStatus.Failed)
+                        else if (terminated && scanResultFromDatabase.Status == ScanStatus.Terminated)
                         {
                             add = true;
                         }

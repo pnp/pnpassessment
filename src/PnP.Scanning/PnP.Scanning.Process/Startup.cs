@@ -10,6 +10,10 @@ namespace PnP.Scanning.Process
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddGrpc();
+
+            // Configure the shutdown to 15s - not yet working
+            //services.Configure<HostOptions>(
+            //    opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(15));
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

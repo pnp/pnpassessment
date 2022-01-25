@@ -13,7 +13,7 @@ namespace PnP.Scanning.Core.Queues
 
         internal StorageManager StorageManager { get; private set; }
 
-        internal int ParallelThreads { get; set; }
+        internal int ParallelThreads { get; private set; }
 
         internal void ConfigureQueue(int parallelThreads)
         {

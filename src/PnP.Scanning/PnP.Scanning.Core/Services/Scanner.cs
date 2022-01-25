@@ -36,6 +36,73 @@ namespace PnP.Scanning.Core.Services
             return await scanManager.GetScanListAsync(request);
         }
 
+        public override async Task PauseStreaming(PauseRequest request, IServerStreamWriter<PauseStatus> responseStream, ServerCallContext context)
+        {
+            if (!Guid.TryParse(request.Id, out Guid scanId))
+            {
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = $"Passed scan id {request.Id} is invalid"
+                });
+            }
+            else
+            {
+                // check if the passed scan id is valid one
+                if (!request.All && !scanManager.ScanExists(scanId))
+                {
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = $"Provided scan id {scanId} is invalid"
+                    });
+
+                    Log.Warning("Provided scan id {ScanId} is not known as running scan", scanId);
+                    return;
+                }
+
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = "Start pausing"
+                });
+
+                // Start the pausing 
+                await scanManager.SetPausingBitAsync(scanId, request.All, Storage.ScanStatus.Pausing);
+
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = "Waiting for running web scans to complete..."
+                });
+
+                // Wait for running web scans to complete
+                await scanManager.WaitForPendingWebScansAsync(scanId, request.All);
+
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = "Running web scans have completed"
+                });
+
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = "Implement pausing in scan database(s)"
+                });
+
+                // Update scan database(s)
+                await scanManager.PrepareDatabaseForPauseAsync(scanId, request.All);
+
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = "Scan database(s) are paused"
+                });
+
+                // Finalized the pausing 
+                await scanManager.SetPausingBitAsync(scanId, request.All, Storage.ScanStatus.Paused);
+
+                await responseStream.WriteAsync(new PauseStatus
+                {
+                    Status = "Pausing done"
+                });
+            }
+        }
+
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously

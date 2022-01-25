@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Services
     internal sealed class ScanManager : IHostedService
     {
         private readonly IHostApplicationLifetime hostApplicationLifetime;
-        private object updateLock = new object();
+        private object scanListLock = new object();        
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager)
@@ -23,6 +23,9 @@ namespace PnP.Scanning.Core.Services
 
             StorageManager = storageManager;
 
+            // Launch a thread that will mark the running scans as terminated
+            Task.Run(async () => await MarkRunningScansAsTerminatedAsync());
+
             // Launch a thread that will monitor and update the list of scans
             Task.Run(async () => await AutoUpdateRunningScansAsync());
         }
@@ -30,6 +33,8 @@ namespace PnP.Scanning.Core.Services
         internal StorageManager StorageManager { get; private set; }
 
         internal int MaxParallelScans { get; private set; } = 3;
+
+        internal int ParallelThreads { get; private set; } = 4;
 
         internal async Task<Guid> StartScanAsync(StartRequest start, List<string> siteCollectionList)
         {
@@ -51,7 +56,7 @@ namespace PnP.Scanning.Core.Services
             var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
             // Configure the queue
-            siteCollectionQueue.ConfigureQueue(4);
+            siteCollectionQueue.ConfigureQueue(ParallelThreads);
 
             // Get the scan configuration options to use
             OptionsBase options = OptionsBase.FromScannerInput(start);
@@ -105,24 +110,155 @@ namespace PnP.Scanning.Core.Services
         internal async Task<ListReply> GetScanListAsync(ListRequest request)
         {
             // When nothing was requested we default to returning all
-            if (!request.Running && !request.Paused && !request.Finished && !request.Failed)
+            if (!request.Running && !request.Paused && !request.Finished && !request.Terminated)
             {
                 request.Running = true;
                 request.Paused = true;
                 request.Finished = true;
-                request.Failed = true;
+                request.Terminated = true;
             }
 
-            return await ScanEnumerationManager.EnumerateScansFromDiskAsync(StorageManager, request.Running, request.Paused, request.Finished, request.Failed);
+            return await ScanEnumerationManager.EnumerateScansFromDiskAsync(StorageManager, request.Running, request.Paused, request.Finished, request.Terminated);
         }
 
-        internal void UpdateScanStatus(Guid scanId, ScanStatus scanStatus)
+        internal async Task SetPausingBitAsync(Guid scanId, bool all, ScanStatus pauseMode)
+        {
+            List<Guid> scansToPause = new();
+            if (all)
+            {
+                Log.Information("Setting {PauseMode} bit for all running scans", pauseMode);
+                lock (scanListLock)
+                {
+                    foreach(var scan in scans)
+                    {
+                        scan.Value.Status = pauseMode;
+                        scansToPause.Add(scan.Key);
+                    }
+                }
+            }
+            else
+            {
+                Log.Information("Setting {PauseMode} bit for scan {ScanId}", pauseMode, scanId);
+                lock (scanListLock)
+                {
+                    scans[scanId].Status = pauseMode;
+                    scansToPause.Add(scanId);
+                }
+            }
+
+            // Update database
+            foreach (var scan in scansToPause)
+            {
+                await StorageManager.SetScanStatusAsync(scan, pauseMode);
+            }
+        }
+
+        internal bool IsPausing(Guid scanId)
+        {
+            // Import to also protect this operation via the scan list lock as otherwise it can result in deadlocks
+            lock (scanListLock)
+            {
+                return scans[scanId].Status == ScanStatus.Pausing || scans[scanId].Status == ScanStatus.Paused;
+            }
+        }
+
+        internal bool ScanExists(Guid scanId)
+        {
+            lock (scanListLock)
+            {
+                return scans.ContainsKey(scanId);
+            }
+        }
+
+        internal async Task PrepareDatabaseForPauseAsync(Guid scanId, bool all)
+        {
+            List<Guid> scansToPause = new();
+            if (all)
+            {
+                foreach (var scan in scans)
+                {
+                    scansToPause.Add(scan.Key);
+                }
+            }
+            else
+            {
+                scansToPause.Add(scanId);
+            }
+
+            foreach(var scan in scansToPause)
+            {
+                await StorageManager.PauseScanAsync(scan);
+            }
+        }
+
+        internal async Task WaitForPendingWebScansAsync(Guid scanId, bool all, int maxChecks = 30, int delay = 10)
+        {
+            bool pendingWebScans = true;
+            int checksDone = 0;
+
+            List<Guid> scansToPause = new();
+            if (all)
+            {
+                foreach (var scan in scans)
+                {
+                    scansToPause.Add(scan.Key);
+                }
+            }
+            else
+            {
+                scansToPause.Add(scanId);
+            }
+
+            // No point in waiting if there are no scans to inspect
+            if (scansToPause.Count == 0)
+            {
+                return;
+            }
+
+            do
+            {
+                Log.Information("Check for running web scans for scan {ScanId}", scanId);
+
+                foreach (var scan in scansToPause)
+                {
+                    // Check for pending web scans
+                    pendingWebScans = await StorageManager.HasRunningWebScansAsync(scan);
+
+                    // One of the scans being paused has pending web scans, no need to check the others 
+                    if (pendingWebScans)
+                    {
+                        break;
+                    }
+                }
+
+                if (pendingWebScans)
+                {
+                    Log.Information("Running web scans for scan {ScanId}, waiting {Delay} seconds", scanId, delay);
+                    checksDone++;
+                    await Task.Delay(TimeSpan.FromSeconds(delay));
+                }
+            }
+            while (pendingWebScans && checksDone <= maxChecks);
+        }
+
+        internal async Task UpdateScanStatusAsync(Guid scanId, ScanStatus scanStatus)
         {
             Log.Information("Updating scan status for scan {ScanId} to {ScanStatus}", scanId, scanStatus);
 
-            lock (updateLock)
+            bool databaseUpdateNeeded = false;
+            lock (scanListLock)
             {
-                scans[scanId].Status = scanStatus;
+                if (scans[scanId].Status != scanStatus)
+                {
+                    scans[scanId].Status = scanStatus;
+                    databaseUpdateNeeded = true;
+                }
+            }
+
+            if (databaseUpdateNeeded)
+            {
+                Log.Information("Updating scan status for scan {ScanId} to {ScanStatus} in database", scanId, scanStatus);
+                await StorageManager.SetScanStatusAsync(scanId, scanStatus);
             }
         }
 
@@ -156,6 +292,11 @@ namespace PnP.Scanning.Core.Services
         private void OnStopping()
         {
             Log.Warning("Kestrel is stopping");
+
+            // Mark what's running as terminated since we're killing the server process
+            MarkRunningScansAsTerminatedAsync().GetAwaiter().GetResult();
+            
+            Log.Warning("Running scans marked as terminated, Kestrel can shutdown now");
         }
 
         private void OnStopped()
@@ -175,13 +316,28 @@ namespace PnP.Scanning.Core.Services
                     if ((scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running) &&
                          scan.Value.SiteCollectionsScanned == scan.Value.SiteCollectionsToScan)
                     {
-                        UpdateScanStatus(scan.Value.Id, ScanStatus.Finished);
+                        await UpdateScanStatusAsync(scan.Value.Id, ScanStatus.Finished);
 
                         await StorageManager.EndScanAsync(scan.Value.Id);
                     }
                 }
 
             }
+        }
+
+        private async Task MarkRunningScansAsTerminatedAsync()
+        {
+            var listedScans = await ScanEnumerationManager.EnumerateScansFromDiskAsync(StorageManager, true, false, false, false);
+
+            int count = 0;
+            foreach(var scan in listedScans.Status)
+            {
+                Log.Information("Marking scan {ScanId} as Terminated", scan.Id);
+                await StorageManager.SetScanStatusAsync(Guid.Parse(scan.Id), ScanStatus.Terminated);
+                count++;
+            }
+
+            Log.Information("{Count} scans are marked as terminated", count);
         }
 
     }

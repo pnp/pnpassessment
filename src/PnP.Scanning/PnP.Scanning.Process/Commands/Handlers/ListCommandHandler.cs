@@ -13,7 +13,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> runningOption;
         private Option<bool> pausedOption;
         private Option<bool> finishedOption;
-        private Option<bool> failedOption;
+        private Option<bool> terminatedOption;
 
         internal ListCommandHandler(ScannerManager processManagerInstance)
         {
@@ -52,30 +52,30 @@ namespace PnP.Scanning.Process.Commands
             };
             cmd.AddOption(finishedOption);
 
-            failedOption = new(
-                name: $"--{Constants.ListFailed}",
+            terminatedOption = new(
+                name: $"--{Constants.ListTerminated}",
                 getDefaultValue: () => false,
-                description: "Lists failed scans"
+                description: "Lists terminated scans"
                 )
             {
                 IsRequired = false,
             };
-            cmd.AddOption(failedOption);
+            cmd.AddOption(terminatedOption);
 
         }
 
         public Command Create()
         {
-            cmd.SetHandler(async (bool running, bool paused, bool finished, bool failed) => 
+            cmd.SetHandler(async (bool running, bool paused, bool finished, bool terminated) => 
                             { 
-                                await HandleStartAsync(running, paused, finished, failed); 
+                                await HandleStartAsync(running, paused, finished, terminated); 
                             }, 
-                            runningOption, pausedOption, finishedOption, failedOption);
+                            runningOption, pausedOption, finishedOption, terminatedOption);
 
             return cmd;
         }
 
-        private async Task HandleStartAsync(bool running, bool paused, bool finished, bool failed)
+        private async Task HandleStartAsync(bool running, bool paused, bool finished, bool terminated)
         {
             // Setup client to talk to scanner
             var client = await processManager.GetScannerClientAsync();
@@ -85,7 +85,7 @@ namespace PnP.Scanning.Process.Commands
                 Running = running,
                 Paused = paused,
                 Finished = finished,
-                Failed = failed,
+                Terminated = terminated,
             });
 
 

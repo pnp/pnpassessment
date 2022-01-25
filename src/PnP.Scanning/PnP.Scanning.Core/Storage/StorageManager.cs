@@ -89,13 +89,46 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        internal async Task SetScanStatusAsync(Guid scanId, ScanStatus scanStatus)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
+                if (scan != null)
+                {
+                    Log.Information("Setting Scan table to status {Status} for scan {ScanId}", scanStatus, scanId);
+                    scan.Status = scanStatus;
+
+                    // Consider a scan marked as Finished, Paused or Terminate to have an end date set
+                    if (scanStatus != ScanStatus.Running && 
+                        scanStatus != ScanStatus.Queued &&
+                        scanStatus != ScanStatus.Pausing )
+                    {
+                        scan.EndDate = DateTime.Now;
+                    }
+
+                    await dbContext.SaveChangesAsync();
+
+                    // Checkpoint the database as the scan is done
+                    await CheckPointDatabaseAsync(dbContext);
+                }
+                else
+                {
+                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
+                    throw new Exception($"No scan row for scan {scanId} found to update");
+                }
+            }
+        }
+
         internal async Task StartSiteCollectionScanAsync(Guid scanId, string siteCollectionUrl)
         {
             using (var dbContext = new ScanContext(scanId))
             {
+
                 var siteToUpdate = dbContext.SiteCollections.FirstOrDefault(p=>p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
+                    Log.Information("Setting SiteCollection table to status Running for scan {ScanId}, site collection {SiteCollectionUrl}", scanId, siteCollectionUrl);
                     siteToUpdate.Status = SiteWebStatus.Running;
                     siteToUpdate.StartDate = DateTime.Now;
 
@@ -138,6 +171,7 @@ namespace PnP.Scanning.Core.Storage
                 var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
+                    Log.Information("Setting Web table to status Running for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
                     webToUpdate.Status = SiteWebStatus.Running;
                     webToUpdate.StartDate = DateTime.Now;
 
@@ -159,6 +193,9 @@ namespace PnP.Scanning.Core.Storage
                 if (siteToUpdate != null)
                 {
                     var failedWeb = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
+
+                    Log.Information("Setting SiteCollection table to status {Status} for scan {ScanId}, site collection {SiteCollectionUrl}", 
+                        failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished, scanId, siteCollectionUrl);
 
                     siteToUpdate.Status = failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished;
                     siteToUpdate.EndDate = DateTime.Now;
@@ -183,6 +220,8 @@ namespace PnP.Scanning.Core.Storage
                     webToUpdate.Status = SiteWebStatus.Finished;
                     webToUpdate.EndDate = DateTime.Now;
 
+                    Log.Information("Setting Web table to status Finished for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+
                     await dbContext.SaveChangesAsync();
                 }
                 else
@@ -205,6 +244,8 @@ namespace PnP.Scanning.Core.Storage
                     webToUpdate.Error = ex?.Message;
                     webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
+                    Log.Information("Setting Web table to status Failed for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+
                     await dbContext.SaveChangesAsync();
                 }
                 else
@@ -212,6 +253,79 @@ namespace PnP.Scanning.Core.Storage
                     Log.Error("No web row for {SiteCollectionUrl}{WebUrl} found to update", siteCollectionUrl, webUrl);
                     throw new Exception($"No web row for {siteCollectionUrl}{webUrl} found to update");
                 }
+            }
+        }
+
+        internal async Task<bool> HasRunningWebScansAsync(Guid scanId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running).ToListAsync())
+                {
+                    var runningWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running);
+                    if (runningWeb != null)
+                    {
+                        Log.Information("Running web found {SiteCollectionUrl}{WebUrl} for scan {ScanId}", site.SiteUrl, runningWeb.WebUrl, scanId);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        internal async Task<bool> SiteCollectionWasCompletelyHandledAsync(Guid scanId, string siteCollectionUrl)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                    var pendingWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Queued);
+                    if (pendingWeb == null)
+                    {
+                        Log.Information("Site collection {SiteCollectionUrl} was completely done in scan {ScanId}", siteCollectionUrl, scanId);
+                        return true;
+                    }
+
+                return false;
+            }
+        }
+
+        internal async Task PauseScanAsync(Guid scanId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+
+                Log.Information("Starting to pause scan {ScanId} at database level", scanId);
+
+                // Sites and webs in "running" state are reset to "queued"
+                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running).ToListAsync())
+                {
+                    site.Status = SiteWebStatus.Queued;
+                    site.StartDate = DateTime.MinValue;
+
+                    Log.Information("Pausing scan {ScanId}, site collection {SiteCollection}", scanId, site.SiteUrl);
+
+                    foreach(var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running).ToListAsync())
+                    { 
+                        web.Status = SiteWebStatus.Queued;
+                        web.StartDate = DateTime.MinValue;
+
+                        Log.Information("Pausing scan {ScanId}, web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+
+                        // All data collected as part of a running web scan is dropped as the web scan will run again when restarted
+#if DEBUG
+                        foreach (var testResult in await dbContext.TestDelays.Where(p=> p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+                        {
+                            dbContext.TestDelays.Remove(testResult);
+                            Log.Information("Pausing scan {ScanId}: dropping test results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+                        }
+#endif
+                    }
+                }
+
+                // Persist all the changes
+                await dbContext.SaveChangesAsync();
+
+                Log.Information("Pausing scan {ScanId} at database level is done", scanId);
             }
         }
 
@@ -288,6 +402,7 @@ namespace PnP.Scanning.Core.Storage
         {
             if (dbContext != null)
             {
+                Log.Information("Checkpointing database");
                 // Force a SQLite checkpoint to ensure all transactions are checkpointed from the wal file into the
                 // the main DB file https://www.sqlite.org/pragma.html#pragma_wal_checkpoint
                 await dbContext.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(RESTART);");

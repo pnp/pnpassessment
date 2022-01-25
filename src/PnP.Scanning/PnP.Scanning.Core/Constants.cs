@@ -19,7 +19,10 @@
         internal const string ListRunning = "running";
         internal const string ListPaused = "paused";
         internal const string ListFinished = "finished";
-        internal const string ListFailed = "failed";
+        internal const string ListTerminated = "terminated";
+
+        internal const string PauseScanId = "scanid";
+        internal const string PauseAll = "all";
 
         #endregion
     }

@@ -13,6 +13,7 @@ service PnPScanner {
 	rpc Stop (StopRequest) returns (google.protobuf.Empty);
 	rpc Ping (google.protobuf.Empty) returns (PingReply);
 	rpc List (ListRequest) returns (ListReply);
+	rpc PauseStreaming (PauseRequest) returns (stream PauseStatus);
 }
 
 // Status
@@ -68,7 +69,7 @@ message ListRequest {
 	bool Running = 1;
 	bool Paused = 2;
 	bool Finished = 3;
-	bool Failed = 4;
+	bool Terminated = 4;
 }
 
 message ListReply {
@@ -82,4 +83,14 @@ message ListScanResponse {
 	int32 SiteCollectionsScanned = 4;
 	google.protobuf.Timestamp ScanStarted = 5;
 	google.protobuf.Timestamp ScanEnded = 6;
+}
+
+// Paused
+message PauseRequest {
+	string Id = 1;
+	bool All = 2;
+}
+
+message PauseStatus {
+	string Status = 1;
 }
