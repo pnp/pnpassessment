@@ -32,7 +32,7 @@ namespace PnP.Scanning.Core.Services
             Task.Run(async () => await AutoUpdateRunningScansAsync());
 
             // Launch a thread that once a minute will clean up finished scans from the in-memory list
-            Task.Run(async () => await ClearFinishedScansFromMemoryAsync());
+            Task.Run(async () => await ClearFinishedOrPausedScansFromMemoryAsync());
         }
 
         internal StorageManager StorageManager { get; private set; }
@@ -286,6 +286,9 @@ namespace PnP.Scanning.Core.Services
 
         internal bool ScanExists(Guid scanId)
         {
+            // Ensure the in-memory table is updated to avoid adding duplicate entries
+            ClearFinishedOrPausedScansFromMemory();
+
             return scans.ContainsKey(scanId);
         }
 
@@ -470,30 +473,34 @@ namespace PnP.Scanning.Core.Services
             Log.Information("{Count} scans are marked as terminated", count);
         }
 
-        private async Task ClearFinishedScansFromMemoryAsync()
+        private async Task ClearFinishedOrPausedScansFromMemoryAsync()
         {
             bool busy = true;
             while (busy)
             {
+                // Check runs once per minute
                 await Task.Delay(TimeSpan.FromMinutes(1));
 
-                foreach (var scan in scans.ToList())
-                {
-                    if (scan.Value.Status == ScanStatus.Finished)
-                    {
-                        if (scans.TryRemove(scan))
-                        {
-                            Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
-                        }
-                        else
-                        {
-                            Log.Warning("Failed removing finished scan {ScanId} from the memory list", scan.Key);
-                        }
-                    }
-                }
-
+                ClearFinishedOrPausedScansFromMemory();
             }
         }
 
+        private void ClearFinishedOrPausedScansFromMemory()
+        {
+            foreach (var scan in scans.ToList())
+            {
+                if (scan.Value.Status == ScanStatus.Finished || scan.Value.Status == ScanStatus.Paused)
+                {
+                    if (scans.TryRemove(scan))
+                    {
+                        Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
+                    }
+                    else
+                    {
+                        Log.Warning("Failed removing finished scan {ScanId} from the memory list", scan.Key);
+                    }
+                }
+            }
+        }
     }
 }
