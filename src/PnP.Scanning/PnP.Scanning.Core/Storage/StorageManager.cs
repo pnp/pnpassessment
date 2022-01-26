@@ -185,7 +185,7 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreWebsToScanAsync(Guid scanId, string siteCollectionUrl, List<string> webs, bool isRestart)
+        internal async Task StoreWebsToScanAsync(Guid scanId, string siteCollectionUrl, List<EnumeratedWeb> webs, bool isRestart)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -197,9 +197,9 @@ namespace PnP.Scanning.Core.Storage
                     // When restarting a scan the needed webs might already be present, so only store them when needed
 
                     bool added = false;
-                    foreach (var webUrl in webs)
+                    foreach (var web in webs)
                     {
-                        var webRecord = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                        var webRecord = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == web.WebUrl);
                         if (webRecord == null)
                         {
                             added = true;
@@ -207,7 +207,8 @@ namespace PnP.Scanning.Core.Storage
                             {
                                 ScanId = scanId,
                                 SiteUrl = siteCollectionUrl,
-                                WebUrl = webUrl,
+                                WebUrl = web.WebUrl,
+                                Template = web.WebTemplate,
                                 Status = SiteWebStatus.Queued
                             });
                         }
@@ -222,13 +223,14 @@ namespace PnP.Scanning.Core.Storage
                 }
                 else
                 {
-                    foreach (var webUrl in webs)
+                    foreach (var web in webs)
                     {
                         dbContext.Webs.Add(new Web
                         {
                             ScanId = scanId,
                             SiteUrl = siteCollectionUrl,
-                            WebUrl = webUrl,
+                            WebUrl = web.WebUrl,
+                            Template = web.WebTemplate,
                             Status = SiteWebStatus.Queued
                         });
                     }
@@ -475,15 +477,18 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task<List<string>> WebsToRestartScanningAsync(Guid scanId, string siteUrl)
+        internal async Task<List<EnumeratedWeb>> WebsToRestartScanningAsync(Guid scanId, string siteUrl)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                List<string> webs = new();
+                List<EnumeratedWeb> webs = new();
 
                 foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.Status == SiteWebStatus.Queued).ToListAsync())
                 {
-                    webs.Add(web.WebUrl);
+                    webs.Add(new EnumeratedWeb
+                    {
+                        WebUrl = web.WebUrl
+                    });
                 }
 
                 return webs;

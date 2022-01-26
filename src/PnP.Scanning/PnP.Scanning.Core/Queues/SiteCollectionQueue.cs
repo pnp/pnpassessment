@@ -67,7 +67,7 @@ namespace PnP.Scanning.Core.Queues
                 {
                     webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
                                                    siteCollection.SiteCollectionUrl,
-                                                   web));
+                                                   web.WebUrl));
                 }
             
                 // Store the webs to be processed, for a restart the webs might already be there

@@ -72,9 +72,9 @@ namespace PnP.Scanning.Core.Services
             return list;
         }
 
-        internal async Task<List<string>> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, bool isRestart)
+        internal async Task<List<EnumeratedWeb>> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, bool isRestart)
         {
-            List<string> webUrlsToScan = new();
+            List<EnumeratedWeb> webUrlsToScan = new();
             
             if (isRestart)
             {
@@ -92,14 +92,14 @@ namespace PnP.Scanning.Core.Services
             if (options is TestOptions testOptions)
             {
                 // Add root web
-                webUrlsToScan.Add($"/");
+                webUrlsToScan.Add(new EnumeratedWeb { WebUrl = "/", WebTemplate = "STS#0"});
 
                 int numberOfWebs = new Random().Next(10);
                 Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs + 1);
 
                 for (int i = 0; i < numberOfWebs; i++)
                 {
-                    webUrlsToScan.Add($"/subsite{i}");
+                    webUrlsToScan.Add(new EnumeratedWeb { WebUrl = $"/subsite{i}", WebTemplate = "STS#0" });
                 }
             }
 #endif
