@@ -80,6 +80,24 @@ namespace PnP.Scanning.Core.Services
                 throw new Exception("Scan request was not added to the list of running scans");
             }
 
+            // Run possible prescanning task, use the root web of the first web in the site collection list
+            var scanner = ScannerBase.NewScanner(StorageManager, scanId, siteCollectionList[0], "/", options);
+            if (scanner != null)
+            {
+                try
+                {
+                    await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Running);
+                    await scanner.PreScanningAsync();
+                    await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Finished);
+                }
+                catch (Exception ex)
+                {
+                    // The web scan failed, log accordingly
+                    Log.Error(ex, "Prescan for scan {ScanId} failed. Error: {Error}", scanId, ex.Message);
+                    await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Failed);
+                }
+            }
+
             Log.Information("Start enqueuing {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
             // Enqueue the received site collections
             foreach (var site in siteCollectionList)
@@ -422,7 +440,7 @@ namespace PnP.Scanning.Core.Services
 
         private void OnStopping()
         {
-            Log.Warning("Kestrel is stopping");
+            Log.Information("Kestrel is stopping");
 
             // Mark what's running as terminated since we're killing the server process
             MarkRunningScansAsTerminatedAsync().GetAwaiter().GetResult();
@@ -432,7 +450,7 @@ namespace PnP.Scanning.Core.Services
 
         private void OnStopped()
         {
-            Log.Warning("Kestrel stopped");
+            Log.Information("Kestrel stopped");
         }
 
         private async Task AutoUpdateRunningScansAsync()

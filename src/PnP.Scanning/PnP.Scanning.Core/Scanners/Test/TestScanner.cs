@@ -40,5 +40,22 @@ namespace PnP.Scanning.Core.Scanners
             // Save of the scanner outcome
             await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3);
         }
+
+        internal async override Task PreScanningAsync()
+        {
+            Logger.Information("Pre scanning work for scan {ScanId} is starting", ScanId);
+            
+            int delay1 = new Random().Next(minDelay, minDelay * 5);
+            await Task.Delay(delay1);
+
+            // Logic that randomly throws an error for 10% of the prescans
+            int throwException = new Random().Next(1, 10);
+            if (throwException == 10)
+            {
+                throw new Exception($"Something went wrong during prescanning with the test scanner with options {Options.TestNumberOfSites}!!");
+            }
+
+            Logger.Information("Pre scanning work for scan {ScanId} is done", ScanId);
+        }
     }
 }

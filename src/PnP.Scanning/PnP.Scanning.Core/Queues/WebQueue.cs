@@ -55,21 +55,18 @@ namespace PnP.Scanning.Core.Queues
             {
                 await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
 
-                ScannerBase? scanner = null;
-                if (web.OptionsBase is TestOptions testOptions)
-                {
-                    scanner = new TestScanner(StorageManager, ScanId, web.SiteCollectionUrl, web.WebUrl, testOptions);
-                }
+                // Get an instance for the actual scanner to use
+                var scanner = ScannerBase.NewScanner(StorageManager, ScanId, web.SiteCollectionUrl, web.WebUrl, web.OptionsBase);
 
                 if (scanner == null)
                 {
-                    Log.Error("Unknown options class specified for scan {ScanId}", ScanId);
-                    throw new Exception($"Unknown options class specified for scan {ScanId}");
+                    Log.Error("Unknown options class specified for scan {ScanId}, no scanner instance created", ScanId);
+                    throw new Exception($"Unknown options class specified for scan {ScanId}, no scanner instance created");
                 }
 
                 try
                 {
-                    // Execute the actual scan logic
+                    // Execute the actual scan logic for the loaded web
                     await scanner.ExecuteAsync();
 
                     // Mark the web was scanned

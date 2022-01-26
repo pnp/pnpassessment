@@ -25,9 +25,28 @@ namespace PnP.Scanning.Core.Scanners
         internal ILogger Logger { get; private set; }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        internal virtual async Task PreScanningAsync()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+        {
+        }
+
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal virtual async Task ExecuteAsync()
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
+        }
+
+        internal static ScannerBase? NewScanner(StorageManager storageManager, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
+        {
+
+#if DEBUG
+            if (options is TestOptions testOptions)
+            {
+                return new TestScanner(storageManager, scanId, siteCollectionUrl, webUrl, testOptions);
+            }
+#endif
+
+            return null;
         }
     }
 }

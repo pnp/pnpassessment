@@ -5,7 +5,6 @@
         Queued = 1,
         Running = 2,
         Finished = 3,
-        Paused = 4,
-        Failed = 5,
+        Failed = 4,
     }
 }

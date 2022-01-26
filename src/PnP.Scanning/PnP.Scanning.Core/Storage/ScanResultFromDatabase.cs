@@ -19,8 +19,6 @@
 
         internal int SiteCollectionsRunning { get; set; }
 
-        internal int SiteCollectionsPaused { get; set; }
-
         internal int SiteCollectionsFinished { get; set; }
 
         internal int SiteCollectionsFailed { get; set; }

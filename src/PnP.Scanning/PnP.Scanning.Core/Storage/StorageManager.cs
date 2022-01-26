@@ -24,6 +24,7 @@ namespace PnP.Scanning.Core.Storage
                     StartDate = DateTime.Now,
                     Version = VersionManager.GetCurrentVersion(),
                     Status = ScanStatus.Queued,
+                    PreScanStatus = SiteWebStatus.Queued,
                     CLIMode = start.Mode,
                     CLIEnvironment = start.Environment,
                     CLITenant = start.Tenant,
@@ -34,6 +35,7 @@ namespace PnP.Scanning.Core.Storage
                 });
 
                 await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");
+                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreScanStatusChange, DateTime.Now, $"Set to {SiteWebStatus.Queued}");
 
                 if (start.Properties.Count > 0)
                 {
@@ -126,6 +128,31 @@ namespace PnP.Scanning.Core.Storage
                     
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
+                }
+                else
+                {
+                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
+                    throw new Exception($"No scan row for scan {scanId} found to update");
+                }
+            }
+        }
+
+        internal async Task SetPreScanStatusAsync(Guid scanId, SiteWebStatus preScanStatus)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
+                if (scan != null)
+                {
+                    Log.Information("Setting Scan table to prescanstatus {Status} for scan {ScanId}", preScanStatus, scanId);
+                    if (scan.PreScanStatus != preScanStatus)
+                    {
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreScanStatusChange, DateTime.Now, $"From {scan.PreScanStatus} to {preScanStatus}");
+                        scan.PreScanStatus = preScanStatus;
+                    }
+
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in SetPreScanStatusAsync for scan {ScanId}", scanId);
                 }
                 else
                 {
@@ -476,7 +503,6 @@ namespace PnP.Scanning.Core.Storage
                         int total = 0;
                         int queued = 0;
                         int running = 0;
-                        int paused = 0;
                         int finished = 0;
                         int failed = 0;
 
@@ -497,10 +523,6 @@ namespace PnP.Scanning.Core.Storage
                                     total++;
                                     finished++;
                                     break;
-                                case SiteWebStatus.Paused:
-                                    total++;
-                                    paused++;
-                                    break;
                                 case SiteWebStatus.Failed:
                                     total++;
                                     failed++;
@@ -512,7 +534,6 @@ namespace PnP.Scanning.Core.Storage
                         {
                             SiteCollectionsQueued = queued,
                             SiteCollectionsRunning = running,
-                            SiteCollectionsPaused = paused,
                             SiteCollectionsFinished = finished,
                             SiteCollectionsFailed = failed,
                         };

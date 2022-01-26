@@ -10,6 +10,8 @@
 
         public ScanStatus Status { get; set; }
 
+        public SiteWebStatus PreScanStatus { get; set; }
+
         public string? Version { get; set; }
 
         public string? CLIMode { get; set; }
