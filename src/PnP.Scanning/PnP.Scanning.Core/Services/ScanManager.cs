@@ -103,7 +103,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal async Task RestartScanAsync(Guid scanId)
+        internal async Task RestartScanAsync(Guid scanId, Action<string> feedback)
         {
             Log.Information("Restarting scan {ScanId}", scanId);
 
@@ -111,6 +111,7 @@ namespace PnP.Scanning.Core.Services
             var scanToRestart = listedScans.Status.FirstOrDefault(p => p.Id.Equals(scanId.ToString(), StringComparison.OrdinalIgnoreCase));
             if (scanToRestart == null)
             {
+                feedback.Invoke($"Cannot restart scan {scanId} as it's unknown");
                 Log.Warning("Cannot restart scan {ScanId} as it's unknown", scanId);
                 return;
             }
@@ -120,26 +121,34 @@ namespace PnP.Scanning.Core.Services
             if (scanStatus == ScanStatus.Paused)
             {
                 // Handle the scan restart
-                await ProcessScanRestartAsync(scanId);
+                await ProcessScanRestartAsync(scanId, (status) =>
+                {
+                    feedback.Invoke(status);
+                });
             }
             else if (scanStatus == ScanStatus.Terminated)
             {
                 // When a scan is terminated only the scan table status is set to Terminated, everything else 
                 // just is what it was when the process terminated. First ensure the database is "consolidated"
                 // before restarting the terminated scan
+                feedback.Invoke($"Consolidating previously terminated scan {scanId} first");
                 await StorageManager.ConsolidatedScanToEnableRestartAsync(scanId);
 
                 // Handle the scan restart
-                await ProcessScanRestartAsync(scanId);
+                await ProcessScanRestartAsync(scanId, (status) => 
+                { 
+                    feedback.Invoke(status);
+                });
             }
             else
             {
+                feedback.Invoke($"Cannot restart scan {scanId} as it's status is {scanStatus}");
                 Log.Warning("Cannot restart scan {ScanId} as it's status is {Status}", scanId, scanStatus);
                 return;
             }
         }
 
-        private async Task ProcessScanRestartAsync(Guid scanId)
+        private async Task ProcessScanRestartAsync(Guid scanId, Action<string> feedback)
         {
             // Aren't we trying to start too many parallel scans?
             EnforeMaximumParallelRunningScans();
@@ -152,6 +161,8 @@ namespace PnP.Scanning.Core.Services
 
             if (siteCollectionList.Count > 0)
             {
+                feedback.Invoke($"{siteCollectionList.Count} site collections will be in scope of this restart");
+
                 // Launch a queue to handle this scan
                 var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
@@ -181,6 +192,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site) { Restart = true });
                 }
+
+                feedback.Invoke($"{siteCollectionList.Count} site collections queued for scanning again");
 
                 // We're done
                 Log.Information("Enqueued {SiteCollectionCount} site collections for restarting scan {ScanId}", siteCollectionList.Count, scanId);

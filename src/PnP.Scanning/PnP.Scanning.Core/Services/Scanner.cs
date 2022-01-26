@@ -135,7 +135,13 @@ namespace PnP.Scanning.Core.Services
             try
             {
                 // Restart the scan
-                await scanManager.RestartScanAsync(scanId);
+                await scanManager.RestartScanAsync(scanId, async (message) => 
+                {
+                    await responseStream.WriteAsync(new RestartStatus
+                    {
+                        Status = message
+                    });
+                });
 
                 await responseStream.WriteAsync(new RestartStatus
                 {
