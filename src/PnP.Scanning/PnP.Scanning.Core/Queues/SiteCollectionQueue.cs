@@ -16,6 +16,8 @@ namespace PnP.Scanning.Core.Queues
             ScanId = scanId;
         }
 
+        internal int ParallelWebProcessingThreads { get; private set; } = 2;
+
         private ScanManager ScanManager { get; set; }
 
         private Guid ScanId { get; set; }
@@ -36,7 +38,7 @@ namespace PnP.Scanning.Core.Queues
                 siteCollectionsToScan = new ActionBlock<SiteCollectionQueueItem>(async (siteCollection) => await ProcessSiteCollectionAsync(siteCollection)
                                                                 , executionDataflowBlockOptions);
 
-                Log.Information("site collection queue for scan {ScanId} setup", ScanId);
+                Log.Information("Site collection queue for scan {ScanId} setup", ScanId);
             }
             
             // Send the request into the queue
@@ -74,8 +76,8 @@ namespace PnP.Scanning.Core.Queues
                 // Start parallel execution per web in this site collection
                 var webQueue = new WebQueue(ScanManager, StorageManager, ScanId);
                 
-                // Use two parallel threads per running site collection task for processing the webs
-                webQueue.ConfigureQueue(2);
+                // Use parallel threads per running site collection task for processing the webs
+                webQueue.ConfigureQueue(ParallelWebProcessingThreads);
 
                 foreach (var web in webToScan)
                 {
@@ -97,7 +99,7 @@ namespace PnP.Scanning.Core.Queues
                 else
                 {
                     // When pausing is ongoing doing "nothing" will leave the site collection in queued status, however if the pausing
-                    // kicked in while the last webs of a given site collection were being processed already then in the end all the 
+                    // kicked in while the last webs of a given site collection were being already processed then in the end all the 
                     // webs are done and the site collection should be marked as "Finished"
                     if (await StorageManager.SiteCollectionWasCompletelyHandledAsync(ScanId, siteCollection.SiteCollectionUrl))
                     {

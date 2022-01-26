@@ -70,13 +70,14 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
+                var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
                     scan.EndDate = DateTime.Now;
                     scan.Status = ScanStatus.Finished;
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in EndScanAsync for scan {ScanId}", scanId);
 
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
@@ -93,7 +94,7 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
+                var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
                     Log.Information("Setting Scan table to status {Status} for scan {ScanId}", scanStatus, scanId);
@@ -108,6 +109,8 @@ namespace PnP.Scanning.Core.Storage
                     }
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in SetScanStatusAsync for scan {ScanId}", scanId);
+
 
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
@@ -125,7 +128,7 @@ namespace PnP.Scanning.Core.Storage
             using (var dbContext = new ScanContext(scanId))
             {
 
-                var siteToUpdate = dbContext.SiteCollections.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
+                var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
                     Log.Information("Setting SiteCollection table to status Running for scan {ScanId}, site collection {SiteCollectionUrl}", scanId, siteCollectionUrl);
@@ -133,6 +136,7 @@ namespace PnP.Scanning.Core.Storage
                     siteToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in StartSiteCollectionScanAsync for scan {ScanId}", scanId);
                 }
                 else
                 {
@@ -173,6 +177,8 @@ namespace PnP.Scanning.Core.Storage
                     if (added)
                     {
                         await dbContext.SaveChangesAsync();
+                        Log.Information("Database updates pushed in StoreWebsToScanAsync for scan {ScanId}", scanId);
+
                     }
                 }
                 else
@@ -189,6 +195,8 @@ namespace PnP.Scanning.Core.Storage
                     }
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in StoreWebsToScanAsync for scan {ScanId}", scanId);
+
                 }
             }
         }
@@ -197,7 +205,7 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
                     Log.Information("Setting Web table to status Running for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
@@ -205,6 +213,7 @@ namespace PnP.Scanning.Core.Storage
                     webToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in StartWebScanAsync for scan {ScanId}", scanId);
                 }
                 else
                 {
@@ -218,10 +227,10 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var siteToUpdate = dbContext.SiteCollections.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
+                var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    var failedWeb = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
+                    var failedWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
 
                     Log.Information("Setting SiteCollection table to status {Status} for scan {ScanId}, site collection {SiteCollectionUrl}",
                         failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished, scanId, siteCollectionUrl);
@@ -230,10 +239,12 @@ namespace PnP.Scanning.Core.Storage
                     siteToUpdate.EndDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in EndSiteCollectionScanAsync for scan {ScanId}", scanId);
+
                 }
                 else
                 {
-                    Log.Error("No site collection row for {SiteCollectionUrl} found to update", siteCollectionUrl);
+                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in scan {ScanId}", siteCollectionUrl, scanId);
                     throw new Exception($"No site collection row for {siteCollectionUrl} found to update");
                 }
             }
@@ -243,7 +254,7 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
                     webToUpdate.Status = SiteWebStatus.Finished;
@@ -252,6 +263,8 @@ namespace PnP.Scanning.Core.Storage
                     Log.Information("Setting Web table to status Finished for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in EndWebScanAsync for scan {ScanId}", scanId);
+
                 }
                 else
                 {
@@ -265,7 +278,7 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webToUpdate = dbContext.Webs.FirstOrDefault(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
                     webToUpdate.Status = SiteWebStatus.Failed;
@@ -276,6 +289,8 @@ namespace PnP.Scanning.Core.Storage
                     Log.Information("Setting Web table to status Failed for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in EndWebScanWithErrorAsync for scan {ScanId}", scanId);
+
                 }
                 else
                 {
@@ -347,6 +362,8 @@ namespace PnP.Scanning.Core.Storage
 
                 // Persist all the changes
                 await dbContext.SaveChangesAsync();
+                Log.Information("Database updates pushed in ConsolidatedScanToEnableRestartAsync for scan {ScanId}", scanId);
+
 
                 Log.Information("Consolidating scan {ScanId} at database level is done", scanId);
             }
@@ -367,7 +384,7 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
+                var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
                     scan.StartDate = DateTime.MinValue;
@@ -375,6 +392,8 @@ namespace PnP.Scanning.Core.Storage
                     scan.Status = ScanStatus.Queued;
 
                     await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in RestartScanAsync for scan {ScanId}", scanId);
+
 
                     // Emulate the original start message as the scan might need some of the passed properties
                     StartRequest start = new() 
@@ -541,6 +560,8 @@ namespace PnP.Scanning.Core.Storage
                 });
 
                 await dbContext.SaveChangesAsync();
+                Log.Information("Database updates pushed in SaveTestScanResultsAsync for scan {ScanId}", scanId);
+
             }
         }
 

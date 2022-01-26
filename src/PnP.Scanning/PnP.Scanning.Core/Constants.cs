@@ -23,7 +23,12 @@
 
         internal const string PauseScanId = "scanid";
         internal const string PauseAll = "all";
+        #endregion
 
+        #region Status
+        internal const string MessageInformation = "Information";
+        internal const string MessageWarning = "Warning";
+        internal const string MessageError = "Error";
         #endregion
     }
 }

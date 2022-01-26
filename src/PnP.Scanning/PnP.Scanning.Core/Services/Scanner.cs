@@ -132,13 +132,26 @@ namespace PnP.Scanning.Core.Services
                 return;
             }
 
-            // Restart the scan
-            await scanManager.RestartScanAsync(scanId);
-
-            await responseStream.WriteAsync(new RestartStatus
+            try
             {
-                Status = "Scan restarted"
-            });
+                // Restart the scan
+                await scanManager.RestartScanAsync(scanId);
+
+                await responseStream.WriteAsync(new RestartStatus
+                {
+                    Status = "Scan restarted"
+                });
+            }
+            catch (Exception ex)
+            {
+                await responseStream.WriteAsync(new RestartStatus
+                {
+                    Status = $"Scan job not restarted due to error: {ex.Message}",
+                    Type = Constants.MessageError
+                });
+
+                Log.Warning("Scan job not started due to error: {Error}", ex.Message);
+            }
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -195,14 +208,28 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // 3. Start the scan
-                var scanId = await scanManager.StartScanAsync(request, sitesToScan);
-
-                await responseStream.WriteAsync(new StartStatus
+                try
                 {
-                    Status = $"Sites to scan are queued up. Scan id = {scanId}"
-                });
+                    var scanId = await scanManager.StartScanAsync(request, sitesToScan);
 
-                Log.Information("Scan job started");
+                    await responseStream.WriteAsync(new StartStatus
+                    {
+                        Status = $"Sites to scan are queued up. Scan id = {scanId}"
+                    });
+
+                    Log.Information("Scan job started");
+
+                }
+                catch (Exception ex)
+                {
+                    await responseStream.WriteAsync(new StartStatus
+                    {
+                        Status = $"Scan job not started due to error: {ex.Message}",
+                        Type = Constants.MessageError
+                    });
+
+                    Log.Warning("Scan job not started due to error: {Error}", ex.Message);
+                }
             }
         }
     }

@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Services
     internal sealed class ScanManager : IHostedService
     {
         private readonly IHostApplicationLifetime hostApplicationLifetime;
-        private object scanListLock = new object();        
+        private object scanListLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager)
@@ -41,17 +41,14 @@ namespace PnP.Scanning.Core.Services
 
         internal int MaxParallelScans { get; private set; } = 3;
 
-        internal int ParallelThreads { get; private set; } = 4;
+        internal int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
 
         internal async Task<Guid> StartScanAsync(StartRequest start, List<string> siteCollectionList)
         {
             Log.Information("Starting the scan job");
 
-            if (NumberOfScansRunning() >= MaxParallelScans)
-            {
-                Log.Error("Max number of parallel scans reached");
-                throw new Exception("Max number of parallel scans reached");
-            }
+            // Aren't we trying to start too many parallel scans?
+            EnforeMaximumParallelRunningScans();
 
             Guid scanId = Guid.NewGuid();
 
@@ -63,10 +60,25 @@ namespace PnP.Scanning.Core.Services
             var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
             // Configure the queue
-            siteCollectionQueue.ConfigureQueue(ParallelThreads);
+            siteCollectionQueue.ConfigureQueue(ParallelSiteCollectionProcessingThreads);
 
             // Get the scan configuration options to use
             OptionsBase options = OptionsBase.FromScannerInput(start);
+
+            Log.Information("Add scan request {ScanId} to in-memory list", scanId);
+            var scan = new Scan(scanId, siteCollectionQueue, options)
+            {
+                SiteCollectionsToScan = siteCollectionList.Count,
+                Status = ScanStatus.Queued,
+            };
+
+            // Ensure scan is added to the in-memory list as once a site collection is enqueud it
+            // starts executing and will check the in-memory list
+            if (!scans.TryAdd(scanId, scan))
+            {
+                Log.Error("Scan request was not added to the list of running scans");
+                throw new Exception("Scan request was not added to the list of running scans");
+            }
 
             Log.Information("Start enqueuing {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
             // Enqueue the received site collections
@@ -74,24 +86,21 @@ namespace PnP.Scanning.Core.Services
             {
                 await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site));
             }
-
             Log.Information("Enqueued {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
 
-            var scan = new Scan(scanId, siteCollectionQueue, options)
-            {
-                SiteCollectionsToScan = siteCollectionList.Count,
-                Status = ScanStatus.Queued,
-            };
-
-            if (!scans.TryAdd(scanId, scan))
-            {
-                Log.Error("Scan request was not added to the list of running scans");
-                throw new Exception("Scan request was not added to the list of running scans");
-            }
-
+            // We're done
             Log.Information("Scan started for scan {ScanId}!", scanId);
 
             return scanId;
+        }
+
+        private void EnforeMaximumParallelRunningScans()
+        {
+            if (NumberOfScansRunning() >= MaxParallelScans)
+            {
+                Log.Error("Max number of parallel scans reached");
+                throw new Exception("Max number of parallel scans reached");
+            }
         }
 
         internal async Task RestartScanAsync(Guid scanId)
@@ -132,6 +141,9 @@ namespace PnP.Scanning.Core.Services
 
         private async Task ProcessScanRestartAsync(Guid scanId)
         {
+            // Aren't we trying to start too many parallel scans?
+            EnforeMaximumParallelRunningScans();
+
             // Update scan status in database
             var start = await StorageManager.RestartScanAsync(scanId);
 
@@ -144,10 +156,24 @@ namespace PnP.Scanning.Core.Services
                 var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
                 // Configure the queue
-                siteCollectionQueue.ConfigureQueue(ParallelThreads);
+                siteCollectionQueue.ConfigureQueue(ParallelSiteCollectionProcessingThreads);
 
                 // Get the scan configuration options to use
                 OptionsBase options = OptionsBase.FromScannerInput(start);
+
+                var scan = new Scan(scanId, siteCollectionQueue, options)
+                {
+                    SiteCollectionsToScan = siteCollectionList.Count,
+                    Status = ScanStatus.Queued,
+                };
+
+                // Important to add the scan to the in-memory list as after queueing a site collection
+                // can start processing immediately and that requires the in-memory list entry
+                if (!scans.TryAdd(scanId, scan))
+                {
+                    Log.Error("Scan restart request was not added to the list of running scans");
+                    throw new Exception("Scan restart request was not added to the list of running scans");
+                }
 
                 Log.Information("Start enqueuing {SiteCollectionCount} site collections for restarting scan {ScanId}", siteCollectionList.Count, scanId);
                 // Enqueue the received site collections
@@ -156,19 +182,8 @@ namespace PnP.Scanning.Core.Services
                     await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site) { Restart = true });
                 }
 
+                // We're done
                 Log.Information("Enqueued {SiteCollectionCount} site collections for restarting scan {ScanId}", siteCollectionList.Count, scanId);
-
-                var scan = new Scan(scanId, siteCollectionQueue, options)
-                {
-                    SiteCollectionsToScan = siteCollectionList.Count,
-                    Status = ScanStatus.Queued,
-                };
-
-                if (!scans.TryAdd(scanId, scan))
-                {
-                    Log.Error("Scan restart request was not added to the list of running scans");
-                    throw new Exception("Scan restart request was not added to the list of running scans");
-                }
             }
             else
             {
@@ -245,18 +260,20 @@ namespace PnP.Scanning.Core.Services
         internal bool IsPausing(Guid scanId)
         {
             // Import to also protect this operation via the scan list lock as otherwise it can result in deadlocks
-            lock (scanListLock)
+            if (scans.ContainsKey(scanId))
             {
                 return scans[scanId].Status == ScanStatus.Pausing || scans[scanId].Status == ScanStatus.Paused;
+            }
+            else
+            {
+                Log.Warning("Error while running IsPausing for scan {ScanId}. Error = scan if not listed yet", scanId);
+                return false;
             }
         }
 
         internal bool ScanExists(Guid scanId)
         {
-            lock (scanListLock)
-            {
-                return scans.ContainsKey(scanId);
-            }
+            return scans.ContainsKey(scanId);
         }
 
         internal async Task PrepareDatabaseForPauseAsync(Guid scanId, bool all)
@@ -348,6 +365,8 @@ namespace PnP.Scanning.Core.Services
             {
                 Log.Information("Updating scan status for scan {ScanId} to {ScanStatus} in database", scanId, scanStatus);
                 await StorageManager.SetScanStatusAsync(scanId, scanStatus);
+                // Add a short delay
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
             }
         }
 
@@ -363,14 +382,11 @@ namespace PnP.Scanning.Core.Services
         internal int NumberOfScansRunning()
         {
             int running = 0;
-            lock (scanListLock)
+            foreach (var scan in scans)
             {
-                foreach (var scan in scans)
+                if (scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running)
                 {
-                    if (scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running)
-                    {
-                        running++;
-                    }
+                    running++;
                 }
             }
 
@@ -403,17 +419,24 @@ namespace PnP.Scanning.Core.Services
             bool busy = true;
             while (busy)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(500));
+                await Task.Delay(TimeSpan.FromMilliseconds(2000));
+
+                List<Guid> scansToMarkAsDone = new();
 
                 foreach (var scan in scans.ToList())
                 {
                     if ((scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running) &&
-                         scan.Value.SiteCollectionsScanned == scan.Value.SiteCollectionsToScan)
+                            scan.Value.SiteCollectionsScanned == scan.Value.SiteCollectionsToScan)
                     {
-                        await UpdateScanStatusAsync(scan.Value.Id, ScanStatus.Finished);
-
-                        await StorageManager.EndScanAsync(scan.Value.Id);
+                        scansToMarkAsDone.Add(scan.Value.Id);
                     }
+                }
+
+                foreach(var scanId in scansToMarkAsDone)
+                {
+                    await UpdateScanStatusAsync(scanId, ScanStatus.Finished);
+
+                    await StorageManager.EndScanAsync(scanId);
                 }
 
             }
@@ -445,16 +468,13 @@ namespace PnP.Scanning.Core.Services
                 {
                     if (scan.Value.Status == ScanStatus.Finished)
                     {
-                        lock (scanListLock)
+                        if (scans.TryRemove(scan))
                         {
-                            if (scans.TryRemove(scan))
-                            {
-                                Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
-                            }
-                            else
-                            {
-                                Log.Warning("Failed removing finished scan {ScanId} from the memory list", scan.Key);
-                            }
+                            Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
+                        }
+                        else
+                        {
+                            Log.Warning("Failed removing finished scan {ScanId} from the memory list", scan.Key);
                         }
                     }
                 }

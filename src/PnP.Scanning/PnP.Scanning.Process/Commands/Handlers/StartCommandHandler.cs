@@ -338,7 +338,18 @@ namespace PnP.Scanning.Process.Commands
             var call = client.Start(start);
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
-                ColorConsole.WriteInfo($"Status: {message.Status}");
+                if (message.Type == Constants.MessageError)
+                {
+                    ColorConsole.WriteError($"Status: {message.Status}");
+                }
+                else if (message.Type == Constants.MessageWarning)
+                {
+                    ColorConsole.WriteWarning($"Status: {message.Status}");
+                }
+                else
+                {
+                    ColorConsole.WriteInfo($"Status: {message.Status}");
+                }
             }
         }
     }

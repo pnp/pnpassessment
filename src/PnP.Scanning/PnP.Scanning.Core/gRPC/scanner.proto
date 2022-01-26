@@ -33,7 +33,7 @@ message ScanStatusReply {
 	int32 SiteCollectionsScanned = 4;
 }
 
-// StartStreaming
+// Start
 message StartRequest {
 	string Mode = 1;
 	string Tenant = 2;
@@ -53,6 +53,7 @@ message PropertyRequest {
 
 message StartStatus {
 	string Status = 1;
+	string Type = 2;
 }
 
 // Stop
@@ -103,4 +104,5 @@ message RestartRequest {
 
 message RestartStatus {
 	string Status = 1;
+	string Type = 2;
 }
