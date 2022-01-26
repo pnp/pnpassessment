@@ -268,6 +268,11 @@ namespace PnP.Scanning.Core.Services
             {
                 await StorageManager.SetScanStatusAsync(scan, pauseMode);
             }
+
+            if (pauseMode == ScanStatus.Paused)
+            {
+                ClearFinishedOrPausedScansFromMemory();
+            }
         }
 
         internal bool IsPausing(Guid scanId)

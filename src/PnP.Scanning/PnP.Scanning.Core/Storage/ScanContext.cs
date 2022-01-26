@@ -10,6 +10,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Property>? Properties { get; set; }
 
+        internal DbSet<History>? History { get; set; }
+
         internal DbSet<SiteCollection>? SiteCollections { get; set; }
 
         internal DbSet<Web>? Webs { get; set; }
@@ -57,12 +59,18 @@ namespace PnP.Scanning.Core.Storage
                 entity.HasIndex(e => new { e.ScanId, e.Name }).IsUnique();
             });
 
+            modelBuilder.Entity<History>().ToTable("History");
+            modelBuilder.Entity<History>(entity =>
+            {
+                entity.HasKey(e => new { e.Id });
+                entity.HasIndex(e => new { e.ScanId, e.Id, e.Event, e.EventDate }).IsUnique();
+            });
+
             modelBuilder.Entity<SiteCollection>().ToTable("SiteCollections");
             modelBuilder.Entity<SiteCollection>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl });
                 entity.HasIndex(e => new { e.ScanId, e.SiteUrl }).IsUnique();
-                entity.HasIndex(e => e.Status);
             });
 
             modelBuilder.Entity<Web>().ToTable("Webs");
@@ -70,7 +78,6 @@ namespace PnP.Scanning.Core.Storage
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
                 entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl }).IsUnique();
-                entity.HasIndex(e => e.Status);
             });
 
 #if DEBUG

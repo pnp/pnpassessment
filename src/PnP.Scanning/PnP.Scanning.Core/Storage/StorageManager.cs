@@ -1,5 +1,6 @@
 ﻿using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.Shell.Interop;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
@@ -31,6 +32,8 @@ namespace PnP.Scanning.Core.Storage
                     CLIAuthMode = start.AuthMode,
                     CLIApplicationId = start.ApplicationId,
                 });
+
+                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");
 
                 if (start.Properties.Count > 0)
                 {
@@ -73,8 +76,14 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
+
+                    if (scan.Status != ScanStatus.Finished)
+                    {
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Finished}");
+                        scan.Status = ScanStatus.Finished;
+                    }
+
                     scan.EndDate = DateTime.Now;
-                    scan.Status = ScanStatus.Finished;
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in EndScanAsync for scan {ScanId}", scanId);
@@ -98,7 +107,11 @@ namespace PnP.Scanning.Core.Storage
                 if (scan != null)
                 {
                     Log.Information("Setting Scan table to status {Status} for scan {ScanId}", scanStatus, scanId);
-                    scan.Status = scanStatus;
+                    if (scan.Status != scanStatus)
+                    {
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"From {scan.Status} to {scanStatus}");
+                        scan.Status = scanStatus;
+                    }
 
                     // Consider a scan marked as Finished, Paused or Terminate to have an end date set
                     if (scanStatus != ScanStatus.Running &&
@@ -110,8 +123,7 @@ namespace PnP.Scanning.Core.Storage
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in SetScanStatusAsync for scan {ScanId}", scanId);
-
-
+                    
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
                 }
@@ -387,7 +399,7 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    scan.StartDate = DateTime.MinValue;
+                    await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Queued}");
                     scan.EndDate = DateTime.MinValue;
                     scan.Status = ScanStatus.Queued;
 
@@ -529,6 +541,17 @@ namespace PnP.Scanning.Core.Storage
                 // the main DB file https://www.sqlite.org/pragma.html#pragma_wal_checkpoint
                 await dbContext.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(RESTART);");
             }
+        }
+
+        internal async Task AddHistoryRecordAsync(ScanContext dbContext, Guid scanId, string eventName, DateTime eventDate, string eventMessage)
+        {
+            await dbContext.History.AddAsync(new History
+            {
+                ScanId = scanId,
+                Event = eventName,
+                EventDate = eventDate,
+                Message = eventMessage
+            });
         }
 
         internal static string GetScanDataFolder(Guid scanId)

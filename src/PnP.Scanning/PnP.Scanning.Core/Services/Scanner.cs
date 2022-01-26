@@ -150,13 +150,13 @@ namespace PnP.Scanning.Core.Services
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "Error restarting scan job: {Message}", ex.Message);
+
                 await responseStream.WriteAsync(new RestartStatus
                 {
                     Status = $"Scan job not restarted due to error: {ex.Message}",
                     Type = Constants.MessageError
                 });
-
-                Log.Warning("Scan job not started due to error: {Error}", ex.Message);
             }
         }
 
@@ -228,13 +228,13 @@ namespace PnP.Scanning.Core.Services
                 }
                 catch (Exception ex)
                 {
+                    Log.Error(ex, "Error starting scan job: {Message}", ex.Message);
+
                     await responseStream.WriteAsync(new StartStatus
                     {
                         Status = $"Scan job not started due to error: {ex.Message}",
                         Type = Constants.MessageError
                     });
-
-                    Log.Warning("Scan job not started due to error: {Error}", ex.Message);
                 }
             }
         }

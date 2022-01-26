@@ -15,7 +15,7 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            var cmd = new Command("stop", "stops all the scans");
+            var cmd = new Command("stop", "stops the scan engine");
 
             // Configure options for stop
 

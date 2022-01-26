@@ -30,5 +30,9 @@
         internal const string MessageWarning = "Warning";
         internal const string MessageError = "Error";
         #endregion
+
+        #region History events
+        internal const string EventScanStatusChange = "ScanStatusChange";
+        #endregion
     }
 }
