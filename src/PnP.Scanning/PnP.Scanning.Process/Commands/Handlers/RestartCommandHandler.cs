@@ -12,6 +12,7 @@ namespace PnP.Scanning.Process.Commands
         private Command cmd;
 
         private Option<Guid> scanIdOption;
+        private Option<int> threadsOption;
 
         internal RestartCommandHandler(ScannerManager processManagerInstance)
         {
@@ -26,26 +27,39 @@ namespace PnP.Scanning.Process.Commands
                 IsRequired = true,
             };
             cmd.AddOption(scanIdOption);
+
+            threadsOption = new(
+                name: $"--{Constants.StartThreads}",
+                description: "Override number of threads set at scan start")
+            {
+                IsRequired = false
+            };
+            cmd.AddOption(threadsOption);
         }
 
         public Command Create()
         {
-            cmd.SetHandler(async (Guid scanId) => 
+            cmd.SetHandler(async (Guid scanId, int threads) => 
                             { 
-                                await HandleRestartAsync(scanId); 
+                                await HandleRestartAsync(scanId, threads); 
                             },
-                            scanIdOption);
+                            scanIdOption, threadsOption);
 
             return cmd;
         }
 
-        private async Task HandleRestartAsync(Guid scanId)
+        private async Task HandleRestartAsync(Guid scanId, int threads)
         {
             // Setup client to talk to scanner
             var client = await processManager.GetScannerClientAsync();
 
             // Restart the scan
-            var call = client.Restart(new Core.Services.RestartRequest { Id = scanId.ToString() });
+            var call = client.Restart(new Core.Services.RestartRequest 
+            { 
+                Id = scanId.ToString(),
+                Threads = threads
+            });
+
             await foreach (var message in call.ResponseStream.ReadAllAsync())
             {
                 if (message.Type == Constants.MessageError)

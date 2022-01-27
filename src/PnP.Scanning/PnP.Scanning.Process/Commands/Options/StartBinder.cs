@@ -15,13 +15,14 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<string> certPath;
         private readonly Option<FileInfo> certFile;
         private readonly Option<string> certPassword;
+        private readonly Option<int> threads;
 
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
 
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<Microsoft365Environment> environmentInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
-                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput
+                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
 #if DEBUG
                            ,Option<int> testNumberOfSitesInput
 #endif
@@ -37,6 +38,8 @@ namespace PnP.Scanning.Process.Commands
             certPath = certPathInput;
             certFile = certFileInput;
             certPassword = certPasswordInput;
+            threads = threadsInput;
+
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -55,6 +58,7 @@ namespace PnP.Scanning.Process.Commands
                 CertPath = bindingContext.ParseResult.GetValueForOption(certPath),
                 CertFile = bindingContext.ParseResult.GetValueForOption(certFile),
                 CertPassword = bindingContext.ParseResult.GetValueForOption(certPassword),
+                Threads = bindingContext.ParseResult.GetValueForOption(threads),
 
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),

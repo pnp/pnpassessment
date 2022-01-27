@@ -17,7 +17,6 @@ namespace PnP.Scanning.Core.Queues
 
         internal void ConfigureQueue(int parallelThreads)
         {
-            Log.Information("Configuring {ParallelThreads} parallel threads for this queue", parallelThreads);
             ParallelThreads = parallelThreads;
         }
     }

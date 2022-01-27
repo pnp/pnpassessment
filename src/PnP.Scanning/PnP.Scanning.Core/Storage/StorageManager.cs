@@ -32,6 +32,7 @@ namespace PnP.Scanning.Core.Storage
                     CLISiteFile = start.SitesFile,
                     CLIAuthMode = start.AuthMode,
                     CLIApplicationId = start.ApplicationId,
+                    CLIThreads = start.Threads,
                 });
 
                 await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");
@@ -439,7 +440,8 @@ namespace PnP.Scanning.Core.Storage
                     // Emulate the original start message as the scan might need some of the passed properties
                     StartRequest start = new() 
                     {
-                        Mode = scan.CLIMode.ToString()
+                        Mode = scan.CLIMode.ToString(),
+                        Threads = scan.CLIThreads
                     };
 
                     foreach(var property in await dbContext.Properties.Where(p=>p.ScanId == scanId).ToListAsync())

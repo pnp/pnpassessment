@@ -27,5 +27,7 @@
         public string? CLIAuthMode { get; set; }
 
         public string? CLIApplicationId { get; set; }
+
+        public int CLIThreads { get; set; }
     }
 }

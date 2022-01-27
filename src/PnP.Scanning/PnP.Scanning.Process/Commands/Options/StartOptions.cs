@@ -22,6 +22,8 @@
 
         public string? CertPassword { get; set; }
 
+        public int Threads { get; set; }
+
 #if DEBUG
         public int TestNumberOfSites { get; set; }
 #endif

@@ -13,6 +13,7 @@
         internal const string StartCertPath = "certpath";
         internal const string StartCertFile = "certfile";
         internal const string StartCertPassword = "certpassword";
+        internal const string StartThreads = "threads";
 
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
@@ -21,7 +22,7 @@
         internal const string ListFinished = "finished";
         internal const string ListTerminated = "terminated";
 
-        internal const string PauseScanId = "scanid";
+        internal const string PauseScanId = "id";
         internal const string PauseAll = "all";
         #endregion
 

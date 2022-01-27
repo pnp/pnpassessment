@@ -59,8 +59,8 @@ namespace PnP.Scanning.Core.Services
             // Launch a queue to handle this scan
             var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
-            // Configure the queue
-            siteCollectionQueue.ConfigureQueue(ParallelSiteCollectionProcessingThreads);
+            // Configure threading for the site collection and web queues
+            siteCollectionQueue.ConfigureParallelProcessing(start.Threads);
 
             // Get the scan configuration options to use
             OptionsBase options = OptionsBase.FromScannerInput(start);
@@ -121,7 +121,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal async Task RestartScanAsync(Guid scanId, Action<string> feedback)
+        internal async Task RestartScanAsync(Guid scanId, RestartRequest request, Action<string> feedback)
         {
             Log.Information("Restarting scan {ScanId}", scanId);
 
@@ -139,7 +139,7 @@ namespace PnP.Scanning.Core.Services
             if (scanStatus == ScanStatus.Paused)
             {
                 // Handle the scan restart
-                await ProcessScanRestartAsync(scanId, (status) =>
+                await ProcessScanRestartAsync(scanId, request, (status) =>
                 {
                     feedback.Invoke(status);
                 });
@@ -153,7 +153,7 @@ namespace PnP.Scanning.Core.Services
                 await StorageManager.ConsolidatedScanToEnableRestartAsync(scanId);
 
                 // Handle the scan restart
-                await ProcessScanRestartAsync(scanId, (status) => 
+                await ProcessScanRestartAsync(scanId, request, (status) => 
                 { 
                     feedback.Invoke(status);
                 });
@@ -166,7 +166,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        private async Task ProcessScanRestartAsync(Guid scanId, Action<string> feedback)
+        private async Task ProcessScanRestartAsync(Guid scanId, RestartRequest request, Action<string> feedback)
         {
             // Aren't we trying to start too many parallel scans?
             EnforeMaximumParallelRunningScans();
@@ -184,8 +184,18 @@ namespace PnP.Scanning.Core.Services
                 // Launch a queue to handle this scan
                 var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
 
-                // Configure the queue
-                siteCollectionQueue.ConfigureQueue(ParallelSiteCollectionProcessingThreads);
+                // Configure threading for the site collection and web queues
+                int threadsToUse = start.Threads;
+                if(request.Threads > 0)
+                {
+                    Log.Information("Scan {ScanId} was originally started with {Threads} but overriden to use {NewThreads} during this restart", scanId, threadsToUse, request.Threads);
+                    threadsToUse = request.Threads;
+                }
+                else
+                {
+                    Log.Information("Scan {ScanId} was originally started with {Threads}, restart will use the same setting", scanId, threadsToUse);
+                }
+                siteCollectionQueue.ConfigureParallelProcessing(threadsToUse);
 
                 // Get the scan configuration options to use
                 OptionsBase options = OptionsBase.FromScannerInput(start);

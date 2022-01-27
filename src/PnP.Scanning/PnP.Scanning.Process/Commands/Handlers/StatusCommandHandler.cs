@@ -15,7 +15,7 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            var cmd = new Command("status", "status of the current scan");
+            var cmd = new Command("status", "Realtime status of the currently running scans");
 
             // Configure options for status
 

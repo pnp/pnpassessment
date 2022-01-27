@@ -21,6 +21,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<string> certPathOption;
         private Option<FileInfo> certPfxFileInfoOption;
         private Option<string> certPfxFilePasswordOption;
+        private Option<int> threadsOption;
 #if DEBUG
         // Specific options for the test handler
         private Option<int> testNumberOfSitesOption;
@@ -30,7 +31,7 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("start", "starts a scan");
+            cmd = new Command("start", "Starts a new scan");
 
             // Configure the options for the start command
 
@@ -233,6 +234,18 @@ namespace PnP.Scanning.Process.Commands
             };
             cmd.AddOption(certPfxFilePasswordOption);
 
+            // Application id
+            threadsOption = new(
+                name: $"--{Constants.StartThreads}",
+                // Default application to use double of the logical processor threads
+                getDefaultValue: () => Environment.ProcessorCount,
+                description: "Number of parallel scan operations to use")
+            {
+                IsRequired = true
+            };
+            cmd.AddOption(threadsOption);
+
+
             #endregion
 
             #region Scan component specific handlers
@@ -292,7 +305,7 @@ namespace PnP.Scanning.Process.Commands
 
             // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
-                                              authenticationModeOption, applicationIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption
+                                              authenticationModeOption, applicationIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
 #if DEBUG                                              
                                               , testNumberOfSitesOption
 #endif
@@ -321,6 +334,7 @@ namespace PnP.Scanning.Process.Commands
                 SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName.ToString() : "",
                 AuthMode = arguments.AuthMode.ToString(),
                 ApplicationId = arguments.ApplicationId.ToString(),
+                Threads = arguments.Threads,
             };
 
 #if DEBUG

@@ -18,7 +18,7 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("pause", "Pauses a scan");
+            cmd = new Command("pause", "Pauses one or all scans");
 
             scanIdOption = new(
                 name: $"--{Constants.PauseScanId}",

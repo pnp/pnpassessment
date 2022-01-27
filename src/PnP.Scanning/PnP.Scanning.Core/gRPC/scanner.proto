@@ -42,7 +42,8 @@ message StartRequest {
 	string SitesFile = 5;
 	string AuthMode = 6;
 	string ApplicationId = 7;
-	repeated PropertyRequest Properties = 8;
+	int32 Threads = 8;
+	repeated PropertyRequest Properties = 9;
 }
 
 message PropertyRequest {
@@ -100,6 +101,7 @@ message PauseStatus {
 // Restart
 message RestartRequest {
 	string Id = 1;
+	int32 Threads = 2;
 }
 
 message RestartStatus {

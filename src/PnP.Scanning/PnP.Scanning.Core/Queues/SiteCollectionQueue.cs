@@ -22,6 +22,28 @@ namespace PnP.Scanning.Core.Queues
 
         private Guid ScanId { get; set; }
 
+        internal void ConfigureParallelProcessing(int threads)
+        {
+            if (threads < 1)
+            {
+                Log.Information("Threads for scan {ScanId} was {Threads}. Setting it to it's default again {Default}", ScanId, threads, Environment.ProcessorCount);
+                threads = Environment.ProcessorCount;
+            }
+
+            if (threads == 1)
+            {
+                Log.Information("Using {SiteThread} site collection scan thread and {WebThread} web scan thread", 1, 1);
+                // Typically used for debugging work
+                ParallelWebProcessingThreads = 1;
+            }
+            else
+            {
+                int siteThreads = threads / ParallelWebProcessingThreads;
+                Log.Information("Using {SiteThread} site collection scan threads and {WebThread} web scan threads", siteThreads, ParallelWebProcessingThreads);
+                ConfigureQueue(siteThreads);
+            }
+        }
+
         internal async Task EnqueueAsync(SiteCollectionQueueItem siteCollection)
         {
             if (siteCollectionsToScan == null)
