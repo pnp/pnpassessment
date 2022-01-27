@@ -12,6 +12,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<History>? History { get; set; }
 
+        internal DbSet<Cache>? Cache { get; set; } 
+
         internal DbSet<SiteCollection>? SiteCollections { get; set; }
 
         internal DbSet<Web>? Webs { get; set; }
@@ -57,6 +59,13 @@ namespace PnP.Scanning.Core.Storage
             {
                 entity.HasKey(e => new { e.ScanId, e.Name });
                 entity.HasIndex(e => new { e.ScanId, e.Name }).IsUnique();
+            });
+
+            modelBuilder.Entity<Cache>().ToTable("Cache");
+            modelBuilder.Entity<Cache>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.Key });
+                entity.HasIndex(e => new { e.ScanId, e.Key }).IsUnique();
             });
 
             modelBuilder.Entity<History>().ToTable("History");

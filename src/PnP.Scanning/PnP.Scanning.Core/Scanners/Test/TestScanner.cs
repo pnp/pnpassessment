@@ -1,4 +1,5 @@
-﻿using PnP.Scanning.Core.Storage;
+﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -6,8 +7,9 @@ namespace PnP.Scanning.Core.Scanners
     {
         private const int minDelay = 500;
         private const int maxDelay = 10000;
+        private const string Cache1 = "Cache1";
 
-        internal TestScanner(StorageManager storageManager, Guid scanId, string siteUrl, string webUrl, TestOptions options) : base(storageManager, scanId, siteUrl, webUrl)
+        internal TestScanner(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteUrl, string webUrl, TestOptions options) : base(scanManager, storageManager, scanId, siteUrl, webUrl)
         {
             Options = options;            
         }
@@ -19,6 +21,8 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Started for {SiteCollectionUrl}{WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", SiteUrl, WebUrl, ScanId, Environment.CurrentManagedThreadId);
             int delay1 = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay1);
+
+            Logger.Information("In scan {ScanId} cache contained key {Key} with value {Value}", ScanId, Cache1, GetFromCache(Cache1));
 
             Logger.Information("Step 1 Delay {SiteCollectionUrl}{WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", SiteUrl, WebUrl, ScanId, Environment.CurrentManagedThreadId);
             var delay2 = new Random().Next(minDelay, maxDelay);
@@ -54,6 +58,8 @@ namespace PnP.Scanning.Core.Scanners
             {
                 throw new Exception($"Something went wrong during prescanning with the test scanner with options {Options.TestNumberOfSites}!!");
             }
+
+            AddToCache(Cache1, $"PnP Rocks! - {DateTime.Now}");
 
             Logger.Information("Pre scanning work for scan {ScanId} is done", ScanId);
         }

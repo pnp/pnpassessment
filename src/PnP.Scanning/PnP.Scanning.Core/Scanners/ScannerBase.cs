@@ -1,12 +1,14 @@
-﻿using PnP.Scanning.Core.Storage;
+﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Storage;
 using Serilog;
 
 namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class ScannerBase
     {
-        internal ScannerBase(StorageManager storageManager, Guid scanId, string siteUrl, string webUrl)
+        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteUrl, string webUrl)
         {
+            ScanManager = scanManager;
             StorageManager = storageManager;
             ScanId = scanId;
             SiteUrl = siteUrl;
@@ -17,6 +19,8 @@ namespace PnP.Scanning.Core.Scanners
         internal string WebUrl { get; set; }
 
         internal string SiteUrl { get; set; }
+
+        internal ScanManager ScanManager { get; private set; }
 
         internal StorageManager StorageManager { get; private set; }
 
@@ -36,17 +40,66 @@ namespace PnP.Scanning.Core.Scanners
         {
         }
 
-        internal static ScannerBase? NewScanner(StorageManager storageManager, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
+        internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {
 
 #if DEBUG
             if (options is TestOptions testOptions)
             {
-                return new TestScanner(storageManager, scanId, siteCollectionUrl, webUrl, testOptions);
+                return new TestScanner(scanManager, storageManager, scanId, siteCollectionUrl, webUrl, testOptions);
             }
 #endif
 
             return null;
+        }
+
+        internal void AddToCache(string key, string value)
+        {
+            key = BuildKey(key);
+            if (ScanManager.Cache.ContainsKey(key))
+            {
+                ScanManager.Cache[key] = value;
+                Log.Information("For scan {ScanId} cache key {Key} was updated with value {Value}", ScanId, key, value);
+            }
+            else
+            {
+                if (ScanManager.Cache.TryAdd(key, value))
+                {
+                    Log.Information("For scan {ScanId} key {Key} was added to cache with value {Value}", ScanId, key, value);
+                }
+                else
+                {
+                    Log.Warning("For scan {ScanId} adding key {Key} with value {Value} failed", ScanId, key, value);
+                }
+            }
+        }
+
+        internal string GetFromCache(string key)
+        {
+            key = BuildKey(key);
+
+            if (ScanManager.Cache.TryGetValue(key, out var value))
+            {
+                return value;
+            }
+            else
+            {
+                Log.Warning("For scan {ScanId} the value for key {Key} with was requested but the key was not cached", ScanId, key);
+                return null;
+            }
+        }
+
+        private string BuildKey(string key)
+        {
+            key = key.Trim().Replace(" ", "-");
+
+            if (string.IsNullOrEmpty(key))
+            {
+                Log.Error("Empty cache key presented for scan {ScanId}", ScanId);
+                throw new Exception($"Empty cache key presented for scan {ScanId}");
+            }
+
+            return $"{ScanId}-{key}";
         }
     }
 }

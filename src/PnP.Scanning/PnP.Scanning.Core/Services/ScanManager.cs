@@ -39,6 +39,8 @@ namespace PnP.Scanning.Core.Services
 
         internal SiteEnumerationManager SiteEnumerationManager { get; private set; }
 
+        internal ConcurrentDictionary<string, string> Cache { get; } = new();
+
         internal int MaxParallelScans { get; private set; } = 3;
 
         internal int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
@@ -81,13 +83,17 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(StorageManager, scanId, siteCollectionList[0], "/", options);
+            var scanner = ScannerBase.NewScanner(this, StorageManager, scanId, siteCollectionList[0], "/", options);
             if (scanner != null)
             {
                 try
                 {
                     await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Running);
                     await scanner.PreScanningAsync();
+
+                    // Persist the possibly cached data, needed to restore this data during a restart
+                    await PersistCacheDataAsync(scanId);
+
                     await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Finished);
                 }
                 catch (Exception ex)
@@ -180,6 +186,9 @@ namespace PnP.Scanning.Core.Services
             if (siteCollectionList.Count > 0)
             {
                 feedback.Invoke($"{siteCollectionList.Count} site collections will be in scope of this restart");
+
+                // Populate in-memory cache again from persisted cache data
+                await LoadCachedDataAsync(scanId);
 
                 // Launch a queue to handle this scan
                 var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
@@ -372,7 +381,7 @@ namespace PnP.Scanning.Core.Services
 
             do
             {
-                Log.Information("Check for running web scans for scan {ScanId}", scanId);
+                Log.Information("Check for running web scans for scan {ScanId}", all ? "*ALL*" : scanId);
 
                 foreach (var scan in scansToPause)
                 {
@@ -388,7 +397,7 @@ namespace PnP.Scanning.Core.Services
 
                 if (pendingWebScans)
                 {
-                    Log.Information("Running web scans for scan {ScanId}, waiting {Delay} seconds", scanId, delay);
+                    Log.Information("Running web scans for scan {ScanId}, waiting {Delay} seconds", all ? "*ALL*" : scanId, delay);
                     checksDone++;
                     await Task.Delay(TimeSpan.FromSeconds(delay));
                 }
@@ -520,6 +529,7 @@ namespace PnP.Scanning.Core.Services
 
         private void ClearFinishedOrPausedScansFromMemory()
         {
+            // Clear scan list
             foreach (var scan in scans.ToList())
             {
                 if (scan.Value.Status == ScanStatus.Finished || scan.Value.Status == ScanStatus.Paused)
@@ -527,10 +537,65 @@ namespace PnP.Scanning.Core.Services
                     if (scans.TryRemove(scan))
                     {
                         Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
+                        
+                        // Clear cached data for removed scan
+                        foreach (var cacheEntry in Cache)
+                        {
+                            if (cacheEntry.Key.StartsWith($"{scan.Key}-"))
+                            {
+                                if (Cache.TryRemove(cacheEntry))
+                                {
+                                    Log.Information("Removing cache key {Key} for finished scan {ScanId} from the memory list", cacheEntry.Key, scan.Key);
+                                }
+                                else
+                                {
+                                    Log.Warning("Failed removing cache key {Key} for finished scan {ScanId} from the memory list", cacheEntry.Key, scan.Key);
+                                }
+                            }
+                        }
                     }
                     else
                     {
                         Log.Warning("Failed removing finished scan {ScanId} from the memory list", scan.Key);
+                    }
+                }
+            }
+        }
+
+        private async Task PersistCacheDataAsync(Guid scanId)
+        {
+            Dictionary<string, string> cacheData = new();
+
+            // Get the cache data relavent for the scan to work with
+            foreach(var cacheEntry in Cache)
+            {
+                if (cacheEntry.Key.StartsWith($"{scanId}-"))
+                {
+                    cacheData[cacheEntry.Key] = cacheEntry.Value;
+                }
+            }
+
+            if (cacheData.Count > 0)
+            {
+                Log.Information("For scan {ScanId} {Count} cache items will be persisted", scanId, cacheData.Count);
+                await StorageManager.StoreCacheResultsAsync(scanId, cacheData);
+            }
+        }
+
+        private async Task LoadCachedDataAsync(Guid scanId)
+        {
+            var cacheData = await StorageManager.LoadCacheResultsAsync(scanId);
+            if (cacheData != null && cacheData.Count > 0)
+            {
+                foreach (var cacheEntry in cacheData)
+                {
+                    if (Cache.TryAdd(cacheEntry.Key, cacheEntry.Value))
+                    {
+                        Log.Information("For scan {ScanId} cache key {Key} was restored with value {Value}", scanId, cacheEntry.Key, cacheEntry.Value);
+                    }
+                    else
+                    {
+                        Log.Warning("For scan {ScanId} cache key {Key} was not restored with value {Value}", scanId, cacheEntry.Key, cacheEntry.Value);
                     }
                 }
             }

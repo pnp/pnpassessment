@@ -497,6 +497,45 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        internal async Task StoreCacheResultsAsync(Guid scanId, Dictionary<string, string> cacheData)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                foreach(var data in cacheData)
+                {
+                    dbContext.Cache.Add(new Cache
+                    {
+                        ScanId = scanId,
+                        Key = data.Key,
+                        Value = data.Value,
+                    });
+                }
+
+                // Persist all the changes
+                await dbContext.SaveChangesAsync();
+                Log.Information("Database updates pushed in StoreCacheResultsAsync for scan {ScanId}", scanId);
+            }
+        }
+
+        internal async Task<Dictionary<string, string>> LoadCacheResultsAsync(Guid scanId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                Dictionary<string, string> cacheData = new();
+
+                int count = 0;
+                foreach (var cacheEntry in await dbContext.Cache.Where(p => p.ScanId == scanId).ToListAsync())
+                {
+                    cacheData[cacheEntry.Key] = cacheEntry.Value;
+                    count++;
+                }
+
+                Log.Information("For scan {ScanId} {Count} items were loaded from cache", scanId, count);
+
+                return cacheData;
+            }
+        }
+
         internal async Task<ScanResultFromDatabase?> GetScanResultAsync(Guid scanId)
         {
             try
