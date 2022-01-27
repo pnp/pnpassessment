@@ -8,11 +8,14 @@ namespace PnP.Scanning.Core.Scanners
         {
             var options = NewOptions(request.Mode);
 
+            // PER SCAN COMPONENT: configure scan component option handling here
 #if DEBUG
             // Assign other inputs
             if (request.Mode.Equals("test", StringComparison.OrdinalIgnoreCase))
             {
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
                 (options as TestOptions).TestNumberOfSites = int.Parse(request.Properties.First().Value);
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
             }
 #endif
 
@@ -21,6 +24,7 @@ namespace PnP.Scanning.Core.Scanners
 
         private static OptionsBase NewOptions(string mode)
         {
+            // PER SCAN COMPONENT: configure scan component option handling here
 #if DEBUG
             if (mode.Equals("test", StringComparison.OrdinalIgnoreCase))
             {

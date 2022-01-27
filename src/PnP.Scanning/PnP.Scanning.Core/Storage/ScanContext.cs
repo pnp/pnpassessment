@@ -3,6 +3,11 @@ using System.Reflection;
 
 namespace PnP.Scanning.Core.Storage
 {
+    /// <summary>
+    /// Scan database context used to work with the database
+    /// 
+    /// Note: For each new scan component work is needed here. Check the PER SCAN COMPONENT: strings to find the right places to add code
+    /// </summary>
     internal class ScanContext : DbContext
     {        
 
@@ -18,6 +23,7 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Web>? Webs { get; set; }
 
+        // PER SCAN COMPONENT: add new tables needed to store the data for the scan component
 #if DEBUG
         internal DbSet<TestDelay>? TestDelays { get; set; }
 #endif
@@ -89,6 +95,7 @@ namespace PnP.Scanning.Core.Storage
                 entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl }).IsUnique();
             });
 
+            // PER SCAN COMPONENT: define needed tables here
 #if DEBUG
             modelBuilder.Entity<TestDelay>().ToTable("TestDelays");
             modelBuilder.Entity<TestDelay>(entity =>

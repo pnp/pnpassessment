@@ -42,7 +42,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {
-
+            // PER SCAN COMPONENT: instantiate the scan component here
 #if DEBUG
             if (options is TestOptions testOptions)
             {

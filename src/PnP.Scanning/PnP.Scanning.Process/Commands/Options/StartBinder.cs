@@ -17,14 +17,16 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<string> certPassword;
         private readonly Option<int> threads;
 
+        // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
 
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<Microsoft365Environment> environmentInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
                            Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
+                           // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
-                           ,Option<int> testNumberOfSitesInput
+                           , Option<int> testNumberOfSitesInput
 #endif
             )
         {
@@ -40,6 +42,7 @@ namespace PnP.Scanning.Process.Commands
             certPassword = certPasswordInput;
             threads = threadsInput;
 
+            // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -59,7 +62,7 @@ namespace PnP.Scanning.Process.Commands
                 CertFile = bindingContext.ParseResult.GetValueForOption(certFile),
                 CertPassword = bindingContext.ParseResult.GetValueForOption(certPassword),
                 Threads = bindingContext.ParseResult.GetValueForOption(threads),
-
+                // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),
 #endif

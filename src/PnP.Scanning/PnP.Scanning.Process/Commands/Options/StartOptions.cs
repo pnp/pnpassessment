@@ -24,6 +24,7 @@
 
         public int Threads { get; set; }
 
+        // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
         public int TestNumberOfSites { get; set; }
 #endif

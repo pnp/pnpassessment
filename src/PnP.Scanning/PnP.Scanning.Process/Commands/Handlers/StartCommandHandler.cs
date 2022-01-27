@@ -22,6 +22,8 @@ namespace PnP.Scanning.Process.Commands
         private Option<FileInfo> certPfxFileInfoOption;
         private Option<string> certPfxFilePasswordOption;
         private Option<int> threadsOption;
+        
+        // PER SCAN COMPONENT: add scan component specific options here
 #if DEBUG
         // Specific options for the test handler
         private Option<int> testNumberOfSitesOption;
@@ -249,7 +251,7 @@ namespace PnP.Scanning.Process.Commands
             #endregion
 
             #region Scan component specific handlers
-
+            // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -306,7 +308,8 @@ namespace PnP.Scanning.Process.Commands
             // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
                                               authenticationModeOption, applicationIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
-#if DEBUG                                              
+                                              // PER SCAN COMPONENT: implement scan component specific options
+#if DEBUG
                                               , testNumberOfSitesOption
 #endif
                                               );
@@ -337,6 +340,7 @@ namespace PnP.Scanning.Process.Commands
                 Threads = arguments.Threads,
             };
 
+            // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
             if (arguments.Mode == Mode.Test)
             {

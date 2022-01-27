@@ -1,11 +1,16 @@
 ﻿using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualStudio.Shell.Interop;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
 namespace PnP.Scanning.Core.Storage
 {
+
+    /// <summary>
+    /// Class handling storage of data
+    /// 
+    /// Note: For each new scan component work is needed here. Check the PER SCAN COMPONENT: strings to find the right places to add code
+    /// </summary>
     internal sealed class StorageManager
     {
         internal static string DbName => "scan.db";
@@ -411,14 +416,11 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        private static async Task DropIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        private async Task DropIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {
+            // PER SCAN COMPONENT: For each scan component implement here the method to drop incomplete web scan results
 #if DEBUG
-            foreach (var testResult in await dbContext.TestDelays.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
-            {
-                dbContext.TestDelays.Remove(testResult);
-                Log.Information("Consolidating scan {ScanId}: dropping test results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
-            }
+            await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
         }
 
@@ -633,6 +635,8 @@ namespace PnP.Scanning.Core.Storage
 
         #region Scanner specific operations
 
+        // PER SCAN COMPONENT: implement respective SaveXXXScanResultsAsync and DropXXXIncompleteWebScanDataAsync methods
+
 #if DEBUG
 
         internal async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3)
@@ -652,6 +656,15 @@ namespace PnP.Scanning.Core.Storage
                 await dbContext.SaveChangesAsync();
                 Log.Information("Database updates pushed in SaveTestScanResultsAsync for scan {ScanId}", scanId);
 
+            }
+        }
+
+        private async Task DropTestIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        {
+            foreach (var testResult in await dbContext.TestDelays.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.TestDelays.Remove(testResult);
+                Log.Information("Consolidating scan {ScanId}: dropping test results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
             }
         }
 
