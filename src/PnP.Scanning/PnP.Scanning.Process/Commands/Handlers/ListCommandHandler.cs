@@ -1,5 +1,7 @@
 ﻿using PnP.Scanning.Core;
+using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Process.Services;
+using Spectre.Console;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -88,27 +90,67 @@ namespace PnP.Scanning.Process.Commands
                 Terminated = terminated,
             });
 
-
             if (listResult.Status.Count > 0)
             {
-                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
-                ColorConsole.WriteLine($"Scan id".PadRight(36) + " | Status " + " | Progress   " + " | Start           | Stop     ");
-                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
+                // Create a table
+                var table = new Table().BorderColor(Color.Grey);
+
+                // Add some columns
+                table.AddColumn("Id ");
+                table.AddColumn(new TableColumn("Status").Centered());
+                table.AddColumn(new TableColumn("Progress").Centered());
+                table.AddColumn("Started at");
+                table.AddColumn("Ended at");
 
                 foreach (var item in listResult.Status)
                 {
                     double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
+                    Markup status;
+                    Markup procent;
+                    if (item.Status == ScanStatus.Running.ToString())
+                    {
+                        status = new Markup($"[orange3]{item.Status}[/]");
+                        procent = new Markup($"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");
+                    }
+                    else if (item.Status == ScanStatus.Finished.ToString())
+                    {
+                        status = new Markup($"[green]{item.Status}[/]");
+                        procent = new Markup($"[green]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([green]{procentDone}%[/])");
+                    }
+                    else if (item.Status == ScanStatus.Terminated.ToString())
+                    {
+                        status = new Markup($"[maroon]{item.Status}[/]");
+                        procent = new Markup($"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
+                    }
+                    else
+                    {
+                        status = new Markup($"{item.Status}");
+                        procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
+                    }
 
-                    ColorConsole.Write($"{item.Id} |");
-                    ColorConsole.Write($"{item.Status} |".PadRight(10));
-                    ColorConsole.Write($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%) |".PadRight(13));
-                    ColorConsole.Write($"{item.ScanStarted.ToDateTime()} |".PadRight(11));
-                    ColorConsole.WriteLine($"{item.ScanEnded.ToDateTime()} |".PadRight(11));
+                    Markup endedAt;
+                    if (item.ScanEnded.ToDateTime() == DateTime.MinValue)
+                    {
+                        endedAt = new Markup("");
+                    }
+                    else
+                    {
+                        endedAt = new Markup($"{item.ScanEnded.ToDateTime().ToLocalTime()}");
+                    }
+
+                    table.AddRow(new Markup($"{item.Id}"), 
+                                 status, 
+                                 procent,
+                                 new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),
+                                 endedAt
+                                 );
                 }
+
+                AnsiConsole.Write(table);
             }
             else
             {
-                ColorConsole.WriteInfo("No scans found meeting the set criteria");
+                AnsiConsole.WriteLine("No scans found meeting the set criteria...");
             }
         }
     }

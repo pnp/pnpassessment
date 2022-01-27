@@ -1,5 +1,6 @@
 ﻿using Grpc.Net.Client;
 using PnP.Scanning.Core.Services;
+using Spectre.Console;
 using System.Diagnostics;
 
 namespace PnP.Scanning.Process.Services
@@ -81,7 +82,7 @@ namespace PnP.Scanning.Process.Services
             }
             else
             {
-                ColorConsole.WriteWarning("No scanner found, starting one...");
+                AnsiConsole.Markup("[gray]No scanner found, starting one...[/]");
 
                 ProcessStartInfo startInfo = new()
                 {
@@ -106,10 +107,14 @@ namespace PnP.Scanning.Process.Services
                     // perform a ping to verify when the grpc server is up
                     await WaitForScannerToBeUpAsync();
 
+                    AnsiConsole.MarkupLine($"[green]OK[/]");
+
                     return port;
                 }
                 else
                 {
+                    AnsiConsole.MarkupLine($"[red]FAILED[/]");
+
                     return -1;
                 }
             }
@@ -150,7 +155,7 @@ namespace PnP.Scanning.Process.Services
 
         private static async Task<bool> CanConnectRunningScannerAsync(int port)
         {
-            ColorConsole.WriteInfo($"Pinging scanner on port {port}...");
+            AnsiConsole.Markup($"[gray]Connecting scanner on port {port}...[/]");
 
             var retryAttempt = 0;
             do
@@ -163,7 +168,7 @@ namespace PnP.Scanning.Process.Services
                     var response = await PingScannerAsync(client);
                     if (response != null && response.UpAndRunning)
                     {
-                        ColorConsole.WriteInfo($"Scanner detected on {port}");
+                        AnsiConsole.MarkupLine($"[green]OK[/]");
                         return true;
                     }
                 }
@@ -177,6 +182,7 @@ namespace PnP.Scanning.Process.Services
             }
             while (retryAttempt <= 2);
 
+            AnsiConsole.MarkupLine($"");
             return false;
         }
 
@@ -250,21 +256,28 @@ namespace PnP.Scanning.Process.Services
 #if DEBUG
         private static void AttachDebugger(System.Diagnostics.Process processToAttachTo)
         {
-            var vsProcess = VisualStudioManager.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
+            try
+            {
+                var vsProcess = VisualStudioManager.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
 
-            if (vsProcess != null)
-            {
-                VisualStudioManager.AttachVisualStudioToProcess(vsProcess, processToAttachTo);
-            }
-            else
-            {
-                // try and attach the old fashioned way
-                Debugger.Launch();
-            }
+                if (vsProcess != null)
+                {
+                    VisualStudioManager.AttachVisualStudioToProcess(vsProcess, processToAttachTo);
+                }
+                else
+                {
+                    // try and attach the old fashioned way
+                    Debugger.Launch();
+                }
 
-            if (Debugger.IsAttached)
+                if (Debugger.IsAttached)
+                {
+                    // log something
+                }
+            }
+            catch (Exception ex)
             {
-                // log something
+                AnsiConsole.WriteException(ex, ExceptionFormats.ShortenEverything);
             }
         }
 #endif

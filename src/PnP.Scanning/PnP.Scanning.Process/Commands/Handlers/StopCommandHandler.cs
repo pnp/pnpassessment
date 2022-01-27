@@ -1,5 +1,6 @@
 ﻿using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
+using Spectre.Console;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -28,8 +29,8 @@ namespace PnP.Scanning.Process.Commands
         {
             try
             {
-                ColorConsole.WriteWarning("Requesting the scanner server to shutdown...");
-                await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "bla" });
+                AnsiConsole.MarkupLine("[gray]Requesting the scanner server to shutdown...[/]");
+                await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "" });
             }
             catch
             {

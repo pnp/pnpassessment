@@ -2,6 +2,7 @@
 using PnP.Scanning.Core;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
+using Spectre.Console;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -22,7 +23,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<FileInfo> certPfxFileInfoOption;
         private Option<string> certPfxFilePasswordOption;
         private Option<int> threadsOption;
-        
+
         // PER SCAN COMPONENT: add scan component specific options here
 #if DEBUG
         // Specific options for the test handler
@@ -324,51 +325,58 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(StartOptions arguments)
         {
-            // Setup client to talk to scanner
-            var client = await processManager.GetScannerClientAsync();
-
-            // Kick off a scan
-            var start = new StartRequest
+            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting scan...", async ctx =>
             {
-                Mode = arguments.Mode.ToString(),
-                Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
-                Environment = arguments.Environment.ToString(),
-                SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
-                SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName.ToString() : "",
-                AuthMode = arguments.AuthMode.ToString(),
-                ApplicationId = arguments.ApplicationId.ToString(),
-                Threads = arguments.Threads,
-            };
+                // Setup client to talk to scanner
+                var client = await processManager.GetScannerClientAsync();
 
-            // PER SCAN COMPONENT: implement scan component specific options
-#if DEBUG
-            if (arguments.Mode == Mode.Test)
-            {
-                start.Properties.Add(new PropertyRequest
+                // Kick off a scan
+                var start = new StartRequest
                 {
-                    Property = testNumberOfSitesOption.Name.TrimStart('-'),
-                    Type = "int",
-                    Value = arguments.TestNumberOfSites.ToString(),
-                });
-            }
-#endif
+                    Mode = arguments.Mode.ToString(),
+                    Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
+                    Environment = arguments.Environment.ToString(),
+                    SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
+                    SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName.ToString() : "",
+                    AuthMode = arguments.AuthMode.ToString(),
+                    ApplicationId = arguments.ApplicationId.ToString(),
+                    Threads = arguments.Threads,
+                };
 
-            var call = client.Start(start);
-            await foreach (var message in call.ResponseStream.ReadAllAsync())
-            {
-                if (message.Type == Constants.MessageError)
+                // PER SCAN COMPONENT: implement scan component specific options
+    #if DEBUG
+                if (arguments.Mode == Mode.Test)
                 {
-                    ColorConsole.WriteError($"Status: {message.Status}");
+                    start.Properties.Add(new PropertyRequest
+                    {
+                        Property = testNumberOfSitesOption.Name.TrimStart('-'),
+                        Type = "int",
+                        Value = arguments.TestNumberOfSites.ToString(),
+                    });
                 }
-                else if (message.Type == Constants.MessageWarning)
+    #endif
+
+                var call = client.Start(start);
+                await foreach (var message in call.ResponseStream.ReadAllAsync())
                 {
-                    ColorConsole.WriteWarning($"Status: {message.Status}");
+                    if (message.Type == Constants.MessageError)
+                    {
+                        AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
+                    }
+                    else if (message.Type == Constants.MessageWarning)
+                    {
+                        AnsiConsole.MarkupLine($"[orange3]{message.Status}[/]");
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"[gray]{message.Status}[/]");
+                    }
+
+                    // Add delay for an improved "visual" experience
+                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+
                 }
-                else
-                {
-                    ColorConsole.WriteInfo($"Status: {message.Status}");
-                }
-            }
+            });
         }
     }
 }

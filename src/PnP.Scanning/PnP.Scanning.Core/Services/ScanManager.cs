@@ -247,7 +247,7 @@ namespace PnP.Scanning.Core.Services
         {
             var statusReply = new StatusReply();
 
-            foreach (var runningScan in scans)
+            foreach (var runningScan in scans.ToList())
             {
                 statusReply.Status.Add(new ScanStatusReply
                 {
@@ -339,7 +339,7 @@ namespace PnP.Scanning.Core.Services
             List<Guid> scansToPause = new();
             if (all)
             {
-                foreach (var scan in scans)
+                foreach (var scan in scans.ToList())
                 {
                     scansToPause.Add(scan.Key);
                 }
@@ -363,7 +363,7 @@ namespace PnP.Scanning.Core.Services
             List<Guid> scansToPause = new();
             if (all)
             {
-                foreach (var scan in scans)
+                foreach (var scan in scans.ToList())
                 {
                     scansToPause.Add(scan.Key);
                 }
@@ -440,7 +440,7 @@ namespace PnP.Scanning.Core.Services
         internal int NumberOfScansRunning()
         {
             int running = 0;
-            foreach (var scan in scans)
+            foreach (var scan in scans.ToList())
             {
                 if (scan.Value.Status == ScanStatus.Queued || scan.Value.Status == ScanStatus.Running)
                 {
@@ -567,7 +567,7 @@ namespace PnP.Scanning.Core.Services
             Dictionary<string, string> cacheData = new();
 
             // Get the cache data relavent for the scan to work with
-            foreach(var cacheEntry in Cache)
+            foreach(var cacheEntry in Cache.ToList())
             {
                 if (cacheEntry.Key.StartsWith($"{scanId}-"))
                 {

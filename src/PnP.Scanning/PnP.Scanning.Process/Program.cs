@@ -8,6 +8,7 @@ using PnP.Scanning.Process.Commands;
 using PnP.Scanning.Process.Services;
 using Serilog;
 using Serilog.Events;
+using Spectre.Console;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process
@@ -34,17 +35,17 @@ namespace PnP.Scanning.Process
 
                 if (args.Length == 0)
                 {
-                    ColorConsole.WriteWrappedHeader("Welcome to the PnP Scanning CLI!");
-                    ColorConsole.WriteInfo("");
-                    ColorConsole.WriteInfo("Enter the command you want to execute (<enter> to quit):");
+                    AnsiConsole.Write(new FigletText("PnP Scanner").Centered().Color(Color.Green));
+                    AnsiConsole.WriteLine("");
+                    AnsiConsole.Markup("Execute a command [gray](<enter> to quit)[/]: ");
                     var consoleInput = Console.ReadLine();
 
                     while (!string.IsNullOrEmpty(consoleInput))
                     {
                         await new RootCommandHandler(processManager).Create().InvokeAsync(consoleInput);
 
-                        ColorConsole.WriteInfo("");
-                        ColorConsole.WriteInfo("Enter the command you want to execute (<enter> to quit):");
+                        AnsiConsole.WriteLine("");
+                        AnsiConsole.Markup("Execute a command [gray](<enter> to quit)[/]: ");
                         consoleInput = Console.ReadLine();
                     }
                 }

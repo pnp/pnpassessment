@@ -1,5 +1,7 @@
 ﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Process.Services;
+using Spectre.Console;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -22,32 +24,84 @@ namespace PnP.Scanning.Process.Commands
             cmd.SetHandler(async () => await HandleStatusAsync());
 
             return cmd;
-        }
+        }       
 
         private async Task HandleStatusAsync()
         {
-            var status = await (await processManager.GetScannerClientAsync()).StatusAsync(new StatusRequest() { Message = "bla" });
+            var client = await processManager.GetScannerClientAsync();
 
-            if (status.Status.Count == 0)
-            {
-                ColorConsole.WriteLine("There are no running scans anymore!", ConsoleColor.Green);
-            }
-            else
-            {
-                ColorConsole.WriteEmbeddedColorLine($"There are [green]{status.Status.Count}[/green] scans still running:");
-                ColorConsole.WriteLine("");
-                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
-                ColorConsole.WriteLine($"Scan id".PadRight(36) + " | Site collection scan status");
-                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
+            var table = new Table().Expand().BorderColor(Color.Grey);
 
-                foreach (var statusMesage in status.Status)
+            // Add some columns
+            table.AddColumn("Id ");
+            table.AddColumn(new TableColumn("Status").Centered());
+            table.AddColumn(new TableColumn("Progress").Centered());
+            
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("Live running scan status. Press [yellow]ESC[/] to exit");
+            AnsiConsole.WriteLine();
+
+            await AnsiConsole.Live(table)                
+                .AutoClear(false)   // Do not remove when done
+                .Overflow(VerticalOverflow.Ellipsis) // Show ellipsis when overflowing
+                .Cropping(VerticalOverflowCropping.Top) // Crop overflow at top
+                .StartAsync(async ctx =>
                 {
-                    double procentDone = Math.Round((double)statusMesage.SiteCollectionsScanned / statusMesage.SiteCollectionsToScan * 100);
-                    ColorConsole.WriteEmbeddedColorLine(string.Format("{0} | [green]{1}[/green]/[green]{2}[/green] ([green]{3}%[/green]) site collections done", 
-                        statusMesage.Id, statusMesage.SiteCollectionsScanned, statusMesage.SiteCollectionsToScan, procentDone));
-                }
-                ColorConsole.WriteLine(new string('-', ColorConsole.MaxWidth));
-            }
+                    do
+                    {
+                        while (!Console.KeyAvailable)
+                        {
+                            var statusInformation = await client.StatusAsync(new StatusRequest() { Message = "bla" });
+
+                            table.Rows.Clear();
+
+                            if (statusInformation.Status.Count > 0)
+                            {
+                                foreach (var item in statusInformation.Status)
+                                {
+                                    double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
+                                    Markup status;
+                                    Markup procent;
+                                    if (item.Status == ScanStatus.Running.ToString())
+                                    {
+                                        status = new Markup($"[orange3]{item.Status}[/]");
+                                        procent = new Markup($"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");
+                                    }
+                                    else if (item.Status == ScanStatus.Finished.ToString())
+                                    {
+                                        status = new Markup($"[green]{item.Status}[/]");
+                                        procent = new Markup($"[green]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([green]{procentDone}%[/])");
+                                    }
+                                    else if (item.Status == ScanStatus.Terminated.ToString())
+                                    {
+                                        status = new Markup($"[maroon]{item.Status}[/]");
+                                        procent = new Markup($"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
+                                    }
+                                    else
+                                    {
+                                        status = new Markup($"{item.Status}");
+                                        procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
+                                    }
+
+                                    table.AddRow(new Markup($"{item.Id}"),
+                                         status,
+                                         procent);
+                                    //ctx.Refresh();
+                                }
+                            }
+                            else
+                            {
+                                table.AddRow(new Markup($"[green]No running scans[/]"), new Markup(""), new Markup(""));
+                            }
+
+                            ctx.Refresh();
+
+                            await Task.Delay(TimeSpan.FromSeconds(1));
+                        }
+                    }
+                    while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+                });
+
         }
     }
 }

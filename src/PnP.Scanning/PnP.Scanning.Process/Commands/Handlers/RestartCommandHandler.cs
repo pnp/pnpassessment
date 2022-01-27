@@ -1,6 +1,7 @@
 ﻿using Grpc.Core;
 using PnP.Scanning.Core;
 using PnP.Scanning.Process.Services;
+using Spectre.Console;
 using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
@@ -50,32 +51,38 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleRestartAsync(Guid scanId, int threads)
         {
-            // Setup client to talk to scanner
-            var client = await processManager.GetScannerClientAsync();
 
-            // Restart the scan
-            var call = client.Restart(new Core.Services.RestartRequest 
-            { 
-                Id = scanId.ToString(),
-                Threads = threads
-            });
-
-            await foreach (var message in call.ResponseStream.ReadAllAsync())
+            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Restarting scan...", async ctx =>
             {
-                if (message.Type == Constants.MessageError)
-                {
-                    ColorConsole.WriteError($"Status: {message.Status}");
-                }
-                else if (message.Type == Constants.MessageWarning)
-                {
-                    ColorConsole.WriteWarning($"Status: {message.Status}");
-                }
-                else
-                {
-                    ColorConsole.WriteInfo($"Status: {message.Status}");
-                }
-            }
+                // Setup client to talk to scanner
+                var client = await processManager.GetScannerClientAsync();
 
+                // Restart the scan
+                var call = client.Restart(new Core.Services.RestartRequest
+                {
+                    Id = scanId.ToString(),
+                    Threads = threads
+                });
+
+                await foreach (var message in call.ResponseStream.ReadAllAsync())
+                {
+                    if (message.Type == Constants.MessageError)
+                    {
+                        AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
+                    }
+                    else if (message.Type == Constants.MessageWarning)
+                    {
+                        AnsiConsole.MarkupLine($"[orange3]{message.Status}[/]");
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"[gray]{message.Status}[/]");
+                    }
+
+                    // Add delay for an improved "visual" experience
+                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                }
+            });
         }
     }
 }

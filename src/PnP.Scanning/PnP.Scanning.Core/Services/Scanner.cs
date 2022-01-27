@@ -42,7 +42,8 @@ namespace PnP.Scanning.Core.Services
             {
                 await responseStream.WriteAsync(new PauseStatus
                 {
-                    Status = $"Passed scan id {request.Id} is invalid"
+                    Status = $"Passed scan id {request.Id} is invalid",
+                    Type = Constants.MessageError
                 });
             }
             else
@@ -52,7 +53,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = $"Provided scan id {scanId} is invalid"
+                        Status = $"Provided scan id {scanId} is invalid",
+                        Type = Constants.MessageError
                     });
 
                     Log.Warning("Provided scan id {ScanId} is not known as running scan", scanId);
@@ -114,7 +116,8 @@ namespace PnP.Scanning.Core.Services
             {
                 await responseStream.WriteAsync(new RestartStatus
                 {
-                    Status = $"Passed scan id {request.Id} is invalid"
+                    Status = $"Passed scan id {request.Id} is invalid",
+                    Type = Constants.MessageError
                 });
 
                 return;
@@ -124,7 +127,8 @@ namespace PnP.Scanning.Core.Services
             {
                 await responseStream.WriteAsync(new RestartStatus
                 {
-                    Status = $"Provided scan id {scanId} is already running or finished"
+                    Status = $"Provided scan id {scanId} is already running or finished",
+                    Type = Constants.MessageError
                 });
 
                 Log.Warning("Provided scan id {ScanId} is already running or finished", scanId);
@@ -201,7 +205,8 @@ namespace PnP.Scanning.Core.Services
             {
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "No sites to scan defined"
+                    Status = "No sites to scan defined",
+                    Type = Constants.MessageWarning
                 });
 
                 Log.Information("No sites to scan defined");
