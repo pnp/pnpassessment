@@ -30,13 +30,16 @@ namespace PnP.Scanning.Process.Commands
         {
             var client = await processManager.GetScannerClientAsync();
 
-            var table = new Table().Expand().BorderColor(Color.Grey);
+            var table = new Table().BorderColor(Color.Grey);
 
             // Add some columns
-            table.AddColumn("Id ");
+            table.AddColumn(new TableColumn("Id").Centered());
+            table.AddColumn(new TableColumn("Mode").Centered());
             table.AddColumn(new TableColumn("Status").Centered());
             table.AddColumn(new TableColumn("Progress").Centered());
-            
+            table.AddColumn(new TableColumn("Session start").Centered());
+            table.AddColumn(new TableColumn("Session duration").Centered());
+
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Live running scan status. Press [yellow]ESC[/] to exit");
             AnsiConsole.WriteLine();
@@ -84,14 +87,16 @@ namespace PnP.Scanning.Process.Commands
                                     }
 
                                     table.AddRow(new Markup($"{item.Id}"),
-                                         status,
-                                         procent);
-                                    //ctx.Refresh();
+                                                 new Markup($"{item.Mode}"),
+                                                 status,
+                                                 procent,
+                                                 new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
+                                                 new Markup(item.Duration.ToTimeSpan().ToString(@"hh\:mm\:ss")));
                                 }
                             }
                             else
                             {
-                                table.AddRow(new Markup($"[green]No running scans[/]"), new Markup(""), new Markup(""));
+                                table.AddRow(new Markup($"[green]No running scans[/]"));
                             }
 
                             ctx.Refresh();

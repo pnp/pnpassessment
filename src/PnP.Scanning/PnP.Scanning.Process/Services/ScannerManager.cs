@@ -86,7 +86,7 @@ namespace PnP.Scanning.Process.Services
 
                 ProcessStartInfo startInfo = new()
                 {
-                    FileName = "PnP.Scanning.Process.exe",
+                    FileName = "microsoft365-scanner.exe",
                     Arguments = $"scanner {port}",
                     UseShellExecute = true
 #if !DEBUG

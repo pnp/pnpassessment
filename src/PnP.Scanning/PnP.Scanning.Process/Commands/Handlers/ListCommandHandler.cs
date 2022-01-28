@@ -97,6 +97,7 @@ namespace PnP.Scanning.Process.Commands
 
                 // Add some columns
                 table.AddColumn("Id ");
+                table.AddColumn("Mode");
                 table.AddColumn(new TableColumn("Status").Centered());
                 table.AddColumn(new TableColumn("Progress").Centered());
                 table.AddColumn("Started at");
@@ -122,6 +123,16 @@ namespace PnP.Scanning.Process.Commands
                         status = new Markup($"[maroon]{item.Status}[/]");
                         procent = new Markup($"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
                     }
+                    else if (item.Status == ScanStatus.Paused.ToString())
+                    {
+                        status = new Markup($"[grey50]{item.Status}[/]");
+                        procent = new Markup($"[grey50]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([grey50]{procentDone}%[/])");
+                    }
+                    else if (item.Status == ScanStatus.Pausing.ToString())
+                    {
+                        status = new Markup($"[grey70]{item.Status}[/]");
+                        procent = new Markup($"[grey70]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([grey70]{procentDone}%[/])");
+                    }
                     else
                     {
                         status = new Markup($"{item.Status}");
@@ -139,6 +150,7 @@ namespace PnP.Scanning.Process.Commands
                     }
 
                     table.AddRow(new Markup($"{item.Id}"), 
+                                 new Markup($"{item.Mode}"),
                                  status, 
                                  procent,
                                  new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),

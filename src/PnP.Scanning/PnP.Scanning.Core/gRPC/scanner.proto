@@ -2,6 +2,7 @@
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
 package PnP.Scanning.Core.Services;
 
@@ -28,9 +29,12 @@ message StatusReply {
 
 message ScanStatusReply {
 	string Id = 1;
-	string Status = 2;
-	int32 SiteCollectionsToScan = 3;
-	int32 SiteCollectionsScanned = 4;
+	string Mode = 2;
+	string Status = 3;
+	int32 SiteCollectionsToScan = 4;
+	int32 SiteCollectionsScanned = 5;
+	google.protobuf.Duration Duration = 6;
+	google.protobuf.Timestamp Started = 7;
 }
 
 // Start
@@ -81,11 +85,12 @@ message ListReply {
 
 message ListScanResponse {
 	string Id = 1;
-	string Status = 2;
-	int32 SiteCollectionsToScan = 3;
-	int32 SiteCollectionsScanned = 4;
-	google.protobuf.Timestamp ScanStarted = 5;
-	google.protobuf.Timestamp ScanEnded = 6;
+	string Mode = 2;
+	string Status = 3;
+	int32 SiteCollectionsToScan = 4;
+	int32 SiteCollectionsScanned = 5;
+	google.protobuf.Timestamp ScanStarted = 6;
+	google.protobuf.Timestamp ScanEnded = 7;
 }
 
 // Pause

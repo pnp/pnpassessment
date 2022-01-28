@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Google.Protobuf.WellKnownTypes;
+using Microsoft.Extensions.Hosting;
 using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
@@ -140,7 +141,7 @@ namespace PnP.Scanning.Core.Services
                 return;
             }
 
-            var scanStatus = (ScanStatus)Enum.Parse(typeof(ScanStatus), scanToRestart.Status);
+            var scanStatus = (ScanStatus)System.Enum.Parse(typeof(ScanStatus), scanToRestart.Status);
 
             if (scanStatus == ScanStatus.Paused)
             {
@@ -252,9 +253,12 @@ namespace PnP.Scanning.Core.Services
                 statusReply.Status.Add(new ScanStatusReply
                 {
                     Id = runningScan.Value.Id.ToString(),
+                    Mode = runningScan.Value.Options.Mode,
                     Status = runningScan.Value.Status.ToString(),
                     SiteCollectionsToScan = runningScan.Value.SiteCollectionsToScan,
                     SiteCollectionsScanned = runningScan.Value.SiteCollectionsScanned,
+                    Duration = Duration.FromTimeSpan(TimeSpan.FromSeconds((DateTime.Now - runningScan.Value.StartedScanSessionAt).TotalSeconds)),
+                    Started = Timestamp.FromDateTime(runningScan.Value.StartedScanSessionAt.ToUniversalTime())
                 });
             }
 

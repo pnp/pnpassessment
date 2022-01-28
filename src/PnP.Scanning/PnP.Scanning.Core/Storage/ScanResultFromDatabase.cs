@@ -11,6 +11,8 @@
 
         internal Guid ScanId { get; set; }
 
+        internal string? Mode { get; set; }
+
         internal ScanStatus Status { get; set; }
 
         internal int SiteCollectionsToScan { get; set; }

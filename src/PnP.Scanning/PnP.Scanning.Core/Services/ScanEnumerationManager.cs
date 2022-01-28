@@ -15,6 +15,8 @@ namespace PnP.Scanning.Core.Services
             Regex regex = new("[({]?[a-fA-F0-9]{8}[-]?([a-fA-F0-9]{4}[-]?){3}[a-fA-F0-9]{12}[})]?", RegexOptions.IgnoreCase);
             var scanFolders = Directory.EnumerateDirectories(StorageManager.GetScannerFolder()).Where(f => regex.IsMatch(f));
 
+            List<ListScanResponse> tempResults = new();
+
             foreach (var scan in scanFolders)
             {
                 string scanIdString = scan.Substring(scan.LastIndexOf(Path.DirectorySeparatorChar) + 1);
@@ -31,6 +33,7 @@ namespace PnP.Scanning.Core.Services
                     if (scanResultFromDatabase != null)
                     {
                         scanResult.Status = scanResultFromDatabase.Status.ToString();
+                        scanResult.Mode = scanResultFromDatabase.Mode;
                         scanResult.ScanStarted = Timestamp.FromDateTime(scanResultFromDatabase.StartDate);
                         scanResult.ScanEnded = Timestamp.FromDateTime(scanResultFromDatabase.EndDate);
                         scanResult.SiteCollectionsToScan = scanResultFromDatabase.SiteCollectionsToScan;
@@ -41,7 +44,7 @@ namespace PnP.Scanning.Core.Services
                         {
                             add = true;
                         }
-                        else if (paused && (scanResultFromDatabase.Status == ScanStatus.Paused || scanResultFromDatabase.Status == ScanStatus.Pausing))
+                        else if (paused && (scanResultFromDatabase.Status == ScanStatus.Queued || scanResultFromDatabase.Status == ScanStatus.Paused || scanResultFromDatabase.Status == ScanStatus.Pausing))
                         {
                             add = true;
                         }
@@ -56,13 +59,41 @@ namespace PnP.Scanning.Core.Services
 
                         if (add)
                         {
-                            scans.Status.Add(scanResult);
+                            tempResults.Add(scanResult);
                         }
                     }
                 }
                 else
                 {
                     Log.Warning("Scan result folder {Folder} was skipped as there's no scan database in the folder", scan);
+                }
+            }
+
+            if (tempResults.Any())
+            {
+                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Finished.ToString()).OrderBy(p => p.ScanStarted))
+                {
+                    scans.Status.Add(scanResult);
+                }
+                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Terminated.ToString()).OrderBy(p => p.ScanStarted))
+                {
+                    scans.Status.Add(scanResult);
+                }
+                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Paused.ToString()).OrderBy(p => p.ScanStarted))
+                {
+                    scans.Status.Add(scanResult);
+                }
+                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Pausing.ToString()).OrderBy(p => p.ScanStarted))
+                {
+                    scans.Status.Add(scanResult);
+                }
+                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Running.ToString()).OrderBy(p => p.ScanStarted))
+                {
+                    scans.Status.Add(scanResult);
+                }
+                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Queued.ToString()).OrderBy(p=>p.ScanStarted))
+                {
+                    scans.Status.Add(scanResult);
                 }
             }
 

@@ -4,6 +4,8 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class OptionsBase
     {
+        internal string? Mode { get; private set; }
+
         internal static OptionsBase FromScannerInput(StartRequest request)
         {
             var options = NewOptions(request.Mode);
@@ -28,7 +30,10 @@ namespace PnP.Scanning.Core.Scanners
 #if DEBUG
             if (mode.Equals("test", StringComparison.OrdinalIgnoreCase))
             {
-                return new TestOptions();
+                return new TestOptions()
+                {
+                    Mode = mode,
+                };
             }
 #endif
 

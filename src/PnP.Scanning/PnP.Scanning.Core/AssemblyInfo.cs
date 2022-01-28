@@ -1,6 +1,6 @@
 ﻿using System.Resources;
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("PnP.Scanning.Process")]
+[assembly: InternalsVisibleTo("microsoft365-scanner")]
 
 [assembly: NeutralResourcesLanguage("en")] 

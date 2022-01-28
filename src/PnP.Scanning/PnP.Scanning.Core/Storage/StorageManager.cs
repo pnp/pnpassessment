@@ -580,6 +580,7 @@ namespace PnP.Scanning.Core.Storage
 
                         var result = new ScanResultFromDatabase(scan.ScanId, scan.Status, total)
                         {
+                            Mode = scan.CLIMode,
                             SiteCollectionsQueued = queued,
                             SiteCollectionsRunning = running,
                             SiteCollectionsFinished = finished,

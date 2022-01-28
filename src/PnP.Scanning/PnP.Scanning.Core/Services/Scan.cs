@@ -13,6 +13,7 @@ namespace PnP.Scanning.Core.Services
             Id = id;
             Queue = queue;
             Options = options;
+            StartedScanSessionAt = DateTime.Now;
         }
 
         internal Guid Id { get; private set; }
@@ -21,9 +22,11 @@ namespace PnP.Scanning.Core.Services
 
         internal OptionsBase Options { get; private set; }
 
+        internal DateTime StartedScanSessionAt { get; private set; }
+
         internal ScanStatus Status { get; set; }
 
-        internal int SiteCollectionsToScan { get; set; }
+        internal int SiteCollectionsToScan { get; set; }        
 
         internal int SiteCollectionsScanned 
         { 

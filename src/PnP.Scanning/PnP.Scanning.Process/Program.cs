@@ -10,6 +10,8 @@ using Serilog;
 using Serilog.Events;
 using Spectre.Console;
 using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Parsing;
 
 namespace PnP.Scanning.Process
 {
@@ -33,16 +35,25 @@ namespace PnP.Scanning.Process
                 // Get ProcessManager instance from the cli executable
                 var processManager = host.Services.GetRequiredService<ScannerManager>();
 
+                var root = new RootCommandHandler(processManager).Create();
+                var builder = new CommandLineBuilder(root);
+                var parser = builder.UseDefaults().Build();
+
                 if (args.Length == 0)
                 {
-                    AnsiConsole.Write(new FigletText("PnP Scanner").Centered().Color(Color.Green));
+                    AnsiConsole.Write(new FigletText("Microsoft 365 Scanner").Centered().Color(Color.Green));
                     AnsiConsole.WriteLine("");
                     AnsiConsole.Markup("Execute a command [gray](<enter> to quit)[/]: ");
                     var consoleInput = Console.ReadLine();
 
+                    // Possible enhancement: build custom tab completion for the "console mode"
+                    // To get suggestions
+                    // var result = parser.Parse(consoleInput).GetCompletions();
+                    // Sample to start from: https://www.codeproject.com/Articles/1182358/Using-Autocomplete-in-Windows-Console-Applications
+
                     while (!string.IsNullOrEmpty(consoleInput))
                     {
-                        await new RootCommandHandler(processManager).Create().InvokeAsync(consoleInput);
+                        await parser.InvokeAsync(consoleInput);
 
                         AnsiConsole.WriteLine("");
                         AnsiConsole.Markup("Execute a command [gray](<enter> to quit)[/]: ");
@@ -51,8 +62,7 @@ namespace PnP.Scanning.Process
                 }
                 else
                 {
-                    // Configure, parse and act on command line input
-                    await new RootCommandHandler(processManager).Create().InvokeAsync(args);
+                    await parser.InvokeAsync(args);
                 }
             }
             else
