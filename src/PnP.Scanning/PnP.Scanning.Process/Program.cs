@@ -144,6 +144,7 @@ namespace PnP.Scanning.Process
                           services.AddSingleton<StorageManager>();
                           services.AddSingleton<ScanManager>();
                           services.AddTransient<SiteEnumerationManager>();
+                          services.AddTransient<ReportManager>();
                       });
 
                   })

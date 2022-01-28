@@ -8,7 +8,11 @@ using System.Collections.Concurrent;
 
 namespace PnP.Scanning.Core.Services
 {
-    // Class for in memory tracking the running scans
+    /// <summary>
+    /// Class for in memory tracking the running scans.
+    /// 
+    /// This class is loaded as singleton, don't use instance variables unless they're thread-safe
+    /// </summary>
     internal sealed class ScanManager : IHostedService
     {
         private readonly IHostApplicationLifetime hostApplicationLifetime;
@@ -36,15 +40,15 @@ namespace PnP.Scanning.Core.Services
             Task.Run(async () => await ClearFinishedOrPausedScansFromMemoryAsync());
         }
 
-        internal StorageManager StorageManager { get; private set; }
+        internal static StorageManager StorageManager { get; private set; }
 
         internal SiteEnumerationManager SiteEnumerationManager { get; private set; }
 
         internal ConcurrentDictionary<string, string> Cache { get; } = new();
 
-        internal int MaxParallelScans { get; private set; } = 3;
+        internal static int MaxParallelScans { get; private set; } = 3;
 
-        internal int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
+        internal static int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
 
         internal async Task<Guid> StartScanAsync(StartRequest start, List<string> siteCollectionList)
         {

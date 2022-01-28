@@ -9,6 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PnP.Scanning.Process", "PnP
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{C99B5E45-EC64-4C78-AF6E-579F38D681D9}"
 	ProjectSection(SolutionItems) = preProject
+		Resources.txt = Resources.txt
 		Test\scanner runs.txt = Test\scanner runs.txt
 		Test\sites.txt = Test\sites.txt
 	EndProjectSection

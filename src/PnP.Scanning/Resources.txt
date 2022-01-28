@@ -1,0 +1,24 @@
+
+PowerBi report gen research
+===========================
+
+CSV export:
+https://joshclose.github.io/CsvHelper/
+
+Performant readonly access via EF:
+https://stackoverflow.com/a/57989351
+
+Updating PBIT file:
+https://www.kasperonbi.com/how-to-change-the-dataset-script-in-power-bi-desktop/
+https://sqlpowered.com/extracting-metadata-from-the-power-bi-report-file/
+https://collab365.com/power-bi-tips-tricks/
+https://www.linkedin.com/pulse/reverse-engineering-power-bi-templates-complete-source-lander/
+
+https://github.com/rajrao/PowerBiDiffer
+https://stackoverflow.com/questions/69147959/power-bi-extract-pbix-and-decode-datamodel-from-xpress9
+
+Changing file inside zip (PBIT) file:
+https://docs.microsoft.com/en-us/dotnet/standard/io/how-to-compress-and-extract-files
+https://stackoverflow.com/questions/53695197/update-a-file-in-a-ziparchive
+https://stackoverflow.com/questions/46810169/overwrite-contents-of-ziparchiveentry
+https://stackoverflow.com/questions/41958084/replace-a-file-with-the-same-name-in-zip

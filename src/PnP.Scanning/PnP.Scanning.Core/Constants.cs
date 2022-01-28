@@ -24,6 +24,10 @@
 
         internal const string PauseScanId = "id";
         internal const string PauseAll = "all";
+
+        internal const string ReportMode = "mode";
+        internal const string ReportDelimiter = "delimiter";
+        internal const string ReportPath = "path";
         #endregion
 
         #region Status

@@ -12,9 +12,10 @@ namespace PnP.Scanning.Core.Services
     {        
         private readonly ScanManager scanManager;
         private readonly SiteEnumerationManager siteEnumerationManager;
+        private readonly ReportManager reportManager;
         private readonly IHost kestrelWebServer;
 
-        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, IHost host)
+        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, IHost host)
         {
             // Kestrel
             kestrelWebServer = host;
@@ -22,6 +23,8 @@ namespace PnP.Scanning.Core.Services
             scanManager = siteScanManager;
             // Site enumeration
             siteEnumerationManager = siteEnumeration;
+            // Report manager
+            reportManager = reports;
         }
 
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
@@ -243,5 +246,51 @@ namespace PnP.Scanning.Core.Services
                 }
             }
         }
+
+        public async override Task Report(ReportRequest request, IServerStreamWriter<ReportStatus> responseStream, ServerCallContext context)
+        {
+            try
+            {
+                if (!Guid.TryParse(request.Id, out Guid scanId))
+                {
+                    await responseStream.WriteAsync(new ReportStatus
+                    {
+                        Status = $"Passed scan id {request.Id} is invalid",
+                        Type = Constants.MessageError
+                    });
+
+                    return;
+                }
+
+                await responseStream.WriteAsync(new ReportStatus
+                {
+                    Status = $"Exporting report data started"
+                });
+
+                Log.Information("Report data export started for scan {ScanId}", scanId);
+
+                await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
+
+                await responseStream.WriteAsync(new ReportStatus
+                {
+                    Status = $"Exporting report data done"
+                });
+
+
+
+                Log.Information("Report data exported for scan {ScanId}", scanId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error creating report for scan. Error : {Message}", ex.Message);
+
+                await responseStream.WriteAsync(new ReportStatus
+                {
+                    Status = $"Error creating report for scan due to error: {ex.Message}",
+                    Type = Constants.MessageError
+                });
+            }
+        }
+
     }
 }

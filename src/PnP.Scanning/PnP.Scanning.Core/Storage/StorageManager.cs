@@ -7,7 +7,7 @@ namespace PnP.Scanning.Core.Storage
 {
 
     /// <summary>
-    /// Class handling storage of data
+    /// Class handling storage of data. This class is loaded as singleton, don't use instance variables unless they're thread-safe
     /// 
     /// Note: For each new scan component work is needed here. Check the PER SCAN COMPONENT: strings to find the right places to add code
     /// </summary>
@@ -622,6 +622,14 @@ namespace PnP.Scanning.Core.Storage
                 EventDate = eventDate,
                 Message = eventMessage
             });
+        }
+
+        internal static ScanContext GetScanContextForDataExport(Guid scanId)
+        {
+            var dbContext = new ScanContext(scanId);
+            dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+            dbContext.ChangeTracker.LazyLoadingEnabled = false;
+            return dbContext;
         }
 
         internal static string GetScanDataFolder(Guid scanId)
