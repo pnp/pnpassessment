@@ -59,17 +59,17 @@ namespace PnP.Scanning.Core.Scanners
             if (ScanManager.Cache.ContainsKey(key))
             {
                 ScanManager.Cache[key] = value;
-                Log.Information("For scan {ScanId} cache key {Key} was updated with value {Value}", ScanId, key, value);
+                Logger.Information("Cache key {Key} was updated with value {Value}", key, value);
             }
             else
             {
                 if (ScanManager.Cache.TryAdd(key, value))
                 {
-                    Log.Information("For scan {ScanId} key {Key} was added to cache with value {Value}", ScanId, key, value);
+                    Logger.Information("Key {Key} was added to cache with value {Value}", key, value);
                 }
                 else
                 {
-                    Log.Warning("For scan {ScanId} adding key {Key} with value {Value} failed", ScanId, key, value);
+                    Logger.Warning("Adding key {Key} with value {Value} failed", key, value);
                 }
             }
         }
@@ -84,7 +84,7 @@ namespace PnP.Scanning.Core.Scanners
             }
             else
             {
-                Log.Warning("For scan {ScanId} the value for key {Key} with was requested but the key was not cached", ScanId, key);
+                Logger.Warning("The value for key {Key} with was requested but not found in cache", key);
                 return null;
             }
         }
@@ -95,7 +95,7 @@ namespace PnP.Scanning.Core.Scanners
 
             if (string.IsNullOrEmpty(key))
             {
-                Log.Error("Empty cache key presented for scan {ScanId}", ScanId);
+                Logger.Error("Empty cache key presented");
                 throw new Exception($"Empty cache key presented for scan {ScanId}");
             }
 

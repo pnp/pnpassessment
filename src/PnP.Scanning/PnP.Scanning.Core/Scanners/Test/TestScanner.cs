@@ -18,13 +18,13 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task ExecuteAsync()
         {
-            Logger.Information("Started for {SiteCollectionUrl}{WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", SiteUrl, WebUrl, ScanId, Environment.CurrentManagedThreadId);
+            Logger.Information("Started for {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
             int delay1 = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay1);
 
-            Logger.Information("In scan {ScanId} cache contained key {Key} with value {Value}", ScanId, Cache1, GetFromCache(Cache1));
+            Logger.Information("Cache contained key {Key} with value {Value}", Cache1, GetFromCache(Cache1));
 
-            Logger.Information("Step 1 Delay {SiteCollectionUrl}{WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", SiteUrl, WebUrl, ScanId, Environment.CurrentManagedThreadId);
+            Logger.Information("Step 1 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
             var delay2 = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay2);
 
@@ -35,11 +35,11 @@ namespace PnP.Scanning.Core.Scanners
                 throw new Exception($"Something went wrong in the test scanner with options {Options.TestNumberOfSites}!!");
             }
 
-            Logger.Information("Step 2 Delay {SiteCollectionUrl}{WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", SiteUrl, WebUrl, ScanId, Environment.CurrentManagedThreadId);
+            Logger.Information("Step 2 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
             var delay3 = new Random().Next(minDelay, maxDelay);
             await Task.Delay(delay3);
 
-            Logger.Information("Step 3 Delay {SiteCollectionUrl}{WebUrl} in scan {ScanId}. ThreadId : {ThreadId}", SiteUrl, WebUrl, ScanId, Environment.CurrentManagedThreadId);
+            Logger.Information("Step 3 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
 
             // Save of the scanner outcome
             await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3);
@@ -47,7 +47,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task PreScanningAsync()
         {
-            Logger.Information("Pre scanning work for scan {ScanId} is starting", ScanId);
+            Logger.Information("Pre scanning work is starting");
             
             int delay1 = new Random().Next(minDelay, minDelay * 5);
             await Task.Delay(delay1);
@@ -61,7 +61,7 @@ namespace PnP.Scanning.Core.Scanners
 
             AddToCache(Cache1, $"PnP Rocks! - {DateTime.Now}");
 
-            Logger.Information("Pre scanning work for scan {ScanId} is done", ScanId);
+            Logger.Information("Pre scanning work done");
         }
     }
 }

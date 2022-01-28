@@ -67,15 +67,15 @@ namespace PnP.Scanning.Process
             }
             else
             {
-                // Tracking issue
-                // https://github.com/serilog/serilog-expressions/issues/60
-
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
                 Log.Logger = new LoggerConfiguration()
                            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                            .Enrich.FromLogContext()
                            .WriteTo.Console()
                            .WriteTo.File($"log_{timestamp}.txt")
+                           // Duplicate all log entries generated for an actual scan component
+                           // to a separate log file in the folder per scan
+                           .WriteTo.Map("ScanId", (scanId, wt) => wt.File($"./{scanId}/log_{scanId}.txt"))
                            .CreateLogger();
 
                 try
