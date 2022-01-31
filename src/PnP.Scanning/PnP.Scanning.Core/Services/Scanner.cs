@@ -275,10 +275,24 @@ namespace PnP.Scanning.Core.Services
                 {
                     Status = $"Exporting report data done"
                 });
-
-
-
                 Log.Information("Report data exported for scan {ScanId}", scanId);
+
+                if (request.Mode == "PowerBI")
+                {
+                    await responseStream.WriteAsync(new ReportStatus
+                    {
+                        Status = $"Start Building PowerBI report"
+                    });
+                    Log.Information("Start Building PowerBI report for scan {ScanId}", scanId);
+
+                    await reportManager.CreatePowerBiReport(scanId, request.Path, request.Delimiter);
+
+                    await responseStream.WriteAsync(new ReportStatus
+                    {
+                        Status = $"Building PowerBI report done"
+                    });
+                    Log.Information("PowerBI report for scan {ScanId} is ready", scanId);
+                }
             }
             catch (Exception ex)
             {

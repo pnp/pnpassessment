@@ -1,0 +1,7 @@
+ScanId,Id,Event,EventDate,Message
+3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,1,ScanStatusChange,01/27/2022 11:43:48,Set to Queued
+3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,2,PreScanStatusChange,01/27/2022 11:43:48,Set to Queued
+3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,3,PreScanStatusChange,01/27/2022 11:43:48,From Queued to Running
+3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,4,PreScanStatusChange,01/27/2022 11:43:50,From Running to Finished
+3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,5,ScanStatusChange,01/27/2022 11:43:50,From Queued to Running
+3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,6,ScanStatusChange,01/27/2022 11:48:32,From Running to Finished

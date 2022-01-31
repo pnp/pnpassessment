@@ -43,7 +43,7 @@ namespace PnP.Scanning.Process
                 {
                     AnsiConsole.Write(new FigletText("Microsoft 365 Scanner").Centered().Color(Color.Green));
                     AnsiConsole.WriteLine("");
-                    AnsiConsole.Markup("Execute a command [gray](<enter> to quit)[/]: ");
+                    AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
                     var consoleInput = Console.ReadLine();
 
                     // Possible enhancement: build custom tab completion for the "console mode"
@@ -56,7 +56,7 @@ namespace PnP.Scanning.Process
                         await parser.InvokeAsync(consoleInput);
 
                         AnsiConsole.WriteLine("");
-                        AnsiConsole.Markup("Execute a command [gray](<enter> to quit)[/]: ");
+                        AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
                         consoleInput = Console.ReadLine();
                     }
                 }

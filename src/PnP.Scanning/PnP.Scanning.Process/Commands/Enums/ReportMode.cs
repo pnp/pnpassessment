@@ -2,7 +2,7 @@
 {
     internal enum ReportMode
     {
-        PowerBi,
+        PowerBI,
         CsvOnly,
     }
 }

@@ -7,6 +7,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <None Remove="Scanners\Test\TestReport.pbit" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="Scanners\Test\TestReport.pbit" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="CsvHelper" Version="27.2.1" />
 		<PackageReference Include="EFCore.BulkExtensions" Version="6.3.0" />
 		<PackageReference Include="envdte" Version="17.0.31902.203" />

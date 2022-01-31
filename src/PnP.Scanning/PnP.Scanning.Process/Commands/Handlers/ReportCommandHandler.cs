@@ -33,7 +33,7 @@ namespace PnP.Scanning.Process.Commands
 
             modeOption = new(
                 name: $"--{Constants.ReportMode}",
-                getDefaultValue: () => ReportMode.PowerBi,
+                getDefaultValue: () => ReportMode.PowerBI,
                 description: "Select the report option")
             {
                 IsRequired = true,
