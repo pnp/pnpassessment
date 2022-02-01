@@ -22,3 +22,35 @@ https://docs.microsoft.com/en-us/dotnet/standard/io/how-to-compress-and-extract-
 https://stackoverflow.com/questions/53695197/update-a-file-in-a-ziparchive
 https://stackoverflow.com/questions/46810169/overwrite-contents-of-ziparchiveentry
 https://stackoverflow.com/questions/41958084/replace-a-file-with-the-same-name-in-zip
+
+Managing PowerBI files using local Analysis services instance (= external tools)
+
+Find local port used by analysis server instance (msmdsrv.exe)
+https://www.biinsight.com/four-different-ways-to-find-your-power-bi-desktop-local-port-number/
+
+XMLA endpoint information:
+https://docs.microsoft.com/en-us/power-bi/admin/service-premium-connect-tools
+
+
+Communicate with local analysis server
+https://dataonwheels.wordpress.com/2021/10/15/power-bi-meets-programmability-tom-xmla-and-c/	
+https://github.com/marclelijveld/External-Tools-Model-Documentation/blob/master/ModelDocumenter/ModelDocumenter/Program.cs
+https://powerbi.microsoft.com/nl-be/blog/using-xmla-endpoints-to-change-data-sources-in-a-power-bi-dataset/
+
+
+TOM programming 
+Tutorial: https://docs.microsoft.com/en-us/analysis-services/tom/tom-pbi-datasets?view=asallproducts-allversions
+Tutorial code: https://github.com/PowerBiDevCamp/Tabular-Object-Model-Tutorial/blob/main/Demos/Learning-TOM/Learning-TOM/DatasetManager.cs
+https://docs.microsoft.com/en-us/analysis-services/tom/create-tables-partitions-and-columns-in-a-tabular-model?view=asallproducts-allversions
+https://www.nuget.org/packages/Microsoft.AnalysisServices.AdomdClient.NetCore.retail.amd64/
+https://www.nuget.org/packages/Microsoft.AnalysisServices.NetCore.retail.amd64/
+
+
+External tools samples (code):
+https://github.com/DaxStudio/DaxStudio/
+https://github.com/otykier/TabularEditor
+https://github.com/microsoft/analysis-services (ALM toolkit, from MSFT Christian Wade)
+https://github.com/sql-bi/VertiPaq-Analyzer
+
+External tools samples (binary only):
+https://github.com/didierterrien/Power-BI-Sidetools/blob/master/Power%20BI%20Sidetools%20test%20version/Power-BI-Sidetools-portable-1-2-16.zip
