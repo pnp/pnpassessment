@@ -27,6 +27,7 @@ Managing PowerBI files using local Analysis services instance (= external tools)
 
 Find local port used by analysis server instance (msmdsrv.exe)
 https://www.biinsight.com/four-different-ways-to-find-your-power-bi-desktop-local-port-number/
+https://github.com/TabularEditor/TabularEditor/tree/master/TabularEditor/UIServices --> sample code for doing this
 
 XMLA endpoint information:
 https://docs.microsoft.com/en-us/power-bi/admin/service-premium-connect-tools
@@ -34,7 +35,6 @@ https://docs.microsoft.com/en-us/power-bi/admin/service-premium-connect-tools
 
 Communicate with local analysis server
 https://dataonwheels.wordpress.com/2021/10/15/power-bi-meets-programmability-tom-xmla-and-c/	
-https://github.com/marclelijveld/External-Tools-Model-Documentation/blob/master/ModelDocumenter/ModelDocumenter/Program.cs
 https://powerbi.microsoft.com/nl-be/blog/using-xmla-endpoints-to-change-data-sources-in-a-power-bi-dataset/
 
 

@@ -27,8 +27,9 @@ namespace PnP.Scanning.Core.Services
         {
         }
 
-        internal async Task CreatePowerBiReport(Guid scanId, string? exportPath = null, string? delimiter = null)
+        internal async Task<string> CreatePowerBiReport(Guid scanId, string? exportPath = null, string? delimiter = null)
         {
+            string reportFile = "";
             exportPath = EnsureReportPath(scanId, exportPath);
 
             using (var dbContext = StorageManager.GetScanContextForDataExport(scanId))
@@ -39,6 +40,7 @@ namespace PnP.Scanning.Core.Services
                 // PER SCAN COMPONENT: Update report data per scan component
                 if (scan.CLIMode == "Test")
                 {
+                    reportFile = "TestReport.pbit";
                     // Put the report file in the report folder
                     string pbitFile = Path.Combine(exportPath, "TestReport.pbit");
                     PersistPBitFromResource("PnP.Scanning.Core.Scanners.Test.TestReport.pbit", pbitFile);
@@ -47,6 +49,8 @@ namespace PnP.Scanning.Core.Services
                     RewriteDataLocationsInPbit(pbitFile, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Test\\\\");
                 }
 #endif               
+
+                return Path.Combine(exportPath, reportFile);
             }
         }
 

@@ -16,6 +16,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<ReportMode> modeOption;
         private Option<Delimiter> delimiterOption;
         private Option<string> exportPathOption;
+        private Option<bool> openGeneratedReportOption;
 
         internal ReportCommandHandler(ScannerManager processManagerInstance)
         {
@@ -57,6 +58,15 @@ namespace PnP.Scanning.Process.Commands
                 IsRequired = false,
             };
             cmd.AddOption(exportPathOption);
+
+            openGeneratedReportOption = new(
+                name: $"--{Constants.ReportOpen}",
+                getDefaultValue: () => true,
+                description: "Open the generated report")
+            {
+                IsRequired = false,
+            };
+            cmd.AddOption(openGeneratedReportOption);
         }
 
         public Command Create()
@@ -66,16 +76,16 @@ namespace PnP.Scanning.Process.Commands
             //{                               
             //});
 
-            cmd.SetHandler(async (Guid scanId, ReportMode mode, Delimiter delimiter, string path) => 
+            cmd.SetHandler(async (Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open) => 
                             { 
-                                await HandleStartAsync(scanId, mode, delimiter, path); 
+                                await HandleStartAsync(scanId, mode, delimiter, path, open); 
                             },
-                            scanIdOption, modeOption, delimiterOption, exportPathOption);
+                            scanIdOption, modeOption, delimiterOption, exportPathOption, openGeneratedReportOption);
 
             return cmd;
         }
 
-        private async Task HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path)
+        private async Task HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open)
         {
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Creating reports...", async ctx =>
             {
@@ -97,6 +107,8 @@ namespace PnP.Scanning.Process.Commands
                     Path = path
                 });
 
+                string finalReportPath = "";
+
                 await foreach (var message in call.ResponseStream.ReadAllAsync())
                 {
                     if (message.Type == Constants.MessageError)
@@ -115,7 +127,19 @@ namespace PnP.Scanning.Process.Commands
                     // Add delay for an improved "visual" experience
                     await Task.Delay(TimeSpan.FromMilliseconds(500));
 
+                    if (!string.IsNullOrEmpty(message.ReportPath))
+                    {                        
+                        finalReportPath = message.ReportPath;
+                    }
                 }
+
+                AnsiConsole.WriteLine();
+
+                if (!string.IsNullOrEmpty(finalReportPath) && open)
+                {
+                    var powerBiDesktop = PowerBiManager.LaunchPowerBiAsync(finalReportPath);
+                }
+
             });
         }
     }

@@ -28,6 +28,7 @@
         internal const string ReportMode = "mode";
         internal const string ReportDelimiter = "delimiter";
         internal const string ReportPath = "path";
+        internal const string ReportOpen = "open";
         #endregion
 
         #region Status

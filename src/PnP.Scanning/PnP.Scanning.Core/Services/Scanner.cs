@@ -285,11 +285,12 @@ namespace PnP.Scanning.Core.Services
                     });
                     Log.Information("Start Building PowerBI report for scan {ScanId}", scanId);
 
-                    await reportManager.CreatePowerBiReport(scanId, request.Path, request.Delimiter);
+                    var exportPath = await reportManager.CreatePowerBiReport(scanId, request.Path, request.Delimiter);
 
                     await responseStream.WriteAsync(new ReportStatus
                     {
-                        Status = $"Building PowerBI report done"
+                        Status = $"Building PowerBI report done",
+                        ReportPath = exportPath
                     });
                     Log.Information("PowerBI report for scan {ScanId} is ready", scanId);
                 }
