@@ -11,9 +11,7 @@ namespace PnP.Scanning.Process.Services
 
             ProcessStartInfo startInfo = new(reportToOpen)
             {
-                UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Minimized,
-                CreateNoWindow = true,
+                UseShellExecute = true,                
             };
 
             System.Diagnostics.Process? powerBiProcess = System.Diagnostics.Process.Start(startInfo);
