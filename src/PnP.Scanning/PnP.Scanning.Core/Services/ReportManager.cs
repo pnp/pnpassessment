@@ -54,7 +54,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal async Task ExportReportDataAsync(Guid scanId, string? exportPath = null, string? delimiter = null)
+        internal async Task<string> ExportReportDataAsync(Guid scanId, string? exportPath = null, string? delimiter = null)
         {
             exportPath = EnsureReportPath(scanId, exportPath);
 
@@ -137,6 +137,7 @@ namespace PnP.Scanning.Core.Services
 #endregion
             }
 
+            return exportPath;
         }
 
         private static string EnsureReportPath(Guid scanId, string? exportPath)

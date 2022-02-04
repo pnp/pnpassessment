@@ -3,6 +3,8 @@ using PnP.Scanning.Core;
 using PnP.Scanning.Process.Services;
 using Spectre.Console;
 using System.CommandLine;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 
 namespace PnP.Scanning.Process.Commands
 {
@@ -137,7 +139,30 @@ namespace PnP.Scanning.Process.Commands
 
                 if (!string.IsNullOrEmpty(finalReportPath) && open)
                 {
-                    var powerBiDesktop = PowerBiManager.LaunchPowerBiAsync(finalReportPath);
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        if (mode == ReportMode.PowerBI)
+                        {
+                            // Open the PowerBI Desktop client
+                            var powerBiDesktop = PowerBiManager.LaunchPowerBiAsync(finalReportPath);
+                        }
+                        else
+                        {
+                            // Open Windows explorer
+                            try
+                            {
+                                _ = System.Diagnostics.Process.Start("explorer.exe", string.Format("\"{0}\"", finalReportPath));
+                            }
+                            catch (Win32Exception win32Exception)
+                            {
+                                AnsiConsole.WriteException(win32Exception);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"[green]Report output is available in folder {Path.GetDirectoryName(finalReportPath)}[/]");
+                    }
                 }
 
             });

@@ -5,7 +5,7 @@ namespace PnP.Scanning.Process.Services
 {
     internal static class PowerBiManager
     {
-        internal static System.Diagnostics.Process LaunchPowerBiAsync(string reportToOpen)
+        internal static System.Diagnostics.Process? LaunchPowerBiAsync(string reportToOpen)
         {
             AnsiConsole.MarkupLine("[gray]Opening the generated report in PowerBI client...[/]");
 

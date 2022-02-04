@@ -269,11 +269,12 @@ namespace PnP.Scanning.Core.Services
 
                 Log.Information("Report data export started for scan {ScanId}", scanId);
 
-                await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
+                var dataExportPath = await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
 
                 await responseStream.WriteAsync(new ReportStatus
                 {
-                    Status = $"Exporting report data done"
+                    Status = $"Exporting report data done",
+                    ReportPath = dataExportPath
                 });
                 Log.Information("Report data exported for scan {ScanId}", scanId);
 
