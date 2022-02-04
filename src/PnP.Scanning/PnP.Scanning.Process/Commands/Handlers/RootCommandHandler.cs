@@ -16,13 +16,14 @@ namespace PnP.Scanning.Process.Commands
         {
             var rootCommand = new RootCommand();
 
+            rootCommand.AddCommand(new ConfigCommandHandler(processManager).Create());
             rootCommand.AddCommand(new ListCommandHandler(processManager).Create());
-            rootCommand.AddCommand(new StartCommandHandler(processManager).Create());
-            rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
-            rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
             rootCommand.AddCommand(new PauseCommandHandler(processManager).Create());
-            rootCommand.AddCommand(new RestartCommandHandler(processManager).Create());
             rootCommand.AddCommand(new ReportCommandHandler(processManager).Create());
+            rootCommand.AddCommand(new RestartCommandHandler(processManager).Create());
+            rootCommand.AddCommand(new StartCommandHandler(processManager).Create());
+            rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
+            rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
 
             rootCommand.Description = "Microsoft 365 Scanner";
 

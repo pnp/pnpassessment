@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PnP.Scanning.Core.Services;
@@ -115,8 +116,13 @@ namespace PnP.Scanning.Process
         private static IHost ConfigureCliHost(string[] args)
         {
             return Host.CreateDefaultBuilder(args)
-                       .ConfigureServices(services =>
+                       .ConfigureServices((context, services) =>
                        {
+                           // Inject configuration data
+                           var customSettings = new ConfigurationOptions();
+                           context.Configuration.Bind("CustomSettings", customSettings);
+                           services.AddSingleton(customSettings);
+
                            services.AddSingleton<ScannerManager>();
                        })
                        .UseConsoleLifetime()

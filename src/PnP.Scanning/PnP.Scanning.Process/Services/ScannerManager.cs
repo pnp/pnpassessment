@@ -10,13 +10,19 @@ namespace PnP.Scanning.Process.Services
     /// </summary>
     internal sealed class ScannerManager
     {
-        public ScannerManager()
+        internal static int StandardScannerPort = 25010;
+
+        public ScannerManager(ConfigurationOptions config)
         {
+            if (config != null && config.Port > 0)
+            {
+                DefaultScannerPort = config.Port;
+            }
         }
 
         internal static string DefaultScannerHost { get; } = "http://localhost";
 
-        internal static int DefaultScannerPort { get; } = 25010;
+        internal static int DefaultScannerPort { get; private set; } = StandardScannerPort;
 
         internal int CurrentScannerPort { get; private set; }
 
