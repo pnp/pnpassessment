@@ -183,7 +183,7 @@ namespace PnP.Scanning.Core.Services
         public async override Task<PingReply> Ping(Empty request, ServerCallContext context)
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            return new PingReply() { UpAndRunning = true };
+            return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId };
         }
 
         public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)

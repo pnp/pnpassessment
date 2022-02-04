@@ -14,18 +14,20 @@ namespace PnP.Scanning.Process.Services
                 UseShellExecute = true,                
             };
 
-            System.Diagnostics.Process? powerBiProcess = System.Diagnostics.Process.Start(startInfo);
-
-            if (powerBiProcess != null && !powerBiProcess.HasExited)
-            {                
-                AnsiConsole.MarkupLine($"[green]OK[/]");
-
-                return powerBiProcess;
-            }
-            else
+            using (System.Diagnostics.Process? powerBiProcess = System.Diagnostics.Process.Start(startInfo))
             {
-                AnsiConsole.MarkupLine($"[red]FAILED[/]");
-                return null;
+
+                if (powerBiProcess != null && !powerBiProcess.HasExited)
+                {
+                    AnsiConsole.MarkupLine($"[green]OK[/]");
+
+                    return powerBiProcess;
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]FAILED[/]");
+                    return null;
+                }
             }
         }
 

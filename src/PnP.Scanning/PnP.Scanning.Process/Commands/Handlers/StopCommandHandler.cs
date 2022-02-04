@@ -29,8 +29,44 @@ namespace PnP.Scanning.Process.Commands
         {
             try
             {
-                AnsiConsole.MarkupLine("[gray]Requesting the scanner server to shutdown...[/]");
+                AnsiConsole.Markup("[gray]Requesting the scanner server to shutdown...[/]");
                 await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "" });
+
+                bool isGrpcUpAndRunning = true;
+                var retryAttempt = 1;
+                do
+                {
+                    try
+                    {
+                        using (var process = System.Diagnostics.Process.GetProcessById(processManager.CurrentScannerProcessId))
+                        {
+                            if (process == null || process.HasExited)
+                            {
+                                AnsiConsole.MarkupLine($"[green]OK[/]");
+                                isGrpcUpAndRunning = false;
+                            }
+                            else
+                            {
+                                // Wait in between checks
+                                await Task.Delay(TimeSpan.FromMilliseconds(500));
+                                retryAttempt++;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        AnsiConsole.MarkupLine($"[green]OK[/]");
+
+                        // Exception means the process is not found
+                        isGrpcUpAndRunning = false;
+                    }
+                }
+                while (isGrpcUpAndRunning && retryAttempt <= 20);
+
+                if (isGrpcUpAndRunning)
+                {
+                    AnsiConsole.MarkupLine($"[red]FAIL[/]");
+                }
             }
             catch
             {

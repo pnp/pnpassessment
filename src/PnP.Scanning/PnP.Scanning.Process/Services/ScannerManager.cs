@@ -18,7 +18,9 @@ namespace PnP.Scanning.Process.Services
 
         internal static int DefaultScannerPort { get; } = 25010;
 
-        internal int CurrentScannerPort { get; private set; }           
+        internal int CurrentScannerPort { get; private set; }
+
+        internal int CurrentScannerProcessId { get; private set; } = -1;
 
         internal async Task<PnPScanner.PnPScannerClient> GetScannerClientAsync()
         {
@@ -65,8 +67,9 @@ namespace PnP.Scanning.Process.Services
             }
         }
 
-        private void RegisterScanner(int port)
+        private void RegisterScanner(int processId, int port)
         {
+            CurrentScannerProcessId = processId;
             CurrentScannerPort = port;
         }
 
@@ -75,9 +78,10 @@ namespace PnP.Scanning.Process.Services
             int port = DefaultScannerPort;
 
             // First check if we can identify an existing running scanning process
-            if (await CanConnectRunningScannerAsync(port))
+            var currentScannerProcessId = await CanConnectRunningScannerAsync(port);
+            if (currentScannerProcessId > -1)
             {
-                RegisterScanner(port);
+                RegisterScanner(currentScannerProcessId, port);
                 return port;
             }
             else
@@ -94,28 +98,29 @@ namespace PnP.Scanning.Process.Services
 #endif
                 };
 
-                System.Diagnostics.Process? scannerProcess = System.Diagnostics.Process.Start(startInfo);
-
-                if (scannerProcess != null && !scannerProcess.HasExited)
+                using (System.Diagnostics.Process? scannerProcess = System.Diagnostics.Process.Start(startInfo))
                 {
-                    RegisterScanner(port);
+                    if (scannerProcess != null && !scannerProcess.HasExited)
+                    {
+                        RegisterScanner(scannerProcess.Id, port);
 
 #if DEBUG
-                    AttachDebugger(scannerProcess);
+                        AttachDebugger(scannerProcess);
 #endif
 
-                    // perform a ping to verify when the grpc server is up
-                    await WaitForScannerToBeUpAsync();
+                        // perform a ping to verify when the grpc server is up
+                        await WaitForScannerToBeUpAsync();
 
-                    AnsiConsole.MarkupLine($"[green]OK[/]");
+                        AnsiConsole.MarkupLine($"[green]OK[/]");
 
-                    return port;
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]FAILED[/]");
+                        return port;
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine($"[red]FAILED[/]");
 
-                    return -1;
+                        return -1;
+                    }
                 }
             }
         }
@@ -153,7 +158,7 @@ namespace PnP.Scanning.Process.Services
             }
         }
 
-        private static async Task<bool> CanConnectRunningScannerAsync(int port)
+        private static async Task<int> CanConnectRunningScannerAsync(int port)
         {
             AnsiConsole.Markup($"[gray]Connecting scanner on port {port}...[/]");
 
@@ -169,7 +174,7 @@ namespace PnP.Scanning.Process.Services
                     if (response != null && response.UpAndRunning)
                     {
                         AnsiConsole.MarkupLine($"[green]OK[/]");
-                        return true;
+                        return response.ProcessId;
                     }
                 }
                 catch
@@ -183,7 +188,7 @@ namespace PnP.Scanning.Process.Services
             while (retryAttempt <= 2);
 
             AnsiConsole.MarkupLine($"");
-            return false;
+            return -1;
         }
 
         private static PnPScanner.PnPScannerClient CreateClient(int port)
