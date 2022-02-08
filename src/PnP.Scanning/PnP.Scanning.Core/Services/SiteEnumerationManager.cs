@@ -1,22 +1,28 @@
-﻿using PnP.Scanning.Core.Scanners;
+﻿using PnP.Core.Admin.Model.SharePoint;
+using PnP.Core.Auth;
+using PnP.Core.Model.SharePoint;
+using PnP.Core.Services;
+using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
+using System.Linq.Expressions;
 
 namespace PnP.Scanning.Core.Services
 {
     internal sealed class SiteEnumerationManager
     {
+        private readonly IPnPContextFactory contextFactory;
 
-        public SiteEnumerationManager(StorageManager storageManager)
+        public SiteEnumerationManager(StorageManager storageManager, IPnPContextFactory pnpContextFactory)
         {
             StorageManager = storageManager;
+            contextFactory = pnpContextFactory;
         }
 
         internal StorageManager StorageManager { get; private set; }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+        internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback)
         {
             List<string> list = new();
 
@@ -29,6 +35,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     list.Add(site.TrimEnd('/'));
                 }
+
+                feedback.Invoke($"Loaded {list.Count} site collections from the passed siteslist parameter");
             }
             else if (!string.IsNullOrEmpty(start.SitesFile))
             {
@@ -40,11 +48,28 @@ namespace PnP.Scanning.Core.Services
                         list.Add(row[0].ToString().TrimEnd('/'));
                     }
                 }
+                feedback.Invoke($"Loaded {list.Count} site collections from the passed file {start.SitesFile}");
             }
             else if (!string.IsNullOrEmpty(start.Tenant))
             {
                 Log.Information("Building list of site collections: using tenant scope");
 
+                using (var context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
+                                                                        new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                                        {
+                                                                            return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
+                                                                        }
+                    )))
+                {
+                    // Enumerate all site collections
+                    var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(filter: SiteCollectionFilter.ExcludePersonalSites);
+                    foreach(var siteCollection in siteCollections)
+                    {
+                        list.Add(siteCollection.Url.ToString());
+                    }
+                }
+
+                feedback.Invoke($"Enumerated {list.Count} site collections for tenant {start.Tenant}");
             }
 
 #if DEBUG
@@ -72,7 +97,7 @@ namespace PnP.Scanning.Core.Services
             return list;
         }
 
-        internal async Task<List<EnumeratedWeb>> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, bool isRestart)
+        internal async Task<List<EnumeratedWeb>> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
             
@@ -83,13 +108,31 @@ namespace PnP.Scanning.Core.Services
                 var websToRestart = await StorageManager.WebsToRestartScanningAsync(scanId, siteCollectionUrl);
                 if (websToRestart != null && websToRestart.Count > 0)
                 {
+                    Log.Information("Loaded {Count} webs for restarting scan {ScanId} with site collection {SiteCollectionUrl}", websToRestart.Count, scanId, siteCollectionUrl);
                     return websToRestart;
                 }
             }
 
+            // Ensure these props are already loaded when the site is loaded into the PnPContext
+            var contextOptions = new PnPContextOptions()
+            {
+                AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[] { w => w.WebTemplateConfiguration }
+            };
+
+            using (var context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl), 
+                                                                    new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                                    {
+                                                                        return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
+                                                                    }),
+                                                                    contextOptions))
+            {
+                webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context));
+            }
+
+            Log.Information("Enumerated {Count} webs for scan {ScanId} with site collection {SiteCollectionUrl}", webUrlsToScan.Count, scanId, siteCollectionUrl);
 #if DEBUG
             // Insert dummy webs
-            if (options is TestOptions testOptions)
+            if (options is TestOptions testOptions && webUrlsToScan.Count == 0)
             {
                 // Add root web
                 webUrlsToScan.Add(new EnumeratedWeb { WebUrl = "/", WebTemplate = "STS#0"});
@@ -124,5 +167,33 @@ namespace PnP.Scanning.Core.Services
         {
             return list.Split(separator, StringSplitOptions.RemoveEmptyEntries);                   
         }
+
+
+        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context)
+        {
+            List<EnumeratedWeb> webs = new();
+
+            // Add the root web
+            webs.Add(new EnumeratedWeb
+            {
+                WebUrl = "/",
+                WebTemplate = $"{context.Web.WebTemplateConfiguration}"
+            });
+
+            // Get the sub webs from the root web of the site collection
+            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync();       
+
+            foreach(var enumeratedWeb in enumeratedWebs)
+            {
+                webs.Add(new EnumeratedWeb
+                {
+                    WebUrl = enumeratedWeb.ServerRelativeUrl,
+                    WebTemplate = $"{enumeratedWeb.WebTemplateConfiguration}"
+                });
+            }
+
+            return webs;
+        }
+
     }
 }

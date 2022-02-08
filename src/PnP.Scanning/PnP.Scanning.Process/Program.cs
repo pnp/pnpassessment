@@ -1,8 +1,13 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using PnP.Core.Auth.Services.Builder.Configuration;
+using PnP.Core.Services.Builder.Configuration;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Process.Commands;
@@ -35,8 +40,9 @@ namespace PnP.Scanning.Process
                 
                 // Get ProcessManager instance from the cli executable
                 var processManager = host.Services.GetRequiredService<ScannerManager>();
+                var dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
 
-                var root = new RootCommandHandler(processManager).Create();
+                var root = new RootCommandHandler(processManager, dataProtectionProvider).Create();
                 var builder = new CommandLineBuilder(root);
                 var parser = builder.UseDefaults().Build();
 
@@ -54,6 +60,7 @@ namespace PnP.Scanning.Process
 
                     while (!string.IsNullOrEmpty(consoleInput))
                     {
+                        AnsiConsole.WriteLine("");
                         await parser.InvokeAsync(consoleInput);
 
                         AnsiConsole.WriteLine("");
@@ -116,6 +123,11 @@ namespace PnP.Scanning.Process
         private static IHost ConfigureCliHost(string[] args)
         {
             return Host.CreateDefaultBuilder(args)
+                       .ConfigureLogging((context, logging) =>
+                       {
+                           // Clear all previously registered providers, don't want logger output to mess with the CLI console output
+                           logging.ClearProviders();
+                       })
                        .ConfigureServices((context, services) =>
                        {
                            // Inject configuration data
@@ -123,7 +135,10 @@ namespace PnP.Scanning.Process
                            context.Configuration.Bind("CustomSettings", customSettings);
                            services.AddSingleton(customSettings);
 
+                           services.AddDataProtection();
+
                            services.AddSingleton<ScannerManager>();
+                           services.AddTransient<AuthenticationManager>();
                        })
                        .UseConsoleLifetime()
                        .Build();
@@ -145,8 +160,16 @@ namespace PnP.Scanning.Process
                           });
                       });
 
-                      webBuilder.ConfigureServices(services =>
+                      webBuilder.ConfigureServices((context, services) =>
                       {
+                          services.AddDataProtection();
+
+                          // Add the PnP Core SDK library
+                          services.AddPnPCore();
+                          services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
+                          services.AddPnPCoreAuthentication();
+                          services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
+
                           services.AddSingleton<StorageManager>();
                           services.AddSingleton<ScanManager>();
                           services.AddTransient<SiteEnumerationManager>();

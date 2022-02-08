@@ -92,7 +92,7 @@ namespace PnP.Scanning.Process.Services
             }
             else
             {
-                AnsiConsole.Markup("[gray]No scanner found, starting one...[/]");
+                AnsiConsole.MarkupLine("[gray]No scanner found, starting one...[/]");
 
                 ProcessStartInfo startInfo = new()
                 {
@@ -166,7 +166,7 @@ namespace PnP.Scanning.Process.Services
 
         private static async Task<int> CanConnectRunningScannerAsync(int port)
         {
-            AnsiConsole.Markup($"[gray]Connecting scanner on port {port}...[/]");
+            AnsiConsole.MarkupLine($"[gray]Connecting scanner on port {port}...[/]");
 
             var retryAttempt = 0;
             do
@@ -193,7 +193,6 @@ namespace PnP.Scanning.Process.Services
             }
             while (retryAttempt <= 2);
 
-            AnsiConsole.MarkupLine($"");
             return -1;
         }
 

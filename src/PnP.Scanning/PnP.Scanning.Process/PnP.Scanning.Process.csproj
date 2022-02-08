@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="EFCore.BulkExtensions" Version="6.3.0" />
     <PackageReference Include="Grpc.Net.Client" Version="2.41.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Abstractions" Version="6.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.1">
       <PrivateAssets>all</PrivateAssets>
@@ -23,6 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\pnpcore\src\sdk\PnP.Core.Admin\PnP.Core.Admin.csproj" />
+    <ProjectReference Include="..\..\..\..\pnpcore\src\sdk\PnP.Core.Auth\PnP.Core.Auth.csproj" />
+    <ProjectReference Include="..\..\..\..\pnpcore\src\sdk\PnP.Core\PnP.Core.csproj" />
     <ProjectReference Include="..\PnP.Scanning.Core\PnP.Scanning.Core.csproj" />
   </ItemGroup>
 

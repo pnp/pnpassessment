@@ -1,4 +1,5 @@
-﻿using PnP.Scanning.Core.Queues;
+﻿using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 
@@ -8,11 +9,12 @@ namespace PnP.Scanning.Core.Services
     {
         private int siteCollectionsScanned = 0;
 
-        internal Scan(Guid id, SiteCollectionQueue queue, OptionsBase options)
+        internal Scan(Guid id, SiteCollectionQueue queue, OptionsBase options, AuthenticationManager authenticationManager)
         {
             Id = id;
             Queue = queue;
             Options = options;
+            AuthenticationManager = authenticationManager;
             StartedScanSessionAt = DateTime.Now;
         }
 
@@ -21,6 +23,8 @@ namespace PnP.Scanning.Core.Services
         internal SiteCollectionQueue Queue { get; private set; }
 
         internal OptionsBase Options { get; private set; }
+
+        internal AuthenticationManager AuthenticationManager { get; private set; }
 
         internal DateTime StartedScanSessionAt { get; private set; }
 

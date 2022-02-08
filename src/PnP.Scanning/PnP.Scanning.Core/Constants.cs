@@ -41,5 +41,10 @@
         internal const string EventScanStatusChange = "ScanStatusChange";
         internal const string EventPreScanStatusChange = "PreScanStatusChange";
         #endregion
+
+        #region Encryption
+        internal const string DataProtectorPurpose = "MSALCache";
+        internal const string MsalCacheFile = "msalcache.bin";
+        #endregion
     }
 }

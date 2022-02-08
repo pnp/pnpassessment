@@ -11,5 +11,9 @@
         public DateTime EndDate { get; set; }
 
         public SiteWebStatus Status { get; set; }
+
+        public string? Error { get; set; }
+
+        public string? StackTrace { get; set; }
     }
 }

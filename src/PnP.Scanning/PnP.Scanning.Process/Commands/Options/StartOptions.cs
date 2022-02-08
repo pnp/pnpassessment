@@ -1,4 +1,6 @@
-﻿namespace PnP.Scanning.Process.Commands
+﻿using PnP.Core.Services;
+
+namespace PnP.Scanning.Process.Commands
 {
     internal class StartOptions
     {

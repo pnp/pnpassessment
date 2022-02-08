@@ -29,7 +29,7 @@ namespace PnP.Scanning.Process.Commands
         {
             try
             {
-                AnsiConsole.Markup("[gray]Requesting the scanner server to shutdown...[/]");
+                AnsiConsole.MarkupLine("[gray]Requesting the scanner server to shutdown...[/]");
                 await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "" });
 
                 bool isGrpcUpAndRunning = true;

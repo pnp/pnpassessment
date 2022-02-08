@@ -1,5 +1,8 @@
 ﻿using Grpc.Core;
+using Microsoft.AspNetCore.DataProtection;
+using PnP.Core.Services;
 using PnP.Scanning.Core;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
 using Spectre.Console;
@@ -10,6 +13,7 @@ namespace PnP.Scanning.Process.Commands
     internal class StartCommandHandler
     {
         private readonly ScannerManager processManager;
+        private readonly IDataProtectionProvider dataProtectionProvider;
 
         private Command cmd;
         private Option<Mode> modeOption;
@@ -30,9 +34,10 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> testNumberOfSitesOption;
 #endif
 
-        public StartCommandHandler(ScannerManager processManagerInstance)
+        public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance)
         {
             processManager = processManagerInstance;
+            dataProtectionProvider = dataProtectionProviderInstance;
 
             cmd = new Command("start", "Starts a new scan");
 
@@ -55,7 +60,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartTenant}",
                 description: "Name of the tenant that will be scanned (e.g. contoso.sharepoint.com)")
             {
-                IsRequired = false
+                IsRequired = true
             };
             cmd.AddOption(tenantOption);
 
@@ -330,6 +335,26 @@ namespace PnP.Scanning.Process.Commands
                 // Setup client to talk to scanner
                 var client = await processManager.GetScannerClientAsync();
 
+                // Handle authentication
+                try
+                {
+                    AnsiConsole.MarkupLine("");
+                    AnsiConsole.MarkupLine($"[gray]Initializing authentication[/]");
+
+                    // Initialize authentication, this will result in a local auth cache when succesfull
+                    await new AuthenticationManager(dataProtectionProvider)
+                                .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), arguments.Environment,
+                                                           arguments.ApplicationId,
+                                                           arguments.CertPath, arguments.CertFile, arguments.CertPassword);
+                }
+                catch (Exception ex)
+                {
+                    AnsiConsole.WriteException(ex);
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+
                 // Kick off a scan
                 var start = new StartRequest
                 {
@@ -354,14 +379,15 @@ namespace PnP.Scanning.Process.Commands
                         Value = arguments.TestNumberOfSites.ToString(),
                     });
                 }
-    #endif
-
+#endif
+                bool encounteredError = false;
                 var call = client.Start(start);
                 await foreach (var message in call.ResponseStream.ReadAllAsync())
                 {
                     if (message.Type == Constants.MessageError)
                     {
                         AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
+                        encounteredError = true;
                     }
                     else if (message.Type == Constants.MessageWarning)
                     {
@@ -374,8 +400,16 @@ namespace PnP.Scanning.Process.Commands
 
                     // Add delay for an improved "visual" experience
                     await Task.Delay(TimeSpan.FromMilliseconds(500));
-
                 }
+
+                if (!encounteredError)
+                {
+                    AnsiConsole.MarkupLine("");
+                    AnsiConsole.MarkupLine($"[gray]Scan is running![/]");
+                    AnsiConsole.MarkupLine($"[gray]Use the [green]status[/] command to get realtime feedback[/]");
+                    AnsiConsole.MarkupLine($"[gray]Use the [green]list[/] command to an overview of all scans[/]");
+                }
+
             });
         }
     }

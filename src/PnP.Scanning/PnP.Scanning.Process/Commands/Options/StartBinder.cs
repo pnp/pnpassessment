@@ -1,4 +1,5 @@
-﻿using System.CommandLine;
+﻿using PnP.Core.Services;
+using System.CommandLine;
 using System.CommandLine.Binding;
 
 namespace PnP.Scanning.Process.Commands

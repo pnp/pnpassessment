@@ -1,6 +1,9 @@
 ﻿using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
+using PnP.Core.Services;
+using PnP.Scanning.Core.Authentication;
 using Serilog;
 
 namespace PnP.Scanning.Core.Services
@@ -14,8 +17,10 @@ namespace PnP.Scanning.Core.Services
         private readonly SiteEnumerationManager siteEnumerationManager;
         private readonly ReportManager reportManager;
         private readonly IHost kestrelWebServer;
+        private readonly IPnPContextFactory contextFactory;
+        private readonly IDataProtectionProvider dataProtectionProvider;
 
-        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, IHost host)
+        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, IHost host, IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory)
         {
             // Kestrel
             kestrelWebServer = host;
@@ -25,6 +30,10 @@ namespace PnP.Scanning.Core.Services
             siteEnumerationManager = siteEnumeration;
             // Report manager
             reportManager = reports;
+            // Data Protection Manager
+            dataProtectionProvider = provider;
+            // PnP Context factory
+            contextFactory = pnpContextFactory;
         }
 
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
@@ -188,43 +197,50 @@ namespace PnP.Scanning.Core.Services
 
         public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
         {
-            Log.Information("Starting scan");
-            await responseStream.WriteAsync(new StartStatus
+            try
             {
-                Status = "Starting"
-            });
-
-            // 1. Handle auth
-
-            await responseStream.WriteAsync(new StartStatus
-            {
-                Status = "Authenticated"
-            });
-
-            // 2. Build list of sites to scan
-            List<string> sitesToScan = await siteEnumerationManager.EnumerateSiteCollectionsToScanAsync(request);
-
-            if (sitesToScan.Count == 0)
-            {
+                Log.Information("Starting scan");
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "No sites to scan defined",
-                    Type = Constants.MessageWarning
+                    Status = "Starting the scan"
                 });
 
-                Log.Information("No sites to scan defined");
-            }
-            else
-            {
+                // 1. Handle auth
+                var authenticationManager = AuthenticationManager.Create(request, dataProtectionProvider);
+
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "Sites to scan are defined"
+                    Status = "Scan authentication initialized"
                 });
 
-                // 3. Start the scan
-                try
+                // 2. Build list of sites to scan
+                List<string> sitesToScan = await siteEnumerationManager.EnumerateSiteCollectionsToScanAsync(request, authenticationManager, async (message) =>
                 {
-                    var scanId = await scanManager.StartScanAsync(request, sitesToScan);
+                    await responseStream.WriteAsync(new StartStatus
+                    {
+                        Status = message
+                    });
+                });
+
+                if (sitesToScan.Count == 0)
+                {
+                    await responseStream.WriteAsync(new StartStatus
+                    {
+                        Status = "No sites to scan defined",
+                        Type = Constants.MessageWarning
+                    });
+
+                    Log.Information("No sites to scan defined");
+                }
+                else
+                {
+                    await responseStream.WriteAsync(new StartStatus
+                    {
+                        Status = "Sites to scan are defined"
+                    });
+
+                    // 3. Start the scan
+                    var scanId = await scanManager.StartScanAsync(request, authenticationManager, sitesToScan);
 
                     await responseStream.WriteAsync(new StartStatus
                     {
@@ -234,16 +250,16 @@ namespace PnP.Scanning.Core.Services
                     Log.Information("Scan job started");
 
                 }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "Error starting scan job: {Message}", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error starting scan job: {Message}", ex.Message);
 
-                    await responseStream.WriteAsync(new StartStatus
-                    {
-                        Status = $"Scan job not started due to error: {ex.Message}",
-                        Type = Constants.MessageError
-                    });
-                }
+                await responseStream.WriteAsync(new StartStatus
+                {
+                    Status = $"Scan job not started due to error: {ex.Message}",
+                    Type = Constants.MessageError
+                });
             }
         }
 

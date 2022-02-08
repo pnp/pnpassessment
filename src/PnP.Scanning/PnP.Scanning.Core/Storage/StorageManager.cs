@@ -1,5 +1,6 @@
 ﻿using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
+using PnP.Core;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
@@ -297,6 +298,32 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        internal async Task EndSiteCollectionScanWithErrorAsync(Guid scanId, string siteCollectionUrl, Exception ex)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
+                if (siteToUpdate != null)
+                {
+                    siteToUpdate.Status = SiteWebStatus.Failed;
+                    siteToUpdate.EndDate = DateTime.Now;
+                    siteToUpdate.Error = GetMessageFromException(ex);
+                    siteToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
+
+                    Log.Information("Setting SiteCollections table to status Failed for scan {ScanId}, web {SiteCollectionUrl}", scanId, siteCollectionUrl);
+
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in EndSiteCollectionScanWithErrorAsync for scan {ScanId}", scanId);
+
+                }
+                else
+                {
+                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in scan {ScanId}", siteCollectionUrl, scanId);
+                    throw new Exception($"No site collection row for {siteCollectionUrl} found to update");
+                }
+            }
+        }
+
         internal async Task EndWebScanAsync(Guid scanId, string siteCollectionUrl, string webUrl)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -330,7 +357,7 @@ namespace PnP.Scanning.Core.Storage
                 {
                     webToUpdate.Status = SiteWebStatus.Failed;
                     webToUpdate.EndDate = DateTime.Now;
-                    webToUpdate.Error = ex?.Message;
+                    webToUpdate.Error = GetMessageFromException(ex);
                     webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
                     Log.Information("Setting Web table to status Failed for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
@@ -640,6 +667,23 @@ namespace PnP.Scanning.Core.Storage
         internal static string GetScannerFolder()
         {
             return AppDomain.CurrentDomain.BaseDirectory;
+        }
+
+        private static string GetMessageFromException(Exception ex)
+        {
+            string message = ex.Message;
+
+            if (ex is PnPException pnPException)
+            {
+                message += $": {pnPException.Error}";
+            }
+            
+            if (ex.InnerException != null)
+            {
+                message += ex.InnerException.Message;
+            }
+
+            return message;
         }
 
         #region Scanner specific operations

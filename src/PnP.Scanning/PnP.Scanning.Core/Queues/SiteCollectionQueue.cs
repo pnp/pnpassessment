@@ -72,62 +72,76 @@ namespace PnP.Scanning.Core.Queues
             // Check the pausing bit, if so then we'll skip processing this site collection
             if (!ScanManager.IsPausing(ScanId))
             {
-                // Mark the scan status as running (if not yet done)
-                await ScanManager.UpdateScanStatusAsync(ScanId, ScanStatus.Running);
-
-                // Mark the site collection as starting with scanning
-                await StorageManager.StartSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
-
-                // Get the sub sites in the given site collection
-                
-                // Enumerate the webs to scan
-                var webUrlsToScan = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase, siteCollection.Restart);
-                
-                // Build list of web queue items to be processed
-                List<WebQueueItem> webToScan = new();
-                foreach (var web in webUrlsToScan)
+                try
                 {
-                    webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
-                                                   siteCollection.SiteCollectionUrl,
-                                                   web.WebUrl));
-                }
-            
-                // Store the webs to be processed, for a restart the webs might already be there
-                await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
 
-                // Start parallel execution per web in this site collection
-                var webQueue = new WebQueue(ScanManager, StorageManager, ScanId);
-                
-                // Use parallel threads per running site collection task for processing the webs
-                webQueue.ConfigureQueue(ParallelWebProcessingThreads);
+                    // Mark the scan status as running (if not yet done)
+                    await ScanManager.UpdateScanStatusAsync(ScanId, ScanStatus.Running);
 
-                foreach (var web in webToScan)
-                {
-                    await webQueue.EnqueueAsync(web);
-                }
+                    // Mark the site collection as starting with scanning
+                    await StorageManager.StartSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
 
-                // Wait until the queue is completely drained
-                webQueue.WaitForCompletion();
+                    // Get the sub sites in the given site collection
 
-                // Increase the site collections scanned in memory counter
-                ScanManager.SiteCollectionScanned(ScanId);
+                    // Enumerate the webs to scan
+                    var webUrlsToScan = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase,
+                                                                                                          ScanManager.GetScanAuthenticationManager(ScanId), siteCollection.Restart);
 
-                // Some of the webs of the site collection could have been paused, if so
-                // the web must not be be set to done
-                if (!ScanManager.IsPausing(ScanId))
-                {
-                    await StorageManager.EndSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
-                }
-                else
-                {
-                    // When pausing is ongoing doing "nothing" will leave the site collection in queued status, however if the pausing
-                    // kicked in while the last webs of a given site collection were being already processed then in the end all the 
-                    // webs are done and the site collection should be marked as "Finished"
-                    if (await StorageManager.SiteCollectionWasCompletelyHandledAsync(ScanId, siteCollection.SiteCollectionUrl))
+                    // Build list of web queue items to be processed
+                    List<WebQueueItem> webToScan = new();
+                    foreach (var web in webUrlsToScan)
                     {
-                        Log.Information("The scan {ScanId} is being paused, but as all webs of site collection {SiteCollectionUrl} were done mark it as Finished", ScanId, siteCollection.SiteCollectionUrl);
+                        webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
+                                                       siteCollection.SiteCollectionUrl,
+                                                       web.WebUrl));
+                    }
+
+                    // Store the webs to be processed, for a restart the webs might already be there
+                    await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
+
+                    // Start parallel execution per web in this site collection
+                    var webQueue = new WebQueue(ScanManager, StorageManager, ScanId);
+
+                    // Use parallel threads per running site collection task for processing the webs
+                    webQueue.ConfigureQueue(ParallelWebProcessingThreads);
+
+                    foreach (var web in webToScan)
+                    {
+                        await webQueue.EnqueueAsync(web);
+                    }
+
+                    // Wait until the queue is completely drained
+                    webQueue.WaitForCompletion();
+
+                    // Increase the site collections scanned in memory counter
+                    ScanManager.SiteCollectionScanned(ScanId);
+
+                    // Some of the webs of the site collection could have been paused, if so
+                    // the web must not be be set to done
+                    if (!ScanManager.IsPausing(ScanId))
+                    {
                         await StorageManager.EndSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
                     }
+                    else
+                    {
+                        // When pausing is ongoing doing "nothing" will leave the site collection in queued status, however if the pausing
+                        // kicked in while the last webs of a given site collection were being already processed then in the end all the 
+                        // webs are done and the site collection should be marked as "Finished"
+                        if (await StorageManager.SiteCollectionWasCompletelyHandledAsync(ScanId, siteCollection.SiteCollectionUrl))
+                        {
+                            Log.Information("The scan {ScanId} is being paused, but as all webs of site collection {SiteCollectionUrl} were done mark it as Finished", ScanId, siteCollection.SiteCollectionUrl);
+                            await StorageManager.EndSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Increase the site collections scanned in memory counter to ensure the "to process count" is updated
+                    ScanManager.SiteCollectionScanned(ScanId);
+                    
+                    // Log the error that happened
+                    Log.Error(ex, "Error happened during scanning of {SiteCollectionUrl} for scan {ScanId}", siteCollection.SiteCollectionUrl, ScanId);
+                    await StorageManager.EndSiteCollectionScanWithErrorAsync(ScanId, siteCollection.SiteCollectionUrl, ex);
                 }
             }
             else

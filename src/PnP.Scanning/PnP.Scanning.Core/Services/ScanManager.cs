@@ -1,5 +1,7 @@
 ﻿using Google.Protobuf.WellKnownTypes;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
@@ -16,12 +18,15 @@ namespace PnP.Scanning.Core.Services
     internal sealed class ScanManager : IHostedService
     {
         private readonly IHostApplicationLifetime hostApplicationLifetime;
+        private readonly IDataProtectionProvider dataProtectionProvider;
         private object scanListLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager)
+        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, IDataProtectionProvider provider)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
+            dataProtectionProvider = provider;
+
             // Hook the application stopping as that allows for cleanup 
             this.hostApplicationLifetime.ApplicationStopping.Register(OnStopping);
             this.hostApplicationLifetime.ApplicationStopped.Register(OnStopped);
@@ -50,7 +55,7 @@ namespace PnP.Scanning.Core.Services
 
         internal static int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
 
-        internal async Task<Guid> StartScanAsync(StartRequest start, List<string> siteCollectionList)
+        internal async Task<Guid> StartScanAsync(StartRequest start, AuthenticationManager authenticationManager, List<string> siteCollectionList)
         {
             Log.Information("Starting the scan job");
 
@@ -73,7 +78,7 @@ namespace PnP.Scanning.Core.Services
             OptionsBase options = OptionsBase.FromScannerInput(start);
 
             Log.Information("Add scan request {ScanId} to in-memory list", scanId);
-            var scan = new Scan(scanId, siteCollectionQueue, options)
+            var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager)
             {
                 SiteCollectionsToScan = siteCollectionList.Count,
                 Status = ScanStatus.Queued,
@@ -192,6 +197,9 @@ namespace PnP.Scanning.Core.Services
             {
                 feedback.Invoke($"{siteCollectionList.Count} site collections will be in scope of this restart");
 
+                // Configure auth
+                var authenticationManager = AuthenticationManager.Create(start, dataProtectionProvider);
+
                 // Populate in-memory cache again from persisted cache data
                 await LoadCachedDataAsync(scanId);
 
@@ -214,7 +222,7 @@ namespace PnP.Scanning.Core.Services
                 // Get the scan configuration options to use
                 OptionsBase options = OptionsBase.FromScannerInput(start);
 
-                var scan = new Scan(scanId, siteCollectionQueue, options)
+                var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager)
                 {
                     SiteCollectionsToScan = siteCollectionList.Count,
                     Status = ScanStatus.Queued,
@@ -281,6 +289,19 @@ namespace PnP.Scanning.Core.Services
             }
 
             return await ScanEnumerationManager.EnumerateScansFromDiskAsync(StorageManager, request.Running, request.Paused, request.Finished, request.Terminated);
+        }
+
+        internal AuthenticationManager GetScanAuthenticationManager(Guid scanId)
+        {
+            if (scans.ContainsKey(scanId))
+            {
+                return scans[scanId].AuthenticationManager;
+            }
+            else
+            {
+                Log.Error("No authentication manager available for {ScanId}", scanId);
+                throw new Exception($"No authentication manager available for {scanId}");
+            }
         }
 
         internal async Task SetPausingStatusAsync(Guid scanId, bool all, ScanStatus pauseMode)
