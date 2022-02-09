@@ -3,17 +3,13 @@ using Microsoft.Identity.Client;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
+using System.Security.Cryptography.X509Certificates;
 
 namespace PnP.Scanning.Core.Authentication
 {
     internal sealed class AuthenticationManager
     {
         private IClientApplicationBase? clientApplication;
-
-        //internal const string DefaultClientId = "31359c7f-bd7e-475c-86db-fdb8c937548e";
-        //internal const string OrganizationsTenantId = "organizations";
-        //internal static readonly Uri DefaultRedirectUri = new Uri("http://localhost");
-        //internal const string AuthorityFormat = "https://login.microsoftonline.com/{0}/";
 
         public AuthenticationManager(IDataProtectionProvider provider)
         {
@@ -34,12 +30,12 @@ namespace PnP.Scanning.Core.Authentication
 
         private IClientApplicationBase? InitializeAuthentication(StartRequest request)
         {
-            return InitializedAuthentication(request.Tenant, request.AuthMode, Enum.Parse<Microsoft365Environment>(request.Environment), Guid.Parse(request.ApplicationId),
+            return InitializedAuthentication(request.Tenant, request.AuthMode, Enum.Parse<Microsoft365Environment>(request.Environment), Guid.Parse(request.ApplicationId), request.TenantId,
                                              request.CertPath, request.CertFile, request.CertPassword);
         }
 
 
-        private IClientApplicationBase? InitializedAuthentication(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId,
+        private IClientApplicationBase? InitializedAuthentication(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
                                                                   string? certPath, string? certFile, string? certPassword)
         {            
 
@@ -64,12 +60,15 @@ namespace PnP.Scanning.Core.Authentication
                 builder = GetBuilderWithAuthority(builder, environment);
                 builder = builder.WithRedirectUri("http://localhost");
 
-                //if (!string.IsNullOrEmpty(tenantId))
-                //{
-                //    builder = builder.WithTenantId(tenantId);
-                //}
+                if (!string.IsNullOrEmpty(tenantId))
+                {
+                    builder = builder.WithTenantId(tenantId);
+                }
 
                 clientApplication = builder.Build();
+
+                // Setup a local encrypted cache
+                TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
             else if (authMode.Equals("Device", StringComparison.OrdinalIgnoreCase))
             {
@@ -77,24 +76,29 @@ namespace PnP.Scanning.Core.Authentication
             }
             else if (authMode.Equals("Application", StringComparison.OrdinalIgnoreCase))
             {
+                var certificate = LoadCertificate(certPath, certFile, certPassword);
 
+                var builder = ConfidentialClientApplicationBuilder.Create(applicationId.ToString()).WithCertificate(certificate);
+                builder = GetBuilderWithAuthority(builder, environment, tenantId);
+                clientApplication = builder.Build();
+
+                // Setup a local encrypted cache - not needed for application permissions as we have all we need for unattended token acquisition
+                //TokenCacheManager.EnableSerialization((clientApplication as IConfidentialClientApplication).AppTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
             else
             {
                 throw new Exception($"Authentication type {authMode} is unknown");
             }
 
-            // Setup a local encrypted cache
-            TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
 
             return clientApplication;
         }
 
-        internal async Task VerifyAuthenticationAsync(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId,
+        internal async Task VerifyAuthenticationAsync(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
                                                           string? certPath, FileInfo? certFile, string? certPassword)
         {
 
-            clientApplication = InitializedAuthentication(tenantName, authMode, environment, applicationId, certPath, certFile?.FullName, certPassword);
+            clientApplication = InitializedAuthentication(tenantName, authMode, environment, applicationId, tenantId, certPath, certFile?.FullName, certPassword);
 
             if (clientApplication != null)
             {
@@ -156,6 +160,12 @@ namespace PnP.Scanning.Core.Authentication
                     AuthenticationResult result = await builder.ExecuteAsync();
                     return result.AccessToken;
                 }
+                else if (clientApplication is IConfidentialClientApplication confidentialClientApplication)
+                {
+                    var builder = confidentialClientApplication.AcquireTokenForClient(scopes);
+                    AuthenticationResult result = await builder.ExecuteAsync();
+                    return result.AccessToken;
+                }
             }
 
             return null;
@@ -194,7 +204,7 @@ namespace PnP.Scanning.Core.Authentication
             return builder;
         }
 
-        public ConfidentialClientApplicationBuilder GetBuilderWithAuthority(ConfidentialClientApplicationBuilder builder, Microsoft365Environment azureEnvironment, string tenantId = "")
+        private ConfidentialClientApplicationBuilder GetBuilderWithAuthority(ConfidentialClientApplicationBuilder builder, Microsoft365Environment azureEnvironment, string tenantId = "")
         {
             if (azureEnvironment == Microsoft365Environment.Production)
             {
@@ -232,6 +242,58 @@ namespace PnP.Scanning.Core.Authentication
                 }
             }
             return builder;
+        }
+
+        private X509Certificate2 LoadCertificate(string? certPathLocation, string? certFile, string? certPassword)
+        {
+            if (!string.IsNullOrEmpty(certPathLocation))
+            {
+                // Did we get a three part certificate path (= local stored cert)
+                var certPath = certPathLocation.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries);
+                if (certPath.Length == 3 && (certPath[1].Equals("CurrentUser", StringComparison.InvariantCultureIgnoreCase) || certPath[1].Equals("LocalMachine", StringComparison.InvariantCultureIgnoreCase)))
+                {
+                    // Load the Cert based upon this
+                    string certThumbPrint = certPath[2].ToUpper();
+
+                    _ = Enum.TryParse(certPath[0], out StoreName storeName);
+                    _ = Enum.TryParse(certPath[1], out StoreLocation storeLocation);
+
+                    var store = new X509Store(storeName, storeLocation);
+                    store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
+                    var certificateCollection = store.Certificates.Find(X509FindType.FindByThumbprint, certThumbPrint, false);
+
+                    store.Close();
+
+                    foreach (var certificate in certificateCollection)
+                    {
+                        if (certificate.Thumbprint == certThumbPrint)
+                        {
+                            return certificate;
+                        }
+                    }
+                }
+
+                throw new Exception($"Certificate ciould not be loaded with using this path information {certPathLocation}");
+            }
+            else
+            {
+                if (!File.Exists(certFile))
+                {
+                    throw new FileNotFoundException($"Certificate file {certFile} does not exist");
+                }
+
+                using (var certfile = File.OpenRead(certFile))
+                {
+                    var certificateBytes = new byte[certfile.Length];
+                    certfile.Read(certificateBytes, 0, (int)certfile.Length);
+                    // Don't dispose the cert as that will lead to "m_safeCertContext is an invalid handle" errors when the confidential client actually uses the cert
+                    return new X509Certificate2(certificateBytes,
+                                                certPassword,
+                                                X509KeyStorageFlags.Exportable |
+                                                X509KeyStorageFlags.MachineKeySet |
+                                                X509KeyStorageFlags.PersistKeySet);
+                }
+            }
         }
     }
 }

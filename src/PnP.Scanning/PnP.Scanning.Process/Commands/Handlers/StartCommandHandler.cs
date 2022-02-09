@@ -23,6 +23,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<FileInfo> sitesFileOption;
         private Option<AuthenticationMode> authenticationModeOption;
         private Option<Guid> applicationIdOption;
+        private Option<string> tenantIdOption;
         private Option<string> certPathOption;
         private Option<FileInfo> certPfxFileInfoOption;
         private Option<string> certPfxFilePasswordOption;
@@ -146,6 +147,16 @@ namespace PnP.Scanning.Process.Commands
             };
             cmd.AddOption(applicationIdOption);
 
+            // Tenant id
+            tenantIdOption = new(
+                name: $"--{Constants.StartTenantId}",
+                //getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
+                description: "Azure tenant id to use for authenticating the scan")
+            {
+                IsRequired = false
+            };
+            cmd.AddOption(tenantIdOption);
+
             // Certificate path
             certPathOption = new(
                 name: $"--{Constants.StartCertPath}",
@@ -195,15 +206,15 @@ namespace PnP.Scanning.Process.Commands
 #pragma warning restore CS8603 // Possible null reference return.
                     }
 
-#pragma warning disable CS8604 // Possible null reference argument.
-                    if (result.FindResultFor(certPfxFilePasswordOption) is { })
-                    {
-                        result.ErrorMessage = $"using --{Constants.StartCertFile} also requires using --{Constants.StartCertPassword}";
-#pragma warning disable CS8603 // Possible null reference return.
-                        return null;
-#pragma warning restore CS8603 // Possible null reference return.
-                    }
-#pragma warning restore CS8604 // Possible null reference argument.
+//#pragma warning disable CS8604 // Possible null reference argument.
+//                    if (result.FindResultFor(certPfxFilePasswordOption) is { })
+//                    {
+//                        result.ErrorMessage = $"using --{Constants.StartCertFile} also requires using --{Constants.StartCertPassword}";
+//#pragma warning disable CS8603 // Possible null reference return.
+//                        return null;
+//#pragma warning restore CS8603 // Possible null reference return.
+//                    }
+//#pragma warning restore CS8604 // Possible null reference argument.
 
                     return new FileInfo(result.Tokens[0].Value);
                 },
@@ -228,11 +239,11 @@ namespace PnP.Scanning.Process.Commands
                         return "";
                     }
 
-                    if (result.FindResultFor(certPfxFileInfoOption) is { })
-                    {
-                        result.ErrorMessage = $"using --{Constants.StartCertPassword} also requires using --{Constants.StartCertFile}";
-                        return "";
-                    }
+                    //if (result.FindResultFor(certPfxFileInfoOption) is { })
+                    //{
+                    //    result.ErrorMessage = $"using --{Constants.StartCertPassword} also requires using --{Constants.StartCertFile}";
+                    //    return "";
+                    //}
 
                     return result.Tokens[0].Value;
                 },
@@ -313,7 +324,7 @@ namespace PnP.Scanning.Process.Commands
 
             // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
-                                              authenticationModeOption, applicationIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
+                                              authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
                                               , testNumberOfSitesOption
@@ -344,7 +355,7 @@ namespace PnP.Scanning.Process.Commands
                     // Initialize authentication, this will result in a local auth cache when succesfull
                     await new AuthenticationManager(dataProtectionProvider)
                                 .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), arguments.Environment,
-                                                           arguments.ApplicationId,
+                                                           arguments.ApplicationId, arguments.TenantId,
                                                            arguments.CertPath, arguments.CertFile, arguments.CertPassword);
                 }
                 catch (Exception ex)
@@ -362,9 +373,13 @@ namespace PnP.Scanning.Process.Commands
                     Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
                     Environment = arguments.Environment.ToString(),
                     SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
-                    SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName.ToString() : "",
+                    SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName : "",
                     AuthMode = arguments.AuthMode.ToString(),
                     ApplicationId = arguments.ApplicationId.ToString(),
+                    TenantId = arguments.TenantId != null ? arguments.TenantId : "",
+                    CertPath = arguments.CertPath != null ? arguments.CertPath : "",
+                    CertFile = arguments.CertFile != null ? arguments.CertFile.FullName : "",
+                    CertPassword = arguments.CertPassword != null ? arguments.CertPassword : "",
                     Threads = arguments.Threads,
                 };
 

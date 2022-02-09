@@ -18,6 +18,8 @@ namespace PnP.Scanning.Process.Commands
 
         public Guid ApplicationId { get; set; }
 
+        public string? TenantId { get; set; }
+
         public string? CertPath { get; set; }
 
         public FileInfo? CertFile { get; set; }

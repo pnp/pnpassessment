@@ -54,14 +54,14 @@ namespace PnP.Scanning.Core.Authentication
         internal static byte[] EncryptData(byte[] input)
         {
             //https://docs.microsoft.com/en-us/aspnet/core/security/data-protection/consumer-apis/overview?view=aspnetcore-5.0
-            var protector = dataProtectionProvider.CreateProtector(Constants.DataProtectorPurpose);
+            var protector = dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose);
             return protector.Protect(input);
         }
 
         internal static byte[] DecryptData(byte[] input)
         {
             //https://docs.microsoft.com/en-us/aspnet/core/security/data-protection/consumer-apis/overview?view=aspnetcore-5.0
-            var protector = dataProtectionProvider.CreateProtector(Constants.DataProtectorPurpose);
+            var protector = dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose);
             return protector.Unprotect(input);
         }
     }

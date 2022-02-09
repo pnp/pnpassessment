@@ -1,18 +1,34 @@
-start --mode test --authmode application --tenant bertonline.sharepoint.com --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1"
-start --mode test --authmode interactive --tenant bertonline.sharepoint.com --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1"
-start --mode test --authmode interactive --tenant bertonline.sharepoint.com --certfile "d:\temp\test.ps1"
-start --mode test --authmode application --tenant bertonline.sharepoint.com --certfile "d:\temp\test.ps1"
+Start: Application permissions
+==============================
 
-start --mode test --authmode application --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt" --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1"
+start --mode test --authmode application --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt" --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --tenantid d8623c9e-30c7-473a-83bc-d907df44a26e
 
-start --mode test --authmode application --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-3,https://bertonline.sharepoint.com/sites/prov-4,https://bertonline.sharepoint.com/sites/prov-5" --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1"
+start --mode test --authmode application --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1,https://bertonline.sharepoint.com/sites/prov-2" --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --tenantid d8623c9e-30c7-473a-83bc-d907df44a26e
 
-start --mode test --authmode application --tenant bertonline.sharepoint.com --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1" --testnumberofsites 5 
-start --mode test --authmode application --tenant bertonline.sharepoint.com --certpath "My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1" --testnumberofsites 8 --threads 16
+start --mode test --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --tenantid d8623c9e-30c7-473a-83bc-d907df44a26e  --testnumberofsites 8 --threads 16
+
+start --mode test --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certfile "D:\github\zzscratch\PnPCoreSdkTestCertificate.pfx" --tenantid d8623c9e-30c7-473a-83bc-d907df44a26e --certpassword *** --testnumberofsites 8 --threads 16
+
+Start: Interactive permissions
+==============================
 
 start --mode test --authmode interactive --tenant bertonline.sharepoint.com --testnumberofsites 2 --threads 1
 
 start --mode test --authmode interactive --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt" --threads 1
 
+List
+====
 list
 list --running
+
+Status
+======
+status
+
+Pause
+=====
+pause --id xxx
+
+Restart
+=======
+restart --id xxx

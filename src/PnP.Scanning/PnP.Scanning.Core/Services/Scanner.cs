@@ -2,7 +2,6 @@
 using Grpc.Core;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
-using PnP.Core.Services;
 using PnP.Scanning.Core.Authentication;
 using Serilog;
 
@@ -17,10 +16,9 @@ namespace PnP.Scanning.Core.Services
         private readonly SiteEnumerationManager siteEnumerationManager;
         private readonly ReportManager reportManager;
         private readonly IHost kestrelWebServer;
-        private readonly IPnPContextFactory contextFactory;
         private readonly IDataProtectionProvider dataProtectionProvider;
 
-        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, IHost host, IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory)
+        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, IHost host, IDataProtectionProvider provider)
         {
             // Kestrel
             kestrelWebServer = host;
@@ -32,8 +30,6 @@ namespace PnP.Scanning.Core.Services
             reportManager = reports;
             // Data Protection Manager
             dataProtectionProvider = provider;
-            // PnP Context factory
-            contextFactory = pnpContextFactory;
         }
 
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)

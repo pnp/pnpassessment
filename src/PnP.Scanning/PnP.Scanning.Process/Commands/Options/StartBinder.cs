@@ -13,6 +13,7 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<FileInfo> sitesFile;
         private readonly Option<AuthenticationMode> authMode;
         private readonly Option<Guid> applicationId;
+        private readonly Option<string> tenantId;
         private readonly Option<string> certPath;
         private readonly Option<FileInfo> certFile;
         private readonly Option<string> certPassword;
@@ -24,7 +25,7 @@ namespace PnP.Scanning.Process.Commands
 #endif
 
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<Microsoft365Environment> environmentInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
-                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
+                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
                            // PER SCAN COMPONENT: implement scan component specific options
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
@@ -38,6 +39,7 @@ namespace PnP.Scanning.Process.Commands
             sitesFile = sitesFileInput;
             authMode = authModeInput;
             applicationId = applicationIdInput;
+            tenantId = tenantIdInput;
             certPath = certPathInput;
             certFile = certFileInput;
             certPassword = certPasswordInput;
@@ -59,6 +61,7 @@ namespace PnP.Scanning.Process.Commands
                 SitesFile = bindingContext.ParseResult.GetValueForOption(sitesFile),
                 AuthMode = bindingContext.ParseResult.GetValueForOption(authMode),
                 ApplicationId = bindingContext.ParseResult.GetValueForOption(applicationId),
+                TenantId = bindingContext.ParseResult.GetValueForOption(tenantId),
                 CertPath = bindingContext.ParseResult.GetValueForOption(certPath),
                 CertFile = bindingContext.ParseResult.GetValueForOption(certFile),
                 CertPassword = bindingContext.ParseResult.GetValueForOption(certPassword),

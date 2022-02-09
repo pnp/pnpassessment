@@ -47,11 +47,12 @@ message StartRequest {
 	string SitesFile = 5;
 	string AuthMode = 6;
 	string ApplicationId = 7;
-	string CertPath = 8;
-	string CertFile = 9;
-	string CertPassword = 10;
-	int32 Threads = 11;
-	repeated PropertyRequest Properties = 12;
+	string TenantId = 8;
+	string CertPath = 9;
+	string CertFile = 10;
+	string CertPassword = 11;
+	int32 Threads = 12;
+	repeated PropertyRequest Properties = 13;
 }
 
 message PropertyRequest {

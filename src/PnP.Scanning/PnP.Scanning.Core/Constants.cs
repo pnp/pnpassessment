@@ -10,6 +10,7 @@
         internal const string StartSitesFile = "sitesfile";
         internal const string StartAuthMode = "authmode";
         internal const string StartApplicationId = "applicationid";
+        internal const string StartTenantId = "tenantid";
         internal const string StartCertPath = "certpath";
         internal const string StartCertFile = "certfile";
         internal const string StartCertPassword = "certpassword";
@@ -43,7 +44,8 @@
         #endregion
 
         #region Encryption
-        internal const string DataProtectorPurpose = "MSALCache";
+        internal const string DataProtectorMsalCachePurpose = "MSALCache";
+        internal const string DataProtectorPasswordPurpose = "Password";
         internal const string MsalCacheFile = "msalcache.bin";
         #endregion
     }

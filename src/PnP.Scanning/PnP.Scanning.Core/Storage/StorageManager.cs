@@ -1,4 +1,5 @@
 ﻿using EFCore.BulkExtensions;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core;
 using PnP.Scanning.Core.Services;
@@ -14,6 +15,15 @@ namespace PnP.Scanning.Core.Storage
     /// </summary>
     internal sealed class StorageManager
     {
+        private readonly IDataProtectionProvider dataProtectionProvider;
+        private readonly IDataProtector passwordProtector;
+
+        public StorageManager(IDataProtectionProvider provider)
+        {
+            dataProtectionProvider = provider;
+            passwordProtector = dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose);
+        }
+
         internal static string DbName => "scan.db";
 
         internal async Task LaunchNewScanAsync(Guid scanId, StartRequest start, List<string> siteCollectionList)
@@ -38,6 +48,10 @@ namespace PnP.Scanning.Core.Storage
                     CLISiteFile = start.SitesFile,
                     CLIAuthMode = start.AuthMode,
                     CLIApplicationId = start.ApplicationId,
+                    CLITenantId = start.TenantId,
+                    CLICertPath = start.CertPath,
+                    CLICertFile = start.CertFile,
+                    CLICertFilePassword = !string.IsNullOrEmpty(start.CertPassword) ? passwordProtector.Protect(start.CertPassword) : start.CertPassword,
                     CLIThreads = start.Threads,
                 });
 
@@ -467,9 +481,17 @@ namespace PnP.Scanning.Core.Storage
 
 
                     // Emulate the original start message as the scan might need some of the passed properties
-                    StartRequest start = new() 
+                    StartRequest start = new()
                     {
                         Mode = scan.CLIMode.ToString(),
+                        AuthMode = scan.CLIAuthMode.ToString(),
+                        Tenant = scan.CLITenant,
+                        ApplicationId = scan.CLIApplicationId,
+                        TenantId = scan.CLITenantId,
+                        Environment = scan.CLIEnvironment,
+                        CertPath = scan.CLICertPath,
+                        CertFile = scan.CLICertFile,
+                        CertPassword = !string.IsNullOrEmpty(scan.CLICertFilePassword) ? passwordProtector.Unprotect(scan.CLICertFilePassword) : scan.CLICertFilePassword,                        
                         Threads = scan.CLIThreads
                     };
 
