@@ -30,6 +30,8 @@
         internal const string ReportDelimiter = "delimiter";
         internal const string ReportPath = "path";
         internal const string ReportOpen = "open";
+
+        internal const string CacheClearAuthentication = "clearauthentication";
         #endregion
 
         #region Status

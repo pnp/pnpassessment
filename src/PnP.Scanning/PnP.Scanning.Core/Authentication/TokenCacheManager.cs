@@ -42,13 +42,19 @@ namespace PnP.Scanning.Core.Authentication
                 }
             }
         }
+
         internal static void EnableSerialization(ITokenCache tokenCache, IDataProtectionProvider dataProtectionProviderInstance, string cachePath)
         {
-            cacheFilePath = Path.Combine(cachePath, Constants.MsalCacheFile);
+            cacheFilePath = CacheFilePath(cachePath);
             dataProtectionProvider = dataProtectionProviderInstance;
         
             tokenCache.SetBeforeAccess(BeforeAccessNotification);
             tokenCache.SetAfterAccess(AfterAccessNotification);
+        }
+
+        internal static string CacheFilePath(string cachePath)
+        {
+            return Path.Combine(cachePath, Constants.MsalCacheFile);
         }
 
         internal static byte[] EncryptData(byte[] input)
