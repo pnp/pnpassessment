@@ -1,6 +1,7 @@
 ﻿using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
+using PnP.Core.Services;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
@@ -19,13 +20,16 @@ namespace PnP.Scanning.Core.Services
     {
         private readonly IHostApplicationLifetime hostApplicationLifetime;
         private readonly IDataProtectionProvider dataProtectionProvider;
+        private readonly IPnPContextFactory contextFactory;
         private object scanListLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, IDataProtectionProvider provider)
+        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, 
+                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
+            contextFactory = pnpContextFactory;
 
             // Hook the application stopping as that allows for cleanup 
             this.hostApplicationLifetime.ApplicationStopping.Register(OnStopping);
@@ -93,7 +97,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(this, StorageManager, scanId, siteCollectionList[0], "/", options);
+            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", options);
             if (scanner != null)
             {
                 try
@@ -118,7 +122,7 @@ namespace PnP.Scanning.Core.Services
             // Enqueue the received site collections
             foreach (var site in siteCollectionList)
             {
-                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site));
+                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site));
             }
             Log.Information("Enqueued {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
 
@@ -240,7 +244,7 @@ namespace PnP.Scanning.Core.Services
                 // Enqueue the received site collections
                 foreach (var site in siteCollectionList)
                 {
-                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, site) { Restart = true });
+                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site) { Restart = true });
                 }
 
                 feedback.Invoke($"{siteCollectionList.Count} site collections queued for scanning again");

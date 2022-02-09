@@ -126,7 +126,14 @@ namespace PnP.Scanning.Core.Services
                                                                     }),
                                                                     contextOptions))
             {
-                webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context));
+                if (!context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
+                {
+                    webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context));
+                }
+                else
+                {
+                    Log.Information("Skipped site {SiteCollectionUrl} for scan {ScanId} as it's a personal site", siteCollectionUrl, scanId);
+                }
             }
 
             Log.Information("Enumerated {Count} webs for scan {ScanId} with site collection {SiteCollectionUrl}", webUrlsToScan.Count, scanId, siteCollectionUrl);
@@ -185,9 +192,20 @@ namespace PnP.Scanning.Core.Services
 
             foreach(var enumeratedWeb in enumeratedWebs)
             {
+                // Turn server relative url into a site relative url
+                string webUrl;
+                if (context.Uri.PathAndQuery != "/")
+                {
+                    webUrl = enumeratedWeb.ServerRelativeUrl.Replace(context.Uri.PathAndQuery, "");
+                }
+                else
+                {
+                    webUrl = enumeratedWeb.ServerRelativeUrl;
+                }
+
                 webs.Add(new EnumeratedWeb
                 {
-                    WebUrl = enumeratedWeb.ServerRelativeUrl,
+                    WebUrl = webUrl,
                     WebTemplate = $"{enumeratedWeb.WebTemplateConfiguration}"
                 });
             }

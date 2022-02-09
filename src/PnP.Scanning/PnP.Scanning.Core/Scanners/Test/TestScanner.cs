@@ -1,4 +1,5 @@
-﻿using PnP.Scanning.Core.Services;
+﻿using PnP.Core.Services;
+using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners
@@ -9,7 +10,7 @@ namespace PnP.Scanning.Core.Scanners
         private const int maxDelay = 10000;
         private const string Cache1 = "Cache1";
 
-        internal TestScanner(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteUrl, string webUrl, TestOptions options) : base(scanManager, storageManager, scanId, siteUrl, webUrl)
+        internal TestScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl, TestOptions options) : base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
         {
             Options = options;            
         }
@@ -18,31 +19,36 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task ExecuteAsync()
         {
-            Logger.Information("Started for {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
-            int delay1 = new Random().Next(minDelay, maxDelay);
-            await Task.Delay(delay1);
-
-            Logger.Information("Cache contained key {Key} with value {Value}", Cache1, GetFromCache(Cache1));
-
-            Logger.Information("Step 1 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
-            var delay2 = new Random().Next(minDelay, maxDelay);
-            await Task.Delay(delay2);
-
-            // Logic that randomly throws an error for 5% of the scanned webs
-            int throwException = new Random().Next(1, 20);
-            if (throwException == 10)
+            using (var context = await GetPnPContextAsync())
             {
-                throw new Exception($"Something went wrong in the test scanner with options {Options.TestNumberOfSites}!!");
+                Logger.Warning("Web id is {WebId}", context.Web.Id);
+
+                Logger.Information("Started for {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
+                int delay1 = new Random().Next(minDelay, maxDelay);
+                await Task.Delay(delay1);
+
+                Logger.Information("Cache contained key {Key} with value {Value}", Cache1, GetFromCache(Cache1));
+
+                Logger.Information("Step 1 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
+                var delay2 = new Random().Next(minDelay, maxDelay);
+                await Task.Delay(delay2);
+
+                // Logic that randomly throws an error for 5% of the scanned webs
+                int throwException = new Random().Next(1, 20);
+                if (throwException == 10)
+                {
+                    throw new Exception($"Something went wrong in the test scanner with options {Options.TestNumberOfSites}!!");
+                }
+
+                Logger.Information("Step 2 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
+                var delay3 = new Random().Next(minDelay, maxDelay);
+                await Task.Delay(delay3);
+
+                Logger.Information("Step 3 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
+
+                // Save of the scanner outcome
+                await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3);
             }
-
-            Logger.Information("Step 2 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
-            var delay3 = new Random().Next(minDelay, maxDelay);
-            await Task.Delay(delay3);
-
-            Logger.Information("Step 3 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
-
-            // Save of the scanner outcome
-            await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3);
         }
 
         internal async override Task PreScanningAsync()

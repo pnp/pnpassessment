@@ -12,7 +12,7 @@ start --mode test --authmode application --tenant bertonline.sharepoint.com --ce
 
 start --mode test --authmode interactive --tenant bertonline.sharepoint.com --testnumberofsites 2 --threads 1
 
-start --mode test --authmode interactive --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt"
+start --mode test --authmode interactive --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt" --threads 1
 
 list
 list --running

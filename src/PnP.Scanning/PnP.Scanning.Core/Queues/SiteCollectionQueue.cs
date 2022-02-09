@@ -92,6 +92,7 @@ namespace PnP.Scanning.Core.Queues
                     foreach (var web in webUrlsToScan)
                     {
                         webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
+                                                       siteCollection.PnPContextFactory,
                                                        siteCollection.SiteCollectionUrl,
                                                        web.WebUrl));
                     }

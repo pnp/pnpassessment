@@ -1,4 +1,6 @@
-﻿using PnP.Scanning.Core.Services;
+﻿using PnP.Core.Auth;
+using PnP.Core.Services;
+using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using Serilog;
 
@@ -6,10 +8,11 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class ScannerBase
     {
-        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteUrl, string webUrl)
+        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl)
         {
             ScanManager = scanManager;
             StorageManager = storageManager;
+            PnPContextFactory = pnpContextFactory;
             ScanId = scanId;
             SiteUrl = siteUrl;
             WebUrl = webUrl;
@@ -23,6 +26,8 @@ namespace PnP.Scanning.Core.Scanners
         internal ScanManager ScanManager { get; private set; }
 
         internal StorageManager StorageManager { get; private set; }
+
+        internal IPnPContextFactory PnPContextFactory { get; private set; }
 
         internal Guid ScanId { get; set; }
 
@@ -40,20 +45,51 @@ namespace PnP.Scanning.Core.Scanners
         {
         }
 
-        internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
+        internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {
             // PER SCAN COMPONENT: instantiate the scan component here
 #if DEBUG
             if (options is TestOptions testOptions)
             {
-                return new TestScanner(scanManager, storageManager, scanId, siteCollectionUrl, webUrl, testOptions);
+                return new TestScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, testOptions);
             }
 #endif
 
             return null;
         }
 
-        internal void AddToCache(string key, string value)
+        protected async Task<PnPContext> GetPnPContextAsync()
+        {
+            return await GetPnPContextImplementationAsync(null);
+        }
+
+        protected async Task<PnPContext> GetPnPContextAsync(PnPContextOptions contextOptions)
+        {
+            return await GetPnPContextImplementationAsync(contextOptions);
+        }
+
+        private async Task<PnPContext> GetPnPContextImplementationAsync(PnPContextOptions? contextOptions)
+        {
+            if (contextOptions != null)
+            {
+                return await PnPContextFactory.CreateAsync(new Uri($"{SiteUrl}{WebUrl}"),
+                                                           new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                           {
+                                                               return ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
+                                                           }),
+                                                           contextOptions);
+            }
+            else
+            {
+                return await PnPContextFactory.CreateAsync(new Uri($"{SiteUrl}{WebUrl}"),
+                                                           new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                           {
+                                                               return ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
+                                                           }));
+            }
+        }
+
+        protected void AddToCache(string key, string value)
         {
             key = BuildKey(key);
             if (ScanManager.Cache.ContainsKey(key))
@@ -74,7 +110,7 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        internal string GetFromCache(string key)
+        protected string GetFromCache(string key)
         {
             key = BuildKey(key);
 

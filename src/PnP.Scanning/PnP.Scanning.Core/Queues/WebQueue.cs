@@ -56,7 +56,7 @@ namespace PnP.Scanning.Core.Queues
                 await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
 
                 // Get an instance for the actual scanner to use
-                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, ScanId, web.SiteCollectionUrl, web.WebUrl, web.OptionsBase);
+                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, web.PnPContextFactory, ScanId, web.SiteCollectionUrl, web.WebUrl, web.OptionsBase);
 
                 if (scanner == null)
                 {
