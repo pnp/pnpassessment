@@ -75,7 +75,7 @@ namespace PnP.Scanning.Core.Services
 #if DEBUG
             // Insert a set of dummy site collections for testing purposes
             if (!string.IsNullOrEmpty(start.Mode) && 
-                start.Mode.Equals("test", StringComparison.OrdinalIgnoreCase) &&
+                start.Mode == Mode.Test.ToString() &&
                 list.Count == 0)
             {
                 int sitesToScan = 10;

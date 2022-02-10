@@ -1,5 +1,6 @@
 ﻿using Grpc.Core;
 using PnP.Scanning.Core;
+using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
 using Spectre.Console;
 using System.CommandLine;

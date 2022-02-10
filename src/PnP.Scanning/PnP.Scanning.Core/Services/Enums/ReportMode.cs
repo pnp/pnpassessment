@@ -1,4 +1,4 @@
-﻿namespace PnP.Scanning.Process.Commands
+﻿namespace PnP.Scanning.Core.Services
 {
     internal enum ReportMode
     {

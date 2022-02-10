@@ -10,7 +10,7 @@ namespace PnP.Scanning.Core.Authentication
     internal sealed class AuthenticationManager
     {
         private IClientApplicationBase? clientApplication;
-        private string? scanAuthenticationMode;
+        private AuthenticationMode scanAuthenticationMode;
         private Func<DeviceCodeResult, Task>? deviceCodeCallback;
 
         public AuthenticationManager(IDataProtectionProvider provider)
@@ -40,6 +40,10 @@ namespace PnP.Scanning.Core.Authentication
         private IClientApplicationBase? InitializedAuthentication(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
                                                                   string? certPath, string? certFile, string? certPassword)
         {            
+            if (!Enum.TryParse<AuthenticationMode>(authMode, out var authenticationMode))
+            {
+                throw new Exception($"Authentication type {authMode} is unknown");
+            }
 
             if (tenantName == null)
             {
@@ -56,7 +60,7 @@ namespace PnP.Scanning.Core.Authentication
                 throw new ArgumentException("No application id specified", nameof(applicationId));
             }
 
-            if (authMode.Equals("Interactive", StringComparison.OrdinalIgnoreCase))
+            if (authenticationMode == AuthenticationMode.Interactive)
             {
                 var builder = PublicClientApplicationBuilder.Create(applicationId.ToString());
                 builder = GetBuilderWithAuthority(builder, environment);
@@ -72,7 +76,7 @@ namespace PnP.Scanning.Core.Authentication
                 // Setup a local encrypted cache
                 TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
-            else if (authMode.Equals("Device", StringComparison.OrdinalIgnoreCase))
+            else if (authenticationMode == AuthenticationMode.Device)
             {
                 var builder = PublicClientApplicationBuilder.Create(applicationId.ToString());
                 builder = GetBuilderWithAuthority(builder, environment);
@@ -87,7 +91,7 @@ namespace PnP.Scanning.Core.Authentication
                 // Setup a local encrypted cache
                 TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
-            else if (authMode.Equals("Application", StringComparison.OrdinalIgnoreCase))
+            else if (authenticationMode == AuthenticationMode.Application)
             {
                 var certificate = LoadCertificate(certPath, certFile, certPassword);
 
@@ -98,12 +102,8 @@ namespace PnP.Scanning.Core.Authentication
                 // Setup a local encrypted cache - not needed for application permissions as we have all we need for unattended token acquisition
                 //TokenCacheManager.EnableSerialization((clientApplication as IConfidentialClientApplication).AppTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
-            else
-            {
-                throw new Exception($"Authentication type {authMode} is unknown");
-            }
 
-            scanAuthenticationMode = authMode;
+            scanAuthenticationMode = authenticationMode;
             return clientApplication;
         }
 
@@ -172,13 +172,13 @@ namespace PnP.Scanning.Core.Authentication
             {
                 if (clientApplication is IPublicClientApplication publicClientApplication)
                 {
-                    if (scanAuthenticationMode == "Interactive")
+                    if (scanAuthenticationMode == AuthenticationMode.Interactive)
                     {
                         var builder = publicClientApplication.AcquireTokenInteractive(scopes);
                         AuthenticationResult result = await builder.ExecuteAsync();
                         return result.AccessToken;
                     }
-                    else if (scanAuthenticationMode == "Device")
+                    else if (scanAuthenticationMode == AuthenticationMode.Device)
                     {
                         var builder = publicClientApplication.AcquireTokenWithDeviceCode(scopes, deviceCodeCallback);
                         AuthenticationResult result = await builder.ExecuteAsync();
@@ -187,7 +187,7 @@ namespace PnP.Scanning.Core.Authentication
                 }
                 else if (clientApplication is IConfidentialClientApplication confidentialClientApplication)
                 {
-                    if (scanAuthenticationMode == "Application")
+                    if (scanAuthenticationMode == AuthenticationMode.Application)
                     {
                         var builder = confidentialClientApplication.AcquireTokenForClient(scopes);
                         AuthenticationResult result = await builder.ExecuteAsync();

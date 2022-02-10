@@ -1,4 +1,6 @@
 ﻿using PnP.Core.Services;
+using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Process.Commands
 {

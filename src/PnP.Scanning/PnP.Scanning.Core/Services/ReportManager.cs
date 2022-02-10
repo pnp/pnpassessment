@@ -38,7 +38,7 @@ namespace PnP.Scanning.Core.Services
 
 #if DEBUG
                 // PER SCAN COMPONENT: Update report data per scan component
-                if (scan.CLIMode == "Test")
+                if (scan.CLIMode == Mode.Test.ToString())
                 {
                     reportFile = "TestReport.pbit";
                     // Put the report file in the report folder
@@ -122,7 +122,7 @@ namespace PnP.Scanning.Core.Services
                 #region Scanner specific export
                 // PER SCAN COMPONENT: define export for the scan specific tables
 #if DEBUG
-                if (scan.CLIMode == "Test")
+                if (scan.CLIMode == Mode.Test.ToString())
                 {
                     using (var writer = new StreamWriter(Path.Join(exportPath, TestDelaysCsv)))
                     {

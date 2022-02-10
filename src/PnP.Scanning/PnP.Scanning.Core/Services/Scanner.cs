@@ -290,7 +290,7 @@ namespace PnP.Scanning.Core.Services
                 });
                 Log.Information("Report data exported for scan {ScanId}", scanId);
 
-                if (request.Mode == "PowerBI")
+                if (request.Mode == ReportMode.PowerBI.ToString())
                 {
                     await responseStream.WriteAsync(new ReportStatus
                     {
