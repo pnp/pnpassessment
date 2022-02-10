@@ -356,7 +356,13 @@ namespace PnP.Scanning.Process.Commands
                     await new AuthenticationManager(dataProtectionProvider)
                                 .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), arguments.Environment,
                                                            arguments.ApplicationId, arguments.TenantId,
-                                                           arguments.CertPath, arguments.CertFile, arguments.CertPassword);
+                                                           arguments.CertPath, arguments.CertFile, arguments.CertPassword,
+                                                           (deviceCodeResult) =>
+                                                           {
+                                                               AnsiConsole.MarkupLine(deviceCodeResult.Message);
+
+                                                               return Task.FromResult(0);
+                                                           });
                 }
                 catch (Exception ex)
                 {

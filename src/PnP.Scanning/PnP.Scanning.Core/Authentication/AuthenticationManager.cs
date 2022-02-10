@@ -10,6 +10,8 @@ namespace PnP.Scanning.Core.Authentication
     internal sealed class AuthenticationManager
     {
         private IClientApplicationBase? clientApplication;
+        private string? scanAuthenticationMode;
+        private Func<DeviceCodeResult, Task>? deviceCodeCallback;
 
         public AuthenticationManager(IDataProtectionProvider provider)
         {
@@ -72,7 +74,18 @@ namespace PnP.Scanning.Core.Authentication
             }
             else if (authMode.Equals("Device", StringComparison.OrdinalIgnoreCase))
             {
+                var builder = PublicClientApplicationBuilder.Create(applicationId.ToString());
+                builder = GetBuilderWithAuthority(builder, environment);
 
+                if (!string.IsNullOrEmpty(tenantId))
+                {
+                    builder = builder.WithTenantId(tenantId);
+                }
+
+                clientApplication = builder.Build();
+
+                // Setup a local encrypted cache
+                TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
             else if (authMode.Equals("Application", StringComparison.OrdinalIgnoreCase))
             {
@@ -90,15 +103,18 @@ namespace PnP.Scanning.Core.Authentication
                 throw new Exception($"Authentication type {authMode} is unknown");
             }
 
-
+            scanAuthenticationMode = authMode;
             return clientApplication;
         }
 
+        // This method is the only one called from the scanner clients (CLI)
         internal async Task VerifyAuthenticationAsync(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
-                                                          string? certPath, FileInfo? certFile, string? certPassword)
+                                                      string? certPath, FileInfo? certFile, string? certPassword,
+                                                      Func<DeviceCodeResult, Task> deviceCodeCallbackInstance)
         {
 
             clientApplication = InitializedAuthentication(tenantName, authMode, environment, applicationId, tenantId, certPath, certFile?.FullName, certPassword);
+            deviceCodeCallback = deviceCodeCallbackInstance;
 
             if (clientApplication != null)
             {
@@ -156,15 +172,27 @@ namespace PnP.Scanning.Core.Authentication
             {
                 if (clientApplication is IPublicClientApplication publicClientApplication)
                 {
-                    var builder = publicClientApplication.AcquireTokenInteractive(scopes);
-                    AuthenticationResult result = await builder.ExecuteAsync();
-                    return result.AccessToken;
+                    if (scanAuthenticationMode == "Interactive")
+                    {
+                        var builder = publicClientApplication.AcquireTokenInteractive(scopes);
+                        AuthenticationResult result = await builder.ExecuteAsync();
+                        return result.AccessToken;
+                    }
+                    else if (scanAuthenticationMode == "Device")
+                    {
+                        var builder = publicClientApplication.AcquireTokenWithDeviceCode(scopes, deviceCodeCallback);
+                        AuthenticationResult result = await builder.ExecuteAsync();
+                        return result.AccessToken;
+                    }
                 }
                 else if (clientApplication is IConfidentialClientApplication confidentialClientApplication)
                 {
-                    var builder = confidentialClientApplication.AcquireTokenForClient(scopes);
-                    AuthenticationResult result = await builder.ExecuteAsync();
-                    return result.AccessToken;
+                    if (scanAuthenticationMode == "Application")
+                    {
+                        var builder = confidentialClientApplication.AcquireTokenForClient(scopes);
+                        AuthenticationResult result = await builder.ExecuteAsync();
+                        return result.AccessToken;
+                    }
                 }
             }
 
