@@ -150,8 +150,7 @@ namespace PnP.Scanning.Process.Commands
             // Tenant id
             tenantIdOption = new(
                 name: $"--{Constants.StartTenantId}",
-                //getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
-                description: "Azure tenant id to use for authenticating the scan")
+                description: $"Azure tenant id to use for authenticating the scan. Will be automatically populated based upon the {Constants.StartTenant} value")
             {
                 IsRequired = false
             };
@@ -309,19 +308,6 @@ namespace PnP.Scanning.Process.Commands
         /// <returns></returns>
         public Command Create()
         {
-            // Custom validation of provided command input, use to validate option combinations
-            //cmd.AddValidator(commandResult =>
-            //{
-            //    //https://github.com/dotnet/command-line-api/issues/1119
-            //    if (authenticationModeOption != null)
-            //    {
-            //        AuthenticationMode mode = commandResult.FindResultFor(authenticationModeOption).GetValueOrDefault<AuthenticationMode>();                    
-
-            //    }
-
-            //    return null;
-            //});
-
             // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
                                               authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
@@ -341,6 +327,16 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(StartOptions arguments)
         {
+            // Auto populate the tenant id when not provided
+            if (string.IsNullOrEmpty(arguments.TenantId) && !string.IsNullOrEmpty(arguments.Tenant))
+            {
+                var tenantId = await AuthenticationManager.GetAzureADTenantIdAsync(arguments.Tenant);
+                if (tenantId != Guid.Empty)
+                {
+                    arguments.TenantId = tenantId.ToString();
+                }
+            }
+
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting scan...", async ctx =>
             {
                 // Setup client to talk to scanner

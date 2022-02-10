@@ -165,7 +165,11 @@ namespace PnP.Scanning.Process
                           services.AddDataProtection();
 
                           // Add the PnP Core SDK library
-                          services.AddPnPCore();
+                          services.AddPnPCore(options =>
+                          {
+                              // Set Graph first to false to optimize performance
+                              options.PnPContext.GraphFirst = false;
+                          });
                           services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
                           services.AddPnPCoreAuthentication();
                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));

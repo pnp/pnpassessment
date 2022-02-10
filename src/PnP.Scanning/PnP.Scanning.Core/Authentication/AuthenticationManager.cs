@@ -12,6 +12,7 @@ namespace PnP.Scanning.Core.Authentication
         private IClientApplicationBase? clientApplication;
         private AuthenticationMode scanAuthenticationMode;
         private Func<DeviceCodeResult, Task>? deviceCodeCallback;
+        private static readonly HttpClient httpClient = new HttpClient();
 
         public AuthenticationManager(IDataProtectionProvider provider)
         {
@@ -323,5 +324,35 @@ namespace PnP.Scanning.Core.Authentication
                 }
             }
         }
+
+        internal static async Task<Guid> GetAzureADTenantIdAsync(string tenant)
+        {
+            using (var request = new HttpRequestMessage(HttpMethod.Get, $"https://{tenant}/_vti_bin/client.svc"))
+            {
+                request.Headers.Add("Authorization", "Bearer");
+                HttpResponseMessage response = await httpClient.SendAsync(request).ConfigureAwait(false);
+
+                // Grab the tenant id from the wwwauthenticate header. 
+                var bearerResponseHeader = response.Headers.WwwAuthenticate.ToString();
+                const string bearer = "Bearer realm=\"";
+                var bearerIndex = bearerResponseHeader.IndexOf(bearer, StringComparison.Ordinal);
+
+                var realmIndex = bearerIndex + bearer.Length;
+
+                if (bearerResponseHeader.Length >= realmIndex + 36)
+                {
+                    var targetRealm = bearerResponseHeader.Substring(realmIndex, 36);
+
+                    if (Guid.TryParse(targetRealm, out Guid realmGuid))
+                    {
+                        return realmGuid;
+                    }
+                }
+            }
+
+            return Guid.Empty;
+
+        }
+
     }
 }
