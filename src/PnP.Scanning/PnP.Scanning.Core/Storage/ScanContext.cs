@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
+#nullable disable
+
 namespace PnP.Scanning.Core.Storage
 {
     /// <summary>
@@ -11,24 +13,31 @@ namespace PnP.Scanning.Core.Storage
     internal class ScanContext : DbContext
     {        
 
-        internal DbSet<Scan>? Scans { get; set; }
+        internal DbSet<Scan> Scans { get; set; }
 
-        internal DbSet<Property>? Properties { get; set; }
+        internal DbSet<Property> Properties { get; set; }
 
-        internal DbSet<History>? History { get; set; }
+        internal DbSet<History> History { get; set; }
 
-        internal DbSet<Cache>? Cache { get; set; } 
+        internal DbSet<Cache> Cache { get; set; } 
 
-        internal DbSet<SiteCollection>? SiteCollections { get; set; }
+        internal DbSet<SiteCollection> SiteCollections { get; set; }
 
-        internal DbSet<Web>? Webs { get; set; }
+        internal DbSet<Web> Webs { get; set; }
 
         // PER SCAN COMPONENT: add new tables needed to store the data for the scan component
 #if DEBUG
-        internal DbSet<TestDelay>? TestDelays { get; set; }
+        internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
 
         internal string DbPath { get; }
+
+        /// <summary>
+        /// Parameterless constructor used for EF Design time operations
+        /// </summary>
+        public ScanContext()
+        {
+        }
 
         internal ScanContext(Guid scanId)
         {
@@ -53,58 +62,37 @@ namespace PnP.Scanning.Core.Storage
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Extend the model defined via annotations, typically used for defining compound keys
 
-            modelBuilder.Entity<Scan>().ToTable("Scans");
-            modelBuilder.Entity<Scan>(entity =>
-            {
-                entity.HasKey(e => e.ScanId);                
-            });
-
-            modelBuilder.Entity<Property>().ToTable("Properties");
             modelBuilder.Entity<Property>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.Name });
-                entity.HasIndex(e => new { e.ScanId, e.Name }).IsUnique();
             });
 
-            modelBuilder.Entity<Cache>().ToTable("Cache");
             modelBuilder.Entity<Cache>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.Key });
-                entity.HasIndex(e => new { e.ScanId, e.Key }).IsUnique();
             });
 
-            modelBuilder.Entity<History>().ToTable("History");
-            modelBuilder.Entity<History>(entity =>
-            {
-                entity.HasKey(e => new { e.Id });
-                entity.HasIndex(e => new { e.ScanId, e.Id, e.Event, e.EventDate }).IsUnique();
-            });
-
-            modelBuilder.Entity<SiteCollection>().ToTable("SiteCollections");
             modelBuilder.Entity<SiteCollection>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl });
-                entity.HasIndex(e => new { e.ScanId, e.SiteUrl }).IsUnique();
             });
 
-            modelBuilder.Entity<Web>().ToTable("Webs");
             modelBuilder.Entity<Web>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
-                entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl }).IsUnique();
             });
 
             // PER SCAN COMPONENT: define needed tables here
 #if DEBUG
-            modelBuilder.Entity<TestDelay>().ToTable("TestDelays");
             modelBuilder.Entity<TestDelay>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
-                entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
             });
-            base.OnModelCreating(modelBuilder);
 #endif
+
+            base.OnModelCreating(modelBuilder);
         }
     }
 }

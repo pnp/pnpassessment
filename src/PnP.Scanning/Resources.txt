@@ -54,3 +54,35 @@ https://github.com/sql-bi/VertiPaq-Analyzer
 
 External tools samples (binary only):
 https://github.com/didierterrien/Power-BI-Sidetools/blob/master/Power%20BI%20Sidetools%20test%20version/Power-BI-Sidetools-portable-1-2-16.zip
+
+
+SQLite
+================
+
+SQLite error (only seen once):
+
+2022-02-09 07:45:37.254 +01:00 [ERR] Error happened during scanning of https://bertonline.sharepoint.com/sites/prov-1 for scan "3878404a-3f41-4299-8356-6a9057dd9572"
+System.AggregateException: One or more errors occurred. (SQLite Error 5: 'unable to delete/modify user-function due to active statements'.)
+ ---> Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 5: 'unable to delete/modify user-function due to active statements'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteConnection.Open()
+   at System.Data.Common.DbConnection.OpenAsync(CancellationToken cancellationToken)
+--- End of stack trace from previous location ---
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenInternalAsync(Boolean errorsExpected, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalConnection.OpenAsync(CancellationToken cancellationToken, Boolean errorsExpected)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+   at Microsoft.EntityFrameworkCore.Query.ShapedQueryCompilingExpressionVisitor.SingleOrDefaultAsync[TSource](IAsyncEnumerable`1 asyncEnumerable, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.ShapedQueryCompilingExpressionVisitor.SingleOrDefaultAsync[TSource](IAsyncEnumerable`1 asyncEnumerable, CancellationToken cancellationToken)
+   at PnP.Scanning.Core.Storage.StorageManager.StartWebScanAsync(Guid scanId, String siteCollectionUrl, String webUrl) in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Storage\StorageManager.cs:line 256
+   at PnP.Scanning.Core.Queues.WebQueue.ProcessWebAsync(WebQueueItem web) in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Queues\WebQueue.cs:line 56
+   at PnP.Scanning.Core.Queues.WebQueue.<EnqueueAsync>b__10_0(WebQueueItem web) in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Queues\WebQueue.cs:line 35
+   --- End of inner exception stack trace ---
+   at System.Threading.Tasks.Task.ThrowIfExceptional(Boolean includeTaskCanceledExceptions)
+   at System.Threading.Tasks.Task.Wait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.Wait()
+   at PnP.Scanning.Core.Queues.WebQueue.WaitForCompletion() in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Queues\WebQueue.cs:line 48
+   at PnP.Scanning.Core.Queues.SiteCollectionQueue.ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection) in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Queues\SiteCollectionQueue.cs:line 115
+

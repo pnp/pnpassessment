@@ -1,0 +1,1 @@
+﻿If you update the data model then a db migration class has to be added! See readme.txt in the Storage/DatabaseMigration folder for more context

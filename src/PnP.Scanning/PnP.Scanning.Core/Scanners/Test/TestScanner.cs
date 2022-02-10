@@ -47,7 +47,7 @@ namespace PnP.Scanning.Core.Scanners
                 Logger.Information("Step 3 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
 
                 // Save of the scanner outcome
-                await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3);
+                await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3, context.Web.Id.ToString());
             }
         }
 

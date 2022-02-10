@@ -27,12 +27,12 @@ namespace PnP.Scanning.Core.Services
         {
         }
 
-        internal async Task<string> CreatePowerBiReport(Guid scanId, string? exportPath = null, string? delimiter = null)
+        internal async Task<string> CreatePowerBiReportAsync(Guid scanId, string? exportPath = null, string? delimiter = null)
         {
             string reportFile = "";
             exportPath = EnsureReportPath(scanId, exportPath);
 
-            using (var dbContext = StorageManager.GetScanContextForDataExport(scanId))
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
                 var scan = await dbContext.Scans.Where(p => p.ScanId == scanId).FirstOrDefaultAsync();
 
@@ -58,7 +58,7 @@ namespace PnP.Scanning.Core.Services
         {
             exportPath = EnsureReportPath(scanId, exportPath);
 
-            using (var dbContext = StorageManager.GetScanContextForDataExport(scanId))
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture)
                 {

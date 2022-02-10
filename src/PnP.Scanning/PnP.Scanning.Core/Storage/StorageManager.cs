@@ -5,6 +5,8 @@ using PnP.Core;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
+#nullable disable
+
 namespace PnP.Scanning.Core.Storage
 {
 
@@ -31,7 +33,7 @@ namespace PnP.Scanning.Core.Storage
             using (var dbContext = new ScanContext(scanId))
             {
                 //Ensure the database is created
-                dbContext.Database.EnsureCreated();
+                await dbContext.Database.MigrateAsync();
 
                 // Add a scan record
                 dbContext.Scans.Add(new Scan
@@ -593,6 +595,9 @@ namespace PnP.Scanning.Core.Storage
             {
                 using (var dbContext = new ScanContext(scanId))
                 {
+                    // Trigger the database to upgrade to the latest
+                    await dbContext.Database.MigrateAsync();
+
                     var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
 
                     if (scan != null)
@@ -673,11 +678,15 @@ namespace PnP.Scanning.Core.Storage
             });
         }
 
-        internal static ScanContext GetScanContextForDataExport(Guid scanId)
+        internal async static Task<ScanContext> GetScanContextForDataExportAsync(Guid scanId)
         {
             var dbContext = new ScanContext(scanId);
             dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
             dbContext.ChangeTracker.LazyLoadingEnabled = false;
+
+            // Ensure the db was upgraded to the latest model
+            await dbContext.Database.MigrateAsync();
+
             return dbContext;
         }
 
@@ -714,7 +723,7 @@ namespace PnP.Scanning.Core.Storage
 
 #if DEBUG
 
-        internal async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3)
+        internal async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3, string webIdString)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -726,6 +735,7 @@ namespace PnP.Scanning.Core.Storage
                     Delay1 = delay1,
                     Delay2 = delay2,
                     Delay3 = delay3,
+                    WebIdString = webIdString
                 });
 
                 await dbContext.SaveChangesAsync();
