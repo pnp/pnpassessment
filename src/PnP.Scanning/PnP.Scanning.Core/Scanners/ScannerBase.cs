@@ -48,8 +48,12 @@ namespace PnP.Scanning.Core.Scanners
         internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {
             // PER SCAN COMPONENT: instantiate the scan component here
+            if (options is SyntexOptions syntexOptions)
+            {
+                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, syntexOptions);
+            }
 #if DEBUG
-            if (options is TestOptions testOptions)
+            else if (options is TestOptions testOptions)
             {
                 return new TestScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, testOptions);
             }

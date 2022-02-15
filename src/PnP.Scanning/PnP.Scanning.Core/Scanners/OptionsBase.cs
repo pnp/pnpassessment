@@ -11,9 +11,13 @@ namespace PnP.Scanning.Core.Scanners
             var options = NewOptions(request.Mode);
 
             // PER SCAN COMPONENT: configure scan component option handling here
+            if (request.Mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
+            { 
+            
+            }
 #if DEBUG
             // Assign other inputs
-            if (request.Mode.Equals("test", StringComparison.OrdinalIgnoreCase))
+            else if (request.Mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
             {
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
                 (options as TestOptions).TestNumberOfSites = int.Parse(request.Properties.First().Value);
@@ -27,10 +31,17 @@ namespace PnP.Scanning.Core.Scanners
         private static OptionsBase NewOptions(string mode)
         {
             // PER SCAN COMPONENT: configure scan component option handling here
-#if DEBUG
-            if (mode.Equals("test", StringComparison.OrdinalIgnoreCase))
+            if (mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                return new TestOptions()
+                return new SyntexOptions
+                {
+                    Mode = mode,
+                };
+            }
+#if DEBUG
+            else if (mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new TestOptions
                 {
                     Mode = mode,
                 };
