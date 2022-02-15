@@ -8,6 +8,7 @@ namespace PnP.Scanning.Core.Services
     internal sealed class Scan
     {
         private int siteCollectionsScanned = 0;
+        private int requestWasThrottled = 0;
 
         internal Scan(Guid id, SiteCollectionQueue queue, OptionsBase options, AuthenticationManager authenticationManager)
         {
@@ -40,9 +41,25 @@ namespace PnP.Scanning.Core.Services
             }  
         }
 
+        internal int RequestsThrottled
+        {
+            get
+            {
+                return requestWasThrottled;
+            }
+        }
+        
+        internal DateTime RetryingRequestAt { get; private set; }
+
         internal void SiteCollectionWasScanned()
         {
             Interlocked.Increment(ref siteCollectionsScanned);
+        }
+
+        internal void RequestWasThrottled(int waitTimeInSeconds)
+        {
+            Interlocked.Increment(ref requestWasThrottled);
+            RetryingRequestAt = DateTime.Now.AddSeconds(waitTimeInSeconds);
         }
     }
 }

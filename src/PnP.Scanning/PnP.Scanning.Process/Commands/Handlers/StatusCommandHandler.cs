@@ -37,6 +37,7 @@ namespace PnP.Scanning.Process.Commands
             table.AddColumn(new TableColumn("Mode").Centered());
             table.AddColumn(new TableColumn("Status").Centered());
             table.AddColumn(new TableColumn("Progress").Centered());
+            table.AddColumn(new TableColumn("Throttling").Centered());
             table.AddColumn(new TableColumn("Session start").Centered());
             table.AddColumn(new TableColumn("Session duration").Centered());
 
@@ -65,6 +66,7 @@ namespace PnP.Scanning.Process.Commands
                                     double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
                                     Markup status;
                                     Markup procent;
+                                    Markup throttling = null;
                                     if (item.Status == ScanStatus.Running.ToString())
                                     {
                                         status = new Markup($"[orange3]{item.Status}[/]");
@@ -86,10 +88,25 @@ namespace PnP.Scanning.Process.Commands
                                         procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
                                     }
 
+                                    if (item.RetryingRequestAt.ToDateTime() != DateTime.MinValue)
+                                    {
+                                        TimeSpan retryAfter = DateTime.Now - item.RetryingRequestAt.ToDateTime().ToLocalTime();
+                                        if (retryAfter.Seconds > 0)
+                                        {
+                                            throttling = new Markup($"{item.RequestsThrottled} / {retryAfter.Seconds} sec");
+                                        }
+                                    }
+
+                                    if (throttling == null)
+                                    {
+                                        throttling = new Markup($"{item.RequestsThrottled} / -");
+                                    }
+
                                     table.AddRow(new Markup($"{item.Id}"),
                                                  new Markup($"{item.Mode}"),
                                                  status,
                                                  procent,
+                                                 throttling,
                                                  new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
                                                  new Markup(item.Duration.ToTimeSpan().ToString(@"hh\:mm\:ss")));
                                 }

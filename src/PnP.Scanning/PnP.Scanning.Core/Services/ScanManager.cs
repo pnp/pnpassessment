@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
 using PnP.Core.Services;
+using PnP.Core.Services.Core;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
@@ -30,6 +31,12 @@ namespace PnP.Scanning.Core.Services
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
             contextFactory = pnpContextFactory;
+
+            // Get notified whenever the scan engine is getting throttled (only applies for calls made via PnP Core SDK!)
+            contextFactory.EventHub.RequestRetry = (retryEvent) =>
+            {
+                HandleRetryEvent(retryEvent);
+            };
 
             // Hook the application stopping as that allows for cleanup 
             this.hostApplicationLifetime.ApplicationStopping.Register(OnStopping);
@@ -274,7 +281,9 @@ namespace PnP.Scanning.Core.Services
                     SiteCollectionsToScan = runningScan.Value.SiteCollectionsToScan,
                     SiteCollectionsScanned = runningScan.Value.SiteCollectionsScanned,
                     Duration = Duration.FromTimeSpan(TimeSpan.FromSeconds((DateTime.Now - runningScan.Value.StartedScanSessionAt).TotalSeconds)),
-                    Started = Timestamp.FromDateTime(runningScan.Value.StartedScanSessionAt.ToUniversalTime())
+                    Started = Timestamp.FromDateTime(runningScan.Value.StartedScanSessionAt.ToUniversalTime()),
+                    RequestsThrottled = runningScan.Value.RequestsThrottled,
+                    RetryingRequestAt = Timestamp.FromDateTime(runningScan.Value.RetryingRequestAt.ToUniversalTime()),
                 });
             }
 
@@ -468,6 +477,29 @@ namespace PnP.Scanning.Core.Services
                 scans[scanId].SiteCollectionWasScanned();
             }
             Log.Information("A site collection was fully scanned for scan {ScanId}", scanId);
+        }
+
+        private void RequestWasThrottled(Guid scanId, int waitTimeInSeconds)
+        {
+            lock (scanListLock)
+            {
+                scans[scanId].RequestWasThrottled(waitTimeInSeconds);
+            }            
+        }
+
+        private void HandleRetryEvent(RetryEvent eventName)
+        {
+            // Skip the retries due to network issues (socket exceptions)
+            if (eventName != null && (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503 || eventName.HttpStatusCode == 504))
+            {
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+                if (eventName.PnpContextProperties.TryGetValue(Constants.PnPContextPropertyScanId, out object scanIdObject) && Guid.TryParse(scanIdObject?.ToString(), out Guid scanId))
+                {
+                    RequestWasThrottled(scanId, eventName.WaitTime);
+                    Log.Warning("[Throttling] request {Request} for scan {ScanId}", eventName.Request, scanId);
+                }
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+            }
         }
 
         internal int NumberOfScansRunning()

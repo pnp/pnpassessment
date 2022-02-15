@@ -116,7 +116,8 @@ namespace PnP.Scanning.Core.Services
             // Ensure these props are already loaded when the site is loaded into the PnPContext
             var contextOptions = new PnPContextOptions()
             {
-                AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[] { w => w.WebTemplateConfiguration }
+                AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[] { w => w.WebTemplateConfiguration },
+                Properties = new Dictionary<string, object>() { { Constants.PnPContextPropertyScanId, scanId } }
             };
 
             using (var context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl), 

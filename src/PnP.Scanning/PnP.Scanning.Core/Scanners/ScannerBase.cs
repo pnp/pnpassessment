@@ -72,21 +72,27 @@ namespace PnP.Scanning.Core.Scanners
         {
             if (contextOptions != null)
             {
-                return await PnPContextFactory.CreateAsync(new Uri($"{SiteUrl}{WebUrl}"),
-                                                           new ExternalAuthenticationProvider((resourceUri, scopes) =>
-                                                           {
-                                                               return ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
-                                                           }),
-                                                           contextOptions);
+                if (contextOptions.Properties == null)
+                {
+                    contextOptions.Properties = new Dictionary<string, object>();
+                }
+
+                contextOptions.Properties[Constants.PnPContextPropertyScanId] = ScanId;
             }
             else
             {
-                return await PnPContextFactory.CreateAsync(new Uri($"{SiteUrl}{WebUrl}"),
-                                                           new ExternalAuthenticationProvider((resourceUri, scopes) =>
-                                                           {
-                                                               return ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
-                                                           }));
+                contextOptions = new PnPContextOptions
+                {
+                    Properties = new Dictionary<string, object>() { { Constants.PnPContextPropertyScanId, ScanId } }
+                };
             }
+
+            return await PnPContextFactory.CreateAsync(new Uri($"{SiteUrl}{WebUrl}"),
+                                                       new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                       {
+                                                           return ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
+                                                       }),
+                                                       contextOptions);
         }
 
         protected void AddToCache(string key, string value)

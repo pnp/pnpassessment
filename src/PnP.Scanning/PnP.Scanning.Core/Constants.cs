@@ -50,5 +50,9 @@
         internal const string DataProtectorPasswordPurpose = "Password";
         internal const string MsalCacheFile = "msalcache.bin";
         #endregion
+
+        #region PnPContext properties
+        internal const string PnPContextPropertyScanId = "ScanId";
+        #endregion
     }
 }

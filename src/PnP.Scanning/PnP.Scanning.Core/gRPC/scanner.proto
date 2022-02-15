@@ -36,6 +36,8 @@ message ScanStatusReply {
 	int32 SiteCollectionsScanned = 5;
 	google.protobuf.Duration Duration = 6;
 	google.protobuf.Timestamp Started = 7;
+	int32 RequestsThrottled = 8;
+	google.protobuf.Timestamp RetryingRequestAt = 9;
 }
 
 // Start
