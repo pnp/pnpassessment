@@ -37,7 +37,8 @@ message ScanStatusReply {
 	google.protobuf.Duration Duration = 6;
 	google.protobuf.Timestamp Started = 7;
 	int32 RequestsThrottled = 8;
-	google.protobuf.Timestamp RetryingRequestAt = 9;
+	int32 RequestsRetriedDueToNetworkError = 9;
+	google.protobuf.Timestamp RetryingRequestAt = 10;
 }
 
 // Start

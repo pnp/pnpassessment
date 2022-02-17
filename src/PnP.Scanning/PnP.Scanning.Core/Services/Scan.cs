@@ -9,6 +9,7 @@ namespace PnP.Scanning.Core.Services
     {
         private int siteCollectionsScanned = 0;
         private int requestWasThrottled = 0;
+        private int requestWasRetriedDueToNetworkIssues = 0;
 
         internal Scan(Guid id, SiteCollectionQueue queue, OptionsBase options, AuthenticationManager authenticationManager)
         {
@@ -48,7 +49,15 @@ namespace PnP.Scanning.Core.Services
                 return requestWasThrottled;
             }
         }
-        
+
+        internal int RequestsRetriedDueToNetworkIssues
+        {
+            get
+            {
+                return requestWasRetriedDueToNetworkIssues;
+            }
+        }
+
         internal DateTime RetryingRequestAt { get; private set; }
 
         internal void SiteCollectionWasScanned()
@@ -59,6 +68,12 @@ namespace PnP.Scanning.Core.Services
         internal void RequestWasThrottled(int waitTimeInSeconds)
         {
             Interlocked.Increment(ref requestWasThrottled);
+            RetryingRequestAt = DateTime.Now.AddSeconds(waitTimeInSeconds);
+        }
+
+        internal void RequestsWasRetriedDueToNetworkIssues(int waitTimeInSeconds)
+        {
+            Interlocked.Increment(ref requestWasRetriedDueToNetworkIssues);
             RetryingRequestAt = DateTime.Now.AddSeconds(waitTimeInSeconds);
         }
     }

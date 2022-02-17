@@ -86,3 +86,8 @@ System.AggregateException: One or more errors occurred. (SQLite Error 5: 'unable
    at PnP.Scanning.Core.Queues.WebQueue.WaitForCompletion() in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Queues\WebQueue.cs:line 48
    at PnP.Scanning.Core.Queues.SiteCollectionQueue.ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection) in D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Queues\SiteCollectionQueue.cs:line 115
 
+
+Throttling / resilience
+=======================
+
+https://stackoverflow.com/questions/52044186/how-to-throttle-all-outgoing-asynchronous-calls-to-httpclient-across-multiple-th

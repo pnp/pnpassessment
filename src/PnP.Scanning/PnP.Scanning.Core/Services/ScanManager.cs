@@ -25,7 +25,7 @@ namespace PnP.Scanning.Core.Services
         private object scanListLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, 
+        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager,
                            IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
@@ -180,8 +180,8 @@ namespace PnP.Scanning.Core.Services
                 await StorageManager.ConsolidatedScanToEnableRestartAsync(scanId);
 
                 // Handle the scan restart
-                await ProcessScanRestartAsync(scanId, request, (status) => 
-                { 
+                await ProcessScanRestartAsync(scanId, request, (status) =>
+                {
                     feedback.Invoke(status);
                 });
             }
@@ -219,7 +219,7 @@ namespace PnP.Scanning.Core.Services
 
                 // Configure threading for the site collection and web queues
                 int threadsToUse = start.Threads;
-                if(request.Threads > 0)
+                if (request.Threads > 0)
                 {
                     Log.Information("Scan {ScanId} was originally started with {Threads} but overriden to use {NewThreads} during this restart", scanId, threadsToUse, request.Threads);
                     threadsToUse = request.Threads;
@@ -283,6 +283,7 @@ namespace PnP.Scanning.Core.Services
                     Duration = Duration.FromTimeSpan(TimeSpan.FromSeconds((DateTime.Now - runningScan.Value.StartedScanSessionAt).TotalSeconds)),
                     Started = Timestamp.FromDateTime(runningScan.Value.StartedScanSessionAt.ToUniversalTime()),
                     RequestsThrottled = runningScan.Value.RequestsThrottled,
+                    RequestsRetriedDueToNetworkError = runningScan.Value.RequestsRetriedDueToNetworkIssues,
                     RetryingRequestAt = Timestamp.FromDateTime(runningScan.Value.RetryingRequestAt.ToUniversalTime()),
                 });
             }
@@ -325,7 +326,7 @@ namespace PnP.Scanning.Core.Services
                 Log.Information("Setting {PauseMode} bit for all running scans", pauseMode);
                 lock (scanListLock)
                 {
-                    foreach(var scan in scans)
+                    foreach (var scan in scans)
                     {
                         scan.Value.Status = pauseMode;
                         scansToPause.Add(scan.Key);
@@ -391,7 +392,7 @@ namespace PnP.Scanning.Core.Services
                 scansToPause.Add(scanId);
             }
 
-            foreach(var scan in scansToPause)
+            foreach (var scan in scansToPause)
             {
                 await StorageManager.ConsolidatedScanToEnableRestartAsync(scan);
             }
@@ -484,23 +485,47 @@ namespace PnP.Scanning.Core.Services
             lock (scanListLock)
             {
                 scans[scanId].RequestWasThrottled(waitTimeInSeconds);
-            }            
+            }
+        }
+
+        private void RequestsWasRetriedDueToNetworkIssues(Guid scanId, int waitTimeInSeconds)
+        {
+            lock (scanListLock)
+            {
+                scans[scanId].RequestsWasRetriedDueToNetworkIssues(waitTimeInSeconds);
+            }
         }
 
         private void HandleRetryEvent(RetryEvent eventName)
         {
             // Skip the retries due to network issues (socket exceptions)
-            if (eventName != null && (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503 || eventName.HttpStatusCode == 504))
+            if (eventName != null)
             {
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                 if (eventName.PnpContextProperties.TryGetValue(Constants.PnPContextPropertyScanId, out object scanIdObject) && Guid.TryParse(scanIdObject?.ToString(), out Guid scanId))
                 {
-                    RequestWasThrottled(scanId, eventName.WaitTime);
-                    Log.Warning("[Throttling] request {Request} for scan {ScanId}", eventName.Request, scanId);
+                    if (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503 || eventName.HttpStatusCode == 504)
+                    {
+                        RequestWasThrottled(scanId, eventName.WaitTime);
+                        Log.Warning("[Throttling] request {Request} for scan {ScanId}", eventName.Request, scanId);
+                        return;
+                    }
+                    else if (eventName.Exception != null)
+                    {
+                        RequestsWasRetriedDueToNetworkIssues(scanId, eventName.WaitTime);
+                        Log.Warning("[Retry] request {Request} for scan {ScanId}", eventName.Request, scanId);
+                        return;
+                    }
+                    else
+                    {
+                        Log.Warning("[Retry] request {Request} for scan {ScanId}, http status code is {StatusCode} and no exception set", eventName.Request, scanId, eventName.HttpStatusCode);
+                    }
                 }
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+             
+                Log.Warning("[Retry] request {Request}, no scan id information found!");
             }
-        }
+        }    
 
         internal int NumberOfScansRunning()
         {

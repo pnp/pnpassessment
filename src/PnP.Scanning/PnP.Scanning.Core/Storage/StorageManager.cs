@@ -462,6 +462,7 @@ namespace PnP.Scanning.Core.Storage
         private async Task DropIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {
             // PER SCAN COMPONENT: For each scan component implement here the method to drop incomplete web scan results
+            await DropSyntexIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #if DEBUG
             await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
@@ -719,31 +720,29 @@ namespace PnP.Scanning.Core.Storage
 
         #region Scanner specific operations
 
-        // PER SCAN COMPONENT: implement respective SaveXXXScanResultsAsync and DropXXXIncompleteWebScanDataAsync methods
-
-#if DEBUG
-
-        internal async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3, string webIdString)
+        // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
+        private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {
-            using (var dbContext = new ScanContext(scanId))
+            foreach (var syntexListResult in await dbContext.SyntexLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
-                dbContext.TestDelays.Add(new TestDelay
-                {
-                    ScanId = scanId,
-                    SiteUrl = siteUrl,
-                    WebUrl = webUrl,
-                    Delay1 = delay1,
-                    Delay2 = delay2,
-                    Delay3 = delay3,
-                    WebIdString = webIdString
-                });
-
-                await dbContext.SaveChangesAsync();
-                Log.Information("Database updates pushed in SaveTestScanResultsAsync for scan {ScanId}", scanId);
-
+                dbContext.SyntexLists.Remove(syntexListResult);
             }
+            foreach (var syntexContentTypeFieldResult in await dbContext.SyntexContentTypeFields.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.SyntexContentTypeFields.Remove(syntexContentTypeFieldResult);
+            }
+            foreach (var syntexContentTypeResult in await dbContext.SyntexContentTypes.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.SyntexContentTypes.Remove(syntexContentTypeResult);
+            }
+            foreach (var syntexFieldResult in await dbContext.SyntexFields.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.SyntexFields.Remove(syntexFieldResult);
+            }
+            Log.Information("Consolidating scan {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
+#if DEBUG
         private async Task DropTestIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {
             foreach (var testResult in await dbContext.TestDelays.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
@@ -752,7 +751,6 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("Consolidating scan {ScanId}: dropping test results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
             }
         }
-
 #endif
 
         #endregion

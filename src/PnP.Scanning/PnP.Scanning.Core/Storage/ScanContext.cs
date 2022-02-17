@@ -26,6 +26,14 @@ namespace PnP.Scanning.Core.Storage
         internal DbSet<Web> Webs { get; set; }
 
         // PER SCAN COMPONENT: add new tables needed to store the data for the scan component
+        internal DbSet<SyntexList> SyntexLists { get; set; }
+
+        internal DbSet<SyntexContentType> SyntexContentTypes { get; set; }
+
+        internal DbSet<SyntexContentTypeField> SyntexContentTypeFields { get; set; }
+
+        internal DbSet<SyntexField> SyntexFields { get; set; }
+
 #if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
@@ -85,6 +93,28 @@ namespace PnP.Scanning.Core.Storage
             });
 
             // PER SCAN COMPONENT: define needed tables here
+            #region Syntex scanner
+            modelBuilder.Entity<SyntexList>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
+            });
+
+            modelBuilder.Entity<SyntexContentType>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.ContentTypeId });
+            });
+
+            modelBuilder.Entity<SyntexContentTypeField>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.ContentTypeId, e.FieldId });
+            });
+
+            modelBuilder.Entity<SyntexField>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FieldId });
+            });
+            #endregion
+
 #if DEBUG
             modelBuilder.Entity<TestDelay>(entity =>
             {

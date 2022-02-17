@@ -169,6 +169,8 @@ namespace PnP.Scanning.Process
                           {
                               // Set Graph first to false to optimize performance
                               options.PnPContext.GraphFirst = false;
+                              // Remove the HTTP timeout to ensure the request does not end before the throttling is over
+                              options.HttpRequests.Timeout = -1;
                           });
                           services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
                           services.AddPnPCoreAuthentication();

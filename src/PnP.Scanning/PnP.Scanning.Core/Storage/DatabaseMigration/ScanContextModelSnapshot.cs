@@ -177,6 +177,202 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("SiteCollections");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexContentType", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentTypeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FieldCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Group")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSyntexContentType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId")
+                        .IsUnique();
+
+                    b.ToTable("SyntexContentTypes");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexContentTypeField", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentTypeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FieldId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InternalName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TermSetId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TypeAsString")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId", "FieldId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId", "FieldId")
+                        .IsUnique();
+
+                    b.ToTable("SyntexContentTypeFields");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexField", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FieldId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InternalName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TermSetId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TypeAsString")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId", "FieldId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "FieldId")
+                        .IsUnique();
+
+                    b.ToTable("SyntexFields");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexList", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("AllowContentTypes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ContentTypeCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FieldCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastChanged")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LastChangedMonth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastChangedMonthString")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastChangedQuarter")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LastChangedYear")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ListExperienceOptions")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListServerRelativeUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ListTemplate")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ListTemplateString")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
+                        .IsUnique();
+
+                    b.ToTable("SyntexLists");
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.TestDelay", b =>
                 {
                     b.Property<Guid>("ScanId")

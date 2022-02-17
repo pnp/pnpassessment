@@ -1,4 +1,5 @@
-﻿using PnP.Core.Services;
+﻿#if DEBUG
+using PnP.Core.Services;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 
@@ -47,7 +48,7 @@ namespace PnP.Scanning.Core.Scanners
                 Logger.Information("Step 3 Delay {SiteCollectionUrl}{WebUrl}. ThreadId : {ThreadId}", SiteUrl, WebUrl, Environment.CurrentManagedThreadId);
 
                 // Save of the scanner outcome
-                await StorageManager.SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3, context.Web.Id.ToString());
+                await SaveTestScanResultsAsync(ScanId, SiteUrl, WebUrl, delay1, delay2, delay3, context.Web.Id.ToString());
             }
         }
 
@@ -69,5 +70,27 @@ namespace PnP.Scanning.Core.Scanners
 
             Logger.Information("Pre scanning work done");
         }
+
+        private async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3, string webIdString)
+        {
+            using (var dbContext = new ScanContext(ScanId))
+            {
+                dbContext.TestDelays.Add(new TestDelay
+                {
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = webUrl,
+                    Delay1 = delay1,
+                    Delay2 = delay2,
+                    Delay3 = delay3,
+                    WebIdString = webIdString
+                });
+
+                await dbContext.SaveChangesAsync();
+                Logger.Information("Database updates pushed in SaveTestScanResultsAsync");
+
+            }
+        }
     }
 }
+#endif

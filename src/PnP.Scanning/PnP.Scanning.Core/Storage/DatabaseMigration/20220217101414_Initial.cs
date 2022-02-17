@@ -98,6 +98,98 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 });
 
             migrationBuilder.CreateTable(
+                name: "SyntexContentTypeFields",
+                columns: table => new
+                {
+                    ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    WebUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    ListId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ContentTypeId = table.Column<string>(type: "TEXT", nullable: false),
+                    FieldId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    InternalName = table.Column<string>(type: "TEXT", nullable: true),
+                    Name = table.Column<string>(type: "TEXT", nullable: true),
+                    TypeAsString = table.Column<string>(type: "TEXT", nullable: true),
+                    Required = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TermSetId = table.Column<Guid>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyntexContentTypeFields", x => new { x.ScanId, x.SiteUrl, x.WebUrl, x.ListId, x.ContentTypeId, x.FieldId });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SyntexContentTypes",
+                columns: table => new
+                {
+                    ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    WebUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    ListId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ContentTypeId = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: true),
+                    Group = table.Column<string>(type: "TEXT", nullable: true),
+                    Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
+                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    IsSyntexContentType = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyntexContentTypes", x => new { x.ScanId, x.SiteUrl, x.WebUrl, x.ListId, x.ContentTypeId });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SyntexFields",
+                columns: table => new
+                {
+                    ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    WebUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    ListId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    FieldId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    InternalName = table.Column<string>(type: "TEXT", nullable: true),
+                    Name = table.Column<string>(type: "TEXT", nullable: true),
+                    TypeAsString = table.Column<string>(type: "TEXT", nullable: true),
+                    Required = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TermSetId = table.Column<Guid>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyntexFields", x => new { x.ScanId, x.SiteUrl, x.WebUrl, x.ListId, x.FieldId });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SyntexLists",
+                columns: table => new
+                {
+                    ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    WebUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    ListId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ListServerRelativeUrl = table.Column<string>(type: "TEXT", nullable: true),
+                    Title = table.Column<string>(type: "TEXT", nullable: true),
+                    ListTemplate = table.Column<int>(type: "INTEGER", nullable: false),
+                    ListTemplateString = table.Column<string>(type: "TEXT", nullable: true),
+                    AllowContentTypes = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ContentTypeCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    ListExperienceOptions = table.Column<string>(type: "TEXT", nullable: true),
+                    ItemCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    Created = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LastChanged = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LastChangedYear = table.Column<int>(type: "INTEGER", nullable: false),
+                    LastChangedMonth = table.Column<int>(type: "INTEGER", nullable: false),
+                    LastChangedMonthString = table.Column<string>(type: "TEXT", nullable: true),
+                    LastChangedQuarter = table.Column<string>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyntexLists", x => new { x.ScanId, x.SiteUrl, x.WebUrl, x.ListId });
+                });
+
+            migrationBuilder.CreateTable(
                 name: "TestDelays",
                 columns: table => new
                 {
@@ -106,7 +198,8 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     WebUrl = table.Column<string>(type: "TEXT", nullable: false),
                     Delay1 = table.Column<int>(type: "INTEGER", nullable: false),
                     Delay2 = table.Column<int>(type: "INTEGER", nullable: false),
-                    Delay3 = table.Column<int>(type: "INTEGER", nullable: false)
+                    Delay3 = table.Column<int>(type: "INTEGER", nullable: false),
+                    WebIdString = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -157,6 +250,30 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SyntexContentTypeFields_ScanId_SiteUrl_WebUrl_ListId_ContentTypeId_FieldId",
+                table: "SyntexContentTypeFields",
+                columns: new[] { "ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId", "FieldId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyntexContentTypes_ScanId_SiteUrl_WebUrl_ListId_ContentTypeId",
+                table: "SyntexContentTypes",
+                columns: new[] { "ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyntexFields_ScanId_SiteUrl_WebUrl_ListId_FieldId",
+                table: "SyntexFields",
+                columns: new[] { "ScanId", "SiteUrl", "WebUrl", "ListId", "FieldId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyntexLists_ScanId_SiteUrl_WebUrl_ListId",
+                table: "SyntexLists",
+                columns: new[] { "ScanId", "SiteUrl", "WebUrl", "ListId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TestDelays_ScanId_SiteUrl_WebUrl",
                 table: "TestDelays",
                 columns: new[] { "ScanId", "SiteUrl", "WebUrl" },
@@ -185,6 +302,18 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
             migrationBuilder.DropTable(
                 name: "SiteCollections");
+
+            migrationBuilder.DropTable(
+                name: "SyntexContentTypeFields");
+
+            migrationBuilder.DropTable(
+                name: "SyntexContentTypes");
+
+            migrationBuilder.DropTable(
+                name: "SyntexFields");
+
+            migrationBuilder.DropTable(
+                name: "SyntexLists");
 
             migrationBuilder.DropTable(
                 name: "TestDelays");
