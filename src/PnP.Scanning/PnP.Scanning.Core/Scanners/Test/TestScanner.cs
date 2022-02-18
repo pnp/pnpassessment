@@ -68,7 +68,24 @@ namespace PnP.Scanning.Core.Scanners
 
             AddToCache(Cache1, $"PnP Rocks! - {DateTime.Now}");
 
+            using (var context = await GetPnPContextAsync())
+            {
+                Logger.Warning("Pre scan done for site with url {Url} and {Id}", context.Uri, context.Site.Id);
+            }
+
             Logger.Information("Pre scanning work done");
+        }
+
+        internal async override Task PostScanningAsync()
+        {
+            Logger.Information("Post scanning work is starting");
+            
+            using (var context = await GetPnPContextAsync())
+            {
+                Logger.Warning("Post scan done for site with url {Url} and {Id}", context.Uri, context.Site.Id);
+            }
+
+            Logger.Information("Post scanning work done");            
         }
 
         private async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3, string webIdString)

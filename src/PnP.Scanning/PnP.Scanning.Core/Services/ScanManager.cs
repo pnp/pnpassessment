@@ -93,6 +93,7 @@ namespace PnP.Scanning.Core.Services
             {
                 SiteCollectionsToScan = siteCollectionList.Count,
                 Status = ScanStatus.Queued,
+                FirstSiteCollection = siteCollectionList[0],
             };
 
             // Ensure scan is added to the in-memory list as once a site collection is enqueud it
@@ -582,6 +583,24 @@ namespace PnP.Scanning.Core.Services
 
                 foreach(var scanId in scansToMarkAsDone)
                 {
+                    // Run post scanning step
+                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", scans[scanId].Options);
+                    if (scanner != null)
+                    {
+                        try
+                        {
+                            await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Running);
+                            await scanner.PostScanningAsync();
+                            await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Finished);
+                        }
+                        catch (Exception ex)
+                        {
+                            // The web scan failed, log accordingly
+                            Log.Error(ex, "Post scan task for scan {ScanId} failed. Error: {Error}", scanId, ex.Message);
+                            await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Failed);
+                        }
+                    }
+
                     await UpdateScanStatusAsync(scanId, ScanStatus.Finished);
 
                     await StorageManager.EndScanAsync(scanId);

@@ -53,6 +53,9 @@ namespace PnP.Scanning.Core.Queues
         {
             if (!ScanManager.IsPausing(ScanId))
             {
+                // Add a random wait to avoid contention when a large parallel scan kicks in
+                await Task.Delay(TimeSpan.FromMilliseconds(new Random().Next(0, 250)));
+
                 await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
 
                 // Get an instance for the actual scanner to use
@@ -68,6 +71,9 @@ namespace PnP.Scanning.Core.Queues
                 {
                     // Execute the actual scan logic for the loaded web
                     await scanner.ExecuteAsync();
+
+                    // Give some room for the other processing threads to handle pause operations
+                    await Task.Delay(TimeSpan.FromMilliseconds(250));
 
                     // Mark the web was scanned
                     await StorageManager.EndWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);

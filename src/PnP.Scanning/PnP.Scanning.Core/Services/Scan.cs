@@ -32,7 +32,9 @@ namespace PnP.Scanning.Core.Services
 
         internal ScanStatus Status { get; set; }
 
-        internal int SiteCollectionsToScan { get; set; }        
+        internal int SiteCollectionsToScan { get; set; }
+        
+        internal string FirstSiteCollection { get; set; }
 
         internal int SiteCollectionsScanned 
         { 

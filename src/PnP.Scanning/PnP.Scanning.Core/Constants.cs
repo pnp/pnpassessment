@@ -43,6 +43,7 @@
         #region History events
         internal const string EventScanStatusChange = "ScanStatusChange";
         internal const string EventPreScanStatusChange = "PreScanStatusChange";
+        internal const string EventPostScanStatusChange = "PostScanStatusChange";
         #endregion
 
         #region Encryption

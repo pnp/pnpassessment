@@ -35,15 +35,17 @@ namespace PnP.Scanning.Core.Scanners
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal virtual async Task PreScanningAsync()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        internal virtual async Task ExecuteAsync()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+        internal virtual async Task PostScanningAsync()
         {
         }
+
+        internal virtual async Task ExecuteAsync()
+        {
+        }
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
         internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {

@@ -43,6 +43,7 @@ namespace PnP.Scanning.Core.Storage
                     Version = VersionManager.GetCurrentVersion(),
                     Status = ScanStatus.Queued,
                     PreScanStatus = SiteWebStatus.Queued,
+                    PostScanStatus = SiteWebStatus.Queued,
                     CLIMode = start.Mode,
                     CLIEnvironment = start.Environment,
                     CLITenant = start.Tenant,
@@ -176,6 +177,31 @@ namespace PnP.Scanning.Core.Storage
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in SetPreScanStatusAsync for scan {ScanId}", scanId);
+                }
+                else
+                {
+                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
+                    throw new Exception($"No scan row for scan {scanId} found to update");
+                }
+            }
+        }
+
+        internal async Task SetPostScanStatusAsync(Guid scanId, SiteWebStatus postScanStatus)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
+                if (scan != null)
+                {
+                    Log.Information("Setting Scan table to postscanstatus {Status} for scan {ScanId}", postScanStatus, scanId);
+                    if (scan.PostScanStatus != postScanStatus)
+                    {
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPostScanStatusChange, DateTime.Now, $"From {scan.PostScanStatus} to {postScanStatus}");
+                        scan.PostScanStatus = postScanStatus;
+                    }
+
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Database updates pushed in SetPostScanStatusAsync for scan {ScanId}", scanId);
                 }
                 else
                 {
