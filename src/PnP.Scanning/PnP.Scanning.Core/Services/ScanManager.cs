@@ -278,7 +278,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     Id = runningScan.Value.Id.ToString(),
                     Mode = runningScan.Value.Options.Mode,
-                    Status = runningScan.Value.Status.ToString(),
+                    Status = runningScan.Value.PostScanRunning ? "Finalizing" : runningScan.Value.Status.ToString(),
                     SiteCollectionsToScan = runningScan.Value.SiteCollectionsToScan,
                     SiteCollectionsScanned = runningScan.Value.SiteCollectionsScanned,
                     Duration = Duration.FromTimeSpan(TimeSpan.FromSeconds((DateTime.Now - runningScan.Value.StartedScanSessionAt).TotalSeconds)),
@@ -589,6 +589,11 @@ namespace PnP.Scanning.Core.Services
                     {
                         try
                         {
+                            lock (scanListLock)
+                            {
+                                scans[scanId].PostScanRunning = true;
+                            }
+
                             await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Running);
                             await scanner.PostScanningAsync();
                             await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Finished);
@@ -598,6 +603,13 @@ namespace PnP.Scanning.Core.Services
                             // The web scan failed, log accordingly
                             Log.Error(ex, "Post scan task for scan {ScanId} failed. Error: {Error}", scanId, ex.Message);
                             await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Failed);
+                        }
+                        finally
+                        {
+                            lock (scanListLock)
+                            {
+                                scans[scanId].PostScanRunning = false;
+                            }
                         }
                     }
 

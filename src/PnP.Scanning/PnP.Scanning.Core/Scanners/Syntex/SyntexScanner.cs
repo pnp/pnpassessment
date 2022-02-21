@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using PnP.Core.Model;
+﻿using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
@@ -8,6 +7,7 @@ using PnP.Scanning.Core.Storage;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Xml;
+using MathNet.Numerics.Statistics;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -23,6 +23,32 @@ namespace PnP.Scanning.Core.Scanners
 
             internal string ContentTypeId { get; set; }
             internal string SchemaXml { get; set; }
+        }
+
+        private class ContentTypeFileUsage
+        {
+            internal ContentTypeFileUsage(int count)
+            {
+                Count = count;
+            }
+
+            internal Dictionary<Guid, double> ContentTypePerList { get; set; } = new Dictionary<Guid, double>();
+
+            internal int Count { get; set; }
+
+            internal double Min { get; set; } = 0;
+
+            internal double Max { get; set; } = 0;
+
+            internal double Mean { get; set; } = 0;
+
+            internal double StandardDeviation { get; set; } = 0;
+
+            internal double Median { get; set; } = 0;
+
+            internal double LowerQuartile { get; set; } = 0;
+
+            internal double UpperQuartile { get; set; } = 0;
         }
 
 
@@ -175,27 +201,99 @@ namespace PnP.Scanning.Core.Scanners
         internal async override Task PostScanningAsync()
         {
             Logger.Information("Post scanning work is starting");
-            using (var context = await GetPnPContextAsync())
+            using (var context = GetClientContext())
             {
                 using (var dbContext = new ScanContext(ScanId))
                 {
-                    foreach (var contentType in dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == ScanId))
+                    foreach (var contentTypeOverview in dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == ScanId))
                     {
                         // Count the content type instances
-                        contentType.Count = dbContext.SyntexContentTypes.Count(p => p.ScanId == ScanId && p.ContentTypeId == contentType.ContentTypeId);
-                        // Count the files of a given content type
-                        contentType.FileCount = await CountFilesUsingContentTypeAsync(context, contentType.ContentTypeId);
+                        contentTypeOverview.ListCount = dbContext.SyntexContentTypes.Count(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeOverview.ContentTypeId);
+                        
+                        // Get descriptive statistics for the number of files of a given content type
+                        var usage = await CountFilesUsingContentTypeAsync(context, contentTypeOverview.ContentTypeId);
+                        contentTypeOverview.FileCount = usage.Count;
+                        contentTypeOverview.FileCountMin = NaNToDouble(usage.Min);
+                        contentTypeOverview.FileCountMax = NaNToDouble(usage.Max);
+                        contentTypeOverview.FileCountMean = NaNToDouble(usage.Mean);
+                        contentTypeOverview.FileCountMedian = NaNToDouble(usage.Median);
+                        contentTypeOverview.FileCountLowerQuartile = NaNToDouble(usage.LowerQuartile);
+                        contentTypeOverview.FileCountUpperQuartile = NaNToDouble(usage.UpperQuartile);
+                        contentTypeOverview.FileCountStandardDeviation = NaNToDouble(usage.StandardDeviation);
+
+                        if (usage.Count > 0)
+                        {
+                            foreach (var list in usage.ContentTypePerList)
+                            {
+                                var contentTypeListToUpdate = dbContext.SyntexContentTypes.FirstOrDefault(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeOverview.ContentTypeId && p.ListId == list.Key);
+                                if (contentTypeListToUpdate != null)
+                                {
+                                    contentTypeListToUpdate.FileCount = (int)list.Value;
+                                }
+                            }
+                        }
+
+                        // save all changes per content type
+                        await dbContext.SaveChangesAsync();
                     }
 
-                    await dbContext.SaveChangesAsync();
                 }
             }
             Logger.Information("Post scanning work done");
         }
 
-        internal async Task<int> CountFilesUsingContentTypeAsync(PnPContext context, string contentTypeId)
+        private double NaNToDouble(double input)
         {
-            return 0;
+            if (input.Equals(double.NaN))
+            {
+                return -1;
+            }
+
+            return input;
+        }
+
+        private async Task<ContentTypeFileUsage> CountFilesUsingContentTypeAsync(Microsoft.SharePoint.Client.ClientContext context, string contentTypeId)
+        {
+            List<string> propertiesToRetrieve = new()
+            {
+                "ListId",
+                "UniqueId",
+            };
+
+            var results = await SearchAsync(context.Web, $"contenttypeid: \"{contentTypeId}*\"", propertiesToRetrieve);
+
+            ContentTypeFileUsage usage = new(results.Count);
+
+            if (results.Count > 0)
+            {
+                //Dictionary<Guid, double> contentTypePerList = new();
+                foreach (var contentType in results)
+                {
+                    if (Guid.TryParse(contentType["ListId"], out Guid listId))
+                    {
+                        if (usage.ContentTypePerList.ContainsKey(listId))
+                        {
+                            usage.ContentTypePerList[listId]++;
+                        }
+                        else
+                        {
+                            usage.ContentTypePerList.Add(listId, 1);
+                        }
+                    }
+                }
+
+                var statistics = new DescriptiveStatistics(usage.ContentTypePerList.Values.ToArray());
+
+                usage.Min = statistics.Minimum;
+                usage.Max = statistics.Maximum;
+                usage.Mean = statistics.Mean;
+                usage.Median = usage.ContentTypePerList.Values.ToArray().Median();
+                usage.StandardDeviation = statistics.StandardDeviation;
+                usage.LowerQuartile = usage.ContentTypePerList.Values.ToArray().LowerQuartile();
+                usage.UpperQuartile = usage.ContentTypePerList.Values.ToArray().UpperQuartile();
+            }
+
+            return usage;
         }
 
 

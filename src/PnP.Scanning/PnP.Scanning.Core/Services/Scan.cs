@@ -78,5 +78,7 @@ namespace PnP.Scanning.Core.Services
             Interlocked.Increment(ref requestWasRetriedDueToNetworkIssues);
             RetryingRequestAt = DateTime.Now.AddSeconds(waitTimeInSeconds);
         }
+
+        internal bool PostScanRunning { get; set; }
     }
 }

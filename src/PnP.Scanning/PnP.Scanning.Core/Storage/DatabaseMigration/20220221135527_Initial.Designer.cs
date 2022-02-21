@@ -11,7 +11,7 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20220221092438_Initial")]
+    [Migration("20220221135527_Initial")]
     partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -202,6 +202,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<int>("FieldCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("FileCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Group")
                         .HasColumnType("TEXT");
 
@@ -278,14 +281,32 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ContentTypeId")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Count")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("FieldCount")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("FileCount")
                         .HasColumnType("INTEGER");
+
+                    b.Property<double>("FileCountLowerQuartile")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("FileCountMax")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("FileCountMean")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("FileCountMedian")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("FileCountMin")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("FileCountStandardDeviation")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("FileCountUpperQuartile")
+                        .HasColumnType("REAL");
 
                     b.Property<string>("Group")
                         .HasColumnType("TEXT");
@@ -294,6 +315,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsSyntexContentType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ListCount")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")

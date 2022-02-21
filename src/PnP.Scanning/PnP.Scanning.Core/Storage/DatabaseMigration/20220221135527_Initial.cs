@@ -130,11 +130,18 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     Group = table.Column<string>(type: "TEXT", nullable: true),
                     Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
                     FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    ListCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    FileCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    FileCountMean = table.Column<double>(type: "REAL", nullable: false),
+                    FileCountStandardDeviation = table.Column<double>(type: "REAL", nullable: false),
+                    FileCountMin = table.Column<double>(type: "REAL", nullable: false),
+                    FileCountMax = table.Column<double>(type: "REAL", nullable: false),
+                    FileCountMedian = table.Column<double>(type: "REAL", nullable: false),
+                    FileCountLowerQuartile = table.Column<double>(type: "REAL", nullable: false),
+                    FileCountUpperQuartile = table.Column<double>(type: "REAL", nullable: false),
                     IsSyntexContentType = table.Column<bool>(type: "INTEGER", nullable: false),
                     SyntexModelDriveId = table.Column<string>(type: "TEXT", nullable: true),
-                    SyntexModelObjectId = table.Column<string>(type: "TEXT", nullable: true),
-                    Count = table.Column<int>(type: "INTEGER", nullable: false),
-                    FileCount = table.Column<int>(type: "INTEGER", nullable: false)
+                    SyntexModelObjectId = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -154,7 +161,8 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     Name = table.Column<string>(type: "TEXT", nullable: true),
                     Group = table.Column<string>(type: "TEXT", nullable: true),
                     Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
-                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false)
+                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    FileCount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {

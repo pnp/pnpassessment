@@ -21,5 +21,7 @@ namespace PnP.Scanning.Core.Storage
         public bool Hidden { get; set; }
 
         public int FieldCount { get; set; }
+
+        public int FileCount { get; set; }
     }
 }

@@ -67,7 +67,7 @@ namespace PnP.Scanning.Process.Commands
                                     Markup status;
                                     Markup procent;
                                     Markup throttling = null;
-                                    if (item.Status == ScanStatus.Running.ToString())
+                                    if (item.Status == ScanStatus.Running.ToString() || item.Status == "Finalizing")
                                     {
                                         status = new Markup($"[orange3]{item.Status}[/]");
                                         procent = new Markup($"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");

@@ -19,6 +19,12 @@ namespace PnP.Scanning.Core.Services
         private const string WebsCsv = "webs.csv";
 
         //PER SCAN COMPONENT: define tables to export to csv
+        private const string SyntexListsCsv = "syntexlists.csv";
+        private const string SyntexContentTypesCsv = "syntexcontenttypes.csv";
+        private const string SyntexContentTypeFieldsCsv = "syntexcontentfields.csv";
+        private const string SyntexContentTypeOverviewCsv = "syntexcontenttypeoverview.csv";
+        private const string SyntexFieldsCsv = "syntexfields.csv";
+
 #if DEBUG
         private const string TestDelaysCsv = "testdelays.csv";
 #endif
@@ -118,9 +124,52 @@ namespace PnP.Scanning.Core.Services
                     }
                 }
 
-
                 #region Scanner specific export
                 // PER SCAN COMPONENT: define export for the scan specific tables
+
+                if (scan.CLIMode == Mode.Syntex.ToString())
+                {
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexListsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexContentTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypeFieldsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexContentTypeFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypeOverviewCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexFieldsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+                }
+
 #if DEBUG
                 if (scan.CLIMode == Mode.Test.ToString())
                 {

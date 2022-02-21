@@ -19,15 +19,30 @@ namespace PnP.Scanning.Core.Storage
 
         public int FieldCount { get; set; }
 
+        public int ListCount { get; set; }
+
+        public int FileCount { get; set; }
+
+        public double FileCountMean { get; set; }
+
+        public double FileCountStandardDeviation { get; set; }
+
+        public double FileCountMin { get; set; }
+
+        public double FileCountMax { get; set; }
+
+        public double FileCountMedian { get; set; }
+
+        public double FileCountLowerQuartile { get; set; }
+
+        public double FileCountUpperQuartile { get; set; }
+
         public bool IsSyntexContentType { get; set; }
 
         public string SyntexModelDriveId { get; set; }
 
         public string SyntexModelObjectId { get; set; }
 
-        public int Count { get; set; }
-                
-        public int FileCount { get; set; }
 
     }
 }
