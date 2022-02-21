@@ -61,6 +61,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     EndDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
                     PreScanStatus = table.Column<int>(type: "INTEGER", nullable: false),
+                    PostScanStatus = table.Column<int>(type: "INTEGER", nullable: false),
                     Version = table.Column<string>(type: "TEXT", nullable: true),
                     CLIMode = table.Column<string>(type: "TEXT", nullable: true),
                     CLITenant = table.Column<string>(type: "TEXT", nullable: true),
@@ -120,6 +121,27 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 });
 
             migrationBuilder.CreateTable(
+                name: "SyntexContentTypeOverview",
+                columns: table => new
+                {
+                    ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ContentTypeId = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: true),
+                    Group = table.Column<string>(type: "TEXT", nullable: true),
+                    Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
+                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    IsSyntexContentType = table.Column<bool>(type: "INTEGER", nullable: false),
+                    SyntexModelDriveId = table.Column<string>(type: "TEXT", nullable: true),
+                    SyntexModelObjectId = table.Column<string>(type: "TEXT", nullable: true),
+                    Count = table.Column<int>(type: "INTEGER", nullable: false),
+                    FileCount = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyntexContentTypeOverview", x => new { x.ScanId, x.ContentTypeId });
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SyntexContentTypes",
                 columns: table => new
                 {
@@ -128,11 +150,11 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     WebUrl = table.Column<string>(type: "TEXT", nullable: false),
                     ListId = table.Column<Guid>(type: "TEXT", nullable: false),
                     ContentTypeId = table.Column<string>(type: "TEXT", nullable: false),
+                    ListContentTypeId = table.Column<string>(type: "TEXT", nullable: true),
                     Name = table.Column<string>(type: "TEXT", nullable: true),
                     Group = table.Column<string>(type: "TEXT", nullable: true),
                     Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
-                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
-                    IsSyntexContentType = table.Column<bool>(type: "INTEGER", nullable: false)
+                    FieldCount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -256,6 +278,17 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SyntexContentTypeOverview_ScanId_ContentTypeId",
+                table: "SyntexContentTypeOverview",
+                columns: new[] { "ScanId", "ContentTypeId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyntexContentTypes_ScanId_ContentTypeId",
+                table: "SyntexContentTypes",
+                columns: new[] { "ScanId", "ContentTypeId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SyntexContentTypes_ScanId_SiteUrl_WebUrl_ListId_ContentTypeId",
                 table: "SyntexContentTypes",
                 columns: new[] { "ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId" },
@@ -305,6 +338,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
             migrationBuilder.DropTable(
                 name: "SyntexContentTypeFields");
+
+            migrationBuilder.DropTable(
+                name: "SyntexContentTypeOverview");
 
             migrationBuilder.DropTable(
                 name: "SyntexContentTypes");

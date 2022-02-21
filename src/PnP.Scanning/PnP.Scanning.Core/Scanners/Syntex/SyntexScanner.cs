@@ -1,4 +1,5 @@
-﻿using PnP.Core.Model;
+﻿using Microsoft.EntityFrameworkCore;
+using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
@@ -6,11 +7,25 @@ using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Xml;
 
 namespace PnP.Scanning.Core.Scanners
 {
     internal class SyntexScanner : ScannerBase
     {
+        private class ContentTypeInfo
+        {
+            internal ContentTypeInfo(string contentTypeId, string schemaXml)
+            {
+                ContentTypeId = contentTypeId;
+                SchemaXml = schemaXml;
+            }
+
+            internal string ContentTypeId { get; set; }
+            internal string SchemaXml { get; set; }
+        }
+
+
         public SyntexScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl, SyntexOptions options) : base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
         {
             Options = options;
@@ -34,7 +49,7 @@ namespace PnP.Scanning.Core.Scanners
                     w => w.Lists.QueryProperties(r => r.Title, r => r.ItemCount, r => r.ListExperience, r => r.TemplateType, r => r.ContentTypesEnabled, r => r.Hidden, 
                                                  r => r.Created, r => r.LastItemUserModifiedDate, r => r.IsSiteAssetsLibrary, r => r.IsSystemList,
                                                  r => r.Fields.QueryProperties(f => f.Id, f => f.Hidden, f => f.TypeAsString, f => f.InternalName, f => f.StaticName, f => f.TermSetId, f => f.Title, f => f.Required),
-                                                 r => r.ContentTypes.QueryProperties(c => c.Id, c => c.StringId, c=> c.Name, c => c.Hidden, c => c.Group,
+                                                 r => r.ContentTypes.QueryProperties(c => c.Id, c => c.StringId, c=> c.Name, c => c.Hidden, c => c.Group, c => c.SchemaXml,
                                                     c => c.Fields.QueryProperties(f => f.Id, f => f.Hidden, f => f.TypeAsString, f => f.InternalName, f => f.StaticName, f => f.TermSetId, f => f.Title, f => f.Required), 
                                                     c => c.FieldLinks.QueryProperties(f => f.Id, f => f.Hidden, f => f.FieldInternalName, f => f.Required)),
                                                  r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl))
@@ -48,6 +63,8 @@ namespace PnP.Scanning.Core.Scanners
                 List<SyntexContentType> syntexContentTypes = new();
                 List<SyntexContentTypeField> syntexContentTypeFields = new();
                 List<SyntexField> syntexFields = new();
+
+                List<ContentTypeInfo> uniqueContentTypesInWeb = new();
 
                 // Loop over the enumerated lists
                 foreach (var list in context.Web.Lists.AsRequested())
@@ -70,11 +87,17 @@ namespace PnP.Scanning.Core.Scanners
                             // Process content type information
                             foreach(var contentType in list.ContentTypes.AsRequested())
                             {
-                                (SyntexContentType syntexContentType, List<SyntexContentTypeField> syntexContentTypeFieldsCollection) = PrepareSyntexContentType(list, contentType);
-                                if (syntexContentType != null && syntexContentTypeFieldsCollection != null)
+                                (SyntexContentType syntexContentType, string schemaXml, List<SyntexContentTypeField> syntexContentTypeFieldsCollection) = PrepareSyntexContentType(list, contentType);
+                                if (syntexContentType != null && syntexContentTypeFieldsCollection != null && schemaXml != null)
                                 {
                                     syntexContentTypes.Add(syntexContentType);
                                     syntexContentTypeFields.AddRange(syntexContentTypeFieldsCollection.ToArray());
+
+                                    // keep track of a list with unique content type ids
+                                    if (uniqueContentTypesInWeb.FirstOrDefault(p => p.ContentTypeId == syntexContentType.ContentTypeId) == null)
+                                    {
+                                        uniqueContentTypesInWeb.Add(new ContentTypeInfo(syntexContentType.ContentTypeId, schemaXml));
+                                    }
                                 }
                             }
                         }
@@ -90,8 +113,36 @@ namespace PnP.Scanning.Core.Scanners
                     }
                 }
 
+                // Process the unique content type ids
+                foreach (var contentType in uniqueContentTypesInWeb)
+                {
+                    if (!await StorageManager.IsContentTypeStoredAsync(ScanId, contentType.ContentTypeId))
+                    {
+                        // Get the first occurance
+                        var contentTypeInstance = syntexContentTypes.First(p => p.ContentTypeId == contentType.ContentTypeId);
+
+                        // Analyze the SchemaXml to detect if this is a syntex created content type
+                        (string? driveId, string? modelId) = IsSyntexContentType(contentType.SchemaXml);
+
+                        SyntexContentTypeSummary syntexContentTypeSummary = new()
+                        {
+                            ScanId = contentTypeInstance.ScanId,
+                            ContentTypeId = contentTypeInstance.ContentTypeId,
+                            FieldCount = contentTypeInstance.FieldCount,
+                            Group = contentTypeInstance.Group,
+                            Hidden = contentTypeInstance.Hidden,
+                            Name = contentTypeInstance.Name,
+                            IsSyntexContentType = driveId != null,
+                            SyntexModelDriveId = driveId,
+                            SyntexModelObjectId = modelId
+                        };
+
+                        await StorageManager.AddToContentTypeSummaryAsync(ScanId, syntexContentTypeSummary);
+                    }
+                }
+
                 // Persist the gathered data
-                await StoreSyntexInformationAsync(syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields);
+                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields);
             }
 
             Logger.Information("Syntex scan of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
@@ -99,12 +150,54 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task PreScanningAsync()
         {
-            //Logger.Information("Pre scanning work is starting");
+            Logger.Information("Pre scanning work is starting");
 
-            //AddToCache(Cache1, $"PnP Rocks! - {DateTime.Now}");
+            using (var context = await GetPnPContextAsync())
+            {
+                bool usesApplicationPermissions = await context.GetMicrosoft365Admin().AccessTokenUsesApplicationPermissionsAsync();
+                AddToCache("UsesApplicationPermissons", usesApplicationPermissions.ToString());
 
-            //Logger.Information("Pre scanning work done");
+                if (usesApplicationPermissions)
+                {
+                    // todo: if needed check here for specific permissions needed and cache them
+                    // so they can be used at no cost in the actual scan code
+                }
+                else
+                {
+                    // todo: if needed check here for specific permissions needed and cache them
+                    // so they can be used at no cost in the actual scan code
+                }
+            }
+
+            Logger.Information("Pre scanning work done");
         }
+
+        internal async override Task PostScanningAsync()
+        {
+            Logger.Information("Post scanning work is starting");
+            using (var context = await GetPnPContextAsync())
+            {
+                using (var dbContext = new ScanContext(ScanId))
+                {
+                    foreach (var contentType in dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == ScanId))
+                    {
+                        // Count the content type instances
+                        contentType.Count = dbContext.SyntexContentTypes.Count(p => p.ScanId == ScanId && p.ContentTypeId == contentType.ContentTypeId);
+                        // Count the files of a given content type
+                        contentType.FileCount = await CountFilesUsingContentTypeAsync(context, contentType.ContentTypeId);
+                    }
+
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+            Logger.Information("Post scanning work done");
+        }
+
+        internal async Task<int> CountFilesUsingContentTypeAsync(PnPContext context, string contentTypeId)
+        {
+            return 0;
+        }
+
 
         private SyntexList PrepareSyntexList(IList list)
         {
@@ -135,11 +228,11 @@ namespace PnP.Scanning.Core.Scanners
             return syntexList;
         }
 
-        private (SyntexContentType?, List<SyntexContentTypeField>?) PrepareSyntexContentType(IList list, IContentType contentType)
+        private (SyntexContentType?, string?, List<SyntexContentTypeField>?) PrepareSyntexContentType(IList list, IContentType contentType)
         {
             if (BuiltInContentTypes.Contains(IdFromListContentType(contentType.StringId)))
             {
-                return (null, null);
+                return (null, null, null);
             }
 
             List<SyntexContentTypeField> syntexContentTypeFields = new List<SyntexContentTypeField>();
@@ -150,10 +243,10 @@ namespace PnP.Scanning.Core.Scanners
                 WebUrl = WebUrl,
                 ListId = list.Id,
                 ContentTypeId = IdFromListContentType(contentType.StringId),  
+                ListContentTypeId = contentType.StringId,
                 Group = contentType.Group,
                 Hidden = contentType.Hidden,
                 Name = contentType.Name,
-                IsSyntexContentType = false
             };
 
             // Process the field refs
@@ -215,7 +308,7 @@ namespace PnP.Scanning.Core.Scanners
 
             syntexContentType.FieldCount = syntexContentTypeFields.Count;
 
-            return (syntexContentType, syntexContentTypeFields);
+            return (syntexContentType, contentType.SchemaXml, syntexContentTypeFields);
         }
 
         private List<SyntexField> PrepareSyntexFields(IList list)
@@ -246,21 +339,52 @@ namespace PnP.Scanning.Core.Scanners
             return syntexFields;
         }
 
-        private async Task StoreSyntexInformationAsync(List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields)
-        {
-            Logger.Information("Start StoreSyntexInformationAsync for {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-            using (var dbContext = new ScanContext(ScanId))
-            {
-                await dbContext.SyntexLists.AddRangeAsync(syntexLists.ToArray());
-                await dbContext.SyntexContentTypes.AddRangeAsync(syntexContentTypes.ToArray());
-                await dbContext.SyntexContentTypeFields.AddRangeAsync(syntexContentTypeFields.ToArray());
-                await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
+        //private async Task StoreSyntexInformationAsync(List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields)
+        //{
+        //    Logger.Information("Start StoreSyntexInformationAsync for {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+        //    using (var dbContext = new ScanContext(ScanId))
+        //    {
+        //        await dbContext.SyntexLists.AddRangeAsync(syntexLists.ToArray());
+        //        await dbContext.SyntexContentTypes.AddRangeAsync(syntexContentTypes.ToArray());
+        //        await dbContext.SyntexContentTypeFields.AddRangeAsync(syntexContentTypeFields.ToArray());
+        //        await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
 
-                await dbContext.SaveChangesAsync();
-                Logger.Information("StoreSyntexInformationAsync succeeded for {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-            }
-        }
+        //        await dbContext.SaveChangesAsync();
+        //        Logger.Information("StoreSyntexInformationAsync succeeded for {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+        //    }
+        //}
 
+        //internal async Task<bool> IsContentTypeStoredAsync(string contentTypeId)
+        //{
+        //    using (var dbContext = new ScanContext(ScanId))
+        //    {
+        //        var contentType = await dbContext.SyntexContentTypes.FirstOrDefaultAsync(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId);
+
+        //        if (contentType != null)
+        //        {
+        //            return true;
+        //        }
+        //        else
+        //        {
+        //            return false;
+        //        }
+        //    }
+        //}
+
+        //internal async Task AddToContentTypeSummaryAsync(SyntexContentTypeSummary syntexContentTypeSummary)
+        //{
+        //    using (var dbContext = new ScanContext(ScanId))
+        //    {
+        //        dbContext.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
+
+        //        var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == ScanId && p.ContentTypeId == syntexContentTypeSummary.ContentTypeId);
+        //        if (contentType == null)
+        //        {
+        //            await dbContext.SyntexContentTypeOverview.AddAsync(syntexContentTypeSummary);
+        //            await dbContext.SaveChangesAsync();
+        //        }
+        //    }
+        //}
 
         private static string IdFromListContentType(string listContentTypeId)
         {
@@ -320,6 +444,36 @@ namespace PnP.Scanning.Core.Scanners
                     return "Q4";
                 }
             }
+        }
+
+        private static (string? driveId, string? modelId) IsSyntexContentType(string schemaXml)
+        {
+            string? driveId = null;
+            string? modelId = null;
+
+            XmlDocument xmlDocument = new();
+            xmlDocument.LoadXml(schemaXml);
+            if (xmlDocument.DocumentElement != null)
+            {
+                XmlNode root = xmlDocument.DocumentElement;
+
+                var nsMgr = new XmlNamespaceManager(new NameTable());
+                nsMgr.AddNamespace("syntex", "http://schemas.microsoft.com/sharepoint/v3/machinelearning/modelid");
+
+                var modelDriveIdNode = root.SelectSingleNode("//ContentType/XmlDocuments/XmlDocument/syntex:ModelId/syntex:ModelDriveId", nsMgr);
+                if (modelDriveIdNode != null)
+                {
+                    driveId = modelDriveIdNode.InnerText;
+                }
+
+                var modelObjectId = root.SelectSingleNode("//ContentType/XmlDocuments/XmlDocument/syntex:ModelId/syntex:ModelObjectId", nsMgr);
+                if (modelObjectId != null)
+                {
+                    modelId = modelObjectId.InnerText;
+                }
+            }
+
+            return (driveId, modelId);
         }
 
     }

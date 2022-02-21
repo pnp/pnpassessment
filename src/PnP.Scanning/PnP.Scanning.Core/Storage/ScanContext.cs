@@ -30,6 +30,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<SyntexContentType> SyntexContentTypes { get; set; }
 
+        internal DbSet<SyntexContentTypeSummary> SyntexContentTypeOverview { get; set; }
+
         internal DbSet<SyntexContentTypeField> SyntexContentTypeFields { get; set; }
 
         internal DbSet<SyntexField> SyntexFields { get; set; }
@@ -102,6 +104,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<SyntexContentType>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.ContentTypeId });
+            });
+
+            modelBuilder.Entity<SyntexContentTypeSummary>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.ContentTypeId });
             });
 
             modelBuilder.Entity<SyntexContentTypeField>(entity =>

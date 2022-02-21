@@ -745,6 +745,57 @@ namespace PnP.Scanning.Core.Storage
         }
 
         #region Scanner specific operations
+        internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.SyntexLists.AddRangeAsync(syntexLists.ToArray());
+                await dbContext.SyntexContentTypes.AddRangeAsync(syntexContentTypes.ToArray());
+                await dbContext.SyntexContentTypeFields.AddRangeAsync(syntexContentTypeFields.ToArray());
+                await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreSyntexInformationAsync succeeded");
+            }
+        }
+
+        internal async Task<bool> IsContentTypeStoredAsync(Guid scanId, string contentTypeId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == scanId && p.ContentTypeId == contentTypeId);
+
+                if (contentType != null)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        internal async Task AddToContentTypeSummaryAsync(Guid scanId, SyntexContentTypeSummary syntexContentTypeSummary)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == scanId && p.ContentTypeId == syntexContentTypeSummary.ContentTypeId);
+                if (contentType == null)
+                {
+                    await dbContext.SyntexContentTypeOverview.AddAsync(syntexContentTypeSummary);
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+        }
+
+        internal async Task<int> CountListsUsingContentType(Guid scanId, string contentTypeId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                return await dbContext.SyntexContentTypes.CountAsync(p => p.ScanId == scanId && p.ContentTypeId == contentTypeId);
+            }
+        }
 
         // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
         private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)

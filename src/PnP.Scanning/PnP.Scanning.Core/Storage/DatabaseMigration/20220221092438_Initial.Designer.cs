@@ -11,7 +11,7 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20220217101414_Initial")]
+    [Migration("20220221092438_Initial")]
     partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -131,6 +131,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("PostScanStatus")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("PreScanStatus")
                         .HasColumnType("INTEGER");
 
@@ -205,13 +208,15 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<bool>("Hidden")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("IsSyntexContentType")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("ListContentTypeId")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .HasColumnType("TEXT");
 
                     b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId");
+
+                    b.HasIndex("ScanId", "ContentTypeId");
 
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId")
                         .IsUnique();
@@ -263,6 +268,49 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("SyntexContentTypeFields");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexContentTypeSummary", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentTypeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FieldCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FileCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Group")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSyntexContentType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SyntexModelDriveId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SyntexModelObjectId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "ContentTypeId");
+
+                    b.HasIndex("ScanId", "ContentTypeId")
+                        .IsUnique();
+
+                    b.ToTable("SyntexContentTypeOverview");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexField", b =>
