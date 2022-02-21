@@ -33,7 +33,7 @@ namespace PnP.Scanning.Core.Services
         {
         }
 
-        internal async Task<string> CreatePowerBiReportAsync(Guid scanId, string? exportPath = null, string? delimiter = null)
+        internal async Task<string> CreatePowerBiReportAsync(Guid scanId, string exportPath = null, string delimiter = null)
         {
             string reportFile = "";
             exportPath = EnsureReportPath(scanId, exportPath);
@@ -60,7 +60,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal async Task<string> ExportReportDataAsync(Guid scanId, string? exportPath = null, string? delimiter = null)
+        internal async Task<string> ExportReportDataAsync(Guid scanId, string exportPath = null, string delimiter = null)
         {
             exportPath = EnsureReportPath(scanId, exportPath);
 
@@ -189,7 +189,7 @@ namespace PnP.Scanning.Core.Services
             return exportPath;
         }
 
-        private static string EnsureReportPath(Guid scanId, string? exportPath)
+        private static string EnsureReportPath(Guid scanId, string exportPath)
         {
             // Export the data from the SQLite store
             if (string.IsNullOrEmpty(exportPath))
@@ -217,8 +217,6 @@ namespace PnP.Scanning.Core.Services
                     return ms.ToArray();
                 }
             }
-
-            return null;
         }
 
         private static void RewriteDataLocationsInPbit(string pbitFile, string oldLocation)
@@ -236,8 +234,8 @@ namespace PnP.Scanning.Core.Services
                 throw new Exception($"Pbit file {pbitFile} does not exist");
             }
 
-            string? newLocation = Path.GetDirectoryName(pbitFile);
-            string? extractPath = newLocation;
+            string newLocation = Path.GetDirectoryName(pbitFile);
+            string extractPath = newLocation;
 
             if (!newLocation.EndsWith(@"\"))
             {

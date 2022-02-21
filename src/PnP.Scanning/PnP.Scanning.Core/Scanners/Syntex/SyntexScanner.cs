@@ -13,6 +13,9 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal class SyntexScanner : ScannerBase
     {
+        private readonly string UsesApplicationPermissons = "UsesApplicationPermissons";
+        private readonly string HasSitesFullControlAll = "HasSitesFullControlAll";
+
         private class ContentTypeInfo
         {
             internal ContentTypeInfo(string contentTypeId, string schemaXml)
@@ -52,7 +55,9 @@ namespace PnP.Scanning.Core.Scanners
         }
 
 
-        public SyntexScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl, SyntexOptions options) : base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
+        public SyntexScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, 
+                             CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl, SyntexOptions options) : 
+            base(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteUrl, webUrl)
         {
             Options = options;
         }
@@ -148,7 +153,7 @@ namespace PnP.Scanning.Core.Scanners
                         var contentTypeInstance = syntexContentTypes.First(p => p.ContentTypeId == contentType.ContentTypeId);
 
                         // Analyze the SchemaXml to detect if this is a syntex created content type
-                        (string? driveId, string? modelId) = IsSyntexContentType(contentType.SchemaXml);
+                        (string driveId, string modelId) = IsSyntexContentType(contentType.SchemaXml);
 
                         SyntexContentTypeSummary syntexContentTypeSummary = new()
                         {
@@ -181,18 +186,23 @@ namespace PnP.Scanning.Core.Scanners
             using (var context = await GetPnPContextAsync())
             {
                 bool usesApplicationPermissions = await context.GetMicrosoft365Admin().AccessTokenUsesApplicationPermissionsAsync();
-                AddToCache("UsesApplicationPermissons", usesApplicationPermissions.ToString());
+                AddToCache(UsesApplicationPermissons, usesApplicationPermissions.ToString());
 
                 if (usesApplicationPermissions)
                 {
-                    // todo: if needed check here for specific permissions needed and cache them
-                    // so they can be used at no cost in the actual scan code
+                    bool hasSitesFullControlAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("Sites.FullControl.All");
+                    AddToCache(HasSitesFullControlAll, hasSitesFullControlAll.ToString());
                 }
                 else
                 {
                     // todo: if needed check here for specific permissions needed and cache them
                     // so they can be used at no cost in the actual scan code
                 }
+            }
+
+            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            {
+                Logger.Information("No DeepScan selected or Application Permissions without Sites.FullControl.All used ==> not using exact content type file counts");
             }
 
             Logger.Information("Pre scanning work done");
@@ -211,7 +221,7 @@ namespace PnP.Scanning.Core.Scanners
                         contentTypeOverview.ListCount = dbContext.SyntexContentTypes.Count(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeOverview.ContentTypeId);
                         
                         // Get descriptive statistics for the number of files of a given content type
-                        var usage = await CountFilesUsingContentTypeAsync(context, contentTypeOverview.ContentTypeId);
+                        var usage = await CountFilesUsingContentTypeAsync(context, dbContext, contentTypeOverview.ContentTypeId);
                         contentTypeOverview.FileCount = usage.Count;
                         contentTypeOverview.FileCountMin = NaNToDouble(usage.Min);
                         contentTypeOverview.FileCountMax = NaNToDouble(usage.Max);
@@ -252,46 +262,70 @@ namespace PnP.Scanning.Core.Scanners
             return input;
         }
 
-        private async Task<ContentTypeFileUsage> CountFilesUsingContentTypeAsync(Microsoft.SharePoint.Client.ClientContext context, string contentTypeId)
+        private async Task<ContentTypeFileUsage> CountFilesUsingContentTypeAsync(Microsoft.SharePoint.Client.ClientContext context, ScanContext dbContext, string contentTypeId)
         {
-            List<string> propertiesToRetrieve = new()
+            ContentTypeFileUsage usage;
+
+            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
-                "ListId",
-                "UniqueId",
-            };
+                usage = new(0);
 
-            var results = await SearchAsync(context.Web, $"contenttypeid: \"{contentTypeId}*\"", propertiesToRetrieve);
-
-            ContentTypeFileUsage usage = new(results.Count);
-
-            if (results.Count > 0)
-            {
-                //Dictionary<Guid, double> contentTypePerList = new();
-                foreach (var contentType in results)
+                foreach (var contentType in dbContext.SyntexContentTypes.Where(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId))
                 {
-                    if (Guid.TryParse(contentType["ListId"], out Guid listId))
+                    foreach (var list in dbContext.SyntexLists.Where(p => p.ScanId == ScanId && p.ListId == contentType.ListId))
                     {
-                        if (usage.ContentTypePerList.ContainsKey(listId))
+                        usage.Count += list.ItemCount;
+                        if (usage.ContentTypePerList.ContainsKey(contentType.ListId))
                         {
-                            usage.ContentTypePerList[listId]++;
+                            usage.ContentTypePerList[contentType.ListId] += list.ItemCount;
                         }
                         else
                         {
-                            usage.ContentTypePerList.Add(listId, 1);
+                            usage.ContentTypePerList.Add(contentType.ListId, list.ItemCount);
                         }
                     }
                 }
-
-                var statistics = new DescriptiveStatistics(usage.ContentTypePerList.Values.ToArray());
-
-                usage.Min = statistics.Minimum;
-                usage.Max = statistics.Maximum;
-                usage.Mean = statistics.Mean;
-                usage.Median = usage.ContentTypePerList.Values.ToArray().Median();
-                usage.StandardDeviation = statistics.StandardDeviation;
-                usage.LowerQuartile = usage.ContentTypePerList.Values.ToArray().LowerQuartile();
-                usage.UpperQuartile = usage.ContentTypePerList.Values.ToArray().UpperQuartile();
             }
+            else
+            {
+                List<string> propertiesToRetrieve = new()
+                {
+                    "ListId",
+                    "UniqueId",
+                };
+
+                var results = await SearchAsync(context.Web, $"contenttypeid: \"{contentTypeId}*\"", propertiesToRetrieve);
+
+                usage = new(results.Count);
+
+                if (results.Count > 0)
+                {
+                    foreach (var contentType in results)
+                    {
+                        if (Guid.TryParse(contentType["ListId"], out Guid listId))
+                        {
+                            if (usage.ContentTypePerList.ContainsKey(listId))
+                            {
+                                usage.ContentTypePerList[listId]++;
+                            }
+                            else
+                            {
+                                usage.ContentTypePerList.Add(listId, 1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Calculate descriptive statistics
+            var statistics = new DescriptiveStatistics(usage.ContentTypePerList.Values.ToArray());
+            usage.Min = statistics.Minimum;
+            usage.Max = statistics.Maximum;
+            usage.Mean = statistics.Mean;
+            usage.Median = usage.ContentTypePerList.Values.ToArray().Median();
+            usage.StandardDeviation = statistics.StandardDeviation;
+            usage.LowerQuartile = usage.ContentTypePerList.Values.ToArray().LowerQuartile();
+            usage.UpperQuartile = usage.ContentTypePerList.Values.ToArray().UpperQuartile();
 
             return usage;
         }
@@ -326,7 +360,7 @@ namespace PnP.Scanning.Core.Scanners
             return syntexList;
         }
 
-        private (SyntexContentType?, string?, List<SyntexContentTypeField>?) PrepareSyntexContentType(IList list, IContentType contentType)
+        private (SyntexContentType, string, List<SyntexContentTypeField>) PrepareSyntexContentType(IList list, IContentType contentType)
         {
             if (BuiltInContentTypes.Contains(IdFromListContentType(contentType.StringId)))
             {
@@ -544,10 +578,10 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private static (string? driveId, string? modelId) IsSyntexContentType(string schemaXml)
+        private static (string driveId, string modelId) IsSyntexContentType(string schemaXml)
         {
-            string? driveId = null;
-            string? modelId = null;
+            string driveId = null;
+            string modelId = null;
 
             XmlDocument xmlDocument = new();
             xmlDocument.LoadXml(schemaXml);

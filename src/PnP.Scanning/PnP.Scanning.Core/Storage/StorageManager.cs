@@ -420,6 +420,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
                 foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running).ToListAsync())
                 {
                     var runningWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running);
@@ -438,6 +440,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
                 var pendingWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Queued);
                 if (pendingWeb == null)
                 {
@@ -548,6 +552,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
                 List<string> siteCollections = new();
 
                 foreach (var site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId && p.Status == SiteWebStatus.Queued).ToListAsync())
@@ -563,6 +569,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
                 List<EnumeratedWeb> webs = new();
 
                 foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.Status == SiteWebStatus.Queued).ToListAsync())
@@ -601,6 +609,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
                 Dictionary<string, string> cacheData = new();
 
                 int count = 0;
@@ -616,7 +626,7 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task<ScanResultFromDatabase?> GetScanResultAsync(Guid scanId)
+        internal async Task<ScanResultFromDatabase> GetScanResultAsync(Guid scanId)
         {
             try
             {
@@ -683,7 +693,7 @@ namespace PnP.Scanning.Core.Storage
             return null;
         }
 
-        internal async Task CheckPointDatabaseAsync(ScanContext? dbContext)
+        internal async Task CheckPointDatabaseAsync(ScanContext dbContext)
         {
             if (dbContext != null)
             {
@@ -763,6 +773,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+
                 var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == scanId && p.ContentTypeId == contentTypeId);
 
                 if (contentType != null)
@@ -786,14 +798,6 @@ namespace PnP.Scanning.Core.Storage
                     await dbContext.SyntexContentTypeOverview.AddAsync(syntexContentTypeSummary);
                     await dbContext.SaveChangesAsync();
                 }
-            }
-        }
-
-        internal async Task<int> CountListsUsingContentType(Guid scanId, string contentTypeId)
-        {
-            using (var dbContext = new ScanContext(scanId))
-            {
-                return await dbContext.SyntexContentTypes.CountAsync(p => p.ScanId == scanId && p.ContentTypeId == contentTypeId);
             }
         }
 

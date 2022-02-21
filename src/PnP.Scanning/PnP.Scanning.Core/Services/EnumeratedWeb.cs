@@ -2,9 +2,9 @@
 {
     internal sealed class EnumeratedWeb
     {
-        internal string? WebUrl { get; set; }
+        internal string WebUrl { get; set; }
 
-        internal string? WebTemplate { get; set; }
+        internal string WebTemplate { get; set; }
 
     }
 }

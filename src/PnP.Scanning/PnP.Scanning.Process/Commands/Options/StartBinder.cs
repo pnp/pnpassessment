@@ -22,6 +22,7 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<int> threads;
 
         // PER SCAN COMPONENT: implement scan component specific options
+        private readonly Option<bool> syntexDeepScan;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
@@ -29,6 +30,7 @@ namespace PnP.Scanning.Process.Commands
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<Microsoft365Environment> environmentInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
                            Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
                            // PER SCAN COMPONENT: implement scan component specific options
+                           , Option<bool> syntexDeepScanInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
@@ -48,6 +50,7 @@ namespace PnP.Scanning.Process.Commands
             threads = threadsInput;
 
             // PER SCAN COMPONENT: implement scan component specific options
+            syntexDeepScan = syntexDeepScanInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -69,6 +72,7 @@ namespace PnP.Scanning.Process.Commands
                 CertPassword = bindingContext.ParseResult.GetValueForOption(certPassword),
                 Threads = bindingContext.ParseResult.GetValueForOption(threads),
                 // PER SCAN COMPONENT: implement scan component specific options
+                SyntexDeepScan = bindingContext.ParseResult.GetValueForOption(syntexDeepScan),
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),
 #endif

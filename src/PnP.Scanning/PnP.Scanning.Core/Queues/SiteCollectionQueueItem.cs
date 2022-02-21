@@ -5,7 +5,8 @@ namespace PnP.Scanning.Core.Queues
 {
     internal class SiteCollectionQueueItem : QueueItemBase
     {
-        internal SiteCollectionQueueItem(OptionsBase optionsBase, IPnPContextFactory pnPContextFactory, string siteCollectionUrl) : base(optionsBase, pnPContextFactory)
+        internal SiteCollectionQueueItem(OptionsBase optionsBase, IPnPContextFactory pnPContextFactory, CsomEventHub csomEventHub, string siteCollectionUrl) : 
+            base(optionsBase, pnPContextFactory, csomEventHub)
         {
             SiteCollectionUrl = siteCollectionUrl;
         }

@@ -30,6 +30,8 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> threadsOption;
 
         // PER SCAN COMPONENT: add scan component specific options here
+        private Option<bool> syntexDeepScanOption;
+
 #if DEBUG
         // Specific options for the test handler
         private Option<int> testNumberOfSitesOption;
@@ -179,7 +181,7 @@ namespace PnP.Scanning.Process.Commands
             certPathOption.AddValidator(val =>
             {
                 // Custom validation of the provided option input 
-                string? input = val.GetValueOrDefault<string>();
+                string input = val.GetValueOrDefault<string>();
                 if (input != null && input.Split("|", StringSplitOptions.RemoveEmptyEntries).Length == 3)
                 {
                     return "";
@@ -268,6 +270,15 @@ namespace PnP.Scanning.Process.Commands
 
             #region Scan component specific handlers
             // PER SCAN COMPONENT: implement scan component specific options
+            syntexDeepScanOption = new(
+                name: $"--{Constants.StartSyntexDeepScan}",
+                getDefaultValue: () => false,
+                description: "Perform Syntex usage a deep scan, requires Sites.FullControl.All when using application permissions")
+            {
+                IsRequired = false
+            };
+            cmd.AddOption(syntexDeepScanOption);
+
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -312,6 +323,7 @@ namespace PnP.Scanning.Process.Commands
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
                                               authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
+                                              , syntexDeepScanOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -386,6 +398,16 @@ namespace PnP.Scanning.Process.Commands
                 };
 
                 // PER SCAN COMPONENT: implement scan component specific options
+                if (arguments.Mode == Mode.Syntex)
+                {
+                    start.Properties.Add(new PropertyRequest
+                    {
+                        Property = syntexDeepScanOption.Name.TrimStart('-'),
+                        Type = "bool",
+                        Value = arguments.SyntexDeepScan.ToString(),
+                    });
+                }
+
     #if DEBUG
                 if (arguments.Mode == Mode.Test)
                 {

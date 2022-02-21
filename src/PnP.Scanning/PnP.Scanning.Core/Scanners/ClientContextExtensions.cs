@@ -1,4 +1,4 @@
-﻿using Serilog;
+﻿using PnP.Scanning.Core.Scanners;
 using System.Net;
 using System.Text;
 
@@ -7,22 +7,23 @@ namespace Microsoft.SharePoint.Client
     internal static class ClientContextExtensions
     {
 
-        internal static async Task ExecuteQueryRetryAsync(this ClientRuntimeContext clientContext, ILogger logger, int retryCount = 10, string userAgent = null)
+        internal static async Task ExecuteQueryRetryAsync(this ClientRuntimeContext clientContext, int retryCount = 10, string userAgent = null)
         {
-            await ExecuteQueryImplementationAsync(logger, clientContext, retryCount, userAgent);
+            await ExecuteQueryImplementationAsync(clientContext, retryCount, userAgent);
         }
 
-        private static async Task ExecuteQueryImplementationAsync(ILogger logger, ClientRuntimeContext clientContext, int retryCount = 10, string userAgent = null)
+        private static async Task ExecuteQueryImplementationAsync(ClientRuntimeContext clientContext, int retryCount = 10, string userAgent = null)
         {
             // Set the TLS preference. Needed on some server os's to work when Office 365 removes support for TLS 1.0
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
             var clientTag = string.Empty;
-            int backoffInterval = 500;
+            int backoffInterval = 1000;
             int retryAttempts = 0;
             int retryAfterInterval = 0;
             bool retry = false;
             ClientRequestWrapper wrapper = null;
+            ClientContextInfo clientContextInfo = clientContext.Tag as ClientContextInfo;
 
             if (retryCount <= 0)
             {
@@ -62,7 +63,6 @@ namespace Microsoft.SharePoint.Client
                     if ((response != null &&
                         (response.StatusCode == (HttpStatusCode)429
                         || response.StatusCode == (HttpStatusCode)503
-                        // || response.StatusCode == (HttpStatusCode)500
                         ))
                         || wex.Status == WebExceptionStatus.Timeout)
                     {
@@ -84,13 +84,17 @@ namespace Microsoft.SharePoint.Client
                             backoffInterval *= 2;
                         }
 
+                        int retryAfterInSeconds = retryAfterInterval / 1000;
+
                         if (wex.Status == WebExceptionStatus.Timeout)
                         {
-                            logger.Warning("CSOM request timeout. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
+                            clientContextInfo.CsomEventHub.RequestRetry?.Invoke(new CsomRetryEvent(clientContextInfo.ScanId, 0, retryAfterInSeconds, new Exception("CSOM request timeout")));
+                            clientContextInfo.Logger.Warning("CSOM request timeout. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
                         }
                         else
                         {
-                            logger.Warning("CSOM request frequency exceeded usage limits. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
+                            clientContextInfo.CsomEventHub.RequestRetry?.Invoke(new CsomRetryEvent(clientContextInfo.ScanId, (int)response.StatusCode, retryAfterInSeconds, null));
+                            clientContextInfo.Logger.Warning("CSOM request frequency exceeded usage limits. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
                         }
 
                         await Task.Delay(retryAfterInterval);
@@ -115,7 +119,7 @@ namespace Microsoft.SharePoint.Client
                             errorSb.AppendLine($"ErrorCode: {socketEx.ErrorCode}"); //10054
                             errorSb.AppendLine($"SocketErrorCode: {socketEx.SocketErrorCode}"); //ConnectionReset
                             errorSb.AppendLine($"Message: {socketEx.Message}"); //An existing connection was forcibly closed by the remote host
-                            logger.Error(socketEx, string.Format("Socket exception: {0}", errorSb.ToString()));
+                            clientContextInfo.Logger.Error(socketEx, string.Format("Socket exception: {0}", errorSb.ToString()));
 
                             //retry
                             wrapper = (ClientRequestWrapper)wex.Data["ClientRequest"];
@@ -135,8 +139,11 @@ namespace Microsoft.SharePoint.Client
                                 retryAfterInterval = backoffInterval;
                                 backoffInterval *= 2;
                             }
+                            
+                            int retryAfterInSeconds = retryAfterInterval / 1000;
 
-                            logger.Warning("CSOM request socket exception. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
+                            clientContextInfo.CsomEventHub.RequestRetry?.Invoke(new CsomRetryEvent(clientContextInfo.ScanId, 0, retryAfterInSeconds, socketEx));
+                            clientContextInfo.Logger.Warning("CSOM request socket exception. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
 
                             await Task.Delay(retryAfterInterval);
 
@@ -154,7 +161,7 @@ namespace Microsoft.SharePoint.Client
                                 }
                             }
 
-                            logger.Error(wex, string.Format("Unhandled exception during CSOM request: {0}", errorSb.ToString()));
+                            clientContextInfo.Logger.Error(wex, string.Format("Unhandled exception during CSOM request: {0}", errorSb.ToString()));
                             throw;
                         }
                     }
@@ -170,7 +177,7 @@ namespace Microsoft.SharePoint.Client
                     errorSb.AppendLine($"ServerErrorValue: {serverEx.ServerErrorValue}");
                     errorSb.AppendLine($"ServerErrorDetails: {serverEx.ServerErrorDetails}");
 
-                    logger.Error(serverEx, string.Format("Unhandled server exception during CSOM request: {0}", errorSb.ToString()));
+                    clientContextInfo.Logger.Error(serverEx, string.Format("Unhandled server exception during CSOM request: {0}", errorSb.ToString()));
 
                     throw;
                 }

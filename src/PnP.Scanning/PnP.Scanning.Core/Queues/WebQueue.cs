@@ -9,7 +9,7 @@ namespace PnP.Scanning.Core.Queues
     internal sealed class WebQueue : QueueBase<WebQueue>
     {
         // Queue containting the tasks to process
-        private ActionBlock<WebQueueItem>? websToScan;
+        private ActionBlock<WebQueueItem> websToScan;
 
         public WebQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId): base(storageManager)
         {
@@ -59,7 +59,7 @@ namespace PnP.Scanning.Core.Queues
                 await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
 
                 // Get an instance for the actual scanner to use
-                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, web.PnPContextFactory, ScanId, web.SiteCollectionUrl, web.WebUrl, web.OptionsBase);
+                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, web.PnPContextFactory, web.CsomEventHub, ScanId, web.SiteCollectionUrl, web.WebUrl, web.OptionsBase);
 
                 if (scanner == null)
                 {

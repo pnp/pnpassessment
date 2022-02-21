@@ -2,6 +2,6 @@
 {
     internal sealed class SyntexOptions : OptionsBase
     {
-
+        internal bool DeepScan { get; set; }
     }
 }

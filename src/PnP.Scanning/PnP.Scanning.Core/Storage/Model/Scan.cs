@@ -19,7 +19,7 @@ namespace PnP.Scanning.Core.Storage
 
         public SiteWebStatus PostScanStatus { get; set; }
 
-        public string? Version { get; set; }
+        public string Version { get; set; }
 
         public string CLIMode { get; set; }
 

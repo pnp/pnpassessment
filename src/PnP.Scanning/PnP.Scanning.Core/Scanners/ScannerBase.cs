@@ -13,11 +13,12 @@ namespace PnP.Scanning.Core.Scanners
     {
         private static readonly Guid localSharePointResultsSourceId = new Guid("8413cd39-2156-4e00-b54d-11efd9abdb89");
 
-        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl)
+        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl)
         {
             ScanManager = scanManager;
             StorageManager = storageManager;
             PnPContextFactory = pnpContextFactory;
+            CsomEventHub = csomEventHub;
             ScanId = scanId;
             SiteUrl = siteUrl;
             WebUrl = webUrl;
@@ -33,6 +34,8 @@ namespace PnP.Scanning.Core.Scanners
         internal StorageManager StorageManager { get; private set; }
 
         internal IPnPContextFactory PnPContextFactory { get; private set; }
+
+        internal CsomEventHub CsomEventHub { get; private set; }
 
         internal Guid ScanId { get; set; }
 
@@ -52,17 +55,17 @@ namespace PnP.Scanning.Core.Scanners
         }
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
-        internal static ScannerBase? NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
+        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {
             // PER SCAN COMPONENT: instantiate the scan component here
             if (options is SyntexOptions syntexOptions)
             {
-                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, syntexOptions);
+                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, syntexOptions);
             }
 #if DEBUG
             else if (options is TestOptions testOptions)
             {
-                return new TestScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, testOptions);
+                return new TestScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, testOptions);
             }
 #endif
 
@@ -79,7 +82,7 @@ namespace PnP.Scanning.Core.Scanners
             return await GetPnPContextImplementationAsync(contextOptions);
         }
 
-        private async Task<PnPContext> GetPnPContextImplementationAsync(PnPContextOptions? contextOptions)
+        private async Task<PnPContext> GetPnPContextImplementationAsync(PnPContextOptions contextOptions)
         {
             if (contextOptions != null)
             {
@@ -110,7 +113,8 @@ namespace PnP.Scanning.Core.Scanners
         {
             var clientContext = new ClientContext(new Uri($"{SiteUrl}{WebUrl}"))
             {
-                DisableReturnValueCache = true
+                DisableReturnValueCache = true,
+                Tag = new ClientContextInfo(ScanId, CsomEventHub, Logger)
             };
 
             clientContext.ExecutingWebRequest += (sender, args) =>
@@ -158,6 +162,36 @@ namespace PnP.Scanning.Core.Scanners
             {
                 Logger.Warning("The value for key {Key} with was requested but not found in cache", key);
                 return null;
+            }
+        }
+
+        protected bool GetBoolFromCache(string key)
+        {
+            key = BuildKey(key);
+
+            if (ScanManager.Cache.TryGetValue(key, out var value))
+            {
+                return bool.Parse(value);
+            }
+            else
+            {
+                Logger.Warning("The value for key {Key} with was requested but not found in cache", key);
+                return false;
+            }
+        }
+
+        protected int GetIntFromCache(string key)
+        {
+            key = BuildKey(key);
+
+            if (ScanManager.Cache.TryGetValue(key, out var value))
+            {
+                return int.Parse(value);
+            }
+            else
+            {
+                Logger.Warning("The value for key {Key} with was requested but not found in cache", key);
+                return 0;
             }
         }
 
@@ -268,7 +302,7 @@ namespace PnP.Scanning.Core.Scanners
             keywordQuery.TrimDuplicates = false;
 
             ClientResult<ResultTableCollection> results = searchExec.ExecuteQuery(keywordQuery);
-            await web.Context.ExecuteQueryRetryAsync(Logger);
+            await web.Context.ExecuteQueryRetryAsync();
 
             if (results != null)
             {

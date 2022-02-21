@@ -104,7 +104,7 @@ namespace PnP.Scanning.Process.Services
 #endif
                 };
 
-                using (System.Diagnostics.Process? scannerProcess = System.Diagnostics.Process.Start(startInfo))
+                using (System.Diagnostics.Process scannerProcess = System.Diagnostics.Process.Start(startInfo))
                 {
                     if (scannerProcess != null && !scannerProcess.HasExited)
                     {
@@ -201,7 +201,7 @@ namespace PnP.Scanning.Process.Services
             return new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"{DefaultScannerHost}:{port}"));
         }
 
-        private async static Task<PingReply?> PingScannerAsync(PnPScanner.PnPScannerClient client)
+        private async static Task<PingReply> PingScannerAsync(PnPScanner.PnPScannerClient client)
         {
             // No point in waiting too long for a ping response
             return await client.PingAsync(new Google.Protobuf.WellKnownTypes.Empty(), deadline: DateTime.UtcNow.AddMilliseconds(500));

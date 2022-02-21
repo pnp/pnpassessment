@@ -4,7 +4,7 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class OptionsBase
     {
-        internal string? Mode { get; private set; }
+        internal string Mode { get; private set; }
 
         internal static OptionsBase FromScannerInput(StartRequest request)
         {
@@ -12,16 +12,20 @@ namespace PnP.Scanning.Core.Scanners
 
             // PER SCAN COMPONENT: configure scan component option handling here
             if (request.Mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
-            { 
-            
+            {
+                foreach (var property in request.Properties)
+                {
+                    if (property.Property == Constants.StartSyntexDeepScan)
+                    {
+                        (options as SyntexOptions).DeepScan = bool.Parse(property.Value);
+                    }
+                }
             }
 #if DEBUG
             // Assign other inputs
             else if (request.Mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
                 (options as TestOptions).TestNumberOfSites = int.Parse(request.Properties.First().Value);
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
             }
 #endif
 

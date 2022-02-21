@@ -8,7 +8,7 @@ namespace PnP.Scanning.Core.Queues
     internal sealed class SiteCollectionQueue : QueueBase<SiteCollectionQueue>
     {
         // Queue containting the tasks to process
-        private ActionBlock<SiteCollectionQueueItem>? siteCollectionsToScan;
+        private ActionBlock<SiteCollectionQueueItem> siteCollectionsToScan;
 
         public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId) : base(storageManager)
         {
@@ -93,6 +93,7 @@ namespace PnP.Scanning.Core.Queues
                     {
                         webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
                                                        siteCollection.PnPContextFactory,
+                                                       siteCollection.CsomEventHub,
                                                        siteCollection.SiteCollectionUrl,
                                                        web.WebUrl));
                     }

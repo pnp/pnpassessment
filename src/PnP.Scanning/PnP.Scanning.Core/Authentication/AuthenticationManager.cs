@@ -9,9 +9,9 @@ namespace PnP.Scanning.Core.Authentication
 {
     internal sealed class AuthenticationManager
     {
-        private IClientApplicationBase? clientApplication;
+        private IClientApplicationBase clientApplication;
         private AuthenticationMode scanAuthenticationMode;
-        private Func<DeviceCodeResult, Task>? deviceCodeCallback;
+        private Func<DeviceCodeResult, Task> deviceCodeCallback;
         private static readonly HttpClient httpClient = new HttpClient();
 
         public AuthenticationManager(IDataProtectionProvider provider)
@@ -31,15 +31,15 @@ namespace PnP.Scanning.Core.Authentication
             return authenticationManager;
         }        
 
-        private IClientApplicationBase? InitializeAuthentication(StartRequest request)
+        private IClientApplicationBase InitializeAuthentication(StartRequest request)
         {
             return InitializedAuthentication(request.Tenant, request.AuthMode, Enum.Parse<Microsoft365Environment>(request.Environment), Guid.Parse(request.ApplicationId), request.TenantId,
                                              request.CertPath, request.CertFile, request.CertPassword);
         }
 
 
-        private IClientApplicationBase? InitializedAuthentication(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
-                                                                  string? certPath, string? certFile, string? certPassword)
+        private IClientApplicationBase InitializedAuthentication(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
+                                                                  string certPath, string certFile, string certPassword)
         {            
             if (!Enum.TryParse<AuthenticationMode>(authMode, out var authenticationMode))
             {
@@ -110,7 +110,7 @@ namespace PnP.Scanning.Core.Authentication
 
         // This method is the only one called from the scanner clients (CLI)
         internal async Task VerifyAuthenticationAsync(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
-                                                      string? certPath, FileInfo? certFile, string? certPassword,
+                                                      string certPath, FileInfo certFile, string certPassword,
                                                       Func<DeviceCodeResult, Task> deviceCodeCallbackInstance)
         {
 
@@ -273,7 +273,7 @@ namespace PnP.Scanning.Core.Authentication
             return builder;
         }
 
-        private X509Certificate2 LoadCertificate(string? certPathLocation, string? certFile, string? certPassword)
+        private X509Certificate2 LoadCertificate(string certPathLocation, string certFile, string certPassword)
         {
             if (!string.IsNullOrEmpty(certPathLocation))
             {

@@ -22,20 +22,28 @@ namespace PnP.Scanning.Core.Services
         private readonly IHostApplicationLifetime hostApplicationLifetime;
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly IPnPContextFactory contextFactory;
+        private readonly CsomEventHub eventHub;
         private object scanListLock = new object();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager,
-                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory)
+                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
             contextFactory = pnpContextFactory;
+            eventHub = csomEventHub;
 
             // Get notified whenever the scan engine is getting throttled (only applies for calls made via PnP Core SDK!)
             contextFactory.EventHub.RequestRetry = (retryEvent) =>
             {
                 HandleRetryEvent(retryEvent);
+            };
+
+            // Get notified whenever a CSOM request is getting throttled
+            eventHub.RequestRetry = (retryEvent) =>
+            {
+                HandleCsomRetryEvent(retryEvent);
             };
 
             // Hook the application stopping as that allows for cleanup 
@@ -105,7 +113,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", options);
+            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, eventHub, scanId, siteCollectionList[0], "/", options);
             if (scanner != null)
             {
                 try
@@ -130,7 +138,7 @@ namespace PnP.Scanning.Core.Services
             // Enqueue the received site collections
             foreach (var site in siteCollectionList)
             {
-                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site));
+                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, eventHub, site));
             }
             Log.Information("Enqueued {SiteCollectionCount} site collections for scan {ScanId}", siteCollectionList.Count, scanId);
 
@@ -238,6 +246,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     SiteCollectionsToScan = siteCollectionList.Count,
                     Status = ScanStatus.Queued,
+                    FirstSiteCollection = siteCollectionList[0]
                 };
 
                 // Important to add the scan to the in-memory list as after queueing a site collection
@@ -252,7 +261,7 @@ namespace PnP.Scanning.Core.Services
                 // Enqueue the received site collections
                 foreach (var site in siteCollectionList)
                 {
-                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site) { Restart = true });
+                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, eventHub, site) { Restart = true });
                 }
 
                 feedback.Invoke($"{siteCollectionList.Count} site collections queued for scanning again");
@@ -502,7 +511,6 @@ namespace PnP.Scanning.Core.Services
             // Skip the retries due to network issues (socket exceptions)
             if (eventName != null)
             {
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                 if (eventName.PnpContextProperties.TryGetValue(Constants.PnPContextPropertyScanId, out object scanIdObject) && Guid.TryParse(scanIdObject?.ToString(), out Guid scanId))
                 {
                     if (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503 || eventName.HttpStatusCode == 504)
@@ -522,11 +530,34 @@ namespace PnP.Scanning.Core.Services
                         Log.Warning("[Retry] request {Request} for scan {ScanId}, http status code is {StatusCode} and no exception set", eventName.Request, scanId, eventName.HttpStatusCode);
                     }
                 }
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
              
                 Log.Warning("[Retry] request {Request}, no scan id information found!");
             }
-        }    
+        }
+
+        private void HandleCsomRetryEvent(CsomRetryEvent eventName)
+        {
+            // Skip the retries due to network issues (socket exceptions)
+            if (eventName != null)
+            {
+                if (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503)
+                {
+                    RequestWasThrottled(eventName.ScanId, eventName.WaitTime);
+                    Log.Warning("[Throttling] CSOM request for scan {ScanId}", eventName.ScanId);
+                    return;
+                }
+                else if (eventName.Exception != null)
+                {
+                    RequestsWasRetriedDueToNetworkIssues(eventName.ScanId, eventName.WaitTime);
+                    Log.Warning("[Retry] CSOM request for scan {ScanId}", eventName.ScanId);
+                    return;
+                }
+                else
+                {
+                    Log.Warning("[Retry] CSOM request for scan {ScanId}, http status code is {StatusCode} and no exception set", eventName.ScanId, eventName.HttpStatusCode);
+                }
+            }
+        }
 
         internal int NumberOfScansRunning()
         {
@@ -584,7 +615,7 @@ namespace PnP.Scanning.Core.Services
                 foreach(var scanId in scansToMarkAsDone)
                 {
                     // Run post scanning step
-                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", scans[scanId].Options);
+                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, eventHub, scanId, scans[scanId].FirstSiteCollection, "/", scans[scanId].Options);
                     if (scanner != null)
                     {
                         try

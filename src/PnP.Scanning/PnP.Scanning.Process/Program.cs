@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using PnP.Core.Auth.Services.Builder.Configuration;
 using PnP.Core.Services.Builder.Configuration;
 using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Process.Commands;
@@ -177,6 +178,7 @@ namespace PnP.Scanning.Process
                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 
                           services.AddSingleton<StorageManager>();
+                          services.AddSingleton<CsomEventHub>();
                           services.AddSingleton<ScanManager>();
                           services.AddTransient<SiteEnumerationManager>();
                           services.AddTransient<ReportManager>();
