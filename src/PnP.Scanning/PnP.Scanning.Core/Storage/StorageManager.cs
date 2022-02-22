@@ -257,6 +257,7 @@ namespace PnP.Scanning.Core.Storage
                                 ScanId = scanId,
                                 SiteUrl = siteCollectionUrl,
                                 WebUrl = web.WebUrl,
+                                WebUrlAbsolute = $"{siteCollectionUrl}{web.WebUrl}",
                                 Template = web.WebTemplate,
                                 Status = SiteWebStatus.Queued
                             });
@@ -278,6 +279,7 @@ namespace PnP.Scanning.Core.Storage
                         {
                             ScanId = scanId,
                             SiteUrl = siteCollectionUrl,
+                            WebUrlAbsolute = $"{siteCollectionUrl}{web.WebUrl}",
                             WebUrl = web.WebUrl,
                             Template = web.WebTemplate,
                             Status = SiteWebStatus.Queued

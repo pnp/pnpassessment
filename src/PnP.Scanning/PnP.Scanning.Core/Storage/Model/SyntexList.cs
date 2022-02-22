@@ -28,6 +28,9 @@ namespace PnP.Scanning.Core.Storage
 
         public string ListExperienceOptions { get; set; }
 
+        public int WorkflowInstanceCount { get; set; }
+
+        public int FlowInstanceCount { get; set; }
         #endregion
 
         #region Information to collect list "activeness"

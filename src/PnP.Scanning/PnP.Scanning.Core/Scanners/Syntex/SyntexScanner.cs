@@ -8,6 +8,8 @@ using System.Globalization;
 using System.Linq.Expressions;
 using System.Xml;
 using MathNet.Numerics.Statistics;
+using Microsoft.SharePoint.Client.WorkflowServices;
+using Microsoft.SharePoint.Client;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -172,6 +174,9 @@ namespace PnP.Scanning.Core.Scanners
                     }
                 }
 
+                // Scan for Workflow 2013 instances on the collected lists
+                await ScanForListWorkflowAsync(syntexLists);
+
                 // Persist the gathered data
                 await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields);
             }
@@ -330,6 +335,40 @@ namespace PnP.Scanning.Core.Scanners
             return usage;
         }
 
+        private async Task ScanForListWorkflowAsync(List<SyntexList> syntexLists)
+        {
+            using (var context = GetClientContext())
+            {
+                var servicesManager = new WorkflowServicesManager(context, context.Web);
+                var subscriptionService = servicesManager.GetWorkflowSubscriptionService();
+                var subscriptions = subscriptionService.EnumerateSubscriptions();
+                context.Load(subscriptions);
+
+                await context.ExecuteQueryRetryAsync();
+
+                foreach (var listSubscription in subscriptions)
+                {
+                    if (Guid.TryParse(GetWorkflowProperty(listSubscription, "Microsoft.SharePoint.ActivationProperties.ListId"), out Guid associatedListIdValue))
+                    {
+                        var inScopeList = syntexLists.FirstOrDefault(p => p.ListId == associatedListIdValue);
+                        if (inScopeList != null)
+                        {
+                            inScopeList.WorkflowInstanceCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        private string GetWorkflowProperty(WorkflowSubscription subscription, string propertyName)
+        {
+            if (subscription.PropertyDefinitions.ContainsKey(propertyName))
+            {
+                return subscription.PropertyDefinitions[propertyName];
+            }
+
+            return "";
+        }
 
         private SyntexList PrepareSyntexList(IList list)
         {
@@ -525,10 +564,10 @@ namespace PnP.Scanning.Core.Scanners
 
         private static bool IncludeList(IList list)
         {
-            if (list.TemplateType == ListTemplateType.DocumentLibrary ||
-                list.TemplateType == ListTemplateType.PictureLibrary ||
-                list.TemplateType == ListTemplateType.XMLForm ||
-                list.TemplateType == ListTemplateType.MySiteDocumentLibrary)
+            if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.DocumentLibrary ||
+                list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.PictureLibrary ||
+                list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.XMLForm ||
+                list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.MySiteDocumentLibrary)
             {
                 if (!list.IsSiteAssetsLibrary && !list.IsSystemList && !list.Hidden)
                 {
