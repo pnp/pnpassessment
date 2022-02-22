@@ -1,10 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CsvHelper.Configuration.Attributes;
 
 #nullable disable
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl) }, IsUnique = true)]
+    [Microsoft.EntityFrameworkCore.Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl) }, IsUnique = true)]
     internal sealed class Web : BaseScanResult
     {
         public DateTime StartDate { get; set; }
@@ -15,8 +15,10 @@ namespace PnP.Scanning.Core.Storage
 
         public string Template { get; set; }
 
+        [Ignore]
         public string Error { get; set; }
 
+        [Ignore]
         public string StackTrace { get; set; }
     }
 }

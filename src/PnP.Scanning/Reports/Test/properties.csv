@@ -1,2 +1,2 @@
-ScanId,Name,Type,Value
-3bd0cade-e8d8-4665-a1b5-944cdf6e8aa2,testnumberofsites,int,100
+ScanId;Name;Type;Value
+61f20990-d9de-4226-9997-f68b2d56cf0f;testnumberofsites;int;10

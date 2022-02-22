@@ -1,10 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CsvHelper.Configuration.Attributes;
 
 #nullable disable
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl) }, IsUnique = true)]
+    [Microsoft.EntityFrameworkCore.Index(new string[] { nameof(ScanId), nameof(SiteUrl) }, IsUnique = true)]
     internal sealed class SiteCollection
     {
         public Guid ScanId { get; set; }
@@ -17,8 +17,10 @@ namespace PnP.Scanning.Core.Storage
 
         public SiteWebStatus Status { get; set; }
 
+        [Ignore]
         public string Error { get; set; }
 
+        [Ignore]
         public string StackTrace { get; set; }
     }
 }

@@ -52,7 +52,8 @@ namespace PnP.Scanning.Core.Services
                     PersistPBitFromResource("PnP.Scanning.Core.Scanners.Test.TestReport.pbit", pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
-                    RewriteDataLocationsInPbit(pbitFile, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Test\\\\");
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Test\\\\", ";");
                 }
 #endif               
 
@@ -219,7 +220,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        private static void RewriteDataLocationsInPbit(string pbitFile, string oldLocation)
+        private static void RewriteDataLocationsInPbit(string pbitFile, string newDelimiter, string oldLocation, string oldDelimiter)
         {
             string destinationPath = "";
             string copiedFile = "";
@@ -281,6 +282,12 @@ namespace PnP.Scanning.Core.Services
                     while ((line = sr.ReadLine()) != null)
                     {
                         newLine = line.Replace(oldLocation, newLocation);
+
+                        if (newDelimiter != null && newDelimiter != oldDelimiter)
+                        {
+                            newLine = newLine.Replace($"Delimiter=\\\"{oldDelimiter}\\\"", $"Delimiter=\\\"{newDelimiter}\\\"");
+                        }
+
                         sw.WriteLine(newLine);
                     }
                 }
