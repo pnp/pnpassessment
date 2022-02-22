@@ -21,6 +21,7 @@ start --mode test --authmode interactive --tenant bertonline.sharepoint.com --te
 start --mode test --authmode interactive --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt" --threads 1
 start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt" --threads 1
 start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1" --threads 1
+start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1,https://bertonline.sharepoint.com/sites/temp2" --syntexdeepscan --threads 1
 
 Start: Device
 =============

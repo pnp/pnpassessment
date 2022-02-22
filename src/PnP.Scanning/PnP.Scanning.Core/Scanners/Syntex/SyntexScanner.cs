@@ -91,7 +91,7 @@ namespace PnP.Scanning.Core.Scanners
 
             using (var context = await GetPnPContextAsync(options))
             {
-
+                List<IList> syntexListInstances = new();
                 List<SyntexList> syntexLists = new();
                 List<SyntexContentType> syntexContentTypes = new();
                 List<SyntexContentTypeField> syntexContentTypeFields = new();
@@ -114,6 +114,7 @@ namespace PnP.Scanning.Core.Scanners
                         syntexList.FieldCount = foundSyntexFields.Count;
 
                         syntexLists.Add(syntexList);
+                        syntexListInstances.Add(list);
 
                         if (list.ContentTypesEnabled)
                         {
@@ -177,6 +178,9 @@ namespace PnP.Scanning.Core.Scanners
                 // Scan for Workflow 2013 instances on the collected lists
                 await ScanForListWorkflowAsync(syntexLists);
 
+                // Scan for PowerAutomate flow instances on the collected lists
+                await ScanForPowerAutomateFlowsAsync(context, syntexListInstances, syntexLists);
+
                 // Persist the gathered data
                 await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields);
             }
@@ -208,6 +212,11 @@ namespace PnP.Scanning.Core.Scanners
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
                 Logger.Information("No DeepScan selected or Application Permissions without Sites.FullControl.All used ==> not using exact content type file counts");
+            }
+
+            if (GetBoolFromCache(UsesApplicationPermissons))
+            {
+                Logger.Warning("Flow instance counts will not be available when using application permissions");
             }
 
             Logger.Information("Pre scanning work done");
@@ -333,6 +342,39 @@ namespace PnP.Scanning.Core.Scanners
             usage.UpperQuartile = usage.ContentTypePerList.Values.ToArray().UpperQuartile();
 
             return usage;
+        }
+
+        private async Task ScanForPowerAutomateFlowsAsync(PnPContext context, List<IList> syntexListInstances, List<SyntexList> syntexLists)
+        {
+            if (!GetBoolFromCache(UsesApplicationPermissons))
+            {
+                var batch = context.NewBatch();
+                Dictionary<Guid, IEnumerableBatchResult<IFlowInstance>> batchResults = new();
+
+                foreach (var list in syntexLists)
+                {
+                    var pnpList = syntexListInstances.FirstOrDefault(p => p.Id == list.ListId);
+                    if (pnpList != null)
+                    {
+                        batchResults.Add(list.ListId, await pnpList.GetFlowInstancesBatchAsync(batch));
+                    }
+                }
+
+                // Execute the batch
+                var batchError = await context.ExecuteAsync(batch, false);
+
+                foreach (var flowBatchResult in batchResults)
+                {
+                    if (flowBatchResult.Value.IsAvailable)
+                    {
+                        var syntexList = syntexLists.FirstOrDefault(p => p.ListId == flowBatchResult.Key);
+                        if (syntexList != null)
+                        {
+                            syntexList.FlowInstanceCount = flowBatchResult.Value.Count;
+                        }
+                    }
+                }
+            }
         }
 
         private async Task ScanForListWorkflowAsync(List<SyntexList> syntexLists)
