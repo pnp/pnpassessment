@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
-    public partial class Initial : Migration
+    public partial class v10 : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -206,6 +206,8 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     ContentTypeCount = table.Column<int>(type: "INTEGER", nullable: false),
                     FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
                     ListExperienceOptions = table.Column<string>(type: "TEXT", nullable: true),
+                    WorkflowInstanceCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    FlowInstanceCount = table.Column<int>(type: "INTEGER", nullable: false),
                     ItemCount = table.Column<int>(type: "INTEGER", nullable: false),
                     Created = table.Column<DateTime>(type: "TEXT", nullable: false),
                     LastChanged = table.Column<DateTime>(type: "TEXT", nullable: false),
@@ -243,6 +245,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
                     SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
                     WebUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    WebUrlAbsolute = table.Column<string>(type: "TEXT", nullable: true),
                     StartDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     EndDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),

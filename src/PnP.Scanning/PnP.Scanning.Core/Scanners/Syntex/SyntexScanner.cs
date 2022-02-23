@@ -441,8 +441,6 @@ namespace PnP.Scanning.Core.Scanners
                 LastChangedQuarter = ToQuarterString(list.LastItemUserModifiedDate),
             };
 
-
-
             return syntexList;
         }
 

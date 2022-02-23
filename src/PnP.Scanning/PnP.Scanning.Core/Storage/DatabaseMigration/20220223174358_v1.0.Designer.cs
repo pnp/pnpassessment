@@ -11,8 +11,8 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20220222160540_ExtraColumns")]
-    partial class ExtraColumns
+    [Migration("20220223174358_v1.0")]
+    partial class v10
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
