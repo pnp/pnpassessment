@@ -77,8 +77,6 @@ namespace PnP.Scanning.Core.Scanners
             {
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
                 {
-                    //w => w.Fields, 
-                    //w => w.Features,
                     w => w.Lists.QueryProperties(r => r.Title, r => r.ItemCount, r => r.ListExperience, r => r.TemplateType, r => r.ContentTypesEnabled, r => r.Hidden, 
                                                  r => r.Created, r => r.LastItemUserModifiedDate, r => r.IsSiteAssetsLibrary, r => r.IsSystemList,
                                                  r => r.Fields.QueryProperties(f => f.Id, f => f.Hidden, f => f.TypeAsString, f => f.InternalName, f => f.StaticName, f => f.TermSetId, f => f.Title, f => f.Required),
@@ -91,7 +89,7 @@ namespace PnP.Scanning.Core.Scanners
 
             using (var context = await GetPnPContextAsync(options))
             {
-                List<IList> syntexListInstances = new();
+                //List<IList> syntexListInstances = new();
                 List<SyntexList> syntexLists = new();
                 List<SyntexContentType> syntexContentTypes = new();
                 List<SyntexContentTypeField> syntexContentTypeFields = new();
@@ -114,7 +112,7 @@ namespace PnP.Scanning.Core.Scanners
                         syntexList.FieldCount = foundSyntexFields.Count;
 
                         syntexLists.Add(syntexList);
-                        syntexListInstances.Add(list);
+                        //syntexListInstances.Add(list);
 
                         if (list.ContentTypesEnabled)
                         {
@@ -175,11 +173,14 @@ namespace PnP.Scanning.Core.Scanners
                     }
                 }
 
+                // Calculate content type file counts
+                await CalculateContentTypeFileCountsAsync(context, syntexContentTypes);
+
                 // Scan for Workflow 2013 instances on the collected lists
                 await ScanForListWorkflowAsync(syntexLists);
 
                 // Scan for PowerAutomate flow instances on the collected lists
-                await ScanForPowerAutomateFlowsAsync(context, syntexListInstances, syntexLists);
+                //await ScanForPowerAutomateFlowsAsync(context, syntexListInstances, syntexLists);
 
                 // Persist the gathered data
                 await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields);
@@ -202,11 +203,6 @@ namespace PnP.Scanning.Core.Scanners
                     bool hasSitesFullControlAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("Sites.FullControl.All");
                     AddToCache(HasSitesFullControlAll, hasSitesFullControlAll.ToString());
                 }
-                else
-                {
-                    // todo: if needed check here for specific permissions needed and cache them
-                    // so they can be used at no cost in the actual scan code
-                }
             }
 
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
@@ -214,10 +210,10 @@ namespace PnP.Scanning.Core.Scanners
                 Logger.Information("No DeepScan selected or Application Permissions without Sites.FullControl.All used ==> not using exact content type file counts");
             }
 
-            if (GetBoolFromCache(UsesApplicationPermissons))
-            {
-                Logger.Warning("Flow instance counts will not be available when using application permissions");
-            }
+            //if (GetBoolFromCache(UsesApplicationPermissons))
+            //{
+            //    Logger.Warning("Flow instance counts will not be available when using application permissions");
+            //}
 
             Logger.Information("Pre scanning work done");
         }
@@ -225,44 +221,30 @@ namespace PnP.Scanning.Core.Scanners
         internal async override Task PostScanningAsync()
         {
             Logger.Information("Post scanning work is starting");
-            using (var context = GetClientContext())
+            using (var dbContext = new ScanContext(ScanId))
             {
-                using (var dbContext = new ScanContext(ScanId))
+
+                foreach (var contentTypeOverview in dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == ScanId))
                 {
-                    foreach (var contentTypeOverview in dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == ScanId))
-                    {
-                        // Count the content type instances
-                        contentTypeOverview.ListCount = dbContext.SyntexContentTypes.Count(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeOverview.ContentTypeId);
-                        
-                        // Get descriptive statistics for the number of files of a given content type
-                        var usage = await CountFilesUsingContentTypeAsync(context, dbContext, contentTypeOverview.ContentTypeId);
-                        contentTypeOverview.FileCount = usage.Count;
-                        contentTypeOverview.FileCountMin = NaNToDouble(usage.Min);
-                        contentTypeOverview.FileCountMax = NaNToDouble(usage.Max);
-                        contentTypeOverview.FileCountMean = NaNToDouble(usage.Mean);
-                        contentTypeOverview.FileCountMedian = NaNToDouble(usage.Median);
-                        contentTypeOverview.FileCountLowerQuartile = NaNToDouble(usage.LowerQuartile);
-                        contentTypeOverview.FileCountUpperQuartile = NaNToDouble(usage.UpperQuartile);
-                        contentTypeOverview.FileCountStandardDeviation = NaNToDouble(usage.StandardDeviation);
+                    // Count the content type instances
+                    contentTypeOverview.ListCount = dbContext.SyntexContentTypes.Count(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeOverview.ContentTypeId);
 
-                        if (usage.Count > 0)
-                        {
-                            foreach (var list in usage.ContentTypePerList)
-                            {
-                                var contentTypeListToUpdate = dbContext.SyntexContentTypes.FirstOrDefault(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeOverview.ContentTypeId && p.ListId == list.Key);
-                                if (contentTypeListToUpdate != null)
-                                {
-                                    contentTypeListToUpdate.FileCount = (int)list.Value;
-                                }
-                            }
-                        }
-
-                        // save all changes per content type
-                        await dbContext.SaveChangesAsync();
-                    }
-
+                    // Get descriptive statistics for the number of files of a given content type
+                    var usage = CountFilesUsingContentType(dbContext, contentTypeOverview.ContentTypeId);
+                    contentTypeOverview.FileCount = usage.Count;
+                    contentTypeOverview.FileCountMin = NaNToDouble(usage.Min);
+                    contentTypeOverview.FileCountMax = NaNToDouble(usage.Max);
+                    contentTypeOverview.FileCountMean = NaNToDouble(usage.Mean);
+                    contentTypeOverview.FileCountMedian = NaNToDouble(usage.Median);
+                    contentTypeOverview.FileCountLowerQuartile = NaNToDouble(usage.LowerQuartile);
+                    contentTypeOverview.FileCountUpperQuartile = NaNToDouble(usage.UpperQuartile);
+                    contentTypeOverview.FileCountStandardDeviation = NaNToDouble(usage.StandardDeviation);
                 }
+
+                // save all changes per content type
+                await dbContext.SaveChangesAsync();
             }
+
             Logger.Information("Post scanning work done");
         }
 
@@ -276,14 +258,50 @@ namespace PnP.Scanning.Core.Scanners
             return input;
         }
 
-        private async Task<ContentTypeFileUsage> CountFilesUsingContentTypeAsync(Microsoft.SharePoint.Client.ClientContext context, ScanContext dbContext, string contentTypeId)
+        private async Task CalculateContentTypeFileCountsAsync(PnPContext context, List<SyntexContentType> contentTypes)
         {
-            ContentTypeFileUsage usage;
+            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            {
+                return;
+            }
+
+            var batch = context.NewBatch();
+            Dictionary<string, IBatchSingleResult<ISearchResult>> batchResults = new();
+
+            foreach (var contentType in contentTypes)
+            {
+                var request = await context.Web.SearchBatchAsync(batch, new SearchOptions($"contenttypeid: \"{contentType.ContentTypeId}*\" AND listid:{contentType.ListId}") 
+                                                                        { 
+                                                                           RowLimit = 0 
+                                                                        });
+                batchResults.Add($"{contentType.ContentTypeId}|{contentType.ListId}", request);
+            }
+
+            // Execute the batch
+            var batchError = await context.ExecuteAsync(batch, false);
+
+            // Process the search results 
+            foreach(var batchResult in batchResults)
+            {
+                if (batchResult.Value.IsAvailable)
+                {
+                    var keySplit = batchResult.Key.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                    var contentTypeToUpdate = contentTypes.FirstOrDefault(p => p.ContentTypeId == keySplit[0] && p.ListId == Guid.Parse(keySplit[1]));
+                    if (contentTypeToUpdate != null)
+                    {
+                        contentTypeToUpdate.FileCount = (int)batchResult.Value.Result.TotalRows;
+                    }
+                }
+            }
+        }
+
+        private ContentTypeFileUsage CountFilesUsingContentType(ScanContext dbContext, string contentTypeId)
+        {
+            ContentTypeFileUsage usage = new(0);
 
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
-                usage = new(0);
-
+                // Estimating content type file usage by assuming all files in a list using a content type are from that content type
                 foreach (var contentType in dbContext.SyntexContentTypes.Where(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId))
                 {
                     foreach (var list in dbContext.SyntexLists.Where(p => p.ScanId == ScanId && p.ListId == contentType.ListId))
@@ -302,31 +320,16 @@ namespace PnP.Scanning.Core.Scanners
             }
             else
             {
-                List<string> propertiesToRetrieve = new()
+                foreach (var contentType in dbContext.SyntexContentTypes.Where(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId))
                 {
-                    "ListId",
-                    "UniqueId",
-                };
-
-                var results = await SearchAsync(context.Web, $"contenttypeid: \"{contentTypeId}*\"", propertiesToRetrieve);
-
-                usage = new(results.Count);
-
-                if (results.Count > 0)
-                {
-                    foreach (var contentType in results)
+                    usage.Count += contentType.FileCount;
+                    if (usage.ContentTypePerList.ContainsKey(contentType.ListId))
                     {
-                        if (Guid.TryParse(contentType["ListId"], out Guid listId))
-                        {
-                            if (usage.ContentTypePerList.ContainsKey(listId))
-                            {
-                                usage.ContentTypePerList[listId]++;
-                            }
-                            else
-                            {
-                                usage.ContentTypePerList.Add(listId, 1);
-                            }
-                        }
+                        usage.ContentTypePerList[contentType.ListId] += contentType.FileCount;
+                    }
+                    else
+                    {
+                        usage.ContentTypePerList.Add(contentType.ListId, contentType.FileCount);
                     }
                 }
             }
@@ -344,38 +347,38 @@ namespace PnP.Scanning.Core.Scanners
             return usage;
         }
 
-        private async Task ScanForPowerAutomateFlowsAsync(PnPContext context, List<IList> syntexListInstances, List<SyntexList> syntexLists)
-        {
-            if (!GetBoolFromCache(UsesApplicationPermissons))
-            {
-                var batch = context.NewBatch();
-                Dictionary<Guid, IEnumerableBatchResult<IFlowInstance>> batchResults = new();
+        //private async Task ScanForPowerAutomateFlowsAsync(PnPContext context, List<IList> syntexListInstances, List<SyntexList> syntexLists)
+        //{
+        //    if (!GetBoolFromCache(UsesApplicationPermissons))
+        //    {
+        //        var batch = context.NewBatch();
+        //        Dictionary<Guid, IEnumerableBatchResult<IFlowInstance>> batchResults = new();
 
-                foreach (var list in syntexLists)
-                {
-                    var pnpList = syntexListInstances.FirstOrDefault(p => p.Id == list.ListId);
-                    if (pnpList != null)
-                    {
-                        batchResults.Add(list.ListId, await pnpList.GetFlowInstancesBatchAsync(batch));
-                    }
-                }
+        //        foreach (var list in syntexLists)
+        //        {
+        //            var pnpList = syntexListInstances.FirstOrDefault(p => p.Id == list.ListId);
+        //            if (pnpList != null)
+        //            {
+        //                batchResults.Add(list.ListId, await pnpList.GetFlowInstancesBatchAsync(batch));
+        //            }
+        //        }
 
-                // Execute the batch
-                var batchError = await context.ExecuteAsync(batch, false);
+        //        // Execute the batch
+        //        var batchError = await context.ExecuteAsync(batch, false);
 
-                foreach (var flowBatchResult in batchResults)
-                {
-                    if (flowBatchResult.Value.IsAvailable)
-                    {
-                        var syntexList = syntexLists.FirstOrDefault(p => p.ListId == flowBatchResult.Key);
-                        if (syntexList != null)
-                        {
-                            syntexList.FlowInstanceCount = flowBatchResult.Value.Count;
-                        }
-                    }
-                }
-            }
-        }
+        //        foreach (var flowBatchResult in batchResults)
+        //        {
+        //            if (flowBatchResult.Value.IsAvailable)
+        //            {
+        //                var syntexList = syntexLists.FirstOrDefault(p => p.ListId == flowBatchResult.Key);
+        //                if (syntexList != null)
+        //                {
+        //                    syntexList.FlowInstanceCount = flowBatchResult.Value.Count;
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
 
         private async Task ScanForListWorkflowAsync(List<SyntexList> syntexLists)
         {
@@ -437,6 +440,8 @@ namespace PnP.Scanning.Core.Scanners
                 LastChangedMonthString = ToMonthString(list.LastItemUserModifiedDate),
                 LastChangedQuarter = ToQuarterString(list.LastItemUserModifiedDate),
             };
+
+
 
             return syntexList;
         }
@@ -551,53 +556,6 @@ namespace PnP.Scanning.Core.Scanners
 
             return syntexFields;
         }
-
-        //private async Task StoreSyntexInformationAsync(List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields)
-        //{
-        //    Logger.Information("Start StoreSyntexInformationAsync for {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-        //    using (var dbContext = new ScanContext(ScanId))
-        //    {
-        //        await dbContext.SyntexLists.AddRangeAsync(syntexLists.ToArray());
-        //        await dbContext.SyntexContentTypes.AddRangeAsync(syntexContentTypes.ToArray());
-        //        await dbContext.SyntexContentTypeFields.AddRangeAsync(syntexContentTypeFields.ToArray());
-        //        await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
-
-        //        await dbContext.SaveChangesAsync();
-        //        Logger.Information("StoreSyntexInformationAsync succeeded for {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-        //    }
-        //}
-
-        //internal async Task<bool> IsContentTypeStoredAsync(string contentTypeId)
-        //{
-        //    using (var dbContext = new ScanContext(ScanId))
-        //    {
-        //        var contentType = await dbContext.SyntexContentTypes.FirstOrDefaultAsync(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId);
-
-        //        if (contentType != null)
-        //        {
-        //            return true;
-        //        }
-        //        else
-        //        {
-        //            return false;
-        //        }
-        //    }
-        //}
-
-        //internal async Task AddToContentTypeSummaryAsync(SyntexContentTypeSummary syntexContentTypeSummary)
-        //{
-        //    using (var dbContext = new ScanContext(ScanId))
-        //    {
-        //        dbContext.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
-
-        //        var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == ScanId && p.ContentTypeId == syntexContentTypeSummary.ContentTypeId);
-        //        if (contentType == null)
-        //        {
-        //            await dbContext.SyntexContentTypeOverview.AddAsync(syntexContentTypeSummary);
-        //            await dbContext.SaveChangesAsync();
-        //        }
-        //    }
-        //}
 
         private static string IdFromListContentType(string listContentTypeId)
         {
