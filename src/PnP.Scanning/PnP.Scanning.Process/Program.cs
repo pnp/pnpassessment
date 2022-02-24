@@ -80,12 +80,15 @@ namespace PnP.Scanning.Process
                 Log.Logger = new LoggerConfiguration()
                            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
                            .Enrich.FromLogContext()
+#if DEBUG
                            .WriteTo.Console()
+#endif
                            .WriteTo.File($"log_{timestamp}.txt")
                            // Duplicate all log entries generated for an actual scan component
                            // to a separate log file in the folder per scan
                            .WriteTo.Map("ScanId", (scanId, wt) => wt.File($"./{scanId}/log_{scanId}.txt"))
                            .CreateLogger();
+                           
 
                 try
                 {
@@ -148,7 +151,7 @@ namespace PnP.Scanning.Process
         private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)
-                  .UseSerilog() 
+                  .UseSerilog()
                   .ConfigureWebHostDefaults(webBuilder =>
                   {
                       webBuilder.UseStartup<Startup<Scanner>>();

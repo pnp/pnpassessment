@@ -97,9 +97,9 @@ namespace PnP.Scanning.Process.Services
 
                 ProcessStartInfo startInfo = new()
                 {
-                    FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "microsoft365-scanner.exe" : "microsoft365-scanner",
+                    FileName = Path.Combine(Environment.ProcessPath),
                     Arguments = $"scanner {port}",
-                    UseShellExecute = true
+                    UseShellExecute = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? true : false
 #if !DEBUG
                     ,WindowStyle = ProcessWindowStyle.Hidden
 #endif
