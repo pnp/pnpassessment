@@ -266,30 +266,52 @@ namespace PnP.Scanning.Core.Scanners
             }
 
             var batch = context.NewBatch();
-            Dictionary<string, IBatchSingleResult<ISearchResult>> batchResults = new();
+            Dictionary<Guid, IBatchSingleResult<ISearchResult>> batchResults = new();
 
+            List<Guid> uniqueListIds = new();
             foreach (var contentType in contentTypes)
             {
-                var request = await context.Web.SearchBatchAsync(batch, new SearchOptions($"contenttypeid: \"{contentType.ContentTypeId}*\" AND listid:{contentType.ListId}") 
-                                                                        { 
-                                                                           RowLimit = 0 
-                                                                        });
-                batchResults.Add($"{contentType.ContentTypeId}|{contentType.ListId}", request);
+                if (!uniqueListIds.Contains(contentType.ListId))
+                {
+                    uniqueListIds.Add(contentType.ListId);
+                }
+            }
+                     
+            // Issue a search request per list, refine the results on contenttypeid
+            foreach (var listId in uniqueListIds)
+            {
+                var request = await context.Web.SearchBatchAsync(batch, new SearchOptions($"listid:{listId}")
+                {
+                    RowLimit = 0,
+                    SortProperties = new List<SortOption>() { new SortOption("DocId") },
+                    RefineProperties = new List<string> { "contenttypeid" },
+                    ClientType = "PnPMicrosoft365Scanner"
+                });
+                batchResults.Add(listId, request);
             }
 
             // Execute the batch
             var batchError = await context.ExecuteAsync(batch, false);
 
             // Process the search results 
-            foreach(var batchResult in batchResults)
+            foreach (var batchResult in batchResults)
             {
                 if (batchResult.Value.IsAvailable)
                 {
-                    var keySplit = batchResult.Key.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
-                    var contentTypeToUpdate = contentTypes.FirstOrDefault(p => p.ContentTypeId == keySplit[0] && p.ListId == Guid.Parse(keySplit[1]));
-                    if (contentTypeToUpdate != null)
+                    foreach (var contentType in contentTypes.Where(p => p.ListId == batchResult.Key))
                     {
-                        contentTypeToUpdate.FileCount = (int)batchResult.Value.Result.TotalRows;
+                        if (batchResult.Value.Result.Refinements.Count > 0 && batchResult.Value.Result.Refinements.ContainsKey("contenttypeid"))
+                        {
+                            foreach (var refinementResult in batchResult.Value.Result.Refinements["contenttypeid"])
+                            {
+                                var contentTypeId = IdFromListContentType(refinementResult.Value);
+                                var contentTypeToUpdate = contentTypes.FirstOrDefault(p => p.ListId == batchResult.Key && p.ContentTypeId == contentTypeId);
+                                if (contentTypeToUpdate != null)
+                                {
+                                    contentTypeToUpdate.FileCount = (int)refinementResult.Count;
+                                }
+                            }
+                        }
                     }
                 }
             }
