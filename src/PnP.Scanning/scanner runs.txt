@@ -26,7 +26,7 @@ start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --
 Start: Device
 =============
 start --mode test --authmode device --tenant bertonline.sharepoint.com --sitesfile "D:\github\pnpscanning\src\PnP.Scanning\sites.txt"
-
+start --mode syntex --authmode device --tenant bertonline.sharepoint.com --syntexdeepscan
 
 
 List

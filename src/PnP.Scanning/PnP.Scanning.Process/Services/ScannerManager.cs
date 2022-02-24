@@ -2,6 +2,7 @@
 using PnP.Scanning.Core.Services;
 using Spectre.Console;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace PnP.Scanning.Process.Services
 {
@@ -96,7 +97,7 @@ namespace PnP.Scanning.Process.Services
 
                 ProcessStartInfo startInfo = new()
                 {
-                    FileName = "microsoft365-scanner.exe",
+                    FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "microsoft365-scanner.exe" : "microsoft365-scanner",
                     Arguments = $"scanner {port}",
                     UseShellExecute = true
 #if !DEBUG
