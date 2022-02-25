@@ -68,6 +68,25 @@ The scanner can be used on MacOS and Linux except the PowerBI report generation 
 
 If you later on want to generate a PowerBI report for a scan ran on Linux of MacOS, you then can copy the scan output folder (guid = scan id, located in the folder containing the binary) to the folder on a Windows machine where you've put the Windows version of the scanner. When you then use `microsoft365-scanner.exe report --id <scan id>` the report will be generated and opened in PowerBI.
 
+### Running on a GCC, GCC High, DoD or China tenant / running the scanner on a port different from 25025
+
+The scanner can be used to run against tenants hosted in other cloud environments. Doing this requires the manual addition of a settings file named `appsettings.json` in the same folder as the scanner binary. Below are the sample settings for selecting another cloud environment:
+
+```json
+{
+  "PnPCore": {
+    "Environment": "USGovernment"
+  },
+  "CustomSettings": {
+    "Port": 7887
+  }
+}
+```
+Valid values for environment are: `Production`, `PreProduction`, `USGovernment` (a.k.a GCC), `USGovernmentHigh` (a.k.a GCC High), `USGovernmentDoD` (a.k.a DoD), `China` and `Germany`.
+
+When you for some reason port 25025 is occupied on your machine you can configure the scanner by providing an alternative port number via the `appsettings.json` file.
+
+
 **Community rocks, sharing is caring!**
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
