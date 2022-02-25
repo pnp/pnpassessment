@@ -82,7 +82,7 @@ The scanner can be used to run against tenants hosted in other cloud environment
   }
 }
 ```
-Valid values for environment are: `Production`, `PreProduction`, `USGovernment` (a.k.a GCC), `USGovernmentHigh` (a.k.a GCC High), `USGovernmentDoD` (a.k.a DoD), `China` and `Germany`.
+Valid values for environment are: `Production`, `PreProduction`, `USGovernment` (a.k.a GCC), `USGovernmentHigh` (a.k.a GCC High), `USGovernmentDoD` (a.k.a DoD), `China` and `Germany`. Next to the adding the `appsettings.json` file you also need to include the `--environment` argument when launching a scan via the `start` command. The possible values are identical to the ones provided in the configuration file.
 
 When you for some reason port 25025 is occupied on your machine you can configure the scanner by providing an alternative port number via the `appsettings.json` file.
 
