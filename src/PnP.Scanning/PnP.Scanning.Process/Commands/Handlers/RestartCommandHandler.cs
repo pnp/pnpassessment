@@ -40,9 +40,9 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            cmd.SetHandler(async (Guid scanId, int threads) => 
-                            { 
-                                await HandleRestartAsync(scanId, threads); 
+            cmd.SetHandler(async (Guid scanId, int threads) =>
+                            {
+                                await HandleRestartAsync(scanId, threads);
                             },
                             scanIdOption, threadsOption);
 

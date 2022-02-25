@@ -81,15 +81,11 @@ namespace PnP.Scanning.Process.Commands
                 parseArgument: (result) =>
                 {
                     // https://github.com/dotnet/command-line-api/issues/1287
-#pragma warning disable CS8604 // Possible null reference argument.
                     var siteFile = result.FindResultFor(sitesFileOption);
-#pragma warning restore CS8604 // Possible null reference argument.
                     if (siteFile != null)
                     {
                         result.ErrorMessage = $"the --{Constants.StartSitesList} option is mutually exclusive with the --{Constants.StartSitesFile} option";
-#pragma warning disable CS8603 // Possible null reference return.
                         return null;
-#pragma warning restore CS8603 // Possible null reference return.
                     }
 
                     return result.Tokens.Select(t => t.Value).ToList();
@@ -108,9 +104,7 @@ namespace PnP.Scanning.Process.Commands
                     if (siteList != null)
                     {
                         result.ErrorMessage = $"the --{Constants.StartSitesFile} option is mutually exclusive with the --{Constants.StartSitesList} option";
-#pragma warning disable CS8603 // Possible null reference return.
                         return null;
-#pragma warning restore CS8603 // Possible null reference return.
                     }
 
                     return new FileInfo(result.Tokens[0].Value);
@@ -202,20 +196,8 @@ namespace PnP.Scanning.Process.Commands
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
                         result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
-#pragma warning disable CS8603 // Possible null reference return.
                         return null;
-#pragma warning restore CS8603 // Possible null reference return.
                     }
-
-//#pragma warning disable CS8604 // Possible null reference argument.
-//                    if (result.FindResultFor(certPfxFilePasswordOption) is { })
-//                    {
-//                        result.ErrorMessage = $"using --{Constants.StartCertFile} also requires using --{Constants.StartCertPassword}";
-//#pragma warning disable CS8603 // Possible null reference return.
-//                        return null;
-//#pragma warning restore CS8603 // Possible null reference return.
-//                    }
-//#pragma warning restore CS8604 // Possible null reference argument.
 
                     return new FileInfo(result.Tokens[0].Value);
                 },
@@ -239,12 +221,6 @@ namespace PnP.Scanning.Process.Commands
                         result.ErrorMessage = $"--{Constants.StartCertPassword} can only be used with --{Constants.StartAuthMode} application";
                         return "";
                     }
-
-                    //if (result.FindResultFor(certPfxFileInfoOption) is { })
-                    //{
-                    //    result.ErrorMessage = $"using --{Constants.StartCertPassword} also requires using --{Constants.StartCertFile}";
-                    //    return "";
-                    //}
 
                     return result.Tokens[0].Value;
                 },
@@ -408,7 +384,7 @@ namespace PnP.Scanning.Process.Commands
                     });
                 }
 
-    #if DEBUG
+#if DEBUG
                 if (arguments.Mode == Mode.Test)
                 {
                     start.Properties.Add(new PropertyRequest

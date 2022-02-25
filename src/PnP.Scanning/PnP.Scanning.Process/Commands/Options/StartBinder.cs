@@ -6,7 +6,7 @@ using System.CommandLine.Binding;
 
 namespace PnP.Scanning.Process.Commands
 {
-    internal sealed class StartBinder: BinderBase<StartOptions>
+    internal sealed class StartBinder : BinderBase<StartOptions>
     {
         private readonly Option<Mode> mode;
         private readonly Option<string> tenant;
@@ -39,7 +39,7 @@ namespace PnP.Scanning.Process.Commands
             mode = modeInput;
             tenant = tenantInput;
             environment = environmentInput;
-            sitesList = sitesListInput; 
+            sitesList = sitesListInput;
             sitesFile = sitesFileInput;
             authMode = authModeInput;
             applicationId = applicationIdInput;

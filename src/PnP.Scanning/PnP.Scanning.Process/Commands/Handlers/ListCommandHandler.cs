@@ -68,10 +68,10 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            cmd.SetHandler(async (bool running, bool paused, bool finished, bool terminated) => 
-                            { 
-                                await HandleStartAsync(running, paused, finished, terminated); 
-                            }, 
+            cmd.SetHandler(async (bool running, bool paused, bool finished, bool terminated) =>
+                            {
+                                await HandleStartAsync(running, paused, finished, terminated);
+                            },
                             runningOption, pausedOption, finishedOption, terminatedOption);
 
             return cmd;
@@ -149,9 +149,9 @@ namespace PnP.Scanning.Process.Commands
                         endedAt = new Markup($"{item.ScanEnded.ToDateTime().ToLocalTime()}");
                     }
 
-                    table.AddRow(new Markup($"{item.Id}"), 
+                    table.AddRow(new Markup($"{item.Id}"),
                                  new Markup($"{item.Mode}"),
-                                 status, 
+                                 status,
                                  procent,
                                  new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),
                                  endedAt

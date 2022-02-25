@@ -153,7 +153,7 @@ namespace PnP.Scanning.Process.Services
                         isGrpcUpAndRunning = response.UpAndRunning;
                     }
                 }
-                catch 
+                catch
                 {
                 }
             }

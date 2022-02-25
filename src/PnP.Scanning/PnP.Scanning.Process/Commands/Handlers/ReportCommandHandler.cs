@@ -79,9 +79,9 @@ namespace PnP.Scanning.Process.Commands
             //{                               
             //});
 
-            cmd.SetHandler(async (Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open) => 
-                            { 
-                                await HandleStartAsync(scanId, mode, delimiter, path, open); 
+            cmd.SetHandler(async (Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open) =>
+                            {
+                                await HandleStartAsync(scanId, mode, delimiter, path, open);
                             },
                             scanIdOption, modeOption, delimiterOption, exportPathOption, openGeneratedReportOption);
 
@@ -102,10 +102,10 @@ namespace PnP.Scanning.Process.Commands
                 }
 
                 // Start the pausing work
-                var call = client.Report(new Core.Services.ReportRequest 
-                { 
-                    Id = scanId.ToString(), 
-                    Mode = mode.ToString(), 
+                var call = client.Report(new Core.Services.ReportRequest
+                {
+                    Id = scanId.ToString(),
+                    Mode = mode.ToString(),
                     Delimiter = delimChar,
                     Path = path
                 });
@@ -131,7 +131,7 @@ namespace PnP.Scanning.Process.Commands
                     await Task.Delay(TimeSpan.FromMilliseconds(500));
 
                     if (!string.IsNullOrEmpty(message.ReportPath))
-                    {                        
+                    {
                         finalReportPath = message.ReportPath;
                     }
                 }

@@ -24,7 +24,7 @@ namespace PnP.Scanning.Process.Commands
             cmd.SetHandler(async () => await HandleStatusAsync());
 
             return cmd;
-        }       
+        }
 
         private async Task HandleStatusAsync()
         {
@@ -45,7 +45,7 @@ namespace PnP.Scanning.Process.Commands
             AnsiConsole.MarkupLine("Live running scan status. Press [yellow]ESC[/] to exit");
             AnsiConsole.WriteLine();
 
-            await AnsiConsole.Live(table)                
+            await AnsiConsole.Live(table)
                 .AutoClear(false)   // Do not remove when done
                 .Overflow(VerticalOverflow.Ellipsis) // Show ellipsis when overflowing
                 .Cropping(VerticalOverflowCropping.Top) // Crop overflow at top
@@ -99,7 +99,7 @@ namespace PnP.Scanning.Process.Commands
 
                                     //if (throttling == null)
                                     //{
-                                        throttling = new Markup($"{item.RequestsThrottled} / {item.RequestsRetriedDueToNetworkError}");
+                                    throttling = new Markup($"{item.RequestsThrottled} / {item.RequestsRetriedDueToNetworkError}");
                                     //}
 
                                     table.AddRow(new Markup($"{item.Id}"),

@@ -38,7 +38,7 @@ namespace PnP.Scanning.Process
             {
                 // Configure needed services
                 var host = ConfigureCliHost(args);
-                
+
                 // Get ProcessManager instance from the cli executable
                 var processManager = host.Services.GetRequiredService<ScannerManager>();
                 var dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
@@ -90,7 +90,7 @@ namespace PnP.Scanning.Process
                            // to a separate log file in the folder per scan
                            .WriteTo.Map("ScanId", (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt")))
                            .CreateLogger();
-                           
+
 
                 try
                 {
@@ -124,7 +124,6 @@ namespace PnP.Scanning.Process
                 }
             }
         }
-
 
         private static IHost ConfigureCliHost(string[] args)
         {

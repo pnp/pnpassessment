@@ -45,7 +45,7 @@ namespace PnP.Scanning.Process.Commands
             // Custom validation of provided command input, use to validate option combinations
             cmd.AddValidator(commandResult =>
             {
-                
+
                 if (// no arguments
                     (commandResult.FindResultFor(scanIdOption) == null && commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == false) ||
                     // --scanid and --all
@@ -60,9 +60,9 @@ namespace PnP.Scanning.Process.Commands
                 }
             });
 
-            cmd.SetHandler(async (Guid scanId, bool all) => 
-                            { 
-                                await HandleStartAsync(scanId, all); 
+            cmd.SetHandler(async (Guid scanId, bool all) =>
+                            {
+                                await HandleStartAsync(scanId, all);
                             },
                             scanIdOption, allScansOption);
 

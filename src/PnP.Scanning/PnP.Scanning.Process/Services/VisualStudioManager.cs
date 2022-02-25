@@ -63,7 +63,7 @@ namespace PnP.Scanning.Process.Services
                     throw new InvalidOperationException(
                             "Visual Studio process cannot find specified application '" + applicationProcess.Id + "'");
                 }
-            }            
+            }
         }
 
         /// <summary>

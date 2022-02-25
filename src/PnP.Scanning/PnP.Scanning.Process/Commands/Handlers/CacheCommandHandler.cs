@@ -36,9 +36,9 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            cmd.SetHandler(async (bool clearAuthentication) => 
-                            { 
-                                await HandleStartAsync(clearAuthentication); 
+            cmd.SetHandler(async (bool clearAuthentication) =>
+                            {
+                                await HandleStartAsync(clearAuthentication);
                             },
                             clearOption);
 
