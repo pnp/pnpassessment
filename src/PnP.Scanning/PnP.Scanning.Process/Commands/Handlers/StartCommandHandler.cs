@@ -51,7 +51,7 @@ namespace PnP.Scanning.Process.Commands
             // Scanner mode
             modeOption = new(
                 name: $"--{Constants.StartMode}",
-                getDefaultValue: () => Mode.Test,
+                getDefaultValue: () => Mode.Syntex,
                 description: "Scanner mode"
                 )
             {
