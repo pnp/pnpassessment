@@ -76,6 +76,8 @@ namespace PnP.Scanning.Process
             }
             else
             {
+                // Use fully qualified paths as otherwise on MacOS the files end up in the wrong location
+                string logFolder = Path.GetDirectoryName(Environment.ProcessPath);
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
                 Log.Logger = new LoggerConfiguration()
                            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -83,10 +85,10 @@ namespace PnP.Scanning.Process
 #if DEBUG
                            .WriteTo.Console()
 #endif
-                           .WriteTo.File($"log_{timestamp}.txt")
+                           .WriteTo.File(Path.Combine(logFolder, $"log_{timestamp}.txt"))
                            // Duplicate all log entries generated for an actual scan component
                            // to a separate log file in the folder per scan
-                           .WriteTo.Map("ScanId", (scanId, wt) => wt.File($"./{scanId}/log_{scanId}.txt"))
+                           .WriteTo.Map("ScanId", (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt")))
                            .CreateLogger();
                            
 
