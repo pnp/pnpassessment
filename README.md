@@ -22,6 +22,36 @@ Export the gathered data to CSV | microsoft365-scanner.exe report --id &lt;scan 
 
 ![scanner run](scannerrun.gif)
 
+### Setting up your Azure AD application
+
+The scanner requires Azure AD based authentication and supports application permissions (app-only) and delegated (user) permissions. Application permissions is the recommended approach as this way the scanner does have guaranteed access to all the sites in your tenant. If you use delegated permissions than you can either use the `Interactive` mode or the `Device` authentication mode. `Device` mode works on all OS's, including Linux as you authenticate the scan from any device. `Interactive` will popup a browser session and ask you to authenticate. Application permissions require you to use a certificate for authentication and this certificate can be provided via a reference to a certificate in a local certificate store e.g. "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84" or via providing a PFX file and password (`--certfile "MyCertificate.pfx" --certpassword ***`). 
+
+If you don't specify the `--applicationid` argument the scanner will try to use the PnP Management Shell app (the one you use for [PnP PowerShell](https://pnp.github.io/powershell/)), but it's recommended to create a dedicated app for scanning as that way you can limit the permissions granted. Using PnP PowerShell this becomes really simple. Below cmdlet will create a new Azure AD application, will create a new self-signed certificate and will configure that cert with the Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.
+
+```PowerShell
+# Ensure you replace contoso.onmicrosoft.com with your Azure AD tenant name
+# Ensure you replace joe@contoso.onmicrosoft.com with the user id that's an Azure AD admin (or global admin)
+
+Register-PnPAzureADApp -ApplicationName FunctionDemoSiteProvisiong `
+                       -Tenant contoso.onmicrosoft.com `
+                       -Store CurrentUser `
+                       -GraphApplicationPermissions "Sites.FullControl.All" `
+                       -SharePointApplicationPermissions "Sites.FullControl.All" `
+                       -Username "joe@contoso.onmicrosoft.com" `
+                       -Interactive
+```
+
+### Permissions required
+
+The scanner aims to be able to perform the scan task at hand using minimal read permissions, but for certain scans not all features work when using minimal permissoins.
+
+Scan | Authentication | Minimal | Optimal | Details
+-----| ---------------| --------|---------|--------
+Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexdeepscan` argument the scanner will use the search APIs to count how many documents use a given content type and search in combination with application permissions requires Sites.FullControl.All
+Syntex | Delegated | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All |
+
+
+
 ## I want to help 🙋‍♂️
 
 If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with sugggested improvements.
