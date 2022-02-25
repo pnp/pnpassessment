@@ -32,7 +32,7 @@ If you don't specify the `--applicationid` argument the scanner will try to use 
 # Ensure you replace contoso.onmicrosoft.com with your Azure AD tenant name
 # Ensure you replace joe@contoso.onmicrosoft.com with the user id that's an Azure AD admin (or global admin)
 
-Register-PnPAzureADApp -ApplicationName FunctionDemoSiteProvisiong `
+Register-PnPAzureADApp -ApplicationName Microsoft365Scanner `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
                        -GraphApplicationPermissions "Sites.FullControl.All" `
