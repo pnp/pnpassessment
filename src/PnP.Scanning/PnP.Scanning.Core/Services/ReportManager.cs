@@ -42,9 +42,20 @@ namespace PnP.Scanning.Core.Services
             {
                 var scan = await dbContext.Scans.Where(p => p.ScanId == scanId).FirstOrDefaultAsync();
 
+                if (scan.CLIMode == Mode.Syntex.ToString())
+                {
+                    reportFile = "SyntexScanReport.pbit";
+                    // Put the report file in the report folder
+                    string pbitFile = Path.Combine(exportPath, "SyntexScanReport.pbit");
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Syntex.SyntexScanReport.pbit", pbitFile);
+
+                    // Update the report file to pick up the exported CSV files in the report folder
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Syntex\\\\", ",");
+                }
 #if DEBUG
                 // PER SCAN COMPONENT: Update report data per scan component
-                if (scan.CLIMode == Mode.Test.ToString())
+                else if (scan.CLIMode == Mode.Test.ToString())
                 {
                     reportFile = "TestReport.pbit";
                     // Put the report file in the report folder

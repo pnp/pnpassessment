@@ -7,10 +7,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <None Remove="Scanners\Syntex\SyntexScanReport.pbit" />
 	  <None Remove="Scanners\Test\TestReport.pbit" />
 	</ItemGroup>
 
 	<ItemGroup>
+	  <EmbeddedResource Include="Scanners\Syntex\SyntexScanReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Test\TestReport.pbit" />
 	</ItemGroup>
 

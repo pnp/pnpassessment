@@ -2,7 +2,9 @@
 {
     internal enum Mode
     {
+#if DEBUG
         Test,
+#endif
         Syntex,
         Workflow
     }
