@@ -68,6 +68,9 @@ The scanner can be used on MacOS and Linux except the PowerBI report generation 
 
 If you later on want to generate a PowerBI report for a scan ran on Linux of MacOS, you then can copy the scan output folder (guid = scan id, located in the folder containing the binary) to the folder on a Windows machine where you've put the Windows version of the scanner. When you then use `microsoft365-scanner.exe report --id <scan id>` the report will be generated and opened in PowerBI.
 
+#### Known issues
+- When running on MacOS the log files end up in your user home folder and not in the folder hosting the scanner binary
+
 **Community rocks, sharing is caring!**
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
