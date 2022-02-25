@@ -19,7 +19,9 @@ Pause a running scan | microsoft365-scanner.exe pause --id &lt;scan id&gt;
 Restart a paused or terminated scan | microsoft365-scanner.exe restart --id &lt;scan id&gt;  
 Generate PowerBI report (includes CSV export) | microsoft365-scanner.exe report --id &lt;scan id&gt;
 Export the gathered data to CSV | microsoft365-scanner.exe report --id &lt;scan id&gt; --mode CsvOnly --Path &lt;location to put CSV files&gt;
-  
+
+![scanner run](scannerrun.gif)
+
 ## I want to help 🙋‍♂️
 
 If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with sugggested improvements.
