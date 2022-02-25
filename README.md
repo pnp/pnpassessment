@@ -1,5 +1,5 @@
 # Microsoft 365 Scanner
-Microsoft 365 SharePoint scanning tool is an open source community tool that provides customers with data to help them with various deprecation and adoption scenarios.
+Microsoft 365 SharePoint scanning tool is an open source community tool that provides customers with data to help them with various deprecation and adoption scenarios. This tool is currently under development/testing, more features and especially more documentation will be added soon.
 
 ## Getting started 🚀
 
@@ -29,6 +29,12 @@ If you want to join our team and help, then feel free to check the issue list fo
 ## Supportability and SLA 💁🏾‍♀️
 
 This tool is an open-source and community provided tool backed by an active community supporting it. This is not a Microsoft provided tool, so there's no SLA or direct support for this open-source component from Microsoft. Please report any issues using the [issues list](https://github.com/pnp/pnpscannning/issues).
+
+## FAQ
+
+### Running on MacOS or Linux
+
+The scanner can be used on MacOS and Linux except the PowerBI report generation as the PowerBI client only is available for Windows. After copying the needed binary from the [releases](https://github.com/pnp/pnpscanning/tree/main/releases) folder you need to make the binary as executable via `sudo chmod +x microsoft365-scanner`. Once that's done you can use the scanner, the scanner binary itself contains all the needed depencies (including the .NET 6 runtime). If you want to generate a PowerBI report for a scan run on Linux of MacOS you can copy the scan output folder (guid = scan id) located in the folder containing the binary to a folder on a Windows machine where you've put the Windows version of the scanner. When you then use `microsoft365-scanner.exe report --id <scan id>` the report will be generated and opened in PowerBI.
 
 **Community rocks, sharing is caring!**
 
