@@ -1,5 +1,5 @@
 ﻿
-To setup "initial" status delete current cs files in the DatabaseMigration folder and call:
+To setup "initial" status delete current cs files in the DatabaseMigration folder and call from the package manager console:
 
 Add-Migration -Name v1.0 -Project PnP.Scanning.Core -OutputDir Storage\DatabaseMigration -StartupProject PnP.Scanning.Process
 

@@ -31,6 +31,7 @@ namespace PnP.Scanning.Process.Commands
 
         // PER SCAN COMPONENT: add scan component specific options here
         private Option<bool> syntexDeepScanOption;
+        private Option<bool> workflowAnalyzeOption;
 
 #if DEBUG
         // Specific options for the test handler
@@ -255,6 +256,15 @@ namespace PnP.Scanning.Process.Commands
             };
             cmd.AddOption(syntexDeepScanOption);
 
+            workflowAnalyzeOption = new(
+                name: $"--{Constants.StartWorkflowAnalyze}",
+                getDefaultValue: () => true,
+                description: "Perform worlflow analysis")
+            {
+                IsRequired = false
+            };
+            cmd.AddOption(workflowAnalyzeOption);
+
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -300,6 +310,7 @@ namespace PnP.Scanning.Process.Commands
                                               authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
                                               , syntexDeepScanOption
+                                              , workflowAnalyzeOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -381,6 +392,16 @@ namespace PnP.Scanning.Process.Commands
                         Property = syntexDeepScanOption.Name.TrimStart('-'),
                         Type = "bool",
                         Value = arguments.SyntexDeepScan.ToString(),
+                    });
+                }
+
+                if (arguments.Mode == Mode.Workflow)
+                {
+                    start.Properties.Add(new PropertyRequest
+                    {
+                        Property = workflowAnalyzeOption.Name.TrimStart('-'),
+                        Type = "bool",
+                        Value = arguments.WorkflowAnalyze.ToString(),
                     });
                 }
 

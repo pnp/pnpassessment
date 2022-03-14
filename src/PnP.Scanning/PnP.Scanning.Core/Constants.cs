@@ -17,6 +17,7 @@
         internal const string StartThreads = "threads";
 
         internal const string StartSyntexDeepScan = "syntexdeepscan";
+        internal const string StartWorkflowAnalyze = "workflowanalyze";
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
         internal const string ListRunning = "running";

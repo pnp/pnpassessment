@@ -33,6 +33,8 @@ namespace PnP.Scanning.Process.Commands
         // PER SCAN COMPONENT: implement scan component specific options
         public bool SyntexDeepScan { get; set; }
 
+        public bool WorkflowAnalyze { get; set; }
+
 #if DEBUG
         public int TestNumberOfSites { get; set; }
 #endif

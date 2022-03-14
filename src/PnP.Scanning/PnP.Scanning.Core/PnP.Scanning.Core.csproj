@@ -9,11 +9,13 @@
 	<ItemGroup>
 	  <None Remove="Scanners\Syntex\SyntexScanReport.pbit" />
 	  <None Remove="Scanners\Test\TestReport.pbit" />
+	  <None Remove="Scanners\Workflow\sp2013wfmodel.xml" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <EmbeddedResource Include="Scanners\Syntex\SyntexScanReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Test\TestReport.pbit" />
+	  <EmbeddedResource Include="Scanners\Workflow\sp2013wfmodel.xml" />
 	</ItemGroup>
 
 	<ItemGroup>

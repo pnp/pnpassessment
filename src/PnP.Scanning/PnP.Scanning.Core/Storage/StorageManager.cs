@@ -495,6 +495,7 @@ namespace PnP.Scanning.Core.Storage
         {
             // PER SCAN COMPONENT: For each scan component implement here the method to drop incomplete web scan results
             await DropSyntexIncompleteWebScanDataAsync(scanId, dbContext, site, web);
+            await DropWorkflowIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #if DEBUG
             await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
@@ -757,6 +758,9 @@ namespace PnP.Scanning.Core.Storage
         }
 
         #region Scanner specific operations
+        
+        // PER SCAN COMPONENT: storage methods per scanner
+        #region Syntex
         internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -802,6 +806,20 @@ namespace PnP.Scanning.Core.Storage
                 }
             }
         }
+        #endregion
+
+        #region Workflow
+        internal async Task StoreWorkflowInformationAsync(Guid scanId, List<Workflow> workflowLists)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.Workflows.AddRangeAsync(workflowLists.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreWorkflowInformationAsync succeeded");
+            }
+        }
+        #endregion
 
         // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
         private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
@@ -823,6 +841,15 @@ namespace PnP.Scanning.Core.Storage
                 dbContext.SyntexFields.Remove(syntexFieldResult);
             }
             Log.Information("Consolidating scan {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+        }
+
+        private async Task DropWorkflowIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        {
+            foreach (var workflow in await dbContext.Workflows.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.Workflows.Remove(workflow);
+            }
+            Log.Information("Consolidating scan {ScanId}: dropping Workflow results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
 #if DEBUG

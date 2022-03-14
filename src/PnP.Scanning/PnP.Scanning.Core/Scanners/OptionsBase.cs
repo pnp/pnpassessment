@@ -21,6 +21,16 @@ namespace PnP.Scanning.Core.Scanners
                     }
                 }
             }
+            else if (request.Mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var property in request.Properties)
+                {
+                    if (property.Property == Constants.StartWorkflowAnalyze)
+                    {
+                        (options as WorkflowOptions).Analyze = bool.Parse(property.Value);
+                    }
+                }
+            }
 #if DEBUG
             // Assign other inputs
             else if (request.Mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
@@ -38,6 +48,13 @@ namespace PnP.Scanning.Core.Scanners
             if (mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 return new SyntexOptions
+                {
+                    Mode = mode,
+                };
+            }
+            else if (mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new WorkflowOptions
                 {
                     Mode = mode,
                 };

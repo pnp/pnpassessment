@@ -58,6 +58,10 @@ namespace PnP.Scanning.Core.Scanners
             {
                 return new SyntexScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, syntexOptions);
             }
+            else if (options is WorkflowOptions workflowOptions)
+            {
+                return new WorkflowScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, workflowOptions);
+            }
 #if DEBUG
             else if (options is TestOptions testOptions)
             {
