@@ -25,6 +25,8 @@ namespace PnP.Scanning.Core.Services
         private const string SyntexContentTypeOverviewCsv = "syntexcontenttypeoverview.csv";
         private const string SyntexFieldsCsv = "syntexfields.csv";
 
+        private const string WorkflowsCsv = "workflows.csv";
+
 #if DEBUG
         private const string TestDelaysCsv = "testdelays.csv";
 #endif
@@ -52,6 +54,17 @@ namespace PnP.Scanning.Core.Services
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
                     RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Syntex\\\\", ",");
+                }
+                else if (scan.CLIMode == Mode.Workflow.ToString())
+                {
+                    reportFile = "WorkflowReport.pbit";
+                    // Put the report file in the report folder
+                    string pbitFile = Path.Combine(exportPath, "WorkflowReport.pbit");
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Workflow.WorkflowReport.pbit", pbitFile);
+
+                    // Update the report file to pick up the exported CSV files in the report folder
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Workflow\\\\", ",");
                 }
 #if DEBUG
                 // PER SCAN COMPONENT: Update report data per scan component
@@ -178,6 +191,17 @@ namespace PnP.Scanning.Core.Services
                         using (var csv = new CsvWriter(writer, config))
                         {
                             await csv.WriteRecordsAsync(dbContext.SyntexFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+                }
+
+                if (scan.CLIMode == Mode.Workflow.ToString())
+                {
+                    using (var writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
                 }

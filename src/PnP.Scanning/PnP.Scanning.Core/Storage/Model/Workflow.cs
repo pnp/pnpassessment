@@ -23,6 +23,22 @@ namespace PnP.Scanning.Core.Storage
 
         public bool Enabled { get; set; }
 
+        public bool ConsiderUpgradingToFlow
+        {
+            get
+            {
+                if ((Scope == "List" || Scope == "Site") &&
+                    Enabled && HasSubscriptions)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
         public string DefinitionName { get; set; }
 
         public string DefinitionDescription { get; set; }
