@@ -13,19 +13,24 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal class WorkflowScanner : ScannerBase
     {
-        private static readonly string[] OOBWorkflowIDStarts = new string[]
+        private class WorkflowInstanceCounts
         {
-            "e43856d2-1bb4-40ef-b08b-016d89a00",    // Publishing approval
-            "3bfb07cb-5c6a-4266-849b-8d6711700",    // Collect feedback - 2010
-            "46c389a4-6e18-476c-aa17-289b0c79fb8f", // Collect feedback
-            "77c71f43-f403-484b-bcb2-303710e00",    // Collect signatures - 2010
-            "2f213931-3b93-4f81-b021-3022434a3114", // Collect signatures
-            "8ad4d8f0-93a7-4941-9657-cf3706f00",    // Approval - 2010
-            "b4154df4-cc53-4c4f-adef-1ecf0b7417f6", // Translation management
-            "c6964bff-bf8d-41ac-ad5e-b61ec111731a", // Three state
-            "c6964bff-bf8d-41ac-ad5e-b61ec111731c", // Approval
-            "dd19a800-37c1-43c0-816d-f8eb5f4a4145", // Disposition approval
-        };
+            public int Total { get; set; }
+
+            public int Started { get; set; }
+
+            public int NotStarted { get; set; }
+
+            public int Cancelled { get; set; }
+
+            public int Cancelling { get; set; }
+
+            public int Suspended { get; set; }
+
+            public int Terminated { get; set; }
+
+            public int Completed { get; set; }
+        }
 
         public WorkflowScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
                                CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl, WorkflowOptions options) :
@@ -60,10 +65,13 @@ namespace PnP.Scanning.Core.Scanners
             {
                 Microsoft.SharePoint.Client.Web web = csomContext.Web;
 
+                WorkflowInstanceService instanceService = null;
+
                 try
                 {
                     var servicesManager = new WorkflowServicesManager(web.Context, web);
                     var deploymentService = servicesManager.GetWorkflowDeploymentService();
+                    instanceService = servicesManager.GetWorkflowInstanceService();
                     var subscriptionService = servicesManager.GetWorkflowSubscriptionService();
 
                     var definitions = deploymentService.EnumerateDefinitions(false);
@@ -106,6 +114,9 @@ namespace PnP.Scanning.Core.Scanners
                         {
                             foreach (var siteWorkflowSubscription in siteWorkflowSubscriptions)
                             {
+                                // Count the workflow instances for this subscription
+                                var instanceCounts = await GetInstanceCountsAsync(web.Context, instanceService, siteWorkflowSubscription);
+
                                 workflowLists.Add(new Workflow
                                 {
                                     ScanId = ScanId,
@@ -130,6 +141,14 @@ namespace PnP.Scanning.Core.Scanners
                                     UnsupportedActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.UnsupportedAccountCount : 0,
                                     LastDefinitionEdit = GetWorkflowPropertyDateTime(siteDefinition.Properties, "Definition.ModifiedDateUTC"),
                                     LastSubscriptionEdit = GetWorkflowPropertyDateTime(siteWorkflowSubscription.PropertyDefinitions, "SharePointWorkflowContext.Subscription.ModifiedDateUTC"),
+                                    TotalInstances = instanceCounts.Total,
+                                    CancelledInstances = instanceCounts.Cancelled,
+                                    CancellingInstances = instanceCounts.Cancelling,
+                                    TerminatedInstances = instanceCounts.Terminated,
+                                    StartedInstances = instanceCounts.Started,
+                                    NotStartedInstances = instanceCounts.NotStarted,
+                                    CompletedInstances = instanceCounts.Completed,
+                                    SuspendedInstances = instanceCounts.Suspended,
                                 });
 
                             }
@@ -204,6 +223,9 @@ namespace PnP.Scanning.Core.Scanners
                                     }
                                 }
 
+                                // Count the workflow instances for this subscription
+                                var instanceCounts = await GetInstanceCountsAsync(web.Context, instanceService, listWorkflowSubscription);
+
                                 workflowLists.Add(new Workflow
                                 {
                                     ScanId = ScanId,
@@ -229,6 +251,14 @@ namespace PnP.Scanning.Core.Scanners
                                     UnsupportedActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.UnsupportedAccountCount : 0,
                                     LastDefinitionEdit = GetWorkflowPropertyDateTime(listDefinition.Properties, "Definition.ModifiedDateUTC"),
                                     LastSubscriptionEdit = GetWorkflowPropertyDateTime(listWorkflowSubscription.PropertyDefinitions, "SharePointWorkflowContext.Subscription.ModifiedDateUTC"),
+                                    TotalInstances = instanceCounts.Total,
+                                    CancelledInstances = instanceCounts.Cancelled,
+                                    CancellingInstances = instanceCounts.Cancelling,
+                                    TerminatedInstances = instanceCounts.Terminated,
+                                    StartedInstances = instanceCounts.Started,
+                                    NotStartedInstances = instanceCounts.NotStarted,
+                                    CompletedInstances = instanceCounts.Completed,
+                                    SuspendedInstances = instanceCounts.Suspended,
                                 });
                             }
                         }
@@ -287,6 +317,33 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Post scanning work is starting");
 
             Logger.Information("Post scanning work done");
+        }
+
+        private async Task<WorkflowInstanceCounts> GetInstanceCountsAsync(ClientRuntimeContext clientContext, WorkflowInstanceService instanceService, WorkflowSubscription subscription)
+        {
+            WorkflowInstanceCounts instanceCounts = new();
+
+            ClientResult<int> total = instanceService.CountInstances(subscription);
+            ClientResult<int> started = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Started);
+            ClientResult<int> notStarted = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.NotStarted);
+            ClientResult<int> cancelled = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Canceled);
+            ClientResult<int> cancelling = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Canceling);
+            ClientResult<int> suspended = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Suspended);
+            ClientResult<int> terminated = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Terminated);
+            ClientResult<int> completed = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Completed);
+
+            await clientContext.ExecuteQueryRetryAsync();
+
+            instanceCounts.Total = total.Value;
+            instanceCounts.Started = started.Value;
+            instanceCounts.NotStarted = notStarted.Value;
+            instanceCounts.Cancelled = cancelled.Value;
+            instanceCounts.Cancelling = cancelling.Value;
+            instanceCounts.Suspended = suspended.Value;
+            instanceCounts.Terminated = terminated.Value;
+            instanceCounts.Completed = completed.Value;
+
+            return instanceCounts;
         }
 
         private bool GetWorkflowPropertyBool(IDictionary<string, string> properties, string property)

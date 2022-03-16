@@ -75,5 +75,21 @@ namespace PnP.Scanning.Core.Storage
         public DateTime LastSubscriptionEdit { get; set; }
 
         public DateTime LastDefinitionEdit { get; set; }
+
+        public int TotalInstances { get; set; }
+
+        public int StartedInstances { get; set; }
+
+        public int NotStartedInstances { get; set; }
+
+        public int CancelledInstances { get; set; }
+
+        public int CancellingInstances { get; set; }
+
+        public int SuspendedInstances { get; set; }
+
+        public int TerminatedInstances { get; set; }
+
+        public int CompletedInstances { get; set; }
     }
 }
