@@ -49,7 +49,7 @@ Scan | Authentication | Minimal | Optimal | Details
 -----| ---------------| --------|---------|--------
 Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexdeepscan` argument the scanner will use the search APIs to count how many documents use a given content type, and search in combination with application permissions requires Sites.FullControl.All
 Syntex | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read |
-Workflow | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All |
+Workflow | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All |
 Workflow | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage |
 
 
