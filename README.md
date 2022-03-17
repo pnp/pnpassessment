@@ -32,13 +32,27 @@ If you don't specify the `--applicationid` argument the scanner will try to use 
 # Ensure you replace contoso.onmicrosoft.com with your Azure AD tenant name
 # Ensure you replace joe@contoso.onmicrosoft.com with the user id that's an Azure AD admin (or global admin)
 
-Register-PnPAzureADApp -ApplicationName Microsoft365Scanner `
+# Sample for Syntex
+Register-PnPAzureADApp -ApplicationName Microsoft365ScannerForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
-                       -GraphApplicationPermissions "Sites.FullControl.All" `
+                       -GraphApplicationPermissions "Sites.Read.All" `
                        -SharePointApplicationPermissions "Sites.FullControl.All" `
+                       -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
+                       -SharePointDelegatePermissions "AllSites.Read" `
                        -Username "joe@contoso.onmicrosoft.com" `
                        -Interactive
+                   
+# Sample for Workflow                   
+Register-PnPAzureADApp -ApplicationName Microsoft365ScannerForWorkflow `
+                       -Tenant contoso.onmicrosoft.com `
+                       -Store CurrentUser `
+                       -GraphApplicationPermissions "Sites.Read.All" `
+                       -SharePointApplicationPermissions "Sites.Manage.All" `
+                       -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
+                       -SharePointDelegatePermissions "AllSites.Manage" `
+                       -Username "joe@contoso.onmicrosoft.com" `
+                       -Interactive                       
 ```
 
 ### Permissions required
