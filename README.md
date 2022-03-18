@@ -32,13 +32,27 @@ If you don't specify the `--applicationid` argument the scanner will try to use 
 # Ensure you replace contoso.onmicrosoft.com with your Azure AD tenant name
 # Ensure you replace joe@contoso.onmicrosoft.com with the user id that's an Azure AD admin (or global admin)
 
-Register-PnPAzureADApp -ApplicationName Microsoft365Scanner `
+# Sample for Syntex
+Register-PnPAzureADApp -ApplicationName Microsoft365ScannerForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
-                       -GraphApplicationPermissions "Sites.FullControl.All" `
+                       -GraphApplicationPermissions "Sites.Read.All" `
                        -SharePointApplicationPermissions "Sites.FullControl.All" `
+                       -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
+                       -SharePointDelegatePermissions "AllSites.Read" `
                        -Username "joe@contoso.onmicrosoft.com" `
                        -Interactive
+                   
+# Sample for Workflow                   
+Register-PnPAzureADApp -ApplicationName Microsoft365ScannerForWorkflow `
+                       -Tenant contoso.onmicrosoft.com `
+                       -Store CurrentUser `
+                       -GraphApplicationPermissions "Sites.Read.All" `
+                       -SharePointApplicationPermissions "Sites.Manage.All" `
+                       -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
+                       -SharePointDelegatePermissions "AllSites.Manage" `
+                       -Username "joe@contoso.onmicrosoft.com" `
+                       -Interactive                       
 ```
 
 ### Permissions required
@@ -48,8 +62,9 @@ The scanner aims to be able to perform the scan task at hand using minimal read 
 Scan | Authentication | Minimal | Optimal | Details
 -----| ---------------| --------|---------|--------
 Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexdeepscan` argument the scanner will use the search APIs to count how many documents use a given content type, and search in combination with application permissions requires Sites.FullControl.All
-Syntex | Delegated | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All |
-
+Syntex | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read |
+Workflow | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All |
+Workflow | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage |
 
 
 ## I want to help 🙋‍♂️
