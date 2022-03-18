@@ -1,14 +1,15 @@
 ﻿namespace PnP.Scanning.Core.Scanners
 {
-    public class WorkflowTriggerAnalysis
+    internal sealed class WorkflowTriggerAnalysis
     {
-        public WorkflowTriggerAnalysis()
+        internal WorkflowTriggerAnalysis()
         {
-            this.WorkflowTriggers = new List<string>();
-            this.UnSupportedTriggers = new List<string>();
+            WorkflowTriggers = new List<string>();
+            UnSupportedTriggers = new List<string>();
         }
 
-        public List<string> WorkflowTriggers { get; set; }
-        public List<string> UnSupportedTriggers { get; set; }
+        internal List<string> WorkflowTriggers { get; set; }
+
+        internal List<string> UnSupportedTriggers { get; set; }
     }
 }

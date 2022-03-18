@@ -1,4 +1,5 @@
-﻿using System.Xml;
+﻿using Serilog;
+using System.Xml;
 using System.Xml.Serialization;
 
 namespace PnP.Scanning.Core.Scanners
@@ -8,7 +9,7 @@ namespace PnP.Scanning.Core.Scanners
     /// </summary>
     internal sealed class WorkflowManager
     {
-        private static readonly Lazy<WorkflowManager> _lazyInstance = new(() => new WorkflowManager());
+        private static readonly Lazy<WorkflowManager> lazyInstance = new(() => new WorkflowManager());
         private WorkflowActions defaultWorkflowActions;
 
         private static readonly string[] SP2013SupportedFlowActions = new string[]
@@ -55,7 +56,7 @@ namespace PnP.Scanning.Core.Scanners
         {
             get
             {
-                return _lazyInstance.Value;
+                return lazyInstance.Value;
             }
         }
 
@@ -154,8 +155,7 @@ namespace PnP.Scanning.Core.Scanners
             }
             catch (Exception ex)
             {
-                // TODO
-                // Eat exception for now
+                Log.Error(ex, $"Error happened while parsing the workflow definition");
             }
 
             return null;
@@ -165,7 +165,7 @@ namespace PnP.Scanning.Core.Scanners
         {
             actionCounter++;
 
-            WorkflowAction defaultOOBWorkflowAction = defaultWorkflowActions.SP2013DefaultActions.Where(p => p.ActionNameShort == node.LocalName).FirstOrDefault();
+            WorkflowAction defaultOOBWorkflowAction = defaultWorkflowActions.SP2013DefaultActions.FirstOrDefault(p => p.ActionNameShort == node.LocalName);
 
             if (defaultOOBWorkflowAction != null)
             {
@@ -184,9 +184,6 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        /// <summary>
-        /// Trigger the population of the default workflow actions for 2010/2013 workflows
-        /// </summary>
         internal void LoadWorkflowDefaultActions()
         {
             WorkflowActions wfActions = new();

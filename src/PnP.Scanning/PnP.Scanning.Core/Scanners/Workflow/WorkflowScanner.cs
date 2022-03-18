@@ -60,7 +60,6 @@ namespace PnP.Scanning.Core.Scanners
                 },
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
                 {
-                    w => w.ContentTypes.QueryProperties(c => c.StringId, c => c.Name),
                     w => w.Lists.QueryProperties(r => r.Title,
                                                  r => r.RootFolder.QueryProperties(f => f.ServerRelativeUrl))
                 }
@@ -94,7 +93,7 @@ namespace PnP.Scanning.Core.Scanners
                 catch (ServerException ex)
                 {
                     // If there is no workflow service present in the farm this method will throw an error. 
-                    // Swallow the exception
+                    Logger.Error(ex, $"No workflow service present!");
                 }
 
                 // We've found SP2013 site scoped workflows
@@ -159,7 +158,6 @@ namespace PnP.Scanning.Core.Scanners
                                     CompletedInstances = instanceCounts.Completed,
                                     SuspendedInstances = instanceCounts.Suspended,
                                 });
-
                             }
                         }
                         else
@@ -191,7 +189,6 @@ namespace PnP.Scanning.Core.Scanners
                                 UsedTriggers = string.Join(",", workFlowTriggerAnalysisResult?.WorkflowTriggers),
                                 LastDefinitionEdit = GetWorkflowPropertyDateTime(siteDefinition.Properties, "Definition.ModifiedDateUTC"),
                             });
-
                         }
                     }
                 }
@@ -219,6 +216,7 @@ namespace PnP.Scanning.Core.Scanners
                         {
                             foreach (var listWorkflowSubscription in listWorkflowSubscriptions)
                             {
+                                // Find associated list
                                 Guid associatedListId = Guid.Empty;
                                 string associatedListTitle = "";
                                 string associatedListUrl = "";
@@ -226,7 +224,6 @@ namespace PnP.Scanning.Core.Scanners
                                 {
                                     associatedListId = associatedListIdValue;
 
-                                    // Lookup this list and update title and url
                                     var listLookup = context.Web.Lists.AsRequested().FirstOrDefault(p => p.Id.Equals(associatedListId));
                                     if (listLookup != null)
                                     {
@@ -235,12 +232,11 @@ namespace PnP.Scanning.Core.Scanners
                                     }
                                 }
 
+                                // Find associated content type
                                 string associatedContentTypeId = "";
                                 string associatedContentTypeName = "";
                                 if (!string.IsNullOrEmpty(listWorkflowSubscription.ParentContentTypeId))
                                 {
-                                    // lookup this content type
-                                    //var contentType = context.Web.ContentTypes.AsRequested().FirstOrDefault(p => p.StringId == listWorkflowSubscription.ParentContentTypeId);
                                     var contentType = context.Site.RootWeb.ContentTypes.AsRequested().FirstOrDefault(p => p.StringId == listWorkflowSubscription.ParentContentTypeId);
                                     if (contentType != null)
                                     {
@@ -333,6 +329,7 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Workflow scan of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal async override Task PreScanningAsync()
         {
             Logger.Information("Pre scanning work is starting");
@@ -348,8 +345,9 @@ namespace PnP.Scanning.Core.Scanners
 
             Logger.Information("Post scanning work done");
         }
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
-        private async Task<WorkflowInstanceCounts> GetInstanceCountsAsync(ClientRuntimeContext clientContext, WorkflowInstanceService instanceService, WorkflowSubscription subscription)
+        private static async Task<WorkflowInstanceCounts> GetInstanceCountsAsync(ClientRuntimeContext clientContext, WorkflowInstanceService instanceService, WorkflowSubscription subscription)
         {
             WorkflowInstanceCounts instanceCounts = new();
 
@@ -376,7 +374,7 @@ namespace PnP.Scanning.Core.Scanners
             return instanceCounts;
         }
 
-        private bool GetWorkflowPropertyBool(IDictionary<string, string> properties, string property)
+        private static bool GetWorkflowPropertyBool(IDictionary<string, string> properties, string property)
         {
             if (string.IsNullOrEmpty(property) || properties == null)
             {
@@ -394,7 +392,7 @@ namespace PnP.Scanning.Core.Scanners
             return false;
         }
 
-        private DateTime GetWorkflowPropertyDateTime(IDictionary<string, string> properties, string property)
+        private static DateTime GetWorkflowPropertyDateTime(IDictionary<string, string> properties, string property)
         {
             if (string.IsNullOrEmpty(property) || properties == null)
             {
@@ -412,7 +410,7 @@ namespace PnP.Scanning.Core.Scanners
             return DateTime.MinValue;
         }
 
-        private string GetWorkflowProperty(WorkflowSubscription subscription, string propertyName)
+        private static string GetWorkflowProperty(WorkflowSubscription subscription, string propertyName)
         {
             if (subscription.PropertyDefinitions.ContainsKey(propertyName))
             {

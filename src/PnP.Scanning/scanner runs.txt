@@ -32,7 +32,7 @@ start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --
 start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1" --threads 1
 start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1,https://bertonline.sharepoint.com/sites/temp2" --syntexdeepscan --threads 1
 
-start --mode Workflow --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/temp3" --threads 1
+start --mode Workflow --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/temp2,https://bertonline.sharepoint.com/sites/temp3" --threads 1
 
 //Minimal permission app
 start --mode Workflow --authmode interactive --tenant bertonline.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478
