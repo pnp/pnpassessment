@@ -1,2 +1,2 @@
 ScanId,StartDate,EndDate,Status,PreScanStatus,PostScanStatus,Version,CLIMode,CLITenant,CLITenantId,CLIEnvironment,CLISiteList,CLISiteFile,CLIAuthMode,CLIApplicationId,CLICertPath,CLICertFile,CLICertFilePassword,CLIThreads
-072db107-ba4d-4515-b451-9477b568de6c,03/16/2022 15:50:05,03/16/2022 15:51:51,Finished,Finished,Finished,1.0.0.0,Workflow,bertonline.sharepoint.com,d8623c9e-30c7-473a-83bc-d907df44a26e,Production,,,Interactive,31359c7f-bd7e-475c-86db-fdb8c937548e,,,,8
+220ed25a-f4fb-41db-975c-f16472d24943,03/18/2022 09:30:43,03/18/2022 09:34:32,Finished,Finished,Finished,1.0.0.0,Workflow,bertonline.sharepoint.com,d8623c9e-30c7-473a-83bc-d907df44a26e,Production,,,Interactive,26ff597b-03bf-401a-9f4f-bb3ee8b82478,,,,4

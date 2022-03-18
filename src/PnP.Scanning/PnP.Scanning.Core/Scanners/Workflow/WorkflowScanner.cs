@@ -54,9 +54,15 @@ namespace PnP.Scanning.Core.Scanners
             // This will not require extra server roundtrips
             PnPContextOptions options = new()
             {
+                AdditionalSitePropertiesOnCreate = new Expression<Func<ISite, object>>[]
+                {
+                    w => w.RootWeb.QueryProperties(p => p.ContentTypes.QueryProperties(p => p.StringId, p => p.Name))
+                },
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
                 {
-                    w => w.Lists.QueryProperties(r => r.Title, r => r.RootFolder.QueryProperties(f => f.ServerRelativeUrl))
+                    w => w.ContentTypes.QueryProperties(c => c.StringId, c => c.Name),
+                    w => w.Lists.QueryProperties(r => r.Title,
+                                                 r => r.RootFolder.QueryProperties(f => f.ServerRelativeUrl))
                 }
             };
 
@@ -124,6 +130,9 @@ namespace PnP.Scanning.Core.Scanners
                                     WebUrl = WebUrl,
                                     ListTitle = "",
                                     ListUrl = "",
+                                    ListId = Guid.Empty,
+                                    ContentTypeId = "",
+                                    ContentTypeName = "",
                                     Scope = "Site",
                                     RestrictToType = siteDefinition.RestrictToType,
                                     DefinitionName = siteDefinition.DisplayName,
@@ -162,6 +171,9 @@ namespace PnP.Scanning.Core.Scanners
                                 WebUrl = WebUrl,
                                 ListTitle = "",
                                 ListUrl = "",
+                                ListId = Guid.Empty,
+                                ContentTypeId = "",
+                                ContentTypeName = "",
                                 Scope = "Site",
                                 RestrictToType = siteDefinition.RestrictToType,
                                 DefinitionName = siteDefinition.DisplayName,
@@ -198,8 +210,8 @@ namespace PnP.Scanning.Core.Scanners
                         if (Options.Analyze)
                         {
                             workFlowAnalysisResult = WorkflowManager.Instance.ParseWorkflowDefinition(listDefinition.Xaml);
-                            workFlowTriggerAnalysisResult = WorkflowManager.ParseWorkflowTriggers(GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartOnCreate"), 
-                                                                                                  GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartOnChange"), 
+                            workFlowTriggerAnalysisResult = WorkflowManager.ParseWorkflowTriggers(GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartOnCreate"),
+                                                                                                  GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartOnChange"),
                                                                                                   GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartManually"));
                         }
 
@@ -215,11 +227,25 @@ namespace PnP.Scanning.Core.Scanners
                                     associatedListId = associatedListIdValue;
 
                                     // Lookup this list and update title and url
-                                    var listLookup = context.Web.Lists.AsRequested().Where(p => p.Id.Equals(associatedListId)).FirstOrDefault();
+                                    var listLookup = context.Web.Lists.AsRequested().FirstOrDefault(p => p.Id.Equals(associatedListId));
                                     if (listLookup != null)
                                     {
                                         associatedListTitle = listLookup.Title;
                                         associatedListUrl = listLookup.RootFolder.ServerRelativeUrl;
+                                    }
+                                }
+
+                                string associatedContentTypeId = "";
+                                string associatedContentTypeName = "";
+                                if (!string.IsNullOrEmpty(listWorkflowSubscription.ParentContentTypeId))
+                                {
+                                    // lookup this content type
+                                    //var contentType = context.Web.ContentTypes.AsRequested().FirstOrDefault(p => p.StringId == listWorkflowSubscription.ParentContentTypeId);
+                                    var contentType = context.Site.RootWeb.ContentTypes.AsRequested().FirstOrDefault(p => p.StringId == listWorkflowSubscription.ParentContentTypeId);
+                                    if (contentType != null)
+                                    {
+                                        associatedContentTypeId = contentType.StringId;
+                                        associatedContentTypeName = contentType.Name;
                                     }
                                 }
 
@@ -234,6 +260,8 @@ namespace PnP.Scanning.Core.Scanners
                                     ListTitle = associatedListTitle,
                                     ListUrl = associatedListUrl,
                                     ListId = associatedListId,
+                                    ContentTypeId = associatedContentTypeId,
+                                    ContentTypeName = associatedContentTypeName,
                                     Scope = "List",
                                     RestrictToType = listDefinition.RestrictToType,
                                     DefinitionName = listDefinition.DisplayName,
@@ -272,6 +300,8 @@ namespace PnP.Scanning.Core.Scanners
                                 ListTitle = "",
                                 ListUrl = "",
                                 ListId = Guid.Empty,
+                                ContentTypeId = "",
+                                ContentTypeName = "",
                                 Scope = "List",
                                 RestrictToType = listDefinition.RestrictToType,
                                 DefinitionName = listDefinition.DisplayName,

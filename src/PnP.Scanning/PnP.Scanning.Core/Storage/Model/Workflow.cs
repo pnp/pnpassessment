@@ -15,6 +15,10 @@ namespace PnP.Scanning.Core.Storage
 
         public Guid ListId { get; set; }
 
+        public string ContentTypeId { get; set; }
+
+        public string ContentTypeName { get; set; }
+
         public bool IsOOBWorkflow { get; set; }
 
         public string Scope { get; set; }
