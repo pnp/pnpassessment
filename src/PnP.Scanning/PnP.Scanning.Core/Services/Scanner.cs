@@ -83,33 +83,52 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // Wait for running web scans to complete
-                await scanManager.WaitForPendingWebScansAsync(scanId, request.All);
+                var waitSucceeded = await scanManager.WaitForPendingWebScansAsync(scanId, request.All);
 
-                await responseStream.WriteAsync(new PauseStatus
+                if (waitSucceeded)
                 {
-                    Status = "Running web scans have completed"
-                });
+                    // All waiting web scans finished in time, continue with the pasuing
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = "Running web scans have completed"
+                    });
 
-                await responseStream.WriteAsync(new PauseStatus
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = "Implement pausing in scan database(s)"
+                    });
+
+                    // Update scan database(s)
+                    await scanManager.PrepareDatabaseForPauseAsync(scanId, request.All);
+
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = "Scan database(s) are paused"
+                    });
+
+                    // Finalized the pausing 
+                    await scanManager.SetPausingStatusAsync(scanId, request.All, Storage.ScanStatus.Paused);
+
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = "Pausing done"
+                    });
+                }
+                else
                 {
-                    Status = "Implement pausing in scan database(s)"
-                });
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = "Pausing did not happen timely, marking scan as terminated"
+                    });
 
-                // Update scan database(s)
-                await scanManager.PrepareDatabaseForPauseAsync(scanId, request.All);
+                    // Finalized the pausing 
+                    await scanManager.SetPausingStatusAsync(scanId, request.All, Storage.ScanStatus.Terminated);
 
-                await responseStream.WriteAsync(new PauseStatus
-                {
-                    Status = "Scan database(s) are paused"
-                });
-
-                // Finalized the pausing 
-                await scanManager.SetPausingStatusAsync(scanId, request.All, Storage.ScanStatus.Paused);
-
-                await responseStream.WriteAsync(new PauseStatus
-                {
-                    Status = "Pausing done"
-                });
+                    await responseStream.WriteAsync(new PauseStatus
+                    {
+                        Status = "Scan was terminated"
+                    });
+                }
             }
         }
 

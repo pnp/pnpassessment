@@ -61,7 +61,7 @@ namespace PnP.Scanning.Core.Services
             Task.Run(async () => await AutoUpdateRunningScansAsync());
 
             // Launch a thread that once a minute will clean up finished scans from the in-memory list
-            Task.Run(async () => await ClearFinishedOrPausedScansFromMemoryAsync());
+            Task.Run(async () => await ClearFinishedOrPausedOrTerminatedScansFromMemoryAsync());
         }
 
         internal static StorageManager StorageManager { get; private set; }
@@ -359,9 +359,9 @@ namespace PnP.Scanning.Core.Services
                 await StorageManager.SetScanStatusAsync(scan, pauseMode);
             }
 
-            if (pauseMode == ScanStatus.Paused)
+            if (pauseMode == ScanStatus.Paused || pauseMode == ScanStatus.Terminated)
             {
-                ClearFinishedOrPausedScansFromMemory();
+                ClearFinishedOrPausedOrTerminatedScansFromMemory();
             }
         }
 
@@ -382,7 +382,7 @@ namespace PnP.Scanning.Core.Services
         internal bool ScanExists(Guid scanId)
         {
             // Ensure the in-memory table is updated to avoid adding duplicate entries
-            ClearFinishedOrPausedScansFromMemory();
+            ClearFinishedOrPausedOrTerminatedScansFromMemory();
 
             return scans.ContainsKey(scanId);
         }
@@ -408,7 +408,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal async Task WaitForPendingWebScansAsync(Guid scanId, bool all, int maxChecks = 30, int delay = 10)
+        internal async Task<bool> WaitForPendingWebScansAsync(Guid scanId, bool all, int maxChecks = 30, int delay = 10)
         {
             bool pendingWebScans = true;
             int checksDone = 0;
@@ -429,7 +429,7 @@ namespace PnP.Scanning.Core.Services
             // No point in waiting if there are no scans to inspect
             if (scansToPause.Count == 0)
             {
-                return;
+                return true;
             }
 
             do
@@ -456,6 +456,9 @@ namespace PnP.Scanning.Core.Services
                 }
             }
             while (pendingWebScans && checksDone <= maxChecks);
+
+            // return false if there are still pending web scans
+            return !pendingWebScans;
         }
 
         internal async Task UpdateScanStatusAsync(Guid scanId, ScanStatus scanStatus)
@@ -666,8 +669,8 @@ namespace PnP.Scanning.Core.Services
 
             Log.Information("{Count} scans are marked as terminated", count);
         }
-
-        private async Task ClearFinishedOrPausedScansFromMemoryAsync()
+        
+        private async Task ClearFinishedOrPausedOrTerminatedScansFromMemoryAsync()
         {
             bool busy = true;
             while (busy)
@@ -675,20 +678,22 @@ namespace PnP.Scanning.Core.Services
                 // Check runs once per minute
                 await Task.Delay(TimeSpan.FromMinutes(1));
 
-                ClearFinishedOrPausedScansFromMemory();
+                ClearFinishedOrPausedOrTerminatedScansFromMemory();
             }
         }
 
-        private void ClearFinishedOrPausedScansFromMemory()
+        private void ClearFinishedOrPausedOrTerminatedScansFromMemory()
         {
             // Clear scan list
             foreach (var scan in scans.ToList())
             {
-                if (scan.Value.Status == ScanStatus.Finished || scan.Value.Status == ScanStatus.Paused)
+                if (scan.Value.Status == ScanStatus.Finished || 
+                    scan.Value.Status == ScanStatus.Paused || 
+                    scan.Value.Status == ScanStatus.Terminated)
                 {
                     if (scans.TryRemove(scan))
                     {
-                        Log.Information("Removing finished scan {ScanId} from the memory list", scan.Key);
+                        Log.Information("Removing finished/paused/terminated scan {ScanId} from the memory list", scan.Key);
                         
                         // Clear cached data for removed scan
                         foreach (var cacheEntry in Cache)
