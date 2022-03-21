@@ -86,7 +86,6 @@ namespace PnP.Scanning.Core.Authentication
                 {
                     builder = builder.WithTenantId(tenantId);
                 }
-
                 clientApplication = builder.Build();
 
                 // Setup a local encrypted cache
@@ -98,10 +97,10 @@ namespace PnP.Scanning.Core.Authentication
 
                 var builder = ConfidentialClientApplicationBuilder.Create(applicationId.ToString()).WithCertificate(certificate);
                 builder = GetBuilderWithAuthority(builder, environment, tenantId);
+
                 clientApplication = builder.Build();
 
                 // Setup a local encrypted cache - not needed for application permissions as we have all we need for unattended token acquisition
-                //TokenCacheManager.EnableSerialization((clientApplication as IConfidentialClientApplication).AppTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
             }
 
             scanAuthenticationMode = authenticationMode;
@@ -158,16 +157,23 @@ namespace PnP.Scanning.Core.Authentication
 
         internal async Task<string> GetAccessTokenAsync(string[] scopes)
         {
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-            var accounts = (await clientApplication.GetAccountsAsync()).ToList();
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
-
             try
             {
-                AuthenticationResult result = await clientApplication.AcquireTokenSilent(scopes, accounts.FirstOrDefault())
-                    .ExecuteAsync()
-                    .ConfigureAwait(false);
-                return result.AccessToken;
+                if (clientApplication is IConfidentialClientApplication confidentialClientApplication)
+                {
+                    // No point is trying to get something from cache as we're not having an account in case of a confidential client
+                    var builder = confidentialClientApplication.AcquireTokenForClient(scopes);
+                    AuthenticationResult result = await builder.ExecuteAsync();
+                    return result.AccessToken;
+                }
+                else
+                {
+                    var accounts = (await clientApplication.GetAccountsAsync()).ToList();
+                    AuthenticationResult result = await clientApplication.AcquireTokenSilent(scopes, accounts.FirstOrDefault())
+                        .ExecuteAsync()
+                        .ConfigureAwait(false);
+                    return result.AccessToken;
+                }
             }
             catch (MsalUiRequiredException)
             {

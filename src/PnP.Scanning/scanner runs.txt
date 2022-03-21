@@ -22,6 +22,8 @@ start --mode workflow --authmode application --tenant bertonline.sharepoint.com 
 //Minimal permission app
 start --mode workflow --authmode application --tenant bertonline.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD"
 
+start --mode workflow --authmode application --tenant bertonline.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" --siteslist "https://bertonline.sharepoint.com/sites/temp3" --threads 1
+
 Start: Interactive
 ==================
 
