@@ -7,12 +7,12 @@ namespace Microsoft.SharePoint.Client
     internal static class ClientContextExtensions
     {
 
-        internal static async Task ExecuteQueryRetryAsync(this ClientRuntimeContext clientContext, int retryCount = 10, string userAgent = null)
+        internal static async Task ExecuteQueryRetryAsync(this ClientRuntimeContext clientContext, int retryCount = 10)
         {
-            await ExecuteQueryImplementationAsync(clientContext, retryCount, userAgent);
+            await ExecuteQueryImplementationAsync(clientContext, retryCount);
         }
 
-        private static async Task ExecuteQueryImplementationAsync(ClientRuntimeContext clientContext, int retryCount = 10, string userAgent = null)
+        private static async Task ExecuteQueryImplementationAsync(ClientRuntimeContext clientContext, int retryCount = 10)
         {
             // Set the TLS preference. Needed on some server os's to work when Office 365 removes support for TLS 1.0
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
@@ -33,6 +33,9 @@ namespace Microsoft.SharePoint.Client
             // Do while retry attempt is less than retry count
             while (retryAttempts < retryCount)
             {
+                // Check if we're cancelling
+                clientContextInfo.CancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     //clientContext.ClientTag = SetClientTag(clientTag);
@@ -97,7 +100,7 @@ namespace Microsoft.SharePoint.Client
                             clientContextInfo.Logger.Warning("CSOM request frequency exceeded usage limits. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
                         }
 
-                        await Task.Delay(retryAfterInterval);
+                        await Task.Delay(retryAfterInterval, clientContextInfo.CancellationToken);
 
                         //Add to retry count and increase delay.
                         retryAttempts++;
@@ -145,7 +148,7 @@ namespace Microsoft.SharePoint.Client
                             clientContextInfo.CsomEventHub.RequestRetry?.Invoke(new CsomRetryEvent(clientContextInfo.ScanId, 0, retryAfterInSeconds, socketEx));
                             clientContextInfo.Logger.Warning("CSOM request socket exception. Retry attempt {RetryAttempts}. Sleeping for {RetryAfterInterval} milliseconds before retrying.", retryAttempts + 1, retryAfterInterval);
 
-                            await Task.Delay(retryAfterInterval);
+                            await Task.Delay(retryAfterInterval, clientContextInfo.CancellationToken);
 
                             //Add to retry count and increase delay.
                             retryAttempts++;

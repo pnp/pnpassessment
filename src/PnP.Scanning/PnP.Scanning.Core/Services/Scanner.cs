@@ -83,7 +83,12 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // Wait for running web scans to complete
-                var waitSucceeded = await scanManager.WaitForPendingWebScansAsync(scanId, request.All);
+                var waitSucceeded = await scanManager.WaitForPendingWebScansAsync(scanId, request.All
+#if DEBUG
+                    // Don't retry that long in debug mode
+                    , maxChecks: 3
+#endif
+                    );
 
                 if (waitSucceeded)
                 {
@@ -120,6 +125,9 @@ namespace PnP.Scanning.Core.Services
                     {
                         Status = "Pausing did not happen timely, marking scan as terminated"
                     });
+
+                    // Start request cancellation to break out of the possible throttling retry loops
+                    scanManager.CancelScan(scanId, request.All);
 
                     // Finalized the pausing 
                     await scanManager.SetPausingStatusAsync(scanId, request.All, Storage.ScanStatus.Terminated);

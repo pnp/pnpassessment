@@ -87,8 +87,11 @@ namespace PnP.Scanning.Core.Services
 
             await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
 
+            // Setup cancellation token
+            CancellationTokenSource cancellationTokenSource = new();
+
             // Launch a queue to handle this scan
-            var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
+            var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token);
 
             // Configure threading for the site collection and web queues
             siteCollectionQueue.ConfigureParallelProcessing(start.Threads);
@@ -97,7 +100,7 @@ namespace PnP.Scanning.Core.Services
             OptionsBase options = OptionsBase.FromScannerInput(start);
 
             Log.Information("Add scan request {ScanId} to in-memory list", scanId);
-            var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager)
+            var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager, cancellationTokenSource)
             {
                 SiteCollectionsToScan = siteCollectionList.Count,
                 Status = ScanStatus.Queued,
@@ -223,8 +226,11 @@ namespace PnP.Scanning.Core.Services
                 // Populate in-memory cache again from persisted cache data
                 await LoadCachedDataAsync(scanId);
 
+                // Setup cancellation token
+                CancellationTokenSource cancellationTokenSource = new();
+
                 // Launch a queue to handle this scan
-                var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId);
+                var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token);
 
                 // Configure threading for the site collection and web queues
                 int threadsToUse = start.Threads;
@@ -242,7 +248,7 @@ namespace PnP.Scanning.Core.Services
                 // Get the scan configuration options to use
                 OptionsBase options = OptionsBase.FromScannerInput(start);
 
-                var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager)
+                var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager, cancellationTokenSource)
                 {
                     SiteCollectionsToScan = siteCollectionList.Count,
                     Status = ScanStatus.Queued,
@@ -325,6 +331,42 @@ namespace PnP.Scanning.Core.Services
             {
                 Log.Error("No authentication manager available for {ScanId}", scanId);
                 throw new Exception($"No authentication manager available for {scanId}");
+            }
+        }
+
+        internal CancellationTokenSource GetCancellationTokenSource(Guid scanId)
+        {
+            if (scans.ContainsKey(scanId))
+            {
+                return scans[scanId].CancellationTokenSource;
+            }
+            else
+            {
+                Log.Error("No cancellation token available for {ScanId}", scanId);
+                throw new Exception($"No cancellation token available for {scanId}");
+            }            
+        }
+
+        internal void CancelScan(Guid scanId, bool all)
+        {
+            if (all)
+            {
+                Log.Information("Cancelling requests for all running scans");
+                lock (scanListLock)
+                {
+                    foreach (var scan in scans)
+                    {
+                        scan.Value.CancellationTokenSource.Cancel();
+                    }
+                }
+            }
+            else
+            {
+                Log.Information("Cancelling requests for scan {ScanId}", scanId);
+                lock (scanListLock)
+                {
+                    scans[scanId].CancellationTokenSource.Cancel();
+                }
             }
         }
 

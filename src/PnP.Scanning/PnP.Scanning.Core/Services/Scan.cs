@@ -11,16 +11,19 @@ namespace PnP.Scanning.Core.Services
         private int requestWasThrottled = 0;
         private int requestWasRetriedDueToNetworkIssues = 0;
 
-        internal Scan(Guid id, SiteCollectionQueue queue, OptionsBase options, AuthenticationManager authenticationManager)
+        internal Scan(Guid id, SiteCollectionQueue queue, OptionsBase options, AuthenticationManager authenticationManager, CancellationTokenSource cancellationTokenSource)
         {
             Id = id;
             Queue = queue;
             Options = options;
             AuthenticationManager = authenticationManager;
             StartedScanSessionAt = DateTime.Now;
+            CancellationTokenSource = cancellationTokenSource;
         }
 
         internal Guid Id { get; private set; }
+
+        internal CancellationTokenSource CancellationTokenSource { get; private set; }
 
         internal SiteCollectionQueue Queue { get; private set; }
 

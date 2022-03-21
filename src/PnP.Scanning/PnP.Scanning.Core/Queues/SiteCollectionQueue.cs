@@ -10,7 +10,7 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<SiteCollectionQueueItem> siteCollectionsToScan;
 
-        public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId) : base(storageManager)
+        public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken) : base(storageManager, cancellationToken)
         {
             ScanManager = scanManager;
             ScanId = scanId;
@@ -52,6 +52,7 @@ namespace PnP.Scanning.Core.Queues
                 {
                     SingleProducerConstrained = true,
                     MaxDegreeOfParallelism = ParallelThreads,
+                    CancellationToken = CancellationToken
                 };
 
                 Log.Information("Configuring site collection queue for scan {ScanId} with {MaxDegreeOfParallelism} max degree of parallelism", ScanId, executionDataflowBlockOptions.MaxDegreeOfParallelism);
@@ -70,7 +71,7 @@ namespace PnP.Scanning.Core.Queues
         private async Task ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection)
         {
             // Check the pausing bit, if so then we'll skip processing this site collection
-            if (!ScanManager.IsPausing(ScanId))
+            if (!ScanManager.IsPausing(ScanId) && !CancellationToken.IsCancellationRequested)
             {
                 try
                 {
@@ -102,7 +103,7 @@ namespace PnP.Scanning.Core.Queues
                     await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
 
                     // Start parallel execution per web in this site collection
-                    var webQueue = new WebQueue(ScanManager, StorageManager, ScanId);
+                    var webQueue = new WebQueue(ScanManager, StorageManager, ScanId, CancellationToken);
 
                     // Use parallel threads per running site collection task for processing the webs
                     webQueue.ConfigureQueue(ParallelWebProcessingThreads);
@@ -148,7 +149,14 @@ namespace PnP.Scanning.Core.Queues
             }
             else
             {
-                Log.Information("Scan {ScanId} has pausing bit set, so skipping processing of site collection {SiteCollection}.", ScanId, siteCollection.SiteCollectionUrl);
+                if (CancellationToken.IsCancellationRequested)
+                {
+                    Log.Information("Scan {ScanId} was cancelled, so skipping processing of site collection {SiteCollection}.", ScanId, siteCollection.SiteCollectionUrl);
+                }
+                else
+                {
+                    Log.Information("Scan {ScanId} has pausing bit set, so skipping processing of site collection {SiteCollection}.", ScanId, siteCollection.SiteCollectionUrl);
+                }
             }
         }        
 

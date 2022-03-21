@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<WebQueueItem> websToScan;
 
-        public WebQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId): base(storageManager)
+        public WebQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken) : base(storageManager, cancellationToken)
         {
             ScanId = scanId;
             ScanManager = scanManager;
@@ -29,6 +29,7 @@ namespace PnP.Scanning.Core.Queues
                 {
                     SingleProducerConstrained = true,
                     MaxDegreeOfParallelism = ParallelThreads,
+                    CancellationToken = CancellationToken
                 };
 
                 // Configure the site collection scanning queue
@@ -51,7 +52,7 @@ namespace PnP.Scanning.Core.Queues
 
         private async Task ProcessWebAsync(WebQueueItem web)
         {
-            if (!ScanManager.IsPausing(ScanId))
+            if (!ScanManager.IsPausing(ScanId) && !CancellationToken.IsCancellationRequested)
             {
                 // Add a random wait to avoid contention when a large parallel scan kicks in
                 await Task.Delay(TimeSpan.FromMilliseconds(new Random().Next(0, 250)));
@@ -81,13 +82,20 @@ namespace PnP.Scanning.Core.Queues
                 catch (Exception ex)
                 {
                     // The web scan failed, log accordingly
-                    Log.Error(ex, "Scan of {SiteUrl}{WebUrl} failed with  scan component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
+                    Log.Error(ex, "Scan of {SiteUrl}{WebUrl} failed with scan component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
                     await StorageManager.EndWebScanWithErrorAsync(ScanId, web.SiteCollectionUrl, web.WebUrl, ex);
                 }
             }
             else
             {
-                Log.Information("Scan {ScanId} has pausing bit set, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                if (CancellationToken.IsCancellationRequested)
+                {
+                    Log.Information("Scan {ScanId} was cancelled, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                }
+                else
+                {
+                    Log.Information("Scan {ScanId} has pausing bit set, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                }
             }
         }
         

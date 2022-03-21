@@ -482,6 +482,33 @@ namespace PnP.Scanning.Core.Storage
                     }
                 }
 
+                // Sites and webs having an error due to "task cancellation" should be retried on a restart. This typically happens
+                // when a scan was paused and pausing took to long so the cancellationtoken was "cancelled" resulting in exceptions
+                // being thrown
+                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Failed).ToListAsync())
+                {
+                    if (!string.IsNullOrEmpty(site.Error) && site.Error.Contains("A task was canceled", StringComparison.OrdinalIgnoreCase))
+                    {
+                        site.Status = SiteWebStatus.Queued;
+                        site.StartDate = DateTime.MinValue;
+
+                        Log.Information("Consolidating scan {ScanId}, site collection {SiteCollection} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl);
+
+                        // Reset the running/failed webs so we can retry them
+                        foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && 
+                                                                        (p.Status == SiteWebStatus.Running || p.Status == SiteWebStatus.Failed)).ToListAsync())
+                        {
+                            web.Status = SiteWebStatus.Queued;
+                            web.StartDate = DateTime.MinValue;
+
+                            Log.Information("Consolidating scan {ScanId}, web {SiteCollection}{Web} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl, web.WebUrl);
+
+                            // All data collected as part of a running web scan is dropped as the web scan will run again when restarted
+                            await DropIncompleteWebScanDataAsync(scanId, dbContext, site, web);
+                        }
+                    }
+                }
+
                 // Persist all the changes
                 await dbContext.SaveChangesAsync();
                 Log.Information("Database updates pushed in ConsolidatedScanToEnableRestartAsync for scan {ScanId}", scanId);

@@ -101,20 +101,31 @@ namespace PnP.Scanning.Core.Scanners
                 };
             }
 
+            var cancellationToken = ScanManager.GetCancellationTokenSource(ScanId).Token;
+
+            // Throw an exception if we've requested to cancel the operation
+            cancellationToken.ThrowIfCancellationRequested();
+
             return await PnPContextFactory.CreateAsync(new Uri($"{SiteUrl}{WebUrl}"),
                                                        new ExternalAuthenticationProvider((resourceUri, scopes) =>
                                                        {
                                                            return ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                                                        }),
+                                                       cancellationToken,
                                                        contextOptions);
         }
 
         protected ClientContext GetClientContext()
         {
+            var cancellationToken = ScanManager.GetCancellationTokenSource(ScanId).Token;
+
+            // Throw an exception if we've requested to cancel the operation
+            cancellationToken.ThrowIfCancellationRequested();
+
             var clientContext = new ClientContext(new Uri($"{SiteUrl}{WebUrl}"))
             {
                 DisableReturnValueCache = true,
-                Tag = new ClientContextInfo(ScanId, CsomEventHub, Logger)
+                Tag = new ClientContextInfo(ScanId, CsomEventHub, Logger, cancellationToken)
             };
 
             clientContext.ExecutingWebRequest += (sender, args) =>
