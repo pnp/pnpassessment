@@ -31,6 +31,8 @@ namespace PnP.Scanning.Core.Storage
         public int WorkflowInstanceCount { get; set; }
 
         public int FlowInstanceCount { get; set; }
+
+        public int RetentionLabelCount { get; set; }
         #endregion
 
         #region Information to collect list "activeness"

@@ -173,8 +173,11 @@ namespace PnP.Scanning.Core.Scanners
                     }
                 }
 
-                // Calculate content type file counts
-                await CalculateContentTypeFileCountsAsync(context, syntexContentTypes);
+                // Calculate content type file and label counts
+                await CalculateContentTypeFileAndLabelCountsAsync(context, syntexContentTypes, syntexLists);
+
+                // Calculate label counts for the remaining lists
+                await CalculateLabelCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists);
 
                 // Scan for Workflow 2013 instances on the collected lists
                 await ScanForListWorkflowAsync(syntexLists);
@@ -258,15 +261,12 @@ namespace PnP.Scanning.Core.Scanners
             return input;
         }
 
-        private async Task CalculateContentTypeFileCountsAsync(PnPContext context, List<SyntexContentType> contentTypes)
+        private async Task CalculateContentTypeFileAndLabelCountsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
         {
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
                 return;
             }
-
-            var batch = context.NewBatch();
-            Dictionary<Guid, IBatchSingleResult<ISearchResult>> batchResults = new();
 
             List<Guid> uniqueListIds = new();
             foreach (var contentType in contentTypes)
@@ -276,39 +276,92 @@ namespace PnP.Scanning.Core.Scanners
                     uniqueListIds.Add(contentType.ListId);
                 }
             }
-                     
+
             // Issue a search request per list, refine the results on contenttypeid
+            // We're not batching search requests to ensure indiviudal request throttling is handled correctly
             foreach (var listId in uniqueListIds)
             {
-                var request = await context.Web.SearchBatchAsync(batch, new SearchOptions($"listid:{listId}")
+                var result = await context.Web.SearchAsync(new SearchOptions($"listid:{listId}")
                 {
                     RowLimit = 0,
                     SortProperties = new List<SortOption>() { new SortOption("DocId") },
-                    RefineProperties = new List<string> { "contenttypeid" },
+                    RefineProperties = new List<string> { "contenttypeid", "compliancetag" },
                     ClientType = "PnPMicrosoft365Scanner"
                 });
-                batchResults.Add(listId, request);
+                
+                if (result.Refinements.Count > 0)
+                {
+                    if (result.Refinements.ContainsKey("contenttypeid"))
+                    {
+                        foreach (var refinementResult in result.Refinements["contenttypeid"])
+                        {
+                            var contentTypeId = IdFromListContentType(refinementResult.Value);
+                            var contentTypeToUpdate = contentTypes.FirstOrDefault(p => p.ListId == listId && p.ContentTypeId == contentTypeId);
+                            if (contentTypeToUpdate != null && (int)refinementResult.Count > 0)
+                            {
+                                contentTypeToUpdate.FileCount = (int)refinementResult.Count;
+                            }
+                        }
+                    }
+
+                    if (result.Refinements.ContainsKey("compliancetag"))
+                    {
+                        foreach (var refinementResult in result.Refinements["compliancetag"])
+                        {
+                            var label = refinementResult.Value;
+
+                            var listToUpdate = syntexLists.FirstOrDefault(p => p.ListId == listId);
+                            if (listToUpdate != null && (int)refinementResult.Count > 0)
+                            {
+                                listToUpdate.RetentionLabelCount += (int)refinementResult.Count;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private async Task CalculateLabelCountsForRemainingListsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
+        {
+            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            {
+                return;
             }
 
-            // Execute the batch
-            var batchError = await context.ExecuteAsync(batch, false);
-
-            // Process the search results 
-            foreach (var batchResult in batchResults)
+            List<Guid> uniqueListIds = new();
+            foreach (var contentType in contentTypes)
             {
-                if (batchResult.Value.IsAvailable)
+                if (!uniqueListIds.Contains(contentType.ListId))
                 {
-                    foreach (var contentType in contentTypes.Where(p => p.ListId == batchResult.Key))
+                    uniqueListIds.Add(contentType.ListId);
+                }
+            }
+
+            // We're not batching search requests to ensure indiviudal request throttling is handled correctly
+            foreach (var list in syntexLists)
+            {
+                if (!uniqueListIds.Contains(list.ListId))
+                {
+                    var result = await context.Web.SearchAsync(new SearchOptions($"listid:{list.ListId}")
                     {
-                        if (batchResult.Value.Result.Refinements.Count > 0 && batchResult.Value.Result.Refinements.ContainsKey("contenttypeid"))
+                        RowLimit = 0,
+                        SortProperties = new List<SortOption>() { new SortOption("DocId") },
+                        RefineProperties = new List<string> { "compliancetag" },
+                        ClientType = "PnPMicrosoft365Scanner"
+                    });
+
+                    if (result.Refinements.Count > 0)
+                    {
+                        if (result.Refinements.ContainsKey("compliancetag"))
                         {
-                            foreach (var refinementResult in batchResult.Value.Result.Refinements["contenttypeid"])
+                            foreach (var refinementResult in result.Refinements["compliancetag"])
                             {
-                                var contentTypeId = IdFromListContentType(refinementResult.Value);
-                                var contentTypeToUpdate = contentTypes.FirstOrDefault(p => p.ListId == batchResult.Key && p.ContentTypeId == contentTypeId);
-                                if (contentTypeToUpdate != null)
+                                var label = refinementResult.Value;
+
+                                var listToUpdate = syntexLists.FirstOrDefault(p => p.ListId == list.ListId);
+                                if (listToUpdate != null && (int)refinementResult.Count > 0)
                                 {
-                                    contentTypeToUpdate.FileCount = (int)refinementResult.Count;
+                                    listToUpdate.RetentionLabelCount += (int)refinementResult.Count;
                                 }
                             }
                         }
@@ -468,10 +521,11 @@ namespace PnP.Scanning.Core.Scanners
 
         private (SyntexContentType, string, List<SyntexContentTypeField>) PrepareSyntexContentType(IList list, IContentType contentType)
         {
-            if (BuiltInContentTypes.Contains(IdFromListContentType(contentType.StringId)))
-            {
-                return (null, null, null);
-            }
+            // For now we're including default content types ~ might need to become optional via a flag?
+            //if (BuiltInContentTypes.Contains(IdFromListContentType(contentType.StringId)))
+            //{
+            //    return (null, null, null);
+            //}
 
             List<SyntexContentTypeField> syntexContentTypeFields = new List<SyntexContentTypeField>();
             SyntexContentType syntexContentType = new()
