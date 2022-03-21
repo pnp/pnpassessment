@@ -1,9 +1,9 @@
 ScanId,Id,Event,EventDate,Message
-e8872b41-486f-454a-8287-b549e99350c0,6,PostScanStatusChange,02/23/2022 18:52:47,From Queued to Running
-e8872b41-486f-454a-8287-b549e99350c0,7,PostScanStatusChange,02/23/2022 18:52:48,From Running to Finished
-e8872b41-486f-454a-8287-b549e99350c0,2,PreScanStatusChange,02/23/2022 18:48:02,Set to Queued
-e8872b41-486f-454a-8287-b549e99350c0,3,PreScanStatusChange,02/23/2022 18:48:03,From Queued to Running
-e8872b41-486f-454a-8287-b549e99350c0,4,PreScanStatusChange,02/23/2022 18:48:03,From Running to Finished
-e8872b41-486f-454a-8287-b549e99350c0,1,ScanStatusChange,02/23/2022 18:48:02,Set to Queued
-e8872b41-486f-454a-8287-b549e99350c0,5,ScanStatusChange,02/23/2022 18:48:03,From Queued to Running
-e8872b41-486f-454a-8287-b549e99350c0,8,ScanStatusChange,02/23/2022 18:52:48,From Running to Finished
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,6,PostScanStatusChange,03/21/2022 20:27:03,From Queued to Running
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,7,PostScanStatusChange,03/21/2022 20:27:03,From Running to Finished
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,2,PreScanStatusChange,03/21/2022 20:20:32,Set to Queued
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,3,PreScanStatusChange,03/21/2022 20:20:32,From Queued to Running
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,4,PreScanStatusChange,03/21/2022 20:20:32,From Running to Finished
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,1,ScanStatusChange,03/21/2022 20:20:31,Set to Queued
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,5,ScanStatusChange,03/21/2022 20:20:32,From Queued to Running
+fdf2468a-20fb-4abc-b3bc-fc7a6c11fac6,8,ScanStatusChange,03/21/2022 20:27:03,From Running to Finished
