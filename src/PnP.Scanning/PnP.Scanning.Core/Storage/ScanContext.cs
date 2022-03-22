@@ -36,6 +36,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<SyntexField> SyntexFields { get; set; }
 
+        internal DbSet<SyntexModelUsage> SyntexModelUsage { get; set; }
+
         internal DbSet<Workflow> Workflows { get; set; }
 
 #if DEBUG
@@ -121,6 +123,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<SyntexField>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FieldId });
+            });
+
+            modelBuilder.Entity<SyntexModelUsage>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.Classifier, e.TargetSiteId, e.TargetWebId, e.TargetListId });
             });
 
             modelBuilder.Entity<Workflow>(entity =>

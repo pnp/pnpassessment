@@ -78,6 +78,7 @@ namespace PnP.Scanning.Core.Scanners
             {
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
                 {
+                    w => w.WebTemplateConfiguration,
                     w => w.Lists.QueryProperties(r => r.Title, r => r.ItemCount, r => r.ListExperience, r => r.TemplateType, r => r.ContentTypesEnabled, r => r.Hidden, 
                                                  r => r.Created, r => r.LastItemUserModifiedDate, r => r.IsSiteAssetsLibrary, r => r.IsSystemList,
                                                  r => r.Fields.QueryProperties(f => f.Id, f => f.Hidden, f => f.TypeAsString, f => f.InternalName, f => f.StaticName, f => f.TermSetId, f => f.Title, f => f.Required),
@@ -95,6 +96,7 @@ namespace PnP.Scanning.Core.Scanners
                 List<SyntexContentType> syntexContentTypes = new();
                 List<SyntexContentTypeField> syntexContentTypeFields = new();
                 List<SyntexField> syntexFields = new();
+                List<SyntexModelUsage> syntexModelUsage = new();
 
                 List<ContentTypeInfo> uniqueContentTypesInWeb = new();
 
@@ -186,8 +188,14 @@ namespace PnP.Scanning.Core.Scanners
                 // Scan for PowerAutomate flow instances on the collected lists
                 //await ScanForPowerAutomateFlowsAsync(context, syntexListInstances, syntexLists);
 
+                // Persist the Syntex model usage data in case we're processing a Syntex Content Center
+                if (context.Web.WebTemplateConfiguration == "CONTENTCTR#0")
+                {
+                    await CaptureSyntexModelUsageDataAsync(context, syntexModelUsage);
+                }
+
                 // Persist the gathered data
-                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields);
+                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields, syntexModelUsage);
             }
 
             Logger.Information("Syntex scan of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
@@ -313,6 +321,7 @@ namespace PnP.Scanning.Core.Scanners
                 var result = await context.Web.SearchAsync(new SearchOptions($"listid:{listId}")
                 {
                     RowLimit = 0,
+                    RowsPerPage = 0,
                     SortProperties = new List<SortOption>() { new SortOption("DocId") },
                     RefineProperties = new List<string> { "contenttypeid", "compliancetag" },
                     ClientType = "PnPMicrosoft365Scanner"
@@ -374,6 +383,7 @@ namespace PnP.Scanning.Core.Scanners
                     var result = await context.Web.SearchAsync(new SearchOptions($"listid:{list.ListId}")
                     {
                         RowLimit = 0,
+                        RowsPerPage = 0,
                         SortProperties = new List<SortOption>() { new SortOption("DocId") },
                         RefineProperties = new List<string> { "compliancetag" },
                         ClientType = "PnPMicrosoft365Scanner"
@@ -511,6 +521,108 @@ namespace PnP.Scanning.Core.Scanners
                         }
                     }
                 }
+            }
+        }
+
+        private async Task CaptureSyntexModelUsageDataAsync(PnPContext context, List<SyntexModelUsage> syntexModelUsage)
+        {
+            // Load the model usage list with the needed properties
+            var modelUsageList = await context.Web.Lists.GetByServerRelativeUrlAsync($"{context.Uri.PathAndQuery}/ModelUsage", 
+                                                                                     p => p.Fields.QueryProperties(p => p.InternalName,
+                                                                                                                   p => p.FieldTypeKind,
+                                                                                                                   p => p.TypeAsString,
+                                                                                                                   p => p.Title));
+            if (modelUsageList != null)
+            {
+                // Use a CAML query and LoadListDataAsStreamAsync approach as potentially there can be a lot of models with a lot of linked lists
+                string viewXml = @"<View>
+                                    <ViewFields>
+                                      <FieldRef Name='Title' />
+                                      <FieldRef Name='ModelUsageTargetSiteID' />
+                                      <FieldRef Name='ModelUsageTargetWebID' />
+                                      <FieldRef Name='ModelUsageTargetListID' />
+                                      <FieldRef Name='ModelUsageClassifiedItemCount' />
+                                      <FieldRef Name='ModelUsageNotProcessedItemCount' />
+                                      <FieldRef Name='ModelUsageAverageConfidenceScore' />
+                                    </ViewFields>
+                                    <OrderBy Override='TRUE'><FieldRef Name= 'ID' Ascending= 'FALSE' /></OrderBy>
+                                   </View>";
+
+                // Load all the needed data using paged requests
+                bool paging = true;
+                string nextPage = null;
+                while (paging)
+                {
+                    // Clear the previous page (if any), no point in keeping all model usage data in memory
+                    modelUsageList.Items.Clear();
+
+                    var output = await modelUsageList.LoadListDataAsStreamAsync(new PnP.Core.Model.SharePoint.RenderListDataOptions()
+                    {
+                        ViewXml = viewXml,
+                        RenderOptions = RenderListDataOptionsFlags.ListData,
+                        Paging = nextPage ?? null,
+                    }).ConfigureAwait(false);
+
+                    if (output.ContainsKey("NextHref"))
+                    {
+                        nextPage = output["NextHref"].ToString().Substring(1);
+                    }
+                    else
+                    {
+                        paging = false;
+                    }
+
+                    // Iterate over the retrieved list items within this page
+                    foreach (var listItem in modelUsageList.Items.AsRequested())
+                    {
+                        // Only capture data for classifiers when linked to a list
+                        if (listItem.Values["ModelUsageTargetListID"] != null && !string.IsNullOrEmpty(listItem.Values["ModelUsageTargetListID"].ToString()))
+                        {
+                            // Only store data if we've valid target information
+                            if (listItem.Values["ModelUsageTargetSiteID"] != null && Guid.TryParse(listItem.Values["ModelUsageTargetSiteID"].ToString(), out Guid targetSiteId) &&
+                                listItem.Values["ModelUsageTargetWebID"] != null && Guid.TryParse(listItem.Values["ModelUsageTargetWebID"].ToString(), out Guid targetWebId) &&
+                                Guid.TryParse(listItem.Values["ModelUsageTargetListID"].ToString(), out Guid targetListId))
+                            {
+
+                                SyntexModelUsage syntexModelUsageRow = new()
+                                {
+                                    ScanId = ScanId,
+                                    SiteUrl = SiteUrl,
+                                    WebUrl = WebUrl,
+                                    Classifier = listItem.Values["Title"].ToString(),
+                                    TargetSiteId = targetSiteId,
+                                    TargetWebId = targetWebId,
+                                    TargetListId = targetListId
+                                };
+
+                                // Store counts 
+                                if (listItem.Values["ModelUsageClassifiedItemCount"] != null && 
+                                    int.TryParse(listItem.Values["ModelUsageClassifiedItemCount"].ToString(), out int modelUsageClassifiedItemCount))
+                                {
+                                    syntexModelUsageRow.ClassifiedItemCount = modelUsageClassifiedItemCount;
+                                }
+
+                                if (listItem.Values["ModelUsageNotProcessedItemCount"] != null &&
+                                    int.TryParse(listItem.Values["ModelUsageNotProcessedItemCount"].ToString(), out int modelUsageNotProcessedItemCount))
+                                {
+                                    syntexModelUsageRow.NotProcessedItemCount = modelUsageNotProcessedItemCount;
+                                }
+
+                                if (listItem.Values["ModelUsageAverageConfidenceScore"] != null &&
+                                    double.TryParse(listItem.Values["ModelUsageAverageConfidenceScore"].ToString(), out double modelUsageAverageConfidenceScore))
+                                {
+                                    syntexModelUsageRow.AverageConfidenceScore = modelUsageAverageConfidenceScore;
+                                }
+
+                                syntexModelUsage.Add(syntexModelUsageRow);
+                            }
+                            else
+                            {
+                                Logger.Warning("No valid values for model target site, web or list id found, not storing model data for model list {ModelList}, classifier {Classifier}", $"{context.Uri.PathAndQuery}/ModelUsage", listItem.Values["Title"].ToString());
+                            }
+                        }
+                    }
+                }                
             }
         }
 

@@ -788,7 +788,9 @@ namespace PnP.Scanning.Core.Storage
         
         // PER SCAN COMPONENT: storage methods per scanner
         #region Syntex
-        internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields)
+        internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, 
+                                                                     List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields,
+                                                                     List<SyntexModelUsage> syntexModelUsage)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -796,6 +798,7 @@ namespace PnP.Scanning.Core.Storage
                 await dbContext.SyntexContentTypes.AddRangeAsync(syntexContentTypes.ToArray());
                 await dbContext.SyntexContentTypeFields.AddRangeAsync(syntexContentTypeFields.ToArray());
                 await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
+                await dbContext.SyntexModelUsage.AddRangeAsync(syntexModelUsage.ToArray());
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StoreSyntexInformationAsync succeeded");
@@ -866,6 +869,10 @@ namespace PnP.Scanning.Core.Storage
             foreach (var syntexFieldResult in await dbContext.SyntexFields.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.SyntexFields.Remove(syntexFieldResult);
+            }
+            foreach (var syntexModelUsage in await dbContext.SyntexModelUsage.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.SyntexModelUsage.Remove(syntexModelUsage);
             }
             Log.Information("Consolidating scan {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
