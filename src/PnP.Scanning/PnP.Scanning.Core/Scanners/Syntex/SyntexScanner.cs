@@ -17,6 +17,7 @@ namespace PnP.Scanning.Core.Scanners
     {
         private readonly string UsesApplicationPermissons = "UsesApplicationPermissons";
         private readonly string HasSitesFullControlAll = "HasSitesFullControlAll";
+        private readonly string HasPermissionsToReadWorkflowData = "HasPermissionsToReadWorkflowData";
 
         private class ContentTypeInfo
         {
@@ -205,12 +206,40 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     bool hasSitesFullControlAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("Sites.FullControl.All");
                     AddToCache(HasSitesFullControlAll, hasSitesFullControlAll.ToString());
+
+                    if (!hasSitesFullControlAll)
+                    {
+                        bool hasSitesManageAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("Sites.Manage.All");
+                        AddToCache(HasPermissionsToReadWorkflowData, hasSitesManageAll.ToString());
+                    }
+                    else
+                    {
+                        AddToCache(HasPermissionsToReadWorkflowData, true.ToString());
+                    }
+                }
+                else
+                {
+                    bool hasAllSitesFullControl = await context.GetMicrosoft365Admin().AccessTokenHasScopeAsync("AllSites.FullControl");
+                    if (!hasAllSitesFullControl)
+                    {
+                        bool hasAllSitesManage = await context.GetMicrosoft365Admin().AccessTokenHasScopeAsync("AllSites.Manage");
+                        AddToCache(HasPermissionsToReadWorkflowData, hasAllSitesManage.ToString());
+                    }
+                    else
+                    {
+                        AddToCache(HasPermissionsToReadWorkflowData, true.ToString());
+                    }
                 }
             }
 
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
                 Logger.Information("No DeepScan selected or Application Permissions without Sites.FullControl.All used ==> not using exact content type file counts");
+            }
+
+            if (!GetBoolFromCache(HasPermissionsToReadWorkflowData))
+            {
+                Logger.Information("No adequate permissions were provided to check for workflow usage. Minimal role is Sites.Manage.All when application permissions, when using delegated the minimal scope is AllSites.Manage");
             }
 
             //if (GetBoolFromCache(UsesApplicationPermissons))
@@ -457,6 +486,11 @@ namespace PnP.Scanning.Core.Scanners
 
         private async Task ScanForListWorkflowAsync(List<SyntexList> syntexLists)
         {
+            if (!GetBoolFromCache(HasPermissionsToReadWorkflowData))
+            {
+                return;
+            }
+
             using (var context = GetClientContext())
             {
                 var servicesManager = new WorkflowServicesManager(context, context.Web);
