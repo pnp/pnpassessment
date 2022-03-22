@@ -61,8 +61,8 @@ The scanner aims to be able to perform the scan task at hand using minimal read 
 
 Scan | Authentication | Minimal | Optimal | Details
 -----| ---------------| --------|---------|--------
-Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexdeepscan` argument the scanner will use the search APIs to count how many documents use a given content type, and search in combination with application permissions requires Sites.FullControl.All
-Syntex | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read |
+Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexdeepscan` argument the scanner will use the search APIs to count how many documents use a given content type and how many retention labels there are applied on a list, and search in combination with application permissions requires Sites.FullControl.All. The scanner will also check if a library uses workflow 2013 and this requires the Sites.Manage.All or higher permission role
+Syntex | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage | The scanner will check if a library uses workflow 2013 and this requires the AllSites.Manage or higher permission scope
 Workflow | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All |
 Workflow | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage |
 
