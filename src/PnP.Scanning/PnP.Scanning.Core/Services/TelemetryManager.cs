@@ -486,7 +486,6 @@ namespace PnP.Scanning.Core.Services
         {
             properties.Add("ScanId", scanId.ToString());
             properties.Add(UsesTenant, (!string.IsNullOrEmpty(Scan.CLITenant)).ToString());
-            properties.Add(Tenant, Scan.CLITenant);
             properties.Add(TenantEnvironment, Scan.CLIEnvironment);
             properties.Add(AuthMode, Scan.CLIAuthMode);
             properties.Add(UsesSitesList, (!string.IsNullOrEmpty(Scan.CLISiteList)).ToString());
