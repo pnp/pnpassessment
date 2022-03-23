@@ -23,16 +23,18 @@ namespace PnP.Scanning.Core.Services
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly IPnPContextFactory contextFactory;
         private readonly CsomEventHub eventHub;
-        private object scanListLock = new object();
+        private readonly TelemetryManager telemetryManager;
+        private object scanListLock = new();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
-        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager,
+        public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, TelemetryManager telemetry,
                            IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
             contextFactory = pnpContextFactory;
             eventHub = csomEventHub;
+            telemetryManager = telemetry;
 
             // Get notified whenever the scan engine is getting throttled (only applies for calls made via PnP Core SDK!)
             contextFactory.EventHub.RequestRetry = (retryEvent) =>
@@ -692,6 +694,8 @@ namespace PnP.Scanning.Core.Services
                     await UpdateScanStatusAsync(scanId, ScanStatus.Finished);
 
                     await StorageManager.EndScanAsync(scanId);
+
+                    await telemetryManager.LogScanEndAsync(scanId);
                 }
 
             }

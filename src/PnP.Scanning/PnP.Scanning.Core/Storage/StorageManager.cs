@@ -211,6 +211,26 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        internal async Task<Scan> GetTelemetryScanInformationAsync(Guid scanId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
+                dbContext.ChangeTracker.LazyLoadingEnabled = false;
+
+                var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
+                if (scan != null)
+                {
+                    return scan;
+                }
+                else
+                {
+                    Log.Error("No scan row for scan {ScanId} found ", scanId);
+                    throw new Exception($"No scan row for scan {scanId} found");
+                }
+            }
+        }
+
         internal async Task StartSiteCollectionScanAsync(Guid scanId, string siteCollectionUrl)
         {
             using (var dbContext = new ScanContext(scanId))

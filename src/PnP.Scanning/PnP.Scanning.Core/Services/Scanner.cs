@@ -15,10 +15,11 @@ namespace PnP.Scanning.Core.Services
         private readonly ScanManager scanManager;
         private readonly SiteEnumerationManager siteEnumerationManager;
         private readonly ReportManager reportManager;
+        private readonly TelemetryManager telemetryManager;
         private readonly IHost kestrelWebServer;
         private readonly IDataProtectionProvider dataProtectionProvider;
 
-        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, IHost host, IDataProtectionProvider provider)
+        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, TelemetryManager telemetry, IHost host, IDataProtectionProvider provider)
         {
             // Kestrel
             kestrelWebServer = host;
@@ -28,6 +29,8 @@ namespace PnP.Scanning.Core.Services
             siteEnumerationManager = siteEnumeration;
             // Report manager
             reportManager = reports;
+            // Telemetry manager
+            telemetryManager = telemetry;
             // Data Protection Manager
             dataProtectionProvider = provider;
         }
@@ -35,12 +38,14 @@ namespace PnP.Scanning.Core.Services
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
         {
             Log.Information("Status {Message} received", request.Message);
+            // Don't send telemetry event here as status is called automatically in a loop from the CLI
             return await scanManager.GetScanStatusAsync();
         }
 
         public override async Task<ListReply> List(ListRequest request, ServerCallContext context)
         {
             Log.Information("List request received");
+            await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.List);
             return await scanManager.GetScanListAsync(request);
         }
 
@@ -137,6 +142,8 @@ namespace PnP.Scanning.Core.Services
                         Status = "Scan was terminated"
                     });
                 }
+
+                await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Pause);
             }
         }
 
@@ -186,6 +193,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     Status = "Scan restarted"
                 });
+
+                await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Restart);
             }
             catch (Exception ex)
             {
@@ -206,6 +215,7 @@ namespace PnP.Scanning.Core.Services
             // Run the stop in a separate thread so that the GRPc client still gets a response
             _ = Task.Run(async () =>
             {
+                await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.Stop);
                 await kestrelWebServer.StopAsync();
             });
             return new Empty();
@@ -270,8 +280,9 @@ namespace PnP.Scanning.Core.Services
                         Status = $"Sites to scan are queued up. Scan id = {scanId}"
                     });
 
-                    Log.Information("Scan job started");
+                    await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Start);
 
+                    Log.Information("Scan job started");
                 }
             }
             catch (Exception ex)
@@ -334,6 +345,8 @@ namespace PnP.Scanning.Core.Services
                     });
                     Log.Information("PowerBI report for scan {ScanId} is ready", scanId);
                 }
+
+                await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Report);
             }
             catch (Exception ex)
             {
