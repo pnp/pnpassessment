@@ -204,9 +204,11 @@ namespace PnP.Scanning.Core.Services
                 var failedSiteCollectionCount = await dbContext.SiteCollections.CountAsync(p => p.Status == SiteWebStatus.Failed);
 
                 int scanDurationInMinutes = 0;
-                if (Scan.EndDate != DateTime.MinValue && Scan.EndDate != DateTime.MaxValue && Scan.StartDate != DateTime.MinValue && Scan.StartDate != DateTime.MaxValue)
+                // Use current value as otherwise end date is not yet set
+                var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
+                if (scan.EndDate != DateTime.MinValue && scan.EndDate != DateTime.MaxValue && scan.StartDate != DateTime.MinValue && scan.StartDate != DateTime.MaxValue)
                 {
-                    scanDurationInMinutes = (int)(Scan.EndDate - Scan.StartDate).TotalMinutes;
+                    scanDurationInMinutes = (int)(scan.EndDate - scan.StartDate).TotalMinutes;
                 }
 
                 metric.Add("SiteCollectionCount", siteCollectionCount);

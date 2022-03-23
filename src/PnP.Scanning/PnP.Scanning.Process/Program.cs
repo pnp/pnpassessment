@@ -62,7 +62,7 @@ namespace PnP.Scanning.Process
                     while (!string.IsNullOrEmpty(consoleInput))
                     {
                         AnsiConsole.WriteLine("");
-                        await parser.InvokeAsync(consoleInput);
+                         await parser.InvokeAsync(consoleInput);
 
                         AnsiConsole.WriteLine("");
                         AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
