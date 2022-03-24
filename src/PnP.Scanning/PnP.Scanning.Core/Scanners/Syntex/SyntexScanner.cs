@@ -31,9 +31,9 @@ namespace PnP.Scanning.Core.Scanners
             internal string SchemaXml { get; set; }
         }
 
-        private class ContentTypeFileUsage
+        private class ContentTypeItemUsage
         {
-            internal ContentTypeFileUsage(int count)
+            internal ContentTypeItemUsage(int count)
             {
                 Count = count;
             }
@@ -177,10 +177,10 @@ namespace PnP.Scanning.Core.Scanners
                 }
 
                 // Calculate content type file and label counts
-                await CalculateContentTypeFileAndLabelCountsAsync(context, syntexContentTypes, syntexLists);
+                await CalculateContentTypeCountsAsync(context, syntexContentTypes, syntexLists);
 
                 // Calculate label counts for the remaining lists
-                await CalculateLabelCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists);
+                await CalculateCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists);
 
                 // Scan for Workflow 2013 instances on the collected lists
                 await ScanForListWorkflowAsync(syntexLists);
@@ -298,7 +298,7 @@ namespace PnP.Scanning.Core.Scanners
             return input;
         }
 
-        private async Task CalculateContentTypeFileAndLabelCountsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
+        private async Task CalculateContentTypeCountsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
         {
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
@@ -375,7 +375,7 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private async Task CalculateLabelCountsForRemainingListsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
+        private async Task CalculateCountsForRemainingListsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
         {
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
@@ -449,9 +449,9 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private ContentTypeFileUsage CountFilesUsingContentType(ScanContext dbContext, string contentTypeId)
+        private ContentTypeItemUsage CountFilesUsingContentType(ScanContext dbContext, string contentTypeId)
         {
-            ContentTypeFileUsage usage = new(0);
+            ContentTypeItemUsage usage = new(0);
 
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
