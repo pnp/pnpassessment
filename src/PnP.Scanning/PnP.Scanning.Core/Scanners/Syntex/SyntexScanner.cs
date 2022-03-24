@@ -340,16 +340,16 @@ namespace PnP.Scanning.Core.Scanners
                                 contentTypeToUpdate.ItemCount = (int)refinementResult.Count;
                             }
 
-                            if (contentTypeId == BuiltInContentTypes.Folder || contentTypeId == BuiltInContentTypes.Document)
+                            if (contentTypeId.StartsWith(BuiltInContentTypes.Folder) || contentTypeId.StartsWith(BuiltInContentTypes.Document))
                             {
                                 var listToUpdate = syntexLists.FirstOrDefault(p => p.ListId == listId);
                                 if (listToUpdate != null && (int)refinementResult.Count > 0)
                                 {
-                                    if (contentTypeId == BuiltInContentTypes.Folder)
+                                    if (contentTypeId.StartsWith(BuiltInContentTypes.Folder))
                                     {
                                         listToUpdate.FolderCount += (int)refinementResult.Count;
                                     } 
-                                    else if (contentTypeId == BuiltInContentTypes.Document)
+                                    else if (contentTypeId.StartsWith(BuiltInContentTypes.Document))
                                     {
                                         listToUpdate.DocumentCount += (int)refinementResult.Count;
                                     }
