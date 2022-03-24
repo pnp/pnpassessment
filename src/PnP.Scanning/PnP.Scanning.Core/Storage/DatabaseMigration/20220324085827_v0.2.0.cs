@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
-    public partial class v010 : Migration
+    public partial class v020 : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -131,14 +131,14 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
                     FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
                     ListCount = table.Column<int>(type: "INTEGER", nullable: false),
-                    FileCount = table.Column<int>(type: "INTEGER", nullable: false),
-                    FileCountMean = table.Column<double>(type: "REAL", nullable: false),
-                    FileCountStandardDeviation = table.Column<double>(type: "REAL", nullable: false),
-                    FileCountMin = table.Column<double>(type: "REAL", nullable: false),
-                    FileCountMax = table.Column<double>(type: "REAL", nullable: false),
-                    FileCountMedian = table.Column<double>(type: "REAL", nullable: false),
-                    FileCountLowerQuartile = table.Column<double>(type: "REAL", nullable: false),
-                    FileCountUpperQuartile = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    ItemCountMean = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCountStandardDeviation = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCountMin = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCountMax = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCountMedian = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCountLowerQuartile = table.Column<double>(type: "REAL", nullable: false),
+                    ItemCountUpperQuartile = table.Column<double>(type: "REAL", nullable: false),
                     IsSyntexContentType = table.Column<bool>(type: "INTEGER", nullable: false),
                     SyntexModelDriveId = table.Column<string>(type: "TEXT", nullable: true),
                     SyntexModelObjectId = table.Column<string>(type: "TEXT", nullable: true)
@@ -162,7 +162,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     Group = table.Column<string>(type: "TEXT", nullable: true),
                     Hidden = table.Column<bool>(type: "INTEGER", nullable: false),
                     FieldCount = table.Column<int>(type: "INTEGER", nullable: false),
-                    FileCount = table.Column<int>(type: "INTEGER", nullable: false)
+                    ItemCount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -210,6 +210,8 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     FlowInstanceCount = table.Column<int>(type: "INTEGER", nullable: false),
                     RetentionLabelCount = table.Column<int>(type: "INTEGER", nullable: false),
                     ItemCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    FolderCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    DocumentCount = table.Column<int>(type: "INTEGER", nullable: false),
                     Created = table.Column<DateTime>(type: "TEXT", nullable: false),
                     LastChanged = table.Column<DateTime>(type: "TEXT", nullable: false),
                     LastChangedYear = table.Column<int>(type: "INTEGER", nullable: false),
@@ -220,6 +222,26 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_SyntexLists", x => new { x.ScanId, x.SiteUrl, x.WebUrl, x.ListId });
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SyntexModelUsage",
+                columns: table => new
+                {
+                    ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    WebUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    Classifier = table.Column<string>(type: "TEXT", nullable: false),
+                    TargetSiteId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    TargetWebId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    TargetListId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ClassifiedItemCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    NotProcessedItemCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    AverageConfidenceScore = table.Column<double>(type: "REAL", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SyntexModelUsage", x => new { x.ScanId, x.SiteUrl, x.WebUrl, x.Classifier, x.TargetSiteId, x.TargetWebId, x.TargetListId });
                 });
 
             migrationBuilder.CreateTable(
@@ -362,6 +384,11 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SyntexModelUsage_ScanId_SiteUrl_WebUrl_Classifier_TargetSiteId_TargetWebId_TargetListId",
+                table: "SyntexModelUsage",
+                columns: new[] { "ScanId", "SiteUrl", "WebUrl", "Classifier", "TargetSiteId", "TargetWebId", "TargetListId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TestDelays_ScanId_SiteUrl_WebUrl",
                 table: "TestDelays",
                 columns: new[] { "ScanId", "SiteUrl", "WebUrl" },
@@ -411,6 +438,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
             migrationBuilder.DropTable(
                 name: "SyntexLists");
+
+            migrationBuilder.DropTable(
+                name: "SyntexModelUsage");
 
             migrationBuilder.DropTable(
                 name: "TestDelays");

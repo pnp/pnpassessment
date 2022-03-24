@@ -271,14 +271,14 @@ namespace PnP.Scanning.Core.Scanners
 
                     // Get descriptive statistics for the number of files of a given content type
                     var usage = CountFilesUsingContentType(dbContext, contentTypeOverview.ContentTypeId);
-                    contentTypeOverview.FileCount = usage.Count;
-                    contentTypeOverview.FileCountMin = NaNToDouble(usage.Min);
-                    contentTypeOverview.FileCountMax = NaNToDouble(usage.Max);
-                    contentTypeOverview.FileCountMean = NaNToDouble(usage.Mean);
-                    contentTypeOverview.FileCountMedian = NaNToDouble(usage.Median);
-                    contentTypeOverview.FileCountLowerQuartile = NaNToDouble(usage.LowerQuartile);
-                    contentTypeOverview.FileCountUpperQuartile = NaNToDouble(usage.UpperQuartile);
-                    contentTypeOverview.FileCountStandardDeviation = NaNToDouble(usage.StandardDeviation);
+                    contentTypeOverview.ItemCount = usage.Count;
+                    contentTypeOverview.ItemCountMin = NaNToDouble(usage.Min);
+                    contentTypeOverview.ItemCountMax = NaNToDouble(usage.Max);
+                    contentTypeOverview.ItemCountMean = NaNToDouble(usage.Mean);
+                    contentTypeOverview.ItemCountMedian = NaNToDouble(usage.Median);
+                    contentTypeOverview.ItemCountLowerQuartile = NaNToDouble(usage.LowerQuartile);
+                    contentTypeOverview.ItemCountUpperQuartile = NaNToDouble(usage.UpperQuartile);
+                    contentTypeOverview.ItemCountStandardDeviation = NaNToDouble(usage.StandardDeviation);
                 }
 
                 // save all changes per content type
@@ -318,7 +318,7 @@ namespace PnP.Scanning.Core.Scanners
             // We're not batching search requests to ensure indiviudal request throttling is handled correctly
             foreach (var listId in uniqueListIds)
             {
-                var result = await context.Web.SearchAsync(new SearchOptions($"listid:{listId}")
+                var result = await context.Web.SearchAsync(new SearchOptions($"listid:{listId} path:\"{context.Uri}\"")
                 {
                     RowLimit = 0,
                     RowsPerPage = 0,
@@ -337,7 +337,23 @@ namespace PnP.Scanning.Core.Scanners
                             var contentTypeToUpdate = contentTypes.FirstOrDefault(p => p.ListId == listId && p.ContentTypeId == contentTypeId);
                             if (contentTypeToUpdate != null && (int)refinementResult.Count > 0)
                             {
-                                contentTypeToUpdate.FileCount = (int)refinementResult.Count;
+                                contentTypeToUpdate.ItemCount = (int)refinementResult.Count;
+                            }
+
+                            if (contentTypeId == BuiltInContentTypes.Folder || contentTypeId == BuiltInContentTypes.Document)
+                            {
+                                var listToUpdate = syntexLists.FirstOrDefault(p => p.ListId == listId);
+                                if (listToUpdate != null && (int)refinementResult.Count > 0)
+                                {
+                                    if (contentTypeId == BuiltInContentTypes.Folder)
+                                    {
+                                        listToUpdate.FolderCount += (int)refinementResult.Count;
+                                    } 
+                                    else if (contentTypeId == BuiltInContentTypes.Document)
+                                    {
+                                        listToUpdate.DocumentCount += (int)refinementResult.Count;
+                                    }
+                                }
                             }
                         }
                     }
@@ -380,17 +396,41 @@ namespace PnP.Scanning.Core.Scanners
             {
                 if (!uniqueListIds.Contains(list.ListId))
                 {
-                    var result = await context.Web.SearchAsync(new SearchOptions($"listid:{list.ListId}")
+                    var result = await context.Web.SearchAsync(new SearchOptions($"listid:{list.ListId} path:\"{context.Uri}\"")
                     {
                         RowLimit = 0,
                         RowsPerPage = 0,
                         SortProperties = new List<SortOption>() { new SortOption("DocId") },
-                        RefineProperties = new List<string> { "compliancetag" },
+                        RefineProperties = new List<string> { "contenttypeid", "compliancetag" },
                         ClientType = "PnPMicrosoft365Scanner"
                     });
 
                     if (result.Refinements.Count > 0)
                     {
+                        if (result.Refinements.ContainsKey("contenttypeid"))
+                        {
+                            foreach (var refinementResult in result.Refinements["contenttypeid"])
+                            {
+                                var contentTypeId = IdFromListContentType(refinementResult.Value);
+
+                                if (contentTypeId == BuiltInContentTypes.Folder || contentTypeId == BuiltInContentTypes.Document)
+                                {
+                                    var listToUpdate = syntexLists.FirstOrDefault(p => p.ListId == list.ListId);
+                                    if (listToUpdate != null && (int)refinementResult.Count > 0)
+                                    {
+                                        if (contentTypeId == BuiltInContentTypes.Folder)
+                                        {
+                                            listToUpdate.FolderCount = (int)refinementResult.Count;
+                                        }
+                                        else if (contentTypeId == BuiltInContentTypes.Document)
+                                        {
+                                            listToUpdate.DocumentCount = (int)refinementResult.Count;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         if (result.Refinements.ContainsKey("compliancetag"))
                         {
                             foreach (var refinementResult in result.Refinements["compliancetag"])
@@ -436,14 +476,14 @@ namespace PnP.Scanning.Core.Scanners
             {
                 foreach (var contentType in dbContext.SyntexContentTypes.Where(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId))
                 {
-                    usage.Count += contentType.FileCount;
+                    usage.Count += contentType.ItemCount;
                     if (usage.ContentTypePerList.ContainsKey(contentType.ListId))
                     {
-                        usage.ContentTypePerList[contentType.ListId] += contentType.FileCount;
+                        usage.ContentTypePerList[contentType.ListId] += contentType.ItemCount;
                     }
                     else
                     {
-                        usage.ContentTypePerList.Add(contentType.ListId, contentType.FileCount);
+                        usage.ContentTypePerList.Add(contentType.ListId, contentType.ItemCount);
                     }
                 }
             }

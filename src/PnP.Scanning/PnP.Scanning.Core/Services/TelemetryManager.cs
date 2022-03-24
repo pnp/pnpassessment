@@ -293,10 +293,15 @@ namespace PnP.Scanning.Core.Services
                 int listsWithRetentionLabelCount = 0;
                 int listsWithFlowCount = 0;
                 int listsWithLessThen100Files = 0;
-                int listsWith100To499files = 0;
-                int listsWith500to4999files = 0;
-                int listsWith5000to49999files = 0;
+                int listsWith100To499Files = 0;
+                int listsWith500to4999Files = 0;
+                int listsWith5000to49999Files = 0;
                 int listsWith50000PlusFiles = 0;
+                int listsWithLessThen50Folders = 0;
+                int listsWith50To259Folders = 0;
+                int listsWith250to2499Folders = 0;
+                int listsWith2500to24999Folders = 0;
+                int listsWith25000PlusFolders = 0;
                 int listsWithLessThen5Fields = 0;
                 int listssWith5To9Fields = 0;
                 int listsWith10to14Fields = 0;
@@ -306,27 +311,48 @@ namespace PnP.Scanning.Core.Services
                 foreach (var syntexList in dbContext.SyntexLists)
                 {
                     listCount++;
-                    listFileCount += syntexList.ItemCount;
+                    listFileCount += syntexList.DocumentCount;
 
-                    if (syntexList.ItemCount < 100)
+                    if (syntexList.DocumentCount < 100)
                     {
                         listsWithLessThen100Files++;
                     }
-                    else if (syntexList.ItemCount < 500)
+                    else if (syntexList.DocumentCount < 500)
                     {
-                        listsWith100To499files++;
+                        listsWith100To499Files++;
                     }
-                    else if (syntexList.ItemCount < 5000)
+                    else if (syntexList.DocumentCount < 5000)
                     {
-                        listsWith500to4999files++;
+                        listsWith500to4999Files++;
                     }
-                    else if (syntexList.ItemCount < 50000)
+                    else if (syntexList.DocumentCount < 50000)
                     {
-                        listsWith5000to49999files++;
+                        listsWith5000to49999Files++;
                     }
                     else
                     {
                         listsWith50000PlusFiles++;
+                    }
+
+                    if (syntexList.FolderCount < 50)
+                    {
+                        listsWithLessThen50Folders++;
+                    }
+                    else if (syntexList.FolderCount < 250)
+                    {
+                        listsWith50To259Folders++;
+                    }
+                    else if (syntexList.FolderCount < 2500)
+                    {
+                        listsWith250to2499Folders++;
+                    }
+                    else if (syntexList.FolderCount < 25000)
+                    {
+                        listsWith2500to24999Folders++;
+                    }
+                    else
+                    {
+                        listsWith25000PlusFolders++;
                     }
 
                     if (syntexList.FieldCount < 5)
@@ -370,10 +396,15 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("ListCount", listCount);
                 metric.Add("ListFileCount", listFileCount);
                 metric.Add("listsWithLessThan100Files", listsWithLessThen100Files);
-                metric.Add("ListsWith100To499files", listsWith100To499files);
-                metric.Add("ListsWith500to4999files", listsWith500to4999files);
-                metric.Add("ListsWith5000to49999files", listsWith5000to49999files);
+                metric.Add("ListsWith100To499Files", listsWith100To499Files);
+                metric.Add("ListsWith500to4999Files", listsWith500to4999Files);
+                metric.Add("ListsWith5000to49999Files", listsWith5000to49999Files);
                 metric.Add("ListsWith50000PlusFiles", listsWith50000PlusFiles);
+                metric.Add("ListsWithLessThen50Folders", listsWithLessThen50Folders);
+                metric.Add("ListsWith50To259Folders", listsWith50To259Folders);
+                metric.Add("ListsWith250to2499Folders", listsWith250to2499Folders);
+                metric.Add("ListsWith2500to24999Folders", listsWith2500to24999Folders);
+                metric.Add("ListsWith25000PlusFolders", listsWith25000PlusFolders);
                 metric.Add("ListsWithLessThen5Fields", listsWithLessThen5Fields);
                 metric.Add("ListssWith5To9Fields", listssWith5To9Fields);
                 metric.Add("ListsWith10to14Fields", listsWith10to14Fields);
@@ -389,11 +420,11 @@ namespace PnP.Scanning.Core.Services
                 int contentTypesWith5To9Fields = 0;
                 int contentTypesWith10to14Fields = 0;
                 int contentTypesWith15PlusFields = 0;
-                int contentTypesWithLessThan100Files = 0;
-                int contentTypesWith100To499files = 0;
-                int contentTypesWith500to4999files = 0;
-                int contentTypesWith5000to49999files = 0;
-                int contentTypesWith50000PlusFiles = 0;
+                int contentTypesWithLessThan100Items = 0;
+                int contentTypesWith100To499Items = 0;
+                int contentTypesWith500to4999Items = 0;
+                int contentTypesWith5000to49999Items = 0;
+                int contentTypesWith50000PlusItems = 0;
 
                 foreach (var syntexContentType in dbContext.SyntexContentTypes)
                 {
@@ -416,25 +447,25 @@ namespace PnP.Scanning.Core.Services
                         contentTypesWith15PlusFields++;
                     }
 
-                    if (syntexContentType.FileCount < 100)
+                    if (syntexContentType.ItemCount < 100)
                     {
-                        contentTypesWithLessThan100Files++;
+                        contentTypesWithLessThan100Items++;
                     }
-                    else if (syntexContentType.FileCount < 500)
+                    else if (syntexContentType.ItemCount < 500)
                     {
-                        contentTypesWith100To499files++;
+                        contentTypesWith100To499Items++;
                     }
-                    else if (syntexContentType.FileCount < 5000)
+                    else if (syntexContentType.ItemCount < 5000)
                     {
-                        contentTypesWith500to4999files++;
+                        contentTypesWith500to4999Items++;
                     }
-                    else if (syntexContentType.FileCount < 5000)
+                    else if (syntexContentType.ItemCount < 5000)
                     {
-                        contentTypesWith5000to49999files++;
+                        contentTypesWith5000to49999Items++;
                     }
                     else
                     {
-                        contentTypesWith50000PlusFiles++;
+                        contentTypesWith50000PlusItems++;
                     }
                 }
 
@@ -443,11 +474,11 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("ContentTypesWith5To9Fields", contentTypesWith5To9Fields);
                 metric.Add("ContentTypesWith10to14Fields", contentTypesWith10to14Fields);
                 metric.Add("ContentTypesWith15PlusFields", contentTypesWith15PlusFields);
-                metric.Add("ContentTypesWithLessThan100Files", contentTypesWithLessThan100Files);
-                metric.Add("ContentTypesWith100To499files", contentTypesWith100To499files);
-                metric.Add("ContentTypesWith500to4999files", contentTypesWith500to4999files);
-                metric.Add("ContentTypesWith5000to49999files", contentTypesWith5000to49999files);
-                metric.Add("ContentTypesWith50000PlusFiles", contentTypesWith50000PlusFiles);
+                metric.Add("ContentTypesWithLessThan100Items", contentTypesWithLessThan100Items);
+                metric.Add("ContentTypesWith100To499Items", contentTypesWith100To499Items);
+                metric.Add("ContentTypesWith500to4999Items", contentTypesWith500to4999Items);
+                metric.Add("ContentTypesWith5000to49999Items", contentTypesWith5000to49999Items);
+                metric.Add("ContentTypesWith50000PlusItems", contentTypesWith50000PlusItems);
 
                 // Syntex usage metrics
                 List<string> uniqueContentCenters = new();

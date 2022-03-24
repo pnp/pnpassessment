@@ -22,6 +22,6 @@ namespace PnP.Scanning.Core.Storage
 
         public int FieldCount { get; set; }
 
-        public int FileCount { get; set; }
+        public int ItemCount { get; set; }
     }
 }

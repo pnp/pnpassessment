@@ -38,6 +38,10 @@ namespace PnP.Scanning.Core.Storage
         #region Information to collect list "activeness"
         public int ItemCount { get; set; }
 
+        public int FolderCount { get; set; }
+
+        public int DocumentCount { get; set; }
+
         public DateTime Created { get; set; }
 
         public DateTime LastChanged { get; set; }

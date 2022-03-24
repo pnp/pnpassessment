@@ -21,21 +21,21 @@ namespace PnP.Scanning.Core.Storage
 
         public int ListCount { get; set; }
 
-        public int FileCount { get; set; }
+        public int ItemCount { get; set; }
 
-        public double FileCountMean { get; set; }
+        public double ItemCountMean { get; set; }
 
-        public double FileCountStandardDeviation { get; set; }
+        public double ItemCountStandardDeviation { get; set; }
 
-        public double FileCountMin { get; set; }
+        public double ItemCountMin { get; set; }
 
-        public double FileCountMax { get; set; }
+        public double ItemCountMax { get; set; }
 
-        public double FileCountMedian { get; set; }
+        public double ItemCountMedian { get; set; }
 
-        public double FileCountLowerQuartile { get; set; }
+        public double ItemCountLowerQuartile { get; set; }
 
-        public double FileCountUpperQuartile { get; set; }
+        public double ItemCountUpperQuartile { get; set; }
 
         public bool IsSyntexContentType { get; set; }
 

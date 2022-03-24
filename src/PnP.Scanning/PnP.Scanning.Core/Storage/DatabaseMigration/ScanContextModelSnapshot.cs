@@ -200,13 +200,13 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<int>("FieldCount")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("FileCount")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Group")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ItemCount")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ListContentTypeId")
@@ -282,30 +282,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<int>("FieldCount")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("FileCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<double>("FileCountLowerQuartile")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("FileCountMax")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("FileCountMean")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("FileCountMedian")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("FileCountMin")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("FileCountStandardDeviation")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("FileCountUpperQuartile")
-                        .HasColumnType("REAL");
-
                     b.Property<string>("Group")
                         .HasColumnType("TEXT");
 
@@ -314,6 +290,30 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<bool>("IsSyntexContentType")
                         .HasColumnType("INTEGER");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("ItemCountLowerQuartile")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ItemCountMax")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ItemCountMean")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ItemCountMedian")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ItemCountMin")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ItemCountStandardDeviation")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("ItemCountUpperQuartile")
+                        .HasColumnType("REAL");
 
                     b.Property<int>("ListCount")
                         .HasColumnType("INTEGER");
@@ -401,10 +401,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<DateTime>("Created")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("DocumentCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("FieldCount")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("FlowInstanceCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FolderCount")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ItemCount")
