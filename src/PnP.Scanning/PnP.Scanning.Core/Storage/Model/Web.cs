@@ -13,6 +13,8 @@ namespace PnP.Scanning.Core.Storage
 
         public DateTime EndDate { get; set; }
 
+        public int ScanDuration { get; set; }
+
         public SiteWebStatus Status { get; set; }
 
         public string Template { get; set; }

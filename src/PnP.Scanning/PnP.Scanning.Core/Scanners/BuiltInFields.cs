@@ -524,6 +524,7 @@
         internal static readonly Guid TaxKeywordTaxHTField = new Guid("1390A86A-23DA-45F0-8EFE-EF36EDADFB39");
         internal static readonly Guid TaxKeyword = new Guid("23F27201-BEE3-471E-B2E7-B64FD8B7CA38");
         internal static readonly Guid SharingHintHash = new Guid("89A0FBBC-67B4-40BD-8C9A-386B325AB4CA");
+        internal static readonly Guid _IpLabelPromotionCtagVersion = new Guid("D736872B-A0B9-4C9D-8750-CA0572B0B2DA");
 
         // Hashset to contain the whole list of built in fields
         private static HashSet<Guid> builtInFieldsHashSet;
@@ -1065,6 +1066,7 @@
                                 TaxKeywordTaxHTField,
                                 TaxKeyword,
                                 SharingHintHash,
+                                _IpLabelPromotionCtagVersion,
                             });
                     }
                 }

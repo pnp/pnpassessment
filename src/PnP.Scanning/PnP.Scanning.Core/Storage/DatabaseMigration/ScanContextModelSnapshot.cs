@@ -163,6 +163,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("Error")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ScanDuration")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("StackTrace")
                         .HasColumnType("TEXT");
 
@@ -395,6 +398,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<bool>("AllowContentTypes")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("AverageDocumentsPerFolder")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ContentTypeCount")
                         .HasColumnType("INTEGER");
 
@@ -431,6 +437,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<int>("LastChangedYear")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("LibrarySize")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ListExperienceOptions")
                         .HasColumnType("TEXT");
 
@@ -448,6 +457,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("Title")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("UsesCustomColumns")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("WorkflowInstanceCount")
                         .HasColumnType("INTEGER");
@@ -546,6 +558,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("Error")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("ScanDuration")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StackTrace")
                         .HasColumnType("TEXT");

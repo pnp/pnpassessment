@@ -42,6 +42,12 @@ namespace PnP.Scanning.Core.Storage
 
         public int DocumentCount { get; set; }
 
+        public int AverageDocumentsPerFolder { get; set; }
+
+        public string LibrarySize { get; set; }
+
+        public bool UsesCustomColumns { get; set; }
+
         public DateTime Created { get; set; }
 
         public DateTime LastChanged { get; set; }

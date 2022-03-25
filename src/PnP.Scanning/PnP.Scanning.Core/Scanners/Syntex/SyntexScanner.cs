@@ -281,6 +281,30 @@ namespace PnP.Scanning.Core.Scanners
                     contentTypeOverview.ItemCountStandardDeviation = NaNToDouble(usage.StandardDeviation);
                 }
 
+                // Populate some extra columns to speed up the PowerBI report
+                foreach(var syntexList in dbContext.SyntexLists)
+                {
+                    if (syntexList.DocumentCount <= 99)
+                    {
+                        syntexList.LibrarySize = "Small";
+                    }
+                    else if (syntexList.DocumentCount <= 999)
+                    {
+                        syntexList.LibrarySize = "Medium";
+                    }
+                    else
+                    {
+                        syntexList.LibrarySize = "Large";
+                    }
+
+                    if (syntexList.DocumentCount > 0 && syntexList.FolderCount > 0)
+                    {
+                        syntexList.AverageDocumentsPerFolder = syntexList.DocumentCount / syntexList.FolderCount;
+                    }
+
+                    syntexList.UsesCustomColumns = syntexList.FieldCount > 0;
+                }
+
                 // save all changes per content type
                 await dbContext.SaveChangesAsync();
             }

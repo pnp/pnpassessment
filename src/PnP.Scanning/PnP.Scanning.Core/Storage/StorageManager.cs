@@ -349,6 +349,7 @@ namespace PnP.Scanning.Core.Storage
 
                     siteToUpdate.Status = failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished;
                     siteToUpdate.EndDate = DateTime.Now;
+                    siteToUpdate.ScanDuration = (siteToUpdate.EndDate - siteToUpdate.StartDate).Seconds;
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in EndSiteCollectionScanAsync for scan {ScanId}", scanId);
@@ -371,6 +372,7 @@ namespace PnP.Scanning.Core.Storage
                 {
                     siteToUpdate.Status = SiteWebStatus.Failed;
                     siteToUpdate.EndDate = DateTime.Now;
+                    siteToUpdate.ScanDuration = (siteToUpdate.EndDate - siteToUpdate.StartDate).Seconds;
                     siteToUpdate.Error = GetMessageFromException(ex);
                     siteToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
@@ -397,6 +399,7 @@ namespace PnP.Scanning.Core.Storage
                 {
                     webToUpdate.Status = SiteWebStatus.Finished;
                     webToUpdate.EndDate = DateTime.Now;
+                    webToUpdate.ScanDuration = (webToUpdate.EndDate - webToUpdate.StartDate).Seconds;
 
                     Log.Information("Setting Web table to status Finished for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
 
@@ -421,6 +424,7 @@ namespace PnP.Scanning.Core.Storage
                 {
                     webToUpdate.Status = SiteWebStatus.Failed;
                     webToUpdate.EndDate = DateTime.Now;
+                    webToUpdate.ScanDuration = (webToUpdate.EndDate - webToUpdate.StartDate).Seconds;
                     webToUpdate.Error = GetMessageFromException(ex);
                     webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
