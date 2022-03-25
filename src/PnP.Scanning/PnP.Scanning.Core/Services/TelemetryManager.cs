@@ -17,7 +17,6 @@ namespace PnP.Scanning.Core.Services
         private const string EngineVersion = "Version";
         private const string AADTenantId = "AADTenantId";
         private const string ScanMode = "Mode";
-        private const string Tenant = "Tenant";
         private const string TenantEnvironment = "Environment";
         private const string AuthMode = "AuthMode";
         private const string UsesTenant = "UsesTenant";
@@ -306,6 +305,9 @@ namespace PnP.Scanning.Core.Services
                 int listssWith5To9Fields = 0;
                 int listsWith10to14Fields = 0;
                 int listsWith15PlusFields = 0;
+                int smallLibraryCount = 0;
+                int mediumLibraryCount = 0;
+                int largeLibraryCount = 0;
 
                 // Syntex lists metrics
                 foreach (var syntexList in dbContext.SyntexLists)
@@ -391,6 +393,19 @@ namespace PnP.Scanning.Core.Services
                     {
                         listsWithFlowCount++;
                     }
+
+                    if (syntexList.LibrarySize == "Small")
+                    {
+                        smallLibraryCount++;
+                    }
+                    else if (syntexList.LibrarySize == "Medium")
+                    {
+                        mediumLibraryCount++;
+                    }
+                    else if (syntexList.LibrarySize == "Large")
+                    {
+                        largeLibraryCount++;
+                    }
                 }
 
                 metric.Add("ListCount", listCount);
@@ -413,6 +428,9 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("ListsWithWorkflowCount", listsWithWorkflowCount);
                 metric.Add("ListsWithRetentionLabelCount", listsWithRetentionLabelCount);
                 metric.Add("ListsWithFlowCount", listsWithFlowCount);
+                metric.Add("ListsLargeCount", largeLibraryCount);
+                metric.Add("ListsMediumCount", mediumLibraryCount);
+                metric.Add("ListsSmallCount", smallLibraryCount);
 
                 // Syntex content type metrics
                 int contentTypeCount = 0;
