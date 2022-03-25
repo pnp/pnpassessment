@@ -535,7 +535,7 @@ namespace PnP.Scanning.Core.Services
 
         private async Task InitializeTelemetryAsync(Guid scanId)
         {
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PnPMicrosoft365Scanner-DisableTelemetry")))
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PNP_DISABLETELEMETRY")))
             {
                 skipTelemetry = true;
             }
