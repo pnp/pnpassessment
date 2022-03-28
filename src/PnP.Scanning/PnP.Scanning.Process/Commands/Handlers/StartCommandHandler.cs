@@ -234,8 +234,8 @@ namespace PnP.Scanning.Process.Commands
             // Application id
             threadsOption = new(
                 name: $"--{Constants.StartThreads}",
-                // Default application to use double of the logical processor threads
-                getDefaultValue: () => Environment.ProcessorCount,
+                // Default application to use the logical processor threads, with a maximum of 10
+                getDefaultValue: () => Math.Min(Environment.ProcessorCount, 10),
                 description: "Number of parallel scan operations to use")
             {
                 IsRequired = true
