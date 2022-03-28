@@ -301,6 +301,10 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         syntexList.AverageDocumentsPerFolder = syntexList.DocumentCount / syntexList.FolderCount;
                     }
+                    else
+                    {
+                        syntexList.AverageDocumentsPerFolder = syntexList.DocumentCount;
+                    }
 
                     syntexList.UsesCustomColumns = syntexList.FieldCount > 0;
                 }
