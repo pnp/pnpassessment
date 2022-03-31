@@ -205,6 +205,8 @@ namespace PnP.Scanning.Core.Scanners
         {
             Logger.Information("Pre scanning work is starting");
 
+            await SendRequestWithClientTagAsync();
+
             using (var context = await GetPnPContextAsync())
             {
                 bool usesApplicationPermissions = await context.GetMicrosoft365Admin().AccessTokenUsesApplicationPermissionsAsync();

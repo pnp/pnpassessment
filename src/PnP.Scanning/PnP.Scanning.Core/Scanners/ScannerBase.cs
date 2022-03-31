@@ -140,6 +140,16 @@ namespace PnP.Scanning.Core.Scanners
             return clientContext;
         }
 
+        protected async Task SendRequestWithClientTagAsync()
+        {
+            using (var context = GetClientContext())
+            {
+                context.ClientTag = "SPDev:M365Scanner";
+                context.Load(context.Web, p => p.Id);
+                await context.ExecuteQueryAsync();
+            }
+        }
+
         protected void AddToCache(string key, string value)
         {
             key = BuildKey(key);

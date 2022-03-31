@@ -334,6 +334,8 @@ namespace PnP.Scanning.Core.Scanners
         {
             Logger.Information("Pre scanning work is starting");
 
+            await SendRequestWithClientTagAsync();
+
             WorkflowManager.Instance.LoadWorkflowDefaultActions();
 
             Logger.Information("Pre scanning work done");
