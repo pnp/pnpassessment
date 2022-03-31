@@ -8,7 +8,6 @@ namespace PnP.Scanning.Core.Services
 {
     internal sealed class TelemetryManager
     {
-        private bool didInitializeTelemetryData;
         private bool skipTelemetry;
         private bool skipTelemetryEventSent;
         private readonly TelemetryClient telemetryClient;
@@ -570,21 +569,12 @@ namespace PnP.Scanning.Core.Services
 
         private async Task InitializeTelemetryDataAsync(Guid scanId)
         {
-            if (didInitializeTelemetryData)
-            {
-                return;
-            }
-            else
-            {
-                didInitializeTelemetryData = true;
-            }
-
             var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
             if (!string.IsNullOrEmpty(scan.CLITenantId) && Guid.TryParse(scan.CLITenantId, out Guid tenantId))
             {
                 Scan = scan;
                 TenantId = tenantId;
-                Log.Information("Tenant id for this scan session is {TenantId}", TenantId);
+                Log.Information("Tenant id for this scan session {ScanId} is {TenantId}. Scan mode = {Mode}", TenantId, scanId, Scan.CLIMode);
             }
             else
             {
