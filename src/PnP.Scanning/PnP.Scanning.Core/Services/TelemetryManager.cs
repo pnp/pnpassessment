@@ -579,19 +579,16 @@ namespace PnP.Scanning.Core.Services
                 didInitializeTelemetryData = true;
             }
 
-            if (TenantId == Guid.Empty)
+            var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
+            if (!string.IsNullOrEmpty(scan.CLITenantId) && Guid.TryParse(scan.CLITenantId, out Guid tenantId))
             {
-                var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
-                if (!string.IsNullOrEmpty(scan.CLITenantId) && Guid.TryParse(scan.CLITenantId, out Guid tenantId))
-                {
-                    Scan = scan;
-                    TenantId = tenantId;
-                    Log.Information("Tenant id for this scan session is {TenantId}", TenantId);
-                }
-                else
-                {
-                    Log.Warning("Tenant id was not retrieved for this scan session");
-                }
+                Scan = scan;
+                TenantId = tenantId;
+                Log.Information("Tenant id for this scan session is {TenantId}", TenantId);
+            }
+            else
+            {
+                Log.Warning("Tenant id was not retrieved for this scan session");
             }
 
             if (string.IsNullOrEmpty(Version))
