@@ -197,8 +197,8 @@ namespace PnP.Scanning.Core.Services
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
                 var siteCollectionCount = await dbContext.SiteCollections.CountAsync();
-                var webCount = await dbContext.SiteCollections.CountAsync();
-                var failedWebCount = await dbContext.SiteCollections.CountAsync(p => p.Status == SiteWebStatus.Failed);
+                var webCount = await dbContext.Webs.CountAsync();
+                var failedWebCount = await dbContext.Webs.CountAsync(p => p.Status == SiteWebStatus.Failed);
                 var failedSiteCollectionCount = await dbContext.SiteCollections.CountAsync(p => p.Status == SiteWebStatus.Failed);
 
                 int scanDurationInMinutes = 0;
