@@ -35,6 +35,10 @@ namespace PnP.Scanning.Core.Services
             {
                 var coreAssembly = Assembly.GetExecutingAssembly();
                 currentVersion = ((AssemblyFileVersionAttribute)coreAssembly.GetCustomAttribute(typeof(AssemblyFileVersionAttribute))).Version;
+                
+                // Drop the file revision
+                var versionOld = new Version(currentVersion);
+                currentVersion = $"{versionOld.Major}.{versionOld.Minor}.{versionOld.Build}";
 
                 using (var request = new HttpRequestMessage(HttpMethod.Get, $"{versionFileUrl}?random={new Random().Next()}"))
                 {
@@ -45,8 +49,8 @@ namespace PnP.Scanning.Core.Services
                 if (!string.IsNullOrEmpty(latestVersion))
                 {
                     latestVersion = latestVersion.Replace("\\r", "").Replace("\\t", "");
+                    versionOld = new Version(currentVersion);
 
-                    var versionOld = new Version(currentVersion);
                     if (Version.TryParse(latestVersion, out Version versionNew))
                     {
                         if (versionOld.CompareTo(versionNew) >= 0)
