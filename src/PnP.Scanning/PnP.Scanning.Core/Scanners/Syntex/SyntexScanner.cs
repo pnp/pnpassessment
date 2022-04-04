@@ -286,11 +286,22 @@ namespace PnP.Scanning.Core.Scanners
                 // Populate some extra columns to speed up the PowerBI report
                 foreach(var syntexList in dbContext.SyntexLists)
                 {
-                    if (syntexList.DocumentCount <= 99)
+                    // If no deepscan was done then we don't have individual document/folder counts, so fall back to item count
+                    int documentCount = 0;
+                    if (Options.DeepScan)
+                    {
+                        documentCount = syntexList.DocumentCount;
+                    }
+                    else
+                    {
+                        documentCount = syntexList.ItemCount;
+                    }
+
+                    if (documentCount <= 99)
                     {
                         syntexList.LibrarySize = "Small";
                     }
-                    else if (syntexList.DocumentCount <= 999)
+                    else if (documentCount <= 999)
                     {
                         syntexList.LibrarySize = "Medium";
                     }
