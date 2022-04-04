@@ -5,6 +5,11 @@ namespace PnP.Scanning.Core.Services
 {
     internal static class VersionManager
     {
+        internal const string versionFileUrl = "https://raw.githubusercontent.com/pnp/pnpscanning/main/version.txt";
+        internal const string newVersionDownloadUrl = "https://aka.ms/m365scannerreleases";
+
+        private static readonly HttpClient httpClient = new HttpClient();
+
         internal static string GetCurrentVersion()
         {
             var coreAssembly = Assembly.GetExecutingAssembly();
@@ -21,5 +26,50 @@ namespace PnP.Scanning.Core.Services
             throw new Exception("Version could not be read");
         }
 
+        internal static async Task<Tuple<string, string>> LatestVersionAsync()
+        {
+            string latestVersion = "";
+            string currentVersion = "";
+
+            try
+            {
+                var coreAssembly = Assembly.GetExecutingAssembly();
+                currentVersion = ((AssemblyFileVersionAttribute)coreAssembly.GetCustomAttribute(typeof(AssemblyFileVersionAttribute))).Version;
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, $"{versionFileUrl}?random={new Random().Next()}"))
+                {
+                    HttpResponseMessage response = await httpClient.SendAsync(request).ConfigureAwait(false);
+                    latestVersion = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                }
+
+                if (!string.IsNullOrEmpty(latestVersion))
+                {
+                    latestVersion = latestVersion.Replace("\\r", "").Replace("\\t", "");
+
+                    var versionOld = new Version(currentVersion);
+                    if (Version.TryParse(latestVersion, out Version versionNew))
+                    {
+                        if (versionOld.CompareTo(versionNew) >= 0)
+                        {
+                            // version is not newer
+                            latestVersion = null;
+                        }
+                    }
+                    else
+                    {
+                        // We could not get the version file
+                        latestVersion = null;
+                    }
+                }
+
+            }
+            catch (Exception)
+            {
+                // Something went wrong
+                latestVersion = null;
+            }
+
+            return new Tuple<string, string>(currentVersion, latestVersion);
+        }
     }
 }
