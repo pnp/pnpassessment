@@ -165,6 +165,9 @@ namespace PnP.Scanning.Core.Services
                 // Populate event properties (if any)
                 PopulateScanProperties(properties, scanId);
 
+                // Populate generic scan properties (if any)
+                await PopulatePropertiesAsync(scanId, properties);
+
                 // Populate generic metrics
                 await PopulateMetricsAsync(scanId, metrics);
 
@@ -280,6 +283,18 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        private async Task PopulatePropertiesAsync(Guid scanId, Dictionary<string, string> properties)
+        {
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            {
+                // Scan properties
+                foreach (var scanProperty in dbContext.Properties)
+                {                    
+                    properties.Add(scanProperty.Name, scanProperty.Value);               
+                }
+            }
+        }
+
         private async Task PopulateSyntexMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -308,25 +323,47 @@ namespace PnP.Scanning.Core.Services
                 int mediumLibraryCount = 0;
                 int largeLibraryCount = 0;
 
+                // Was deep scan used?
+                bool deepScanUsed = false;
+                var deepScanProperty = await dbContext.Properties.FirstOrDefaultAsync(p => p.Name == "syntexdeepscan");
+                if (deepScanProperty != null)
+                {
+                    if (deepScanProperty.Value.Equals("True", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        deepScanUsed = true;
+                    }
+                    else
+                    {
+                        deepScanUsed = false;
+                    }
+                }
+
                 // Syntex lists metrics
                 foreach (var syntexList in dbContext.SyntexLists)
                 {
-                    listCount++;
-                    listFileCount += syntexList.DocumentCount;
+                    int valueToUse = syntexList.DocumentCount;
 
-                    if (syntexList.DocumentCount < 100)
+                    if (!deepScanUsed)
+                    {
+                        valueToUse = syntexList.ItemCount;
+                    }
+
+                    listCount++;                    
+                    listFileCount += valueToUse;                    
+
+                    if (valueToUse < 100)
                     {
                         listsWithLessThen100Files++;
                     }
-                    else if (syntexList.DocumentCount < 500)
+                    else if (valueToUse < 500)
                     {
                         listsWith100To499Files++;
                     }
-                    else if (syntexList.DocumentCount < 5000)
+                    else if (valueToUse < 5000)
                     {
                         listsWith500to4999Files++;
                     }
-                    else if (syntexList.DocumentCount < 50000)
+                    else if (valueToUse < 50000)
                     {
                         listsWith5000to49999Files++;
                     }

@@ -5,9 +5,9 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <AssemblyName>microsoft365-scanner</AssemblyName>
+    <AssemblyName>microsoft365-assessment</AssemblyName>
 	<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-	<Version>0.4.0</Version>  
+	<Version>0.5.0</Version>  
   </PropertyGroup>
 
   <ItemGroup>

@@ -71,7 +71,7 @@ namespace PnP.Scanning.Process
 
                 if (args.Length == 0)
                 {
-                    AnsiConsole.Write(new FigletText("Microsoft 365 Scanner").Centered().Color(Color.Green));
+                    AnsiConsole.Write(new FigletText("Microsoft 365 Assessment").Centered().Color(Color.Green));
                     AnsiConsole.WriteLine("");
                     AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
                     var consoleInput = Console.ReadLine();
