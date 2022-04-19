@@ -21,7 +21,7 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("list", "Lists the all the Microsoft 365 Assessments with their status");
+            cmd = new Command("list", "Lists all the Microsoft 365 Assessments with their status");
 
             // Scanner mode
             runningOption = new(

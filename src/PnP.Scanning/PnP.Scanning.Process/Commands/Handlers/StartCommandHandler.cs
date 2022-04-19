@@ -43,7 +43,7 @@ namespace PnP.Scanning.Process.Commands
             processManager = processManagerInstance;
             dataProtectionProvider = dataProtectionProviderInstance;
 
-            cmd = new Command("start", "Starts a new assessment");
+            cmd = new Command("start", "Starts a new Microsoft 365 Assessment");
 
             // Configure the options for the start command
 
