@@ -70,7 +70,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task ExecuteAsync()
         {
-            Logger.Information("Starting Syntex scan of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+            Logger.Information("Starting Syntex assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
             // Define extra Web/Site data that we want to load when the context is inialized
             // This will not require extra server roundtrips
@@ -198,12 +198,12 @@ namespace PnP.Scanning.Core.Scanners
                 await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields, syntexModelUsage);
             }
 
-            Logger.Information("Syntex scan of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+            Logger.Information("Syntex assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
         internal async override Task PreScanningAsync()
         {
-            Logger.Information("Pre scanning work is starting");
+            Logger.Information("Pre assessment work is starting");
 
             await SendRequestWithClientTagAsync();
 
@@ -257,12 +257,12 @@ namespace PnP.Scanning.Core.Scanners
             //    Logger.Warning("Flow instance counts will not be available when using application permissions");
             //}
 
-            Logger.Information("Pre scanning work done");
+            Logger.Information("Pre assessment work done");
         }
 
         internal async override Task PostScanningAsync()
         {
-            Logger.Information("Post scanning work is starting");
+            Logger.Information("Post assessment work is starting");
             using (var dbContext = new ScanContext(ScanId))
             {
 
@@ -326,7 +326,7 @@ namespace PnP.Scanning.Core.Scanners
                 await dbContext.SaveChangesAsync();
             }
 
-            Logger.Information("Post scanning work done");
+            Logger.Information("Post assessment work done");
         }
 
         private double NaNToDouble(double input)

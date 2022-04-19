@@ -64,8 +64,8 @@ namespace PnP.Scanning.Core.Queues
 
                 if (scanner == null)
                 {
-                    Log.Error("Unknown options class specified for scan {ScanId}, no scanner instance created", ScanId);
-                    throw new Exception($"Unknown options class specified for scan {ScanId}, no scanner instance created");
+                    Log.Error("Unknown options class specified for assessment {ScanId}, no assessment instance created", ScanId);
+                    throw new Exception($"Unknown options class specified for assessment {ScanId}, no assessment instance created");
                 }
 
                 try
@@ -82,7 +82,7 @@ namespace PnP.Scanning.Core.Queues
                 catch (Exception ex)
                 {
                     // The web scan failed, log accordingly
-                    Log.Error(ex, "Scan of {SiteUrl}{WebUrl} failed with scan component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
+                    Log.Error(ex, "Assessment of {SiteUrl}{WebUrl} failed with assessment component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
                     await StorageManager.EndWebScanWithErrorAsync(ScanId, web.SiteCollectionUrl, web.WebUrl, ex);
                 }
             }
@@ -90,11 +90,11 @@ namespace PnP.Scanning.Core.Queues
             {
                 if (CancellationToken.IsCancellationRequested)
                 {
-                    Log.Information("Scan {ScanId} was cancelled, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                    Log.Information("Assessment {ScanId} was cancelled, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
                 }
                 else
                 {
-                    Log.Information("Scan {ScanId} has pausing bit set, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                    Log.Information("Assessment {ScanId} has pausing bit set, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
                 }
             }
         }

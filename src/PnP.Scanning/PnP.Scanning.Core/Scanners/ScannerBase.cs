@@ -223,7 +223,7 @@ namespace PnP.Scanning.Core.Scanners
             if (string.IsNullOrEmpty(key))
             {
                 Logger.Error("Empty cache key presented");
-                throw new Exception($"Empty cache key presented for scan {ScanId}");
+                throw new Exception($"Empty cache key presented for assessment {ScanId}");
             }
 
             return $"{ScanId}-{key}";

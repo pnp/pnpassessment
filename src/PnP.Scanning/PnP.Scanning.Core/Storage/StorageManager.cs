@@ -26,7 +26,7 @@ namespace PnP.Scanning.Core.Storage
             passwordProtector = dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose);
         }
 
-        internal static string DbName => "scan.db";
+        internal static string DbName => "assessment.db";
 
         internal async Task LaunchNewScanAsync(Guid scanId, StartRequest start, List<string> siteCollectionList)
         {
@@ -112,15 +112,15 @@ namespace PnP.Scanning.Core.Storage
                     scan.EndDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in EndScanAsync for assessment {ScanId}", scanId);
 
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
                 }
                 else
                 {
-                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
-                    throw new Exception($"No scan row for scan {scanId} found to update");
+                    Log.Error("No assessment row for assessment {ScanId} found to update", scanId);
+                    throw new Exception($"No assessment row for assessment {scanId} found to update");
                 }
             }
         }
@@ -132,7 +132,7 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    Log.Information("Setting Scan table to status {Status} for scan {ScanId}", scanStatus, scanId);
+                    Log.Information("Setting Scan table to status {Status} for assessment {ScanId}", scanStatus, scanId);
                     if (scan.Status != scanStatus)
                     {
                         await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {scanStatus}");
@@ -148,15 +148,15 @@ namespace PnP.Scanning.Core.Storage
                     }
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in SetScanStatusAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in SetScanStatusAsync for assessment {ScanId}", scanId);
                     
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
                 }
                 else
                 {
-                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
-                    throw new Exception($"No scan row for scan {scanId} found to update");
+                    Log.Error("No assessment row for assessment {ScanId} found to update", scanId);
+                    throw new Exception($"No assessment row for assessment {scanId} found to update");
                 }
             }
         }
@@ -168,7 +168,7 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    Log.Information("Setting Scan table to prescanstatus {Status} for scan {ScanId}", preScanStatus, scanId);
+                    Log.Information("Setting Scan table to preassessmentstatus {Status} for assessment {ScanId}", preScanStatus, scanId);
                     if (scan.PreScanStatus != preScanStatus)
                     {
                         await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreAssessmentStatusChange, DateTime.Now, $"From {scan.PreScanStatus} to {preScanStatus}");
@@ -176,12 +176,12 @@ namespace PnP.Scanning.Core.Storage
                     }
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in SetPreScanStatusAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in SetPreScanStatusAsync for assessment {ScanId}", scanId);
                 }
                 else
                 {
-                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
-                    throw new Exception($"No scan row for scan {scanId} found to update");
+                    Log.Error("No assessment row for assessment {ScanId} found to update", scanId);
+                    throw new Exception($"No assessment row for assessment {scanId} found to update");
                 }
             }
         }
@@ -193,7 +193,7 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    Log.Information("Setting Scan table to postscanstatus {Status} for scan {ScanId}", postScanStatus, scanId);
+                    Log.Information("Setting Scan table to postassessmentstatus {Status} for assessment {ScanId}", postScanStatus, scanId);
                     if (scan.PostScanStatus != postScanStatus)
                     {
                         await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPostAssessmentStatusChange, DateTime.Now, $"From {scan.PostScanStatus} to {postScanStatus}");
@@ -201,12 +201,12 @@ namespace PnP.Scanning.Core.Storage
                     }
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in SetPostScanStatusAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in SetPostScanStatusAsync for assessment {ScanId}", scanId);
                 }
                 else
                 {
-                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
-                    throw new Exception($"No scan row for scan {scanId} found to update");
+                    Log.Error("No assessment row for assessment {ScanId} found to update", scanId);
+                    throw new Exception($"No assessment row for assessment {scanId} found to update");
                 }
             }
         }
@@ -225,8 +225,8 @@ namespace PnP.Scanning.Core.Storage
                 }
                 else
                 {
-                    Log.Error("No scan row for scan {ScanId} found ", scanId);
-                    throw new Exception($"No scan row for scan {scanId} found");
+                    Log.Error("No assessment row for assessment {ScanId} found ", scanId);
+                    throw new Exception($"No assessment row for assessment {scanId} found");
                 }
             }
         }
@@ -239,12 +239,12 @@ namespace PnP.Scanning.Core.Storage
                 var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    Log.Information("Setting SiteCollection table to status Running for scan {ScanId}, site collection {SiteCollectionUrl}", scanId, siteCollectionUrl);
+                    Log.Information("Setting SiteCollection table to status Running for assessment {ScanId}, site collection {SiteCollectionUrl}", scanId, siteCollectionUrl);
                     siteToUpdate.Status = SiteWebStatus.Running;
                     siteToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in StartSiteCollectionScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in StartSiteCollectionScanAsync for assessment {ScanId}", scanId);
                 }
                 else
                 {
@@ -287,7 +287,7 @@ namespace PnP.Scanning.Core.Storage
                     if (added)
                     {
                         await dbContext.SaveChangesAsync();
-                        Log.Information("Database updates pushed in StoreWebsToScanAsync for scan {ScanId}", scanId);
+                        Log.Information("Database updates pushed in StoreWebsToScanAsync for assessment {ScanId}", scanId);
 
                     }
                 }
@@ -307,7 +307,7 @@ namespace PnP.Scanning.Core.Storage
                     }
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in StoreWebsToScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in StoreWebsToScanAsync for assessment {ScanId}", scanId);
 
                 }
             }
@@ -320,12 +320,12 @@ namespace PnP.Scanning.Core.Storage
                 var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
-                    Log.Information("Setting Web table to status Running for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+                    Log.Information("Setting Web table to status Running for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
                     webToUpdate.Status = SiteWebStatus.Running;
                     webToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in StartWebScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in StartWebScanAsync for assessment {ScanId}", scanId);
                 }
                 else
                 {
@@ -344,7 +344,7 @@ namespace PnP.Scanning.Core.Storage
                 {
                     var failedWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
 
-                    Log.Information("Setting SiteCollection table to status {Status} for scan {ScanId}, site collection {SiteCollectionUrl}",
+                    Log.Information("Setting SiteCollection table to status {Status} for assessment {ScanId}, site collection {SiteCollectionUrl}",
                         failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished, scanId, siteCollectionUrl);
 
                     siteToUpdate.Status = failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished;
@@ -352,12 +352,12 @@ namespace PnP.Scanning.Core.Storage
                     siteToUpdate.ScanDuration = (siteToUpdate.EndDate - siteToUpdate.StartDate).Seconds;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndSiteCollectionScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in EndSiteCollectionScanAsync for assessment {ScanId}", scanId);
 
                 }
                 else
                 {
-                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in scan {ScanId}", siteCollectionUrl, scanId);
+                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in assessment {ScanId}", siteCollectionUrl, scanId);
                     throw new Exception($"No site collection row for {siteCollectionUrl} found to update");
                 }
             }
@@ -376,15 +376,15 @@ namespace PnP.Scanning.Core.Storage
                     siteToUpdate.Error = GetMessageFromException(ex);
                     siteToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
-                    Log.Information("Setting SiteCollections table to status Failed for scan {ScanId}, web {SiteCollectionUrl}", scanId, siteCollectionUrl);
+                    Log.Information("Setting SiteCollections table to status Failed for assessment {ScanId}, web {SiteCollectionUrl}", scanId, siteCollectionUrl);
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndSiteCollectionScanWithErrorAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in EndSiteCollectionScanWithErrorAsync for assessment {ScanId}", scanId);
 
                 }
                 else
                 {
-                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in scan {ScanId}", siteCollectionUrl, scanId);
+                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in assessment {ScanId}", siteCollectionUrl, scanId);
                     throw new Exception($"No site collection row for {siteCollectionUrl} found to update");
                 }
             }
@@ -401,10 +401,10 @@ namespace PnP.Scanning.Core.Storage
                     webToUpdate.EndDate = DateTime.Now;
                     webToUpdate.ScanDuration = (webToUpdate.EndDate - webToUpdate.StartDate).Seconds;
 
-                    Log.Information("Setting Web table to status Finished for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+                    Log.Information("Setting Web table to status Finished for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndWebScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in EndWebScanAsync for assessment {ScanId}", scanId);
 
                 }
                 else
@@ -428,10 +428,10 @@ namespace PnP.Scanning.Core.Storage
                     webToUpdate.Error = GetMessageFromException(ex);
                     webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
-                    Log.Information("Setting Web table to status Failed for scan {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+                    Log.Information("Setting Web table to status Failed for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndWebScanWithErrorAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in EndWebScanWithErrorAsync for assessment {ScanId}", scanId);
 
                 }
                 else
@@ -453,7 +453,7 @@ namespace PnP.Scanning.Core.Storage
                     var runningWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running);
                     if (runningWeb != null)
                     {
-                        Log.Information("Running web found {SiteCollectionUrl}{WebUrl} for scan {ScanId}", site.SiteUrl, runningWeb.WebUrl, scanId);
+                        Log.Information("Running web found {SiteCollectionUrl}{WebUrl} for assessment {ScanId}", site.SiteUrl, runningWeb.WebUrl, scanId);
                         return true;
                     }
                 }
@@ -471,7 +471,7 @@ namespace PnP.Scanning.Core.Storage
                 var pendingWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Queued);
                 if (pendingWeb == null)
                 {
-                    Log.Information("Site collection {SiteCollectionUrl} was completely done in scan {ScanId}", siteCollectionUrl, scanId);
+                    Log.Information("Site collection {SiteCollectionUrl} was completely done in assessment {ScanId}", siteCollectionUrl, scanId);
                     return true;
                 }
 
@@ -484,7 +484,7 @@ namespace PnP.Scanning.Core.Storage
             using (var dbContext = new ScanContext(scanId))
             {
 
-                Log.Information("Starting to consolidate scan {ScanId} at database level", scanId);
+                Log.Information("Starting to consolidate assessment {ScanId} at database level", scanId);
 
                 // Sites and webs in "running" state are reset to "queued"
                 foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running).ToListAsync())
@@ -492,14 +492,14 @@ namespace PnP.Scanning.Core.Storage
                     site.Status = SiteWebStatus.Queued;
                     site.StartDate = DateTime.MinValue;
 
-                    Log.Information("Consolidating scan {ScanId}, site collection {SiteCollection}", scanId, site.SiteUrl);
+                    Log.Information("Consolidating assessment {ScanId}, site collection {SiteCollection}", scanId, site.SiteUrl);
 
                     foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running).ToListAsync())
                     {
                         web.Status = SiteWebStatus.Queued;
                         web.StartDate = DateTime.MinValue;
 
-                        Log.Information("Consolidating scan {ScanId}, web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+                        Log.Information("Consolidating assessment {ScanId}, web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
 
                         // All data collected as part of a running web scan is dropped as the web scan will run again when restarted
                         await DropIncompleteWebScanDataAsync(scanId, dbContext, site, web);
@@ -516,7 +516,7 @@ namespace PnP.Scanning.Core.Storage
                         site.Status = SiteWebStatus.Queued;
                         site.StartDate = DateTime.MinValue;
 
-                        Log.Information("Consolidating scan {ScanId}, site collection {SiteCollection} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl);
+                        Log.Information("Consolidating assessment {ScanId}, site collection {SiteCollection} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl);
 
                         // Reset the running/failed webs so we can retry them
                         foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && 
@@ -525,7 +525,7 @@ namespace PnP.Scanning.Core.Storage
                             web.Status = SiteWebStatus.Queued;
                             web.StartDate = DateTime.MinValue;
 
-                            Log.Information("Consolidating scan {ScanId}, web {SiteCollection}{Web} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl, web.WebUrl);
+                            Log.Information("Consolidating assessment {ScanId}, web {SiteCollection}{Web} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl, web.WebUrl);
 
                             // All data collected as part of a running web scan is dropped as the web scan will run again when restarted
                             await DropIncompleteWebScanDataAsync(scanId, dbContext, site, web);
@@ -535,10 +535,10 @@ namespace PnP.Scanning.Core.Storage
 
                 // Persist all the changes
                 await dbContext.SaveChangesAsync();
-                Log.Information("Database updates pushed in ConsolidatedScanToEnableRestartAsync for scan {ScanId}", scanId);
+                Log.Information("Database updates pushed in ConsolidatedScanToEnableRestartAsync for assessment {ScanId}", scanId);
 
 
-                Log.Information("Consolidating scan {ScanId} at database level is done", scanId);
+                Log.Information("Consolidating assessment {ScanId} at database level is done", scanId);
             }
         }
 
@@ -564,7 +564,7 @@ namespace PnP.Scanning.Core.Storage
                     scan.Status = ScanStatus.Queued;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in RestartScanAsync for scan {ScanId}", scanId);
+                    Log.Information("Database updates pushed in RestartScanAsync for assessment {ScanId}", scanId);
 
 
                     // Emulate the original start message as the scan might need some of the passed properties
@@ -596,8 +596,8 @@ namespace PnP.Scanning.Core.Storage
                 }
                 else
                 {
-                    Log.Error("No scan row for scan {ScanId} found to update", scanId);
-                    throw new Exception($"No scan row for scan {scanId} found to update");
+                    Log.Error("No assessment row for assessment {ScanId} found to update", scanId);
+                    throw new Exception($"No assessment row for assessment {scanId} found to update");
                 }
             }
         }
@@ -655,7 +655,7 @@ namespace PnP.Scanning.Core.Storage
 
                 // Persist all the changes
                 await dbContext.SaveChangesAsync();
-                Log.Information("Database updates pushed in StoreCacheResultsAsync for scan {ScanId}", scanId);
+                Log.Information("Database updates pushed in StoreCacheResultsAsync for assessment {ScanId}", scanId);
             }
         }
 
@@ -674,7 +674,7 @@ namespace PnP.Scanning.Core.Storage
                     count++;
                 }
 
-                Log.Information("For scan {ScanId} {Count} items were loaded from cache", scanId, count);
+                Log.Information("For assessment {ScanId} {Count} items were loaded from cache", scanId, count);
 
                 return cacheData;
             }
@@ -741,7 +741,7 @@ namespace PnP.Scanning.Core.Storage
             }
             catch (Exception ex)
             {
-                Log.Error("Could not get results for scan {ScanId}. Error: {Error}", scanId, ex.Message);
+                Log.Error("Could not get results for assessment {ScanId}. Error: {Error}", scanId, ex.Message);
             }
 
             return null;
@@ -898,7 +898,7 @@ namespace PnP.Scanning.Core.Storage
             {
                 dbContext.SyntexModelUsage.Remove(syntexModelUsage);
             }
-            Log.Information("Consolidating scan {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+            Log.Information("Consolidating assessment {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
         private async Task DropWorkflowIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
@@ -907,7 +907,7 @@ namespace PnP.Scanning.Core.Storage
             {
                 dbContext.Workflows.Remove(workflow);
             }
-            Log.Information("Consolidating scan {ScanId}: dropping Workflow results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+            Log.Information("Consolidating assessment {ScanId}: dropping Workflow results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
 #if DEBUG
@@ -916,7 +916,7 @@ namespace PnP.Scanning.Core.Storage
             foreach (var testResult in await dbContext.TestDelays.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.TestDelays.Remove(testResult);
-                Log.Information("Consolidating scan {ScanId}: dropping test results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+                Log.Information("Consolidating assessment {ScanId}: dropping test results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
             }
         }
 #endif

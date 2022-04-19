@@ -291,7 +291,7 @@ namespace PnP.Scanning.Core.Services
                 foreach (var scanProperty in dbContext.Properties)
                 {
                     // Telemetry processing picks up "syntexdeepscan", so ensure we always send this property using that name
-                    if (scanProperty.Name.Equals("syntexfull", StringComparison.OrdinalIgnoreCase))
+                    if (scanProperty.Name.Equals(Constants.StartSyntexFull, StringComparison.OrdinalIgnoreCase))
                     {
                         properties.Add("syntexdeepscan", scanProperty.Value);
                     }
@@ -333,7 +333,7 @@ namespace PnP.Scanning.Core.Services
 
                 // Was deep scan used?
                 bool deepScanUsed = false;
-                var deepScanProperty = await dbContext.Properties.FirstOrDefaultAsync(p => p.Name == "syntexdeepscan");
+                var deepScanProperty = await dbContext.Properties.FirstOrDefaultAsync(p => p.Name == Constants.StartSyntexFull);
                 if (deepScanProperty != null)
                 {
                     if (deepScanProperty.Value.Equals("True", StringComparison.InvariantCultureIgnoreCase))
@@ -619,11 +619,11 @@ namespace PnP.Scanning.Core.Services
             {
                 Scan = scan;
                 TenantId = tenantId;
-                Log.Information("Tenant id for this scan session {ScanId} is {TenantId}. Scan mode = {Mode}", TenantId, scanId, Scan.CLIMode);
+                Log.Information("Tenant id for this assessment session {ScanId} is {TenantId}. Assessment mode = {Mode}", TenantId, scanId, Scan.CLIMode);
             }
             else
             {
-                Log.Warning("Tenant id was not retrieved for this scan session");
+                Log.Warning("Tenant id was not retrieved for this assessment session");
             }
 
             if (string.IsNullOrEmpty(Version))

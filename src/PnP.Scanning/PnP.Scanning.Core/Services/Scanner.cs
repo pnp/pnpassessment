@@ -55,7 +55,7 @@ namespace PnP.Scanning.Core.Services
             {
                 await responseStream.WriteAsync(new PauseStatus
                 {
-                    Status = $"Passed scan id {request.Id} is invalid",
+                    Status = $"Passed assessment id {request.Id} is invalid",
                     Type = Constants.MessageError
                 });
             }
@@ -66,11 +66,11 @@ namespace PnP.Scanning.Core.Services
                 {
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = $"Provided scan id {scanId} is invalid",
+                        Status = $"Provided assessment id {scanId} is invalid",
                         Type = Constants.MessageError
                     });
 
-                    Log.Warning("Provided scan id {ScanId} is not known as running scan", scanId);
+                    Log.Warning("Provided assessment id {ScanId} is not known as running assessment", scanId);
                     return;
                 }
 
@@ -84,7 +84,7 @@ namespace PnP.Scanning.Core.Services
 
                 await responseStream.WriteAsync(new PauseStatus
                 {
-                    Status = "Waiting for running web scans to complete..."
+                    Status = "Waiting for running web assessments to complete..."
                 });
 
                 // Wait for running web scans to complete
@@ -100,12 +100,12 @@ namespace PnP.Scanning.Core.Services
                     // All waiting web scans finished in time, continue with the pasuing
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = "Running web scans have completed"
+                        Status = "Running web assessments have completed"
                     });
 
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = "Implement pausing in scan database(s)"
+                        Status = "Implement pausing in assessment database(s)"
                     });
 
                     // Update scan database(s)
@@ -113,7 +113,7 @@ namespace PnP.Scanning.Core.Services
 
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = "Scan database(s) are paused"
+                        Status = "Assessment database(s) are paused"
                     });
 
                     // Finalized the pausing 
@@ -128,7 +128,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = "Pausing did not happen timely, marking scan as terminated"
+                        Status = "Pausing did not happen timely, marking assessment as terminated"
                     });
 
                     // Start request cancellation to break out of the possible throttling retry loops
@@ -139,7 +139,7 @@ namespace PnP.Scanning.Core.Services
 
                     await responseStream.WriteAsync(new PauseStatus
                     {
-                        Status = "Scan was terminated"
+                        Status = "Assessments was terminated"
                     });
                 }
 
@@ -151,14 +151,14 @@ namespace PnP.Scanning.Core.Services
         {
             await responseStream.WriteAsync(new RestartStatus
             {
-                Status = "Restarting scan"
+                Status = "Restarting assessment"
             });
 
             if (!Guid.TryParse(request.Id, out Guid scanId))
             {
                 await responseStream.WriteAsync(new RestartStatus
                 {
-                    Status = $"Passed scan id {request.Id} is invalid",
+                    Status = $"Passed assessment id {request.Id} is invalid",
                     Type = Constants.MessageError
                 });
 
@@ -169,11 +169,11 @@ namespace PnP.Scanning.Core.Services
             {
                 await responseStream.WriteAsync(new RestartStatus
                 {
-                    Status = $"Provided scan id {scanId} is already running or finished",
+                    Status = $"Provided assessment id {scanId} is already running or finished",
                     Type = Constants.MessageError
                 });
 
-                Log.Warning("Provided scan id {ScanId} is already running or finished", scanId);
+                Log.Warning("Provided assessment id {ScanId} is already running or finished", scanId);
 
                 return;
             }
@@ -191,18 +191,18 @@ namespace PnP.Scanning.Core.Services
 
                 await responseStream.WriteAsync(new RestartStatus
                 {
-                    Status = "Scan restarted"
+                    Status = "Assessment restarted"
                 });
 
                 await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Restart);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error restarting scan job: {Message}", ex.Message);
+                Log.Error(ex, "Error restarting assessment job: {Message}", ex.Message);
 
                 await responseStream.WriteAsync(new RestartStatus
                 {
-                    Status = $"Scan job not restarted due to error: {ex.Message}",
+                    Status = $"Assessment job not restarted due to error: {ex.Message}",
                     Type = Constants.MessageError
                 });
             }
@@ -232,10 +232,10 @@ namespace PnP.Scanning.Core.Services
         {
             try
             {
-                Log.Information("Starting scan");
+                Log.Information("Starting Microsoft 365 Assessment");
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "Starting the scan"
+                    Status = "Starting the Microsoft 365 Assessment"
                 });
 
                 // 1. Handle auth
@@ -243,7 +243,7 @@ namespace PnP.Scanning.Core.Services
 
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "Scan authentication initialized"
+                    Status = "Microsoft 365 Assessment authentication initialized"
                 });
 
                 // 2. Build list of sites to scan
@@ -259,17 +259,17 @@ namespace PnP.Scanning.Core.Services
                 {
                     await responseStream.WriteAsync(new StartStatus
                     {
-                        Status = "No sites to scan defined",
+                        Status = "No sites to assess defined",
                         Type = Constants.MessageWarning
                     });
 
-                    Log.Information("No sites to scan defined");
+                    Log.Information("No sites to assess defined");
                 }
                 else
                 {
                     await responseStream.WriteAsync(new StartStatus
                     {
-                        Status = "Sites to scan are defined"
+                        Status = "Sites to assess are defined"
                     });
 
                     // 3. Start the scan
@@ -277,21 +277,21 @@ namespace PnP.Scanning.Core.Services
 
                     await responseStream.WriteAsync(new StartStatus
                     {
-                        Status = $"Sites to scan are queued up. Scan id = {scanId}"
+                        Status = $"Sites to assess are queued up. Assessment id = {scanId}"
                     });
 
                     await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Start);
 
-                    Log.Information("Scan job started");
+                    Log.Information("Assessment job started");
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error starting scan job: {Message}", ex.Message);
+                Log.Error(ex, "Error starting assessment job: {Message}", ex.Message);
 
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = $"Scan job not started due to error: {ex.Message}",
+                    Status = $"Assessment job not started due to error: {ex.Message}",
                     Type = Constants.MessageError
                 });
             }
@@ -305,7 +305,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     await responseStream.WriteAsync(new ReportStatus
                     {
-                        Status = $"Passed scan id {request.Id} is invalid",
+                        Status = $"Passed assessment id {request.Id} is invalid",
                         Type = Constants.MessageError
                     });
 
@@ -317,7 +317,7 @@ namespace PnP.Scanning.Core.Services
                     Status = $"Exporting report data started"
                 });
 
-                Log.Information("Report data export started for scan {ScanId}", scanId);
+                Log.Information("Report data export started for assessment {ScanId}", scanId);
 
                 var dataExportPath = await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
 
@@ -326,7 +326,7 @@ namespace PnP.Scanning.Core.Services
                     Status = $"Exporting report data done",
                     ReportPath = dataExportPath
                 });
-                Log.Information("Report data exported for scan {ScanId}", scanId);
+                Log.Information("Report data exported for assessment {ScanId}", scanId);
 
                 if (request.Mode == ReportMode.PowerBI.ToString())
                 {
@@ -334,7 +334,7 @@ namespace PnP.Scanning.Core.Services
                     {
                         Status = $"Start Building PowerBI report"
                     });
-                    Log.Information("Start Building PowerBI report for scan {ScanId}", scanId);
+                    Log.Information("Start Building PowerBI report for assessment {ScanId}", scanId);
 
                     var exportPath = await reportManager.CreatePowerBiReportAsync(scanId, request.Path, request.Delimiter);
 
@@ -343,18 +343,18 @@ namespace PnP.Scanning.Core.Services
                         Status = $"Building PowerBI report done",
                         ReportPath = exportPath
                     });
-                    Log.Information("PowerBI report for scan {ScanId} is ready", scanId);
+                    Log.Information("PowerBI report for assessment {ScanId} is ready", scanId);
                 }
 
                 await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Report);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error creating report for scan. Error : {Message}", ex.Message);
+                Log.Error(ex, "Error creating report for this Microsoft 365 Assessment. Error : {Message}", ex.Message);
 
                 await responseStream.WriteAsync(new ReportStatus
                 {
-                    Status = $"Error creating report for scan due to error: {ex.Message}",
+                    Status = $"Error creating report for this Microsoft 365 Assessment due to error: {ex.Message}",
                     Type = Constants.MessageError
                 });
             }

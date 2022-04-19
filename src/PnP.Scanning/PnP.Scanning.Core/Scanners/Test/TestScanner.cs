@@ -56,7 +56,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task PreScanningAsync()
         {
-            Logger.Information("Pre scanning work is starting");
+            Logger.Information("Pre assessment work is starting");
             
             int delay1 = new Random().Next(minDelay, minDelay * 5);
             await Task.Delay(delay1);
@@ -65,29 +65,29 @@ namespace PnP.Scanning.Core.Scanners
             int throwException = new Random().Next(1, 10);
             if (throwException == 10)
             {
-                throw new Exception($"Something went wrong during prescanning with the test scanner with options {Options.TestNumberOfSites}!!");
+                throw new Exception($"Something went wrong during preassessment with the test assessment with options {Options.TestNumberOfSites}!!");
             }
 
             AddToCache(Cache1, $"PnP Rocks! - {DateTime.Now}");
 
             using (var context = await GetPnPContextAsync())
             {
-                Logger.Warning("Pre scan done for site with url {Url} and {Id}", context.Uri, context.Site.Id);
+                Logger.Warning("Pre assessment done for site with url {Url} and {Id}", context.Uri, context.Site.Id);
             }
 
-            Logger.Information("Pre scanning work done");
+            Logger.Information("Pre assessment work done");
         }
 
         internal async override Task PostScanningAsync()
         {
-            Logger.Information("Post scanning work is starting");
+            Logger.Information("Post assessment work is starting");
             
             using (var context = await GetPnPContextAsync())
             {
-                Logger.Warning("Post scan done for site with url {Url} and {Id}", context.Uri, context.Site.Id);
+                Logger.Warning("Post assessment done for site with url {Url} and {Id}", context.Uri, context.Site.Id);
             }
 
-            Logger.Information("Post scanning work done");            
+            Logger.Information("Post assessment work done");            
         }
 
         private async Task SaveTestScanResultsAsync(Guid scanId, string siteUrl, string webUrl, int delay1, int delay2, int delay3, string webIdString)

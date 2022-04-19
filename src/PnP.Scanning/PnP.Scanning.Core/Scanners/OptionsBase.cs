@@ -69,7 +69,7 @@ namespace PnP.Scanning.Core.Scanners
             }
 #endif
 
-            throw new Exception("Unsupported scan mode passed in");
+            throw new Exception("Unsupported assessment mode passed in");
         }
     }
 }

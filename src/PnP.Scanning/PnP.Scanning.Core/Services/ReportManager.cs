@@ -100,14 +100,14 @@ namespace PnP.Scanning.Core.Services
                 var scan = await dbContext.Scans.Where(p => p.ScanId == scanId).FirstOrDefaultAsync();
                 if (scan == null)
                 {
-                    Log.Error("There was no scan result found for scan {ScanId}", scanId);
-                    throw new Exception($"There was no scan result found for scan {scanId}");
+                    Log.Error("There was no assessment result found for assessment {ScanId}", scanId);
+                    throw new Exception($"There was no assessment result found for assessment {scanId}");
                 }
 
                 if (scan.Status != ScanStatus.Finished && scan.Status != ScanStatus.Paused)
                 {
-                    Log.Error("Scan {ScanId} was not Finished or Paused, can't export the data", scanId);
-                    throw new Exception($"Scan {scanId} was not Finished or Paused, can't export the data");
+                    Log.Error("Assessment {ScanId} was not Finished or Paused, can't export the data", scanId);
+                    throw new Exception($"Assessment {scanId} was not Finished or Paused, can't export the data");
                 }
 
                 using (var writer = new StreamWriter(Path.Join(exportPath, ScansCsv)))

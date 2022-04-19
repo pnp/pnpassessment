@@ -65,7 +65,7 @@ namespace PnP.Scanning.Core.Services
                 }
                 else
                 {
-                    Log.Warning("Scan result folder {Folder} was skipped as there's no scan database in the folder", scan);
+                    Log.Warning("Assessment result folder {Folder} was skipped as there's no assessment database in the folder", scan);
                 }
             }
 

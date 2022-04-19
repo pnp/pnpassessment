@@ -44,7 +44,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal async override Task ExecuteAsync()
         {
-            Logger.Information("Starting Workflow scan of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+            Logger.Information("Starting Workflow assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
             List<Workflow> workflowLists = new();
             WorkflowDefinition[] siteDefinitions = null;
@@ -326,26 +326,26 @@ namespace PnP.Scanning.Core.Scanners
 
             }
 
-            Logger.Information("Workflow scan of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+            Logger.Information("Workflow assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         internal async override Task PreScanningAsync()
         {
-            Logger.Information("Pre scanning work is starting");
+            Logger.Information("Pre assessment work is starting");
 
             await SendRequestWithClientTagAsync();
 
             WorkflowManager.Instance.LoadWorkflowDefaultActions();
 
-            Logger.Information("Pre scanning work done");
+            Logger.Information("Pre assessment work done");
         }
 
         internal async override Task PostScanningAsync()
         {
-            Logger.Information("Post scanning work is starting");
+            Logger.Information("Post assessment work is starting");
 
-            Logger.Information("Post scanning work done");
+            Logger.Information("Post assessment work done");
         }
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 

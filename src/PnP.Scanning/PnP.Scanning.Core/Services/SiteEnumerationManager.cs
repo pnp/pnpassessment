@@ -26,7 +26,7 @@ namespace PnP.Scanning.Core.Services
         {
             List<string> list = new();
 
-            Log.Information("Building list of site collections to scan");
+            Log.Information("Building list of site collections to assess");
 
             if (!string.IsNullOrEmpty(start.SitesList))
             {
@@ -92,7 +92,7 @@ namespace PnP.Scanning.Core.Services
                 }
             }
 #endif
-            Log.Information("Scan scope defined: {SitesToScan} site collections will be scanned", list.Count);
+            Log.Information("Assessment scope defined: {SitesToScan} site collections will be assessed", list.Count);
 
             return list;
         }
@@ -108,7 +108,7 @@ namespace PnP.Scanning.Core.Services
                 var websToRestart = await StorageManager.WebsToRestartScanningAsync(scanId, siteCollectionUrl);
                 if (websToRestart != null && websToRestart.Count > 0)
                 {
-                    Log.Information("Loaded {Count} webs for restarting scan {ScanId} with site collection {SiteCollectionUrl}", websToRestart.Count, scanId, siteCollectionUrl);
+                    Log.Information("Loaded {Count} webs for restarting assessment {ScanId} with site collection {SiteCollectionUrl}", websToRestart.Count, scanId, siteCollectionUrl);
                     return websToRestart;
                 }
             }
@@ -133,11 +133,11 @@ namespace PnP.Scanning.Core.Services
                 }
                 else
                 {
-                    Log.Information("Skipped site {SiteCollectionUrl} for scan {ScanId} as it's a personal site", siteCollectionUrl, scanId);
+                    Log.Information("Skipped site {SiteCollectionUrl} for assessment {ScanId} as it's a personal site", siteCollectionUrl, scanId);
                 }
             }
 
-            Log.Information("Enumerated {Count} webs for scan {ScanId} with site collection {SiteCollectionUrl}", webUrlsToScan.Count, scanId, siteCollectionUrl);
+            Log.Information("Enumerated {Count} webs for assessment {ScanId} with site collection {SiteCollectionUrl}", webUrlsToScan.Count, scanId, siteCollectionUrl);
 #if DEBUG
             // Insert dummy webs
             if (options is TestOptions testOptions && webUrlsToScan.Count == 0)
@@ -146,7 +146,7 @@ namespace PnP.Scanning.Core.Services
                 webUrlsToScan.Add(new EnumeratedWeb { WebUrl = "/", WebTemplate = "STS#0"});
 
                 int numberOfWebs = new Random().Next(10);
-                Log.Information("Number of webs to scan: {WebsToScan}", numberOfWebs + 1);
+                Log.Information("Number of webs to assess: {WebsToScan}", numberOfWebs + 1);
 
                 for (int i = 0; i < numberOfWebs; i++)
                 {

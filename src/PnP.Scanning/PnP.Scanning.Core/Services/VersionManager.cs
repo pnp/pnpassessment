@@ -5,10 +5,10 @@ namespace PnP.Scanning.Core.Services
 {
     internal static class VersionManager
     {
-        internal const string versionFileUrl = "https://raw.githubusercontent.com/pnp/pnpscanning/main/version.txt";
+        internal const string versionFileUrl = "https://raw.githubusercontent.com/pnp/pnpassessment/main/version.txt";
         internal const string newVersionDownloadUrl = "https://aka.ms/m365scannerreleases";
 
-        private static readonly HttpClient httpClient = new HttpClient();
+        private static readonly HttpClient httpClient = new();
 
         internal static string GetCurrentVersion()
         {
