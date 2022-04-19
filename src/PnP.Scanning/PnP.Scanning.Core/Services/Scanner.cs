@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
 using PnP.Scanning.Core.Authentication;
 using Serilog;
+using System.Runtime.InteropServices;
 
 namespace PnP.Scanning.Core.Services
 {
@@ -332,18 +333,29 @@ namespace PnP.Scanning.Core.Services
                 {
                     await responseStream.WriteAsync(new ReportStatus
                     {
-                        Status = $"Start Building PowerBI report"
+                        Status = $"Start Building Power BI report"
                     });
-                    Log.Information("Start Building PowerBI report for assessment {ScanId}", scanId);
+                    Log.Information("Start Building Power BI report for assessment {ScanId}", scanId);
 
-                    var exportPath = await reportManager.CreatePowerBiReportAsync(scanId, request.Path, request.Delimiter);
-
-                    await responseStream.WriteAsync(new ReportStatus
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        Status = $"Building PowerBI report done",
-                        ReportPath = exportPath
-                    });
-                    Log.Information("PowerBI report for assessment {ScanId} is ready", scanId);
+                        var exportPath = await reportManager.CreatePowerBiReportAsync(scanId, request.Path, request.Delimiter);
+
+                        await responseStream.WriteAsync(new ReportStatus
+                        {
+                            Status = $"Building Power BI report done",
+                            ReportPath = exportPath
+                        });
+                        Log.Information("Power BI report for assessment {ScanId} is ready", scanId);
+                    }
+                    else
+                    {
+                        await responseStream.WriteAsync(new ReportStatus
+                        {
+                            Status = $"Building Power BI report skipped, this requires a Microsoft Windows OS"
+                        });
+                        Log.Information("Power BI report for assessment {ScanId} is skipped due to a non Windows OS", scanId);
+                    }
                 }
 
                 await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Report);

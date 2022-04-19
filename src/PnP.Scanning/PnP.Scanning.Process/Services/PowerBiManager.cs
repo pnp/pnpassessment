@@ -7,7 +7,7 @@ namespace PnP.Scanning.Process.Services
     {
         internal static System.Diagnostics.Process LaunchPowerBiAsync(string reportToOpen)
         {
-            AnsiConsole.MarkupLine("[gray]Opening the generated report in PowerBI client...[/]");
+            AnsiConsole.MarkupLine("[gray]Opening the generated report in Power BI Desktop...[/]");
 
             ProcessStartInfo startInfo = new(reportToOpen)
             {
@@ -26,6 +26,7 @@ namespace PnP.Scanning.Process.Services
                 else
                 {
                     AnsiConsole.MarkupLine($"[red]FAILED[/]");
+                    AnsiConsole.MarkupLine("[red]Please verify you've Power BI Desktop installed (https://aka.ms/pbidesktopstore)[/]");
                     return null;
                 }
             }
