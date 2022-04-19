@@ -12,13 +12,13 @@ Common CLI calls are:
 Task | CLI
 -----|------
 Start a new Syntex assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode syntex --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
-Start a new Syntex deep scan assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1,https://bertonline.sharepoint.com/sites/temp2" --syntexdeepscan
+Start a new Syntex full assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/prov-1,https://bertonline.sharepoint.com/sites/temp2" --syntexfull
 List all the assessments | microsoft365-assessment.exe list
 Realtime status update of the running assessments | microsoft365-assessment.exe status
-Pause a running assessment | microsoft365-assessment.exe pause --id &lt;scan id&gt;
-Restart a paused or terminated assessment | microsoft365-assessment.exe restart --id &lt;scan id&gt;  
-Generate PowerBI report (includes CSV export) | microsoft365-assessment.exe report --id &lt;scan id&gt;
-Export the gathered data to CSV | microsoft365-assessment.exe report --id &lt;scan id&gt; --mode CsvOnly --path &lt;location to put CSV files&gt;
+Pause a running assessment | microsoft365-assessment.exe pause --id &lt;assessment id&gt;
+Restart a paused or terminated assessment | microsoft365-assessment.exe restart --id &lt;assessment id&gt;  
+Generate PowerBI report (includes CSV export) | microsoft365-assessment.exe report --id &lt;assessment id&gt;
+Export the gathered data to CSV | microsoft365-assessment.exe report --id &lt;assessment id&gt; --mode CsvOnly --path &lt;location to put CSV files&gt;
 
 ![scanner run](scannerrun.gif)
 
@@ -61,7 +61,7 @@ The assessment tool aims to be able to perform the assessment task at hand using
 
 Assessment | Authentication | Minimal | Optimal | Details
 -----| ---------------| --------|---------|--------
-Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexdeepscan` argument the assessment tool will use the search APIs to count how many documents use a given content type and how many retention labels there are applied on a list, and search in combination with application permissions requires Sites.FullControl.All. The assessment tool will also check if a library uses workflow 2013 and this requires the Sites.Manage.All or higher permission role
+Syntex | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.FullControl.All | When using the `--syntexfull` argument the assessment tool will use the search APIs to count how many documents use a given content type and how many retention labels there are applied on a list, and search in combination with application permissions requires Sites.FullControl.All. The assessment tool will also check if a library uses workflow 2013 and this requires the Sites.Manage.All or higher permission role
 Syntex | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Read | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage | The assessment tool will check if a library uses workflow 2013 and this requires the AllSites.Manage or higher permission scope
 Workflow | Application | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All | **Graph:** Sites.Read.All, **SharePoint:** Sites.Manage.All |
 Workflow | Delegated | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage | **Graph:** Sites.Read.All, User.Read, **SharePoint:** AllSites.Manage |
@@ -81,7 +81,7 @@ This tool is an open-source and community provided tool backed by an active comm
 
 The assessment tool can be used on MacOS and Linux except the PowerBI report generation as the PowerBI client only is available for Windows. After copying the needed binary from the [releases](https://github.com/pnp/pnpscanning/releases) folder you need to mark the binary as executable via `sudo chmod +x microsoft365-assessment`. Once that's done you can use the assessment tool, the assessment tool binary itself contains all the needed depencies (including the .NET 6 runtime). 
 
-If you later on want to generate a PowerBI report for an assessment ran on Linux of MacOS, you then can copy the scan output folder (guid = scan id, located in the folder containing the binary) to the folder on a Windows machine where you've put the Windows version of the assessment tool. When you then use `microsoft365-assessment.exe report --id <scan id>` the report will be generated and opened in PowerBI.
+If you later on want to generate a PowerBI report for an assessment ran on Linux of MacOS, you then can copy the scan output folder (guid = scan id, located in the folder containing the binary) to the folder on a Windows machine where you've put the Windows version of the assessment tool. When you then use `microsoft365-assessment.exe report --id <assessment id>` the report will be generated and opened in Power BI Desktop.
 
 ### Running on a GCC, GCC High, DoD or China tenant / running the assessment tool on a port different from 25025
 
