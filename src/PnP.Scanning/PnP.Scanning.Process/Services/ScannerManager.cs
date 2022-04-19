@@ -54,7 +54,7 @@ namespace PnP.Scanning.Process.Services
                     }
                     else
                     {
-                        throw new Exception("No scanner found");
+                        throw new Exception("No Microsoft 365 Assessment tool found");
                     }
 
                 }
@@ -93,7 +93,7 @@ namespace PnP.Scanning.Process.Services
             }
             else
             {
-                AnsiConsole.MarkupLine("[gray]No scanner found, starting one...[/]");
+                AnsiConsole.MarkupLine("[gray]No running Microsoft 365 Assessment found, starting one...[/]");
 
                 ProcessStartInfo startInfo = new()
                 {
@@ -161,13 +161,13 @@ namespace PnP.Scanning.Process.Services
 
             if (!isGrpcUpAndRunning)
             {
-                throw new Exception("Scanner did not start timely");
+                throw new Exception("Microsoft 365 Assessment tool did not start timely");
             }
         }
 
         private static async Task<int> CanConnectRunningScannerAsync(int port)
         {
-            AnsiConsole.MarkupLine($"[gray]Connecting scanner on port {port}...[/]");
+            AnsiConsole.MarkupLine($"[gray]Connecting Microsoft 365 Assessment on port {port}...[/]");
 
             var retryAttempt = 0;
             do

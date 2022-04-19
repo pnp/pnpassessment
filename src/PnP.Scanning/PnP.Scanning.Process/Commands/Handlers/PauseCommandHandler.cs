@@ -19,11 +19,11 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("pause", "Pauses one or all scans");
+            cmd = new Command("pause", "Pauses one or all Microsoft 365 Assessments");
 
             scanIdOption = new(
                 name: $"--{Constants.PauseScanId}",
-                description: "Id of the scan to pause")
+                description: "Id of the Microsoft 365 Assessment to pause")
             {
                 IsRequired = false,
             };
@@ -31,7 +31,7 @@ namespace PnP.Scanning.Process.Commands
 
             allScansOption = new(
                 name: $"--{Constants.PauseAll}",
-                description: "Pause all scans")
+                description: "Pause all Microsoft 365 Assessments")
             {
                 IsRequired = false,
             };
@@ -52,7 +52,7 @@ namespace PnP.Scanning.Process.Commands
                     (commandResult.FindResultFor(scanIdOption) != null && commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == true)
                    )
                 {
-                    return $"You need to either use the --{Constants.PauseScanId} with a valid scan id or the --{Constants.PauseAll} option";
+                    return $"You need to either use the --{Constants.PauseScanId} with a valid Microsoft 365 Assessment id or the --{Constants.PauseAll} option";
                 }
                 else
                 {
@@ -71,7 +71,7 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(Guid scanId, bool all)
         {
-            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Pausing scan...", async ctx =>
+            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Pausing Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
                 var client = await processManager.GetScannerClientAsync();

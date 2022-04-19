@@ -289,8 +289,16 @@ namespace PnP.Scanning.Core.Services
             {
                 // Scan properties
                 foreach (var scanProperty in dbContext.Properties)
-                {                    
-                    properties.Add(scanProperty.Name, scanProperty.Value);               
+                {
+                    // Telemetry processing picks up "syntexdeepscan", so ensure we always send this property using that name
+                    if (scanProperty.Name.Equals("syntexfull", StringComparison.OrdinalIgnoreCase))
+                    {
+                        properties.Add("syntexdeepscan", scanProperty.Value);
+                    }
+                    else
+                    {
+                        properties.Add(scanProperty.Name, scanProperty.Value);
+                    }
                 }
             }
         }

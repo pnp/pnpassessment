@@ -15,7 +15,7 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            var cmd = new Command("config", "Outputs the scanner configuration");
+            var cmd = new Command("config", "Outputs the Microsoft 365 Assessment configuration");
 
             // Configure options for status
 

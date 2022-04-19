@@ -19,11 +19,11 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("restart", "Restarts a paused or terminated scan");
+            cmd = new Command("restart", "Restarts a paused or terminated Microsoft 365 Assessment");
 
             scanIdOption = new(
                 name: $"--{Constants.PauseScanId}",
-                description: "Id of the scan to restart")
+                description: "Id of the Microsoft 365 Assessment to restart")
             {
                 IsRequired = true,
             };
@@ -31,7 +31,7 @@ namespace PnP.Scanning.Process.Commands
 
             threadsOption = new(
                 name: $"--{Constants.StartThreads}",
-                description: "Override number of threads set at scan start")
+                description: "Override number of threads set at Microsoft 365 Assessment start")
             {
                 IsRequired = false
             };
@@ -52,7 +52,7 @@ namespace PnP.Scanning.Process.Commands
         private async Task HandleRestartAsync(Guid scanId, int threads)
         {
 
-            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Restarting scan...", async ctx =>
+            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Restarting Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
                 var client = await processManager.GetScannerClientAsync();

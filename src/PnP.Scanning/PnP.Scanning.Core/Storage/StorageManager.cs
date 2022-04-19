@@ -58,8 +58,8 @@ namespace PnP.Scanning.Core.Storage
                     CLIThreads = start.Threads,
                 });
 
-                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");
-                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreScanStatusChange, DateTime.Now, $"Set to {SiteWebStatus.Queued}");
+                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");
+                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreAssessmentStatusChange, DateTime.Now, $"Set to {SiteWebStatus.Queued}");
 
                 if (start.Properties.Count > 0)
                 {
@@ -105,7 +105,7 @@ namespace PnP.Scanning.Core.Storage
 
                     if (scan.Status != ScanStatus.Finished)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Finished}");
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Finished}");
                         scan.Status = ScanStatus.Finished;
                     }
 
@@ -135,7 +135,7 @@ namespace PnP.Scanning.Core.Storage
                     Log.Information("Setting Scan table to status {Status} for scan {ScanId}", scanStatus, scanId);
                     if (scan.Status != scanStatus)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"From {scan.Status} to {scanStatus}");
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {scanStatus}");
                         scan.Status = scanStatus;
                     }
 
@@ -171,7 +171,7 @@ namespace PnP.Scanning.Core.Storage
                     Log.Information("Setting Scan table to prescanstatus {Status} for scan {ScanId}", preScanStatus, scanId);
                     if (scan.PreScanStatus != preScanStatus)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreScanStatusChange, DateTime.Now, $"From {scan.PreScanStatus} to {preScanStatus}");
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreAssessmentStatusChange, DateTime.Now, $"From {scan.PreScanStatus} to {preScanStatus}");
                         scan.PreScanStatus = preScanStatus;
                     }
 
@@ -196,7 +196,7 @@ namespace PnP.Scanning.Core.Storage
                     Log.Information("Setting Scan table to postscanstatus {Status} for scan {ScanId}", postScanStatus, scanId);
                     if (scan.PostScanStatus != postScanStatus)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPostScanStatusChange, DateTime.Now, $"From {scan.PostScanStatus} to {postScanStatus}");
+                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPostAssessmentStatusChange, DateTime.Now, $"From {scan.PostScanStatus} to {postScanStatus}");
                         scan.PostScanStatus = postScanStatus;
                     }
 
@@ -559,7 +559,7 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    await AddHistoryRecordAsync(dbContext, scanId, Constants.EventScanStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Queued}");
+                    await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Queued}");
                     scan.EndDate = DateTime.MinValue;
                     scan.Status = ScanStatus.Queued;
 

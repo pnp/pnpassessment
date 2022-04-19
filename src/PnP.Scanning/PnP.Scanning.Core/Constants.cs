@@ -16,7 +16,7 @@
         internal const string StartCertPassword = "certpassword";
         internal const string StartThreads = "threads";
 
-        internal const string StartSyntexDeepScan = "syntexdeepscan";
+        internal const string StartSyntexFull = "syntexfull";
         internal const string StartWorkflowAnalyze = "workflowanalyze";
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
@@ -43,9 +43,9 @@
         #endregion
 
         #region History events
-        internal const string EventScanStatusChange = "ScanStatusChange";
-        internal const string EventPreScanStatusChange = "PreScanStatusChange";
-        internal const string EventPostScanStatusChange = "PostScanStatusChange";
+        internal const string EventAssessmentStatusChange = "AssessmentStatusChange";
+        internal const string EventPreAssessmentStatusChange = "PreAssessmentStatusChange";
+        internal const string EventPostAssessmentStatusChange = "PostAssessmentStatusChange";
         #endregion
 
         #region Encryption

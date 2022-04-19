@@ -17,7 +17,7 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            var cmd = new Command("status", "Realtime status of the currently running scans");
+            var cmd = new Command("status", "Realtime status of the currently running Microsoft 365 Assessments");
 
             // Configure options for status
 
@@ -42,7 +42,7 @@ namespace PnP.Scanning.Process.Commands
             table.AddColumn(new TableColumn("Session duration").Centered());
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("Live running scan status. Press [yellow]ESC[/] to exit");
+            AnsiConsole.MarkupLine("Live running Microsoft 365 Assessment status. Press [yellow]ESC[/] to exit");
             AnsiConsole.WriteLine();
 
             await AnsiConsole.Live(table)

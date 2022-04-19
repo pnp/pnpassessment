@@ -16,7 +16,7 @@ namespace PnP.Scanning.Process.Commands
 
         public Command Create()
         {
-            var cmd = new Command("stop", "Stops the scan engine, terminating all running scans");
+            var cmd = new Command("stop", "Stops the Microsoft 365 Assessment engine, terminating all running assessments");
 
             // Configure options for stop
 
@@ -29,7 +29,7 @@ namespace PnP.Scanning.Process.Commands
         {
             try
             {
-                AnsiConsole.MarkupLine("[gray]Requesting the scanner server to shutdown...[/]");
+                AnsiConsole.MarkupLine("[gray]Requesting the Microsoft 365 Assessment process to shutdown...[/]");
                 await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "" });
 
                 bool isGrpcUpAndRunning = true;

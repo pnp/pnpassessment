@@ -127,18 +127,18 @@ namespace PnP.Scanning.Process
                         }
                     }
 
-                    Log.Information($"Starting scanner on port {orchestratorPort}");
+                    Log.Information($"Starting Microsoft 365 Assessment on port {orchestratorPort}");
 
                     // Add and configure needed services
                     var host = ConfigureScannerHost(args, orchestratorPort);
 
-                    Log.Information($"Started scanner on port {orchestratorPort}");
+                    Log.Information($"Started Microsoft 365 Assessment on port {orchestratorPort}");
 
                     await host.RunAsync();
                 }
                 catch (Exception ex)
                 {
-                    Log.Fatal(ex, "Scanner terminated unexpectedly");
+                    Log.Fatal(ex, "Microsoft 365 Assessment terminated unexpectedly");
                 }
                 finally
                 {

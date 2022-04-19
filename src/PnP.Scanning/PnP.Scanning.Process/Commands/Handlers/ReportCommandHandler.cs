@@ -25,11 +25,11 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("report", "Generates the scan reports");
+            cmd = new Command("report", "Generates the Microsoft 365 Assessment reports");
 
             scanIdOption = new(
                 name: $"--{Constants.PauseScanId}",
-                description: "Id of the scan to pause")
+                description: "Id of the Microsoft 365 Assessment to generate the report for")
             {
                 IsRequired = false,
             };

@@ -30,7 +30,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> threadsOption;
 
         // PER SCAN COMPONENT: add scan component specific options here
-        private Option<bool> syntexDeepScanOption;
+        private Option<bool> syntexFullOption;
         private Option<bool> workflowAnalyzeOption;
 
 #if DEBUG
@@ -43,7 +43,7 @@ namespace PnP.Scanning.Process.Commands
             processManager = processManagerInstance;
             dataProtectionProvider = dataProtectionProviderInstance;
 
-            cmd = new Command("start", "Starts a new scan");
+            cmd = new Command("start", "Starts a new assessment");
 
             // Configure the options for the start command
 
@@ -53,7 +53,7 @@ namespace PnP.Scanning.Process.Commands
             modeOption = new(
                 name: $"--{Constants.StartMode}",
                 getDefaultValue: () => Mode.Syntex,
-                description: "Scanner mode"
+                description: "Assessment mode"
                 )
             {
                 IsRequired = true,
@@ -62,7 +62,7 @@ namespace PnP.Scanning.Process.Commands
 
             tenantOption = new(
                 name: $"--{Constants.StartTenant}",
-                description: "Name of the tenant that will be scanned (e.g. contoso.sharepoint.com)")
+                description: "Name of the tenant that will be assessed (e.g. contoso.sharepoint.com)")
             {
                 IsRequired = true
             };
@@ -71,7 +71,7 @@ namespace PnP.Scanning.Process.Commands
             environmentOption = new(
                 name: $"--{Constants.StartEnvironment}",
                 getDefaultValue: () => Microsoft365Environment.Production,
-                description: "The cloud environment you're scanning")
+                description: "The cloud environment you're running an assessment for")
             {
                 IsRequired = false
             };
@@ -91,7 +91,7 @@ namespace PnP.Scanning.Process.Commands
 
                     return result.Tokens.Select(t => t.Value).ToList();
                 },
-                description: "List with site collections to scan")
+                description: "List with site collections to assess")
             {
                 IsRequired = false
             };
@@ -110,7 +110,7 @@ namespace PnP.Scanning.Process.Commands
 
                     return new FileInfo(result.Tokens[0].Value);
                 },
-                description: "File containing a list of site collections to scan")
+                description: "File containing a list of site collections to assess")
             {
                 IsRequired = false
             };
@@ -126,7 +126,7 @@ namespace PnP.Scanning.Process.Commands
             authenticationModeOption = new(
                     name: $"--{Constants.StartAuthMode}",
                     getDefaultValue: () => AuthenticationMode.Interactive,
-                    description: "Authentication mode used for the scan")
+                    description: "Authentication mode used for the Microsoft 365 Assessment")
             {
                 IsRequired = true
             };
@@ -138,7 +138,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartApplicationId}",
                 // Default application to use is the PnP Management shell application
                 getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
-                description: "Azure AD application id to use for authenticating the scan")
+                description: "Azure AD application id to use for authenticating the Microsoft 365 Assessment")
             {
                 IsRequired = true
             };
@@ -147,7 +147,7 @@ namespace PnP.Scanning.Process.Commands
             // Tenant id
             tenantIdOption = new(
                 name: $"--{Constants.StartTenantId}",
-                description: $"Azure tenant id to use for authenticating the scan. Will be automatically populated based upon the {Constants.StartTenant} value")
+                description: $"Azure tenant id to use for authenticating the Microsoft 365 Assessment. Will be automatically populated based upon the {Constants.StartTenant} value")
             {
                 IsRequired = false
             };
@@ -236,7 +236,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartThreads}",
                 // Default application to use the logical processor threads, with a maximum of 10
                 getDefaultValue: () => Math.Min(Environment.ProcessorCount, 10),
-                description: "Number of parallel scan operations to use")
+                description: "Number of parallel assessment threads to use")
             {
                 IsRequired = true
             };
@@ -247,14 +247,14 @@ namespace PnP.Scanning.Process.Commands
 
             #region Scan component specific handlers
             // PER SCAN COMPONENT: implement scan component specific options
-            syntexDeepScanOption = new(
-                name: $"--{Constants.StartSyntexDeepScan}",
+            syntexFullOption = new(
+                name: $"--{Constants.StartSyntexFull}",
                 getDefaultValue: () => false,
-                description: "Perform Syntex usage a deep scan, requires Sites.FullControl.All when using application permissions")
+                description: "Perform a full Syntex assessment, requires Sites.FullControl.All when using application permissions")
             {
                 IsRequired = false
             };
-            cmd.AddOption(syntexDeepScanOption);
+            cmd.AddOption(syntexFullOption);
 
             workflowAnalyzeOption = new(
                 name: $"--{Constants.StartWorkflowAnalyze}",
@@ -287,7 +287,7 @@ namespace PnP.Scanning.Process.Commands
 
                     return numberOfSites;
                 },
-                description: "Number of site collections to emulate for dummy scanning")
+                description: "Number of site collections to emulate for dummy assessment")
             {
                 IsRequired = false
             };
@@ -309,7 +309,7 @@ namespace PnP.Scanning.Process.Commands
             var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
                                               authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
-                                              , syntexDeepScanOption
+                                              , syntexFullOption
                                               , workflowAnalyzeOption
 #if DEBUG
                                               , testNumberOfSitesOption
@@ -336,7 +336,7 @@ namespace PnP.Scanning.Process.Commands
                 }
             }
 
-            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting scan...", async ctx =>
+            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
                 var client = await processManager.GetScannerClientAsync();
@@ -389,7 +389,7 @@ namespace PnP.Scanning.Process.Commands
                 {
                     start.Properties.Add(new PropertyRequest
                     {
-                        Property = syntexDeepScanOption.Name.TrimStart('-'),
+                        Property = syntexFullOption.Name.TrimStart('-'),
                         Type = "bool",
                         Value = arguments.SyntexDeepScan.ToString(),
                     });
@@ -441,9 +441,9 @@ namespace PnP.Scanning.Process.Commands
                 if (!encounteredError)
                 {
                     AnsiConsole.MarkupLine("");
-                    AnsiConsole.MarkupLine($"[gray]Scan is running![/]");
+                    AnsiConsole.MarkupLine($"[gray]Microsoft 365 Assessment is running![/]");
                     AnsiConsole.MarkupLine($"[gray]Use the [green]status[/] command to get realtime feedback[/]");
-                    AnsiConsole.MarkupLine($"[gray]Use the [green]list[/] command to an overview of all scans[/]");
+                    AnsiConsole.MarkupLine($"[gray]Use the [green]list[/] command to an overview of all Microsoft 365 Assessments[/]");
                 }
 
             });

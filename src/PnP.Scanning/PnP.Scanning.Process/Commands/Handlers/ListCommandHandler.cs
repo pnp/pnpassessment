@@ -21,13 +21,13 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("list", "Lists the all the scans with their status");
+            cmd = new Command("list", "Lists the all the Microsoft 365 Assessments with their status");
 
             // Scanner mode
             runningOption = new(
                 name: $"--{Constants.ListRunning}",
                 getDefaultValue: () => false,
-                description: "Lists running scans"
+                description: "Lists running Microsoft 365 Assessments"
                 )
             {
                 IsRequired = false,
@@ -37,7 +37,7 @@ namespace PnP.Scanning.Process.Commands
             pausedOption = new(
                 name: $"--{Constants.ListPaused}",
                 getDefaultValue: () => false,
-                description: "Lists paused scans"
+                description: "Lists paused Microsoft 365 Assessments"
                 )
             {
                 IsRequired = false,
@@ -47,7 +47,7 @@ namespace PnP.Scanning.Process.Commands
             finishedOption = new(
                 name: $"--{Constants.ListFinished}",
                 getDefaultValue: () => false,
-                description: "Lists finished scans"
+                description: "Lists finished Microsoft 365 Assessments"
                 )
             {
                 IsRequired = false,
@@ -57,7 +57,7 @@ namespace PnP.Scanning.Process.Commands
             terminatedOption = new(
                 name: $"--{Constants.ListTerminated}",
                 getDefaultValue: () => false,
-                description: "Lists terminated scans"
+                description: "Lists terminated Microsoft 365 Assessments"
                 )
             {
                 IsRequired = false,
@@ -162,7 +162,7 @@ namespace PnP.Scanning.Process.Commands
             }
             else
             {
-                AnsiConsole.WriteLine("No scans found meeting the set criteria...");
+                AnsiConsole.WriteLine("No Microsoft 365 Assessments found meeting the set criteria...");
             }
         }
     }

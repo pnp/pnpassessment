@@ -19,13 +19,13 @@ namespace PnP.Scanning.Process.Commands
         {
             processManager = processManagerInstance;
 
-            cmd = new Command("cache", "Manages the scanner cache");
+            cmd = new Command("cache", "Manages the Microsoft 365 Assessment cache");
 
             // Scanner mode
             clearOption = new(
                 name: $"--{Constants.CacheClearAuthentication}",
                 getDefaultValue: () => false,
-                description: "Clears the scanner authentication cache"
+                description: "Clears the Microsoft 365 Assessment authentication cache"
                 )
             {
                 IsRequired = false,

@@ -29,7 +29,7 @@ namespace PnP.Scanning.Process.Commands
             rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
 
-            rootCommand.Description = "Microsoft 365 Scanner";
+            rootCommand.Description = "Microsoft 365 Assessment tool";
 
             return rootCommand;
         }

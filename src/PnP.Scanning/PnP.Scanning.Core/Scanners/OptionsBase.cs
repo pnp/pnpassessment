@@ -15,7 +15,7 @@ namespace PnP.Scanning.Core.Scanners
             {
                 foreach (var property in request.Properties)
                 {
-                    if (property.Property == Constants.StartSyntexDeepScan)
+                    if (property.Property == Constants.StartSyntexFull)
                     {
                         (options as SyntexOptions).DeepScan = bool.Parse(property.Value);
                     }
