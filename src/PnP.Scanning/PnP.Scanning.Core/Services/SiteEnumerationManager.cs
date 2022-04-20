@@ -62,7 +62,17 @@ namespace PnP.Scanning.Core.Services
                     )))
                 {
                     // Enumerate all site collections
-                    var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(filter: SiteCollectionFilter.ExcludePersonalSites);
+                    VanityUrlOptions vanityUrlOptions = null;
+                    if (!string.IsNullOrEmpty(start.MySiteHostUrl) && !string.IsNullOrEmpty(start.AdminCenterUrl))
+                    {
+                        vanityUrlOptions = new VanityUrlOptions
+                        {
+                            AdminCenterUri = new Uri(start.AdminCenterUrl),
+                            MySiteHostUri = new Uri(start.MySiteHostUrl)
+                        };
+                    }
+
+                    var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(filter: SiteCollectionFilter.ExcludePersonalSites, vanityUrlOptions: vanityUrlOptions);
                     foreach(var siteCollection in siteCollections)
                     {
                         list.Add(siteCollection.Url.ToString());

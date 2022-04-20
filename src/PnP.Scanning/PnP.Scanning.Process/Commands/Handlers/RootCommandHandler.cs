@@ -8,11 +8,13 @@ namespace PnP.Scanning.Process.Commands
     {
         private readonly ScannerManager processManager;
         private readonly IDataProtectionProvider dataProtectionProvider;
+        private readonly ConfigurationOptions configurationOptions;
 
-        public RootCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance)
+        public RootCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance)
         {
             processManager = processManagerInstance;
             dataProtectionProvider = dataProtectionProviderInstance;
+            configurationOptions = configurationOptionsInstance;
         }
 
         public Command Create()
@@ -25,7 +27,7 @@ namespace PnP.Scanning.Process.Commands
             rootCommand.AddCommand(new PauseCommandHandler(processManager).Create());
             rootCommand.AddCommand(new ReportCommandHandler(processManager).Create());
             rootCommand.AddCommand(new RestartCommandHandler(processManager).Create());
-            rootCommand.AddCommand(new StartCommandHandler(processManager, dataProtectionProvider).Create());
+            rootCommand.AddCommand(new StartCommandHandler(processManager, dataProtectionProvider, configurationOptions).Create());
             rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
 

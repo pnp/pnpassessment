@@ -10,8 +10,6 @@ namespace PnP.Scanning.Process.Commands
 
         public string Tenant { get; set; }
 
-        public Microsoft365Environment Environment { get; set; }
-
         public List<string> SitesList { get; set; }
 
         public FileInfo SitesFile { get; set; }

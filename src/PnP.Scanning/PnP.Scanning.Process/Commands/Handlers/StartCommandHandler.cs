@@ -14,11 +14,11 @@ namespace PnP.Scanning.Process.Commands
     {
         private readonly ScannerManager processManager;
         private readonly IDataProtectionProvider dataProtectionProvider;
+        private readonly ConfigurationOptions configurationOptions;
 
         private Command cmd;
         private Option<Mode> modeOption;
         private Option<string> tenantOption;
-        private Option<Microsoft365Environment> environmentOption;
         private Option<List<string>> sitesListOption;
         private Option<FileInfo> sitesFileOption;
         private Option<AuthenticationMode> authenticationModeOption;
@@ -38,10 +38,11 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> testNumberOfSitesOption;
 #endif
 
-        public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance)
+        public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance)
         {
             processManager = processManagerInstance;
             dataProtectionProvider = dataProtectionProviderInstance;
+            configurationOptions = configurationOptionsInstance;
 
             cmd = new Command("start", "Starts a new Microsoft 365 Assessment");
 
@@ -67,15 +68,6 @@ namespace PnP.Scanning.Process.Commands
                 IsRequired = true
             };
             cmd.AddOption(tenantOption);
-
-            environmentOption = new(
-                name: $"--{Constants.StartEnvironment}",
-                getDefaultValue: () => Microsoft365Environment.Production,
-                description: "The cloud environment you're running an assessment for")
-            {
-                IsRequired = false
-            };
-            cmd.AddOption(environmentOption);
 
             sitesListOption = new(
                 name: $"--{Constants.StartSitesList}",
@@ -306,7 +298,7 @@ namespace PnP.Scanning.Process.Commands
         public Command Create()
         {
             // Binder approach as that one can handle an unlimited number of command line arguments
-            var startBinder = new StartBinder(modeOption, tenantOption, environmentOption, sitesListOption, sitesFileOption,
+            var startBinder = new StartBinder(modeOption, tenantOption, sitesListOption, sitesFileOption,
                                               authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
                                               , syntexFullOption
@@ -342,14 +334,23 @@ namespace PnP.Scanning.Process.Commands
                 var client = await processManager.GetScannerClientAsync();
 
                 // Handle authentication
+                Microsoft365Environment environment = Microsoft365Environment.Production;
                 try
                 {
                     AnsiConsole.MarkupLine("");
                     AnsiConsole.MarkupLine($"[gray]Initializing authentication[/]");
 
+                    if (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.Environment))
+                    {
+                        if (Enum.TryParse(typeof(Microsoft365Environment), configurationOptions.Environment, out object parsedEnvironment))
+                        {
+                            environment = (Microsoft365Environment)parsedEnvironment;
+                        }
+                    }
+
                     // Initialize authentication, this will result in a local auth cache when succesfull
                     await new AuthenticationManager(dataProtectionProvider)
-                                .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), arguments.Environment,
+                                .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), environment,
                                                            arguments.ApplicationId, arguments.TenantId,
                                                            arguments.CertPath, arguments.CertFile, arguments.CertPassword,
                                                            (deviceCodeResult) =>
@@ -372,7 +373,7 @@ namespace PnP.Scanning.Process.Commands
                 {
                     Mode = arguments.Mode.ToString(),
                     Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
-                    Environment = arguments.Environment.ToString(),
+                    Environment = environment.ToString(),
                     SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
                     SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName : "",
                     AuthMode = arguments.AuthMode.ToString(),
@@ -382,6 +383,8 @@ namespace PnP.Scanning.Process.Commands
                     CertFile = arguments.CertFile != null ? arguments.CertFile.FullName : "",
                     CertPassword = arguments.CertPassword != null ? arguments.CertPassword : "",
                     Threads = arguments.Threads,
+                    AdminCenterUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.AdminCenterUrl)) ? configurationOptions.AdminCenterUrl : "",
+                    MySiteHostUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.MySiteHostUrl)) ? configurationOptions.MySiteHostUrl : "",
                 };
 
                 // PER SCAN COMPONENT: implement scan component specific options

@@ -1,5 +1,4 @@
-﻿using PnP.Core.Services;
-using PnP.Scanning.Core.Authentication;
+﻿using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using System.CommandLine;
 using System.CommandLine.Binding;
@@ -10,7 +9,6 @@ namespace PnP.Scanning.Process.Commands
     {
         private readonly Option<Mode> mode;
         private readonly Option<string> tenant;
-        private readonly Option<Microsoft365Environment> environment;
         private readonly Option<List<string>> sitesList;
         private readonly Option<FileInfo> sitesFile;
         private readonly Option<AuthenticationMode> authMode;
@@ -28,7 +26,7 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<int> testNumberOfSites;
 #endif
 
-        public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<Microsoft365Environment> environmentInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
+        public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
                            Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
                            // PER SCAN COMPONENT: implement scan component specific options
                            , Option<bool> syntexDeepScanInput
@@ -40,7 +38,6 @@ namespace PnP.Scanning.Process.Commands
         {
             mode = modeInput;
             tenant = tenantInput;
-            environment = environmentInput;
             sitesList = sitesListInput;
             sitesFile = sitesFileInput;
             authMode = authModeInput;
@@ -64,7 +61,6 @@ namespace PnP.Scanning.Process.Commands
             {
                 Mode = bindingContext.ParseResult.GetValueForOption(mode),
                 Tenant = bindingContext.ParseResult.GetValueForOption(tenant),
-                Environment = bindingContext.ParseResult.GetValueForOption(environment),
                 SitesList = bindingContext.ParseResult.GetValueForOption(sitesList),
                 SitesFile = bindingContext.ParseResult.GetValueForOption(sitesFile),
                 AuthMode = bindingContext.ParseResult.GetValueForOption(authMode),

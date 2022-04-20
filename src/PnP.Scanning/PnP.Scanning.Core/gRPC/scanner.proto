@@ -56,6 +56,8 @@ message StartRequest {
 	string CertPassword = 11;
 	int32 Threads = 12;
 	repeated PropertyRequest Properties = 13;
+	string AdminCenterUrl = 14;
+	string MySiteHostUrl = 15;	
 }
 
 message PropertyRequest {

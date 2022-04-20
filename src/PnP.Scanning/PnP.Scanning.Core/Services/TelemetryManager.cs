@@ -619,7 +619,7 @@ namespace PnP.Scanning.Core.Services
             {
                 Scan = scan;
                 TenantId = tenantId;
-                Log.Information("Tenant id for this assessment session {ScanId} is {TenantId}. Assessment mode = {Mode}", TenantId, scanId, Scan.CLIMode);
+                Log.Information("Tenant id for this assessment session {ScanId} is {TenantId}. Assessment mode = {Mode}", scanId, TenantId, Scan.CLIMode);
             }
             else
             {

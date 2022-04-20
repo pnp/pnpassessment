@@ -64,8 +64,9 @@ namespace PnP.Scanning.Process
                 // Get ProcessManager instance from the cli executable
                 var processManager = host.Services.GetRequiredService<ScannerManager>();
                 var dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
+                var configurationData = host.Services.GetRequiredService<ConfigurationOptions>();
 
-                var root = new RootCommandHandler(processManager, dataProtectionProvider).Create();
+                var root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
                 var builder = new CommandLineBuilder(root);
                 var parser = builder.UseDefaults().Build();
 
