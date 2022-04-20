@@ -42,7 +42,7 @@ jobs:
     - name: Build docs
       shell: pwsh
       run: |
-        ./dev/docs/build.ps1
+        ./main/docs/build.ps1
     # Add, commit and push the changes
     - name: Add & Commit & Push
       uses: EndBug/add-and-commit@v6
