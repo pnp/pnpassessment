@@ -4,7 +4,7 @@ Microsoft 365 SharePoint Assessment tool is an open source community tool that p
 ## Getting started 🚀
 
 Minimal steps to run:
-- Download the assessment tool for the OS you're using. Assessment tool versions can be found in the [releases](https://github.com/pnp/pnpscanning/releases) folder
+- Download the assessment tool for the OS you're using. Assessment tool versions can be found in the [releases](https://github.com/pnp/pnpassessment/releases) folder
 - Use the Assessment tool CLI to operate it: `microsoft365-assessment.exe --help` will show the available commands
 
 Common CLI calls are:
@@ -73,13 +73,13 @@ If you want to join our team and help, then feel free to check the issue list fo
 
 ## Supportability and SLA 💁🏾‍♀️
 
-This tool is an open-source and community provided tool backed by an active community supporting it. This is not a Microsoft provided tool, so there's no SLA or direct support for this open-source component from Microsoft. Please report any issues using the [issues list](https://github.com/pnp/pnpscannning/issues).
+This tool is an open-source and community provided tool backed by an active community supporting it. This is not a Microsoft provided tool, so there's no SLA or direct support for this open-source component from Microsoft. Please report any issues using the [issues list](https://github.com/pnp/pnpassessment/issues).
 
 ## FAQ
 
 ### Running on MacOS or Linux
 
-The assessment tool can be used on MacOS and Linux except the PowerBI report generation as the PowerBI client only is available for Windows. After copying the needed binary from the [releases](https://github.com/pnp/pnpscanning/releases) folder you need to mark the binary as executable via `sudo chmod +x microsoft365-assessment`. Once that's done you can use the assessment tool, the assessment tool binary itself contains all the needed depencies (including the .NET 6 runtime). 
+The assessment tool can be used on MacOS and Linux except the PowerBI report generation as the PowerBI client only is available for Windows. After copying the needed binary from the [releases](https://github.com/pnp/pnpassessment/releases) folder you need to mark the binary as executable via `sudo chmod +x microsoft365-assessment`. Once that's done you can use the assessment tool, the assessment tool binary itself contains all the needed depencies (including the .NET 6 runtime). 
 
 If you later on want to generate a PowerBI report for an assessment ran on Linux of MacOS, you then can copy the scan output folder (guid = scan id, located in the folder containing the binary) to the folder on a Windows machine where you've put the Windows version of the assessment tool. When you then use `microsoft365-assessment.exe report --id <assessment id>` the report will be generated and opened in Power BI Desktop.
 
