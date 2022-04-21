@@ -82,6 +82,33 @@
                   </div>
                     <h1 id="configure-authentication">Configure authentication</h1>
 
+<p>When using the SharePoint Syntex adoption module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application (<a href="../using-the-assessment-tool/setupauth.html">learn more here</a>). The specific permissions required for this module are described below.</p>
+<h2 id="permission-requirements">Permission requirements</h2>
+<p>The Microsoft 365 Assessment tool aims to be able to perform the SharePoint Syntex adoption assessment using minimal read permissions, but for a full assessment the optimal permissions are required.</p>
+<table>
+<thead>
+<tr>
+<th>Authentication</th>
+<th>Minimal</th>
+<th>Optimal</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Application</td>
+<td><strong>Graph:</strong> Sites.Read.All <br> <strong>SharePoint:</strong> Sites.Read.All</td>
+<td><strong>Graph:</strong> Sites.Read.All <br> <strong>SharePoint:</strong> Sites.FullControl.All</td>
+<td>When using the <code>--syntexfull</code> argument the assessment tool will use the search APIs to count how many documents use a given content type and how many retention labels there are applied on a list, and search in combination with application permissions requires Sites.FullControl.All. The assessment tool will also check if a library uses workflow 2013 and this requires the Sites.Manage.All or higher permission role</td>
+</tr>
+<tr>
+<td>Delegated</td>
+<td><strong>Graph:</strong> Sites.Read.All, User.Read <br> <strong>SharePoint:</strong> AllSites.Read</td>
+<td><strong>Graph:</strong> Sites.Read.All, User.Read <br> <strong>SharePoint:</strong> AllSites.Manage</td>
+<td>The assessment tool will check if a library uses workflow 2013 and this requires the AllSites.Manage or higher permission scope</td>
+</tr>
+</tbody>
+</table>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
