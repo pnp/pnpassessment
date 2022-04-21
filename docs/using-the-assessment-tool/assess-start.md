@@ -8,8 +8,8 @@ Before diving into all the possible command line arguments let's first show some
 
 Task | CLI
 -----|------
-Start a new Syntex full assessment (application permissions) for a complete tenant | `microsoft365-assessment.exe start --mode syntex --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84" --syntexfull`
-Start a new Syntex assessment (delegated permissions) for a set of site collections | `microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales,https://bertonline.sharepoint.com/sites/apacsales"`
+Start a new Syntex full assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode syntex --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84" --syntexfull
+Start a new Syntex assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales,https://bertonline.sharepoint.com/sites/apacsales"
 
 ## Command line arguments
 
@@ -65,7 +65,7 @@ As mentioned in the [configure authentication](setupauth.md) page it's recommend
 
 When you've chosen to use application permissions you need to tell the Microsoft 365 Assessment tool the certificate it needs to use for authentication. Two modes are supported: you either point to a certificate already stored in a certificate store on your computer (`--certpath`) or you point to a PFX file containing the certificate (`--certfile`). When using a PFX file you also need to specify the password to open the file via `--certpassword`.
 
-When using `--certpath` some additional information is needed to understand how the `--certpath` argument (e.g. `My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84`) needs to be defined. You can use `My` or `Root` store name followed by either `CurrentUser` or `LocalMachine` to identify the location in a certificate store on your computer. The last part is the thumbprint of the certificate you want to use.
+When using `--certpath` some additional information is needed to understand how the `--certpath` argument (e.g. `My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84`) needs to be defined. You typically use the `My` or `Root` store names followed by either `CurrentUser` or `LocalMachine` to identify the location of the certificate store on your computer. The last part is the thumbprint of the certificate you want to use.
 
 > [!Note]
 > If you're using the `LocalMachine` store location then be aware that you'll need to ensure the user running the Microsoft 365 Assessment tool has permissions to read the certificate private key in the `LocalMachine` store. You can do this by granting the account you're using to run the Microsoft 365 Assessment tool permissions to read the private key by opening up the local machine certificate console (`certlm.msc`), navigating to the certificate you're using, right click on the certificate, choose `All Tasks -> Manage private keys...` and add your user account with read permissions.
@@ -84,3 +84,7 @@ By default the Microsoft 365 Assessment tool will use multiple parallel operatio
 
 > [!Important]
 > Running too many parallel operations will make it more likely the assessment will be throttled. Using between 4 and 8 threads is a good starting point.
+
+## Running multiple parallel assessments
+
+The Microsoft 365 Assessment tool suports running up to 3 parallel assessments, but do note that just like with bumping up the amount of parallel operations this will increase the likelihood of getting throttled.

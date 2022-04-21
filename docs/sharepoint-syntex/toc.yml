@@ -1,7 +1,7 @@
 - name: Introduction
   href: readme.md
-- name: Permission requirements
-  href: authrequirements.md
+- name: Requirements
+  href: requirements.md
 - name: Run an assessment
   href: assess.md
 - name: Report      

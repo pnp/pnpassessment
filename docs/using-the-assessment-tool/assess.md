@@ -16,12 +16,19 @@ To use the Microsoft 365 Assessment tool you'll need to use the command line int
 
 ### Launch without command line arguments
 
-In this mode the Microsoft 365 Assessment tool CLI will be started and then allows you to keep adding providing commands like `List`, `Start`, `Status` and more.
+In this mode the Microsoft 365 Assessment tool CLI will be started and then allows you to keep providing arguments like `List`, `Start`, `Status` and more.
 
 ![argument less gif](../images/assessmentnoarguments.gif)
+
+> [!Note]
+> To leave this mode you need to press enter without specifying an argument.
 
 ### Launch with command line arguments
 
 Here you specify the needed command and optionally it's arguments as part of the command line when you execute the Microsoft 365 Assessment tool.
 
 ![argument less gif](../images/assessmentarguments.gif)
+
+### Understanding the available command line options
+
+The best way to figure out what's possible is by reading the documentation, but a brief summary of the options is also available if you add the `--help` argument. You can do this for the Microsoft 365 Assessment tool (`microsoft365-assessment.exe --help`) or for a specific command (`microsoft365-assessment.exe start --help`).
