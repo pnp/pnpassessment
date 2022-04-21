@@ -24,4 +24,4 @@ In this mode the Microsoft 365 Assessment tool CLI will be started and then allo
 
 Here you specify the needed command and optionally it's arguments as part of the command line when you execute the Microsoft 365 Assessment tool.
 
-![argument less gif](../images/assessmentnoarguments.gif)
+![argument less gif](../images/assessmentarguments.gif)
