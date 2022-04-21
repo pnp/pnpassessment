@@ -1,2 +1,12 @@
 # Configure authentication
 
+When using the SharePoint Syntex adoption module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application ([learn more here](../using-the-assessment-tool/setupauth.md)). The specific permissions required for this module are described below.
+
+## Permission requirements
+
+The Microsoft 365 Assessment tool aims to be able to perform the SharePoint Syntex adoption assessment using minimal read permissions, but for a full assessment the optimal permissions are required.
+
+Authentication | Minimal | Optimal | Details
+---------------| --------|---------|--------
+Application | **Graph:** Sites.Read.All <br> **SharePoint:** Sites.Read.All | **Graph:** Sites.Read.All <br> **SharePoint:** Sites.FullControl.All | When using the `--syntexfull` argument the assessment tool will use the search APIs to count how many documents use a given content type and how many retention labels there are applied on a list, and search in combination with application permissions requires Sites.FullControl.All. The assessment tool will also check if a library uses workflow 2013 and this requires the Sites.Manage.All or higher permission role
+Delegated | **Graph:** Sites.Read.All, User.Read <br> **SharePoint:** AllSites.Read | **Graph:** Sites.Read.All, User.Read <br> **SharePoint:** AllSites.Manage | The assessment tool will check if a library uses workflow 2013 and this requires the AllSites.Manage or higher permission scope

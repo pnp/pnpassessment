@@ -2,7 +2,7 @@
   href: readme.md
 - name: Download
   href: download.md
-- name: Setup authentication
+- name: Configure authentication
   href: setupauth.md
 - name: Run the Microsoft 365 Assessment tool
   href: assess.md
