@@ -76,7 +76,7 @@ Depending on the chosen assessment mode (`--mode` argument) you can optionally d
 
 ### SharePoint Syntex adoption assessment
 
-When running this assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the specific [SharePoint Syntex assessment page](../sharepoint-syntex/authrequirements.md) to learn more.
+When running this assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the specific [SharePoint Syntex assessment page](../sharepoint-syntex/requirements.md) to learn more.
 
 ### Parallel operations
 
