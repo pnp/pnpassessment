@@ -75,149 +75,39 @@
                   </div>
                     <h1 id="microsoft-365-assessment-tool">Microsoft 365 Assessment Tool</h1>
 
-<p>Microsoft 365 SharePoint Assessment tool is an open source community tool that provides customers with data to help them with various deprecation and adoption scenarios. This tool is currently under development/testing, more features and especially more documentation will be added soon.</p>
+<p>The Microsoft 365 Assessment tool is an open source community tool that provides customers with data to help them with various deprecation and adoption scenarios. At launch the tool only supports a SharePoint Syntex adoption module but additional modules are under development.</p>
 <h2 id="getting-started-">Getting started 🚀</h2>
-<p>Minimal steps to run:</p>
-<ul>
-<li>Download the assessment tool for the OS you're using. Assessment tool versions can be found in the <a href="https://github.com/pnp/pnpassessment/releases">releases</a> folder</li>
-<li>Use the Assessment tool CLI to operate it: <code>microsoft365-assessment.exe --help</code> will show the available commands</li>
-</ul>
-<p>Common CLI calls are:</p>
+<p>The minimal steps to get started are:</p>
 <table>
 <thead>
 <tr>
-<th>Task</th>
-<th>CLI</th>
+<th>Step</th>
+<th>Description</th>
+<th>Learn more</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Start a new Syntex assessment (application permissions) for a complete tenant</td>
-<td>microsoft365-assessment.exe start --mode syntex --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot;</td>
+<td>Download</td>
+<td>Download the assessment tool for the OS you're using. Assessment tool versions can be found in the <a href="https://github.com/pnp/pnpassessment/releases">releases</a> folder</td>
+<td><a href="using-the-assessment-tool/download.html">Download</a></td>
 </tr>
 <tr>
-<td>Start a new Syntex full assessment (delegated permissions) for a set of site collections</td>
-<td>microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist &quot;https://bertonline.sharepoint.com/sites/prov-1,https://bertonline.sharepoint.com/sites/temp2&quot; --syntexfull</td>
+<td>Configure auth</td>
+<td>Setup an Azure AD application</td>
+<td><a href="using-the-assessment-tool/setupauth.html">Setup auth</a></td>
 </tr>
 <tr>
-<td>List all the assessments</td>
-<td>microsoft365-assessment.exe list</td>
-</tr>
-<tr>
-<td>Realtime status update of the running assessments</td>
-<td>microsoft365-assessment.exe status</td>
-</tr>
-<tr>
-<td>Pause a running assessment</td>
-<td>microsoft365-assessment.exe pause --id &lt;assessment id&gt;</td>
-</tr>
-<tr>
-<td>Restart a paused or terminated assessment</td>
-<td>microsoft365-assessment.exe restart --id &lt;assessment id&gt;</td>
-</tr>
-<tr>
-<td>Generate PowerBI report (includes CSV export)</td>
-<td>microsoft365-assessment.exe report --id &lt;assessment id&gt;</td>
-</tr>
-<tr>
-<td>Export the gathered data to CSV</td>
-<td>microsoft365-assessment.exe report --id &lt;assessment id&gt; --mode CsvOnly --path &lt;location to put CSV files&gt;</td>
-</tr>
-</tbody>
-</table>
-<p><img src="images/scannerrun.gif" alt="scanner run"></p>
-<h3 id="setting-up-your-azure-ad-application">Setting up your Azure AD application</h3>
-<p>The assessment tool requires Azure AD based authentication and supports application permissions (app-only) and delegated (user) permissions. Application permissions is the recommended approach as this way the assessment tool does have guaranteed access to all the sites in your tenant. If you use delegated permissions than you can either use the <code>Interactive</code> mode or the <code>Device</code> authentication mode. <code>Device</code> mode works on all OS's, including Linux as you authenticate the assessment tool from any device. <code>Interactive</code> will popup a browser session and ask you to authenticate. Application permissions require you to use a certificate for authentication and this certificate can be provided via a reference to a certificate in a local certificate store e.g. &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot; or via providing a PFX file and password (<code>--certfile &quot;MyCertificate.pfx&quot; --certpassword ***</code>).</p>
-<p>If you don't specify the <code>--applicationid</code> argument the assessment tool will try to use the PnP Management Shell app (the one you use for <a href="https://pnp.github.io/powershell/">PnP PowerShell</a>), but it's recommended to create a dedicated app for assessment as that way you can limit the permissions granted. Using PnP PowerShell this becomes really simple. Below cmdlet will create a new Azure AD application, will create a new self-signed certificate and will configure that cert with the Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.</p>
-<pre><code class="lang-PowerShell"># Ensure you replace contoso.onmicrosoft.com with your Azure AD tenant name
-# Ensure you replace joe@contoso.onmicrosoft.com with the user id that's an Azure AD admin (or global admin)
-
-# Sample for Syntex
-Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentForSyntex `
-                       -Tenant contoso.onmicrosoft.com `
-                       -Store CurrentUser `
-                       -GraphApplicationPermissions &quot;Sites.Read.All&quot; `
-                       -SharePointApplicationPermissions &quot;Sites.FullControl.All&quot; `
-                       -GraphDelegatePermissions &quot;Sites.Read.All&quot;, &quot;User.Read&quot; `
-                       -SharePointDelegatePermissions &quot;AllSites.Read&quot; `
-                       -Username &quot;joe@contoso.onmicrosoft.com&quot; `
-                       -Interactive
-                   
-# Sample for Workflow                   
-Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentForWorkflow `
-                       -Tenant contoso.onmicrosoft.com `
-                       -Store CurrentUser `
-                       -GraphApplicationPermissions &quot;Sites.Read.All&quot; `
-                       -SharePointApplicationPermissions &quot;Sites.Manage.All&quot; `
-                       -GraphDelegatePermissions &quot;Sites.Read.All&quot;, &quot;User.Read&quot; `
-                       -SharePointDelegatePermissions &quot;AllSites.Manage&quot; `
-                       -Username &quot;joe@contoso.onmicrosoft.com&quot; `
-                       -Interactive                       
-</code></pre>
-<h3 id="permissions-required">Permissions required</h3>
-<p>The assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissoins.</p>
-<table>
-<thead>
-<tr>
-<th>Assessment</th>
-<th>Authentication</th>
-<th>Minimal</th>
-<th>Optimal</th>
-<th>Details</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Syntex</td>
-<td>Application</td>
-<td><strong>Graph:</strong> Sites.Read.All, <strong>SharePoint:</strong> Sites.Read.All</td>
-<td><strong>Graph:</strong> Sites.Read.All, <strong>SharePoint:</strong> Sites.FullControl.All</td>
-<td>When using the <code>--syntexfull</code> argument the assessment tool will use the search APIs to count how many documents use a given content type and how many retention labels there are applied on a list, and search in combination with application permissions requires Sites.FullControl.All. The assessment tool will also check if a library uses workflow 2013 and this requires the Sites.Manage.All or higher permission role</td>
-</tr>
-<tr>
-<td>Syntex</td>
-<td>Delegated</td>
-<td><strong>Graph:</strong> Sites.Read.All, User.Read, <strong>SharePoint:</strong> AllSites.Read</td>
-<td><strong>Graph:</strong> Sites.Read.All, User.Read, <strong>SharePoint:</strong> AllSites.Manage</td>
-<td>The assessment tool will check if a library uses workflow 2013 and this requires the AllSites.Manage or higher permission scope</td>
-</tr>
-<tr>
-<td>Workflow</td>
-<td>Application</td>
-<td><strong>Graph:</strong> Sites.Read.All, <strong>SharePoint:</strong> Sites.Manage.All</td>
-<td><strong>Graph:</strong> Sites.Read.All, <strong>SharePoint:</strong> Sites.Manage.All</td>
-<td></td>
-</tr>
-<tr>
-<td>Workflow</td>
-<td>Delegated</td>
-<td><strong>Graph:</strong> Sites.Read.All, User.Read, <strong>SharePoint:</strong> AllSites.Manage</td>
-<td><strong>Graph:</strong> Sites.Read.All, User.Read, <strong>SharePoint:</strong> AllSites.Manage</td>
-<td></td>
+<td>Run</td>
+<td>Use the Assessment tool CLI to operate it: <code>microsoft365-assessment.exe --help</code> will show the available commands</td>
+<td><a href="using-the-assessment-tool/assess.html">Run</a></td>
 </tr>
 </tbody>
 </table>
 <h2 id="i-want-to-help-">I want to help 🙋‍♂️</h2>
-<p>If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with sugggested improvements.</p>
+<p>If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with suggested improvements. Check out our <a href="contributing/readme.html">Contribution guidance</a> to learn more.</p>
 <h2 id="supportability-and-sla-">Supportability and SLA 💁🏾‍♀️</h2>
 <p>This tool is an open-source and community provided tool backed by an active community supporting it. This is not a Microsoft provided tool, so there's no SLA or direct support for this open-source component from Microsoft. Please report any issues using the <a href="https://github.com/pnp/pnpassessment/issues">issues list</a>.</p>
-<h2 id="faq">FAQ</h2>
-<h3 id="running-on-macos-or-linux">Running on MacOS or Linux</h3>
-<p>The assessment tool can be used on MacOS and Linux except the PowerBI report generation as the PowerBI client only is available for Windows. After copying the needed binary from the <a href="https://github.com/pnp/pnpassessment/releases">releases</a> folder you need to mark the binary as executable via <code>sudo chmod +x microsoft365-assessment</code>. Once that's done you can use the assessment tool, the assessment tool binary itself contains all the needed depencies (including the .NET 6 runtime).</p>
-<p>If you later on want to generate a PowerBI report for an assessment ran on Linux of MacOS, you then can copy the scan output folder (guid = scan id, located in the folder containing the binary) to the folder on a Windows machine where you've put the Windows version of the assessment tool. When you then use <code>microsoft365-assessment.exe report --id &lt;assessment id&gt;</code> the report will be generated and opened in Power BI Desktop.</p>
-<h3 id="running-on-a-gcc-gcc-high-dod-or-china-tenant--running-the-assessment-tool-on-a-port-different-from-25025">Running on a GCC, GCC High, DoD or China tenant / running the assessment tool on a port different from 25025</h3>
-<p>The assessment tool can be used to run against tenants hosted in other cloud environments. Doing this requires the manual addition of a settings file named <code>appsettings.json</code> in the same folder as the assessment tool binary. Below are the sample settings for selecting another cloud environment:</p>
-<pre><code class="lang-json">{
-  &quot;PnPCore&quot;: {
-    &quot;Environment&quot;: &quot;USGovernment&quot;
-  },
-  &quot;CustomSettings&quot;: {
-    &quot;Port&quot;: 7887
-  }
-}
-</code></pre>
-<p>Valid values for environment are: <code>Production</code>, <code>PreProduction</code>, <code>USGovernment</code> (a.k.a GCC), <code>USGovernmentHigh</code> (a.k.a GCC High), <code>USGovernmentDoD</code> (a.k.a DoD), <code>China</code> and <code>Germany</code>. Next to the adding the <code>appsettings.json</code> file you also need to include the <code>--environment</code> argument when launching an assessment via the <code>start</code> command. The possible values are identical to the ones provided in the configuration file.</p>
-<p>When you for some reason port 25025 is occupied on your machine you can configure the assessment tool by providing an alternative port number via the <code>appsettings.json</code> file.</p>
 <p><strong>Community rocks, sharing is caring!</strong></p>
 <p>This project has adopted the <a href="https://opensource.microsoft.com/codeofconduct/">Microsoft Open Source Code of Conduct</a>. For more information see the <a href="https://opensource.microsoft.com/codeofconduct/faq/">Code of Conduct FAQ</a> or contact <a href="mailto:opencode@microsoft.com">opencode@microsoft.com</a> with any additional questions or comments.</p>
 </article>
