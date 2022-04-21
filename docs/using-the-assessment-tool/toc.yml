@@ -4,7 +4,7 @@
   href: download.md
 - name: Authentication
   href: setupauth.md
-- name: Run the Microsoft 365 Assessment tool
+- name: Use the Microsoft 365 Assessment tool
   href: assess.md
   items:
     - name: Start an assessment 
@@ -24,3 +24,5 @@
       href: configuration-vanityurls.md
     - name: Port
       href: configuration-port.md
+    - name: Telemetry
+      href: configuration-telemetry.md
