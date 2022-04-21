@@ -95,11 +95,11 @@
 <tbody>
 <tr>
 <td>Start a new Syntex full assessment (application permissions) for a complete tenant</td>
-<td><code>microsoft365-assessment.exe start --mode syntex --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath &quot;My&amp;#124;CurrentUser&amp;#124;b133d1cb4d19ce539986c7ac67de005481084c84&quot; --syntexfull</code></td>
+<td>microsoft365-assessment.exe start --mode syntex --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot; --syntexfull</td>
 </tr>
 <tr>
 <td>Start a new Syntex assessment (delegated permissions) for a set of site collections</td>
-<td><code>microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales,https://bertonline.sharepoint.com/sites/apacsales&quot;</code></td>
+<td>microsoft365-assessment.exe start --mode Syntex --authmode interactive --tenant bertonline.sharepoint.com --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales,https://bertonline.sharepoint.com/sites/apacsales&quot;</td>
 </tr>
 </tbody>
 </table>
@@ -155,7 +155,7 @@ https://bertonline.sharepoint.com/sites/apacsales
 <p>As mentioned in the <a href="setupauth.html">configure authentication</a> page it's recommended to create an Azure AD application. To tell the Microsoft 365 Assessment tool which Azure AD application it should use you need to specify the Azure AD application id via the <code>--applicationid</code> argument. A sample: <code>--applicationid c545f9ce-1c11-440b-812b-0b35217d9e83</code>. When you do not specify an Azure AD application id the PnP Management Shell application is used (<code>31359c7f-bd7e-475c-86db-fdb8c937548e</code>).</p>
 <h3 id="specifying-the-certificate-to-use-when-using-application-permissions">Specifying the certificate to use when using application permissions</h3>
 <p>When you've chosen to use application permissions you need to tell the Microsoft 365 Assessment tool the certificate it needs to use for authentication. Two modes are supported: you either point to a certificate already stored in a certificate store on your computer (<code>--certpath</code>) or you point to a PFX file containing the certificate (<code>--certfile</code>). When using a PFX file you also need to specify the password to open the file via <code>--certpassword</code>.</p>
-<p>When using <code>--certpath</code> some additional information is needed to understand how the <code>--certpath</code> argument (e.g. <code>My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84</code>) needs to be defined. You can use <code>My</code> or <code>Root</code> store name followed by either <code>CurrentUser</code> or <code>LocalMachine</code> to identify the location in a certificate store on your computer. The last part is the thumbprint of the certificate you want to use.</p>
+<p>When using <code>--certpath</code> some additional information is needed to understand how the <code>--certpath</code> argument (e.g. <code>My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84</code>) needs to be defined. You typically use the <code>My</code> or <code>Root</code> store names followed by either <code>CurrentUser</code> or <code>LocalMachine</code> to identify the location of the certificate store on your computer. The last part is the thumbprint of the certificate you want to use.</p>
 <div class="NOTE">
 <h5>Note</h5>
 <p>If you're using the <code>LocalMachine</code> store location then be aware that you'll need to ensure the user running the Microsoft 365 Assessment tool has permissions to read the certificate private key in the <code>LocalMachine</code> store. You can do this by granting the account you're using to run the Microsoft 365 Assessment tool permissions to read the private key by opening up the local machine certificate console (<code>certlm.msc</code>), navigating to the certificate you're using, right click on the certificate, choose <code>All Tasks -&gt; Manage private keys...</code> and add your user account with read permissions.</p>
@@ -163,13 +163,15 @@ https://bertonline.sharepoint.com/sites/apacsales
 <h2 id="other-configuration-options">Other configuration options</h2>
 <p>Depending on the chosen assessment mode (<code>--mode</code> argument) you can optionally define extra arguments.</p>
 <h3 id="sharepoint-syntex-adoption-assessment">SharePoint Syntex adoption assessment</h3>
-<p>When running this assessment it's recommended to use the <code>--syntexfull</code> argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the specific <a href="../sharepoint-syntex/authrequirements.html">SharePoint Syntex assessment page</a> to learn more.</p>
+<p>When running this assessment it's recommended to use the <code>--syntexfull</code> argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the specific <a href="../sharepoint-syntex/requirements.html">SharePoint Syntex assessment page</a> to learn more.</p>
 <h3 id="parallel-operations">Parallel operations</h3>
 <p>By default the Microsoft 365 Assessment tool will use multiple parallel operations to read data from your tenant. By default one operation per logical processor is used with a maximum of 10, but you can change this number via the <code>--threads</code> argument.</p>
 <div class="IMPORTANT">
 <h5>Important</h5>
 <p>Running too many parallel operations will make it more likely the assessment will be throttled. Using between 4 and 8 threads is a good starting point.</p>
 </div>
+<h2 id="running-multiple-parallel-assessments">Running multiple parallel assessments</h2>
+<p>The Microsoft 365 Assessment tool suports running up to 3 parallel assessments, but do note that just like with bumping up the amount of parallel operations this will increase the likelihood of getting throttled.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

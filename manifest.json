@@ -95,18 +95,6 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "sharepoint-syntex/authrequirements.md",
-      "output": {
-        ".html": {
-          "relative_path": "sharepoint-syntex/authrequirements.html",
-          "hash": "YCW8mEy2OzedkrnVD8RJyQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "sharepoint-syntex/csv-contentfields.md",
       "output": {
         ".html": {
@@ -322,12 +310,24 @@
       "version": ""
     },
     {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/requirements.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/requirements.html",
+          "hash": "JLQx00f/Fx1yJfci+DWX7Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
       "type": "Toc",
       "source_relative_path": "sharepoint-syntex/toc.yml",
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/toc.html",
-          "hash": "HeCNm/6MIOyPzcOEZCWpNA=="
+          "hash": "591nNKIwj2zv55v7vmYi0w=="
         }
       },
       "is_incremental": false,
@@ -375,7 +375,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "ynxt05ZHt9HfpDIQ0y9LRQ=="
+          "hash": "xHFYZJC25guFdmWElSPJ+Q=="
         }
       },
       "is_incremental": false,
@@ -399,7 +399,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess.html",
-          "hash": "acM4HIad14XjOsqC2m2fqw=="
+          "hash": "HHoG9LA5/dHrEK/w1vYcHA=="
         }
       },
       "is_incremental": false,
@@ -543,7 +543,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/setupauth.html",
-          "hash": "I4omRYRpCvL8346dNdMh/w=="
+          "hash": "rPxCAxp7qm8e4sBQGQ8F9A=="
         }
       },
       "is_incremental": false,
@@ -555,7 +555,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/toc.html",
-          "hash": "IqNcaIhRt2ziJeR+8EU4bQ=="
+          "hash": "JCGNwzNcHXG5kTds5pBOmQ=="
         }
       },
       "is_incremental": false,

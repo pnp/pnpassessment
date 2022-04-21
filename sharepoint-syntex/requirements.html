@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Configure authentication | Microsoft 365 Assessment Tool </title>
+    <title>Requirements | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Configure authentication | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Requirements | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -78,13 +78,13 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
                   <div class="contribution-panel mobile-hide pull-right">
-                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/sharepoint-syntex/authrequirements.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/sharepoint-syntex/requirements.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="configure-authentication">Configure authentication</h1>
+                    <h1 id="requirements">Requirements</h1>
 
-<p>When using the SharePoint Syntex adoption module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application (<a href="../using-the-assessment-tool/setupauth.html">learn more here</a>). The specific permissions required for this module are described below.</p>
+<p>This page lists the SharePoint Syntex adoption assessment specific requirements and options.</p>
 <h2 id="permission-requirements">Permission requirements</h2>
-<p>The Microsoft 365 Assessment tool aims to be able to perform the SharePoint Syntex adoption assessment using minimal read permissions, but for a full assessment the optimal permissions are required.</p>
+<p>When using the SharePoint Syntex adoption module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application (<a href="../using-the-assessment-tool/setupauth.html">learn more here</a>). The Microsoft 365 Assessment tool aims to be able to perform the SharePoint Syntex adoption assessment using minimal read permissions, but for a full assessment the optimal permissions are required.</p>
 <table>
 <thead>
 <tr>
@@ -109,6 +109,8 @@
 </tr>
 </tbody>
 </table>
+<h2 id="command-line-arguments-for-starting-an-assessment">Command line arguments for starting an assessment</h2>
+<p>When starting the SharePoint Syntex adoption assessment it's recommended to use the <code>--syntexfull</code> argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the above chapter to learn more.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
