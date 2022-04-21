@@ -82,6 +82,50 @@
                   </div>
                     <h1 id="create-assessment-report">Create assessment report</h1>
 
+<p>When an assessment run completes the typical next step is to produce a report or use the gathered data in some other form. These actions can be realized using the <code>report</code> option of the Microsoft 365 Assessment tool. For all adoption or deprecation scenarios implemented in the Microsoft 365 Assessment tool you can request a Power BI report that visualizes and summarizes the gathered data, enabling you to interpret the results and take the necessary actions. The generated Power BI report uses CSV files as data source and these files are created together with the report.</p>
+<h2 id="sample-report-commands">Sample report commands</h2>
+<p>Before diving into all the possible command line arguments let's first show some typical use cases:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generate Power BI report (includes CSV export) in the default location</td>
+<td>microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3</td>
+</tr>
+<tr>
+<td>Export the gathered data as CSV files in a custom location</td>
+<td>microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --mode CsvOnly --path &quot;c:\reports&quot;</td>
+</tr>
+</tbody>
+</table>
+<h2 id="power-bi">Power BI</h2>
+<p>The report format used by the Microsoft 365 Assessment tool is Power BI and we've chosen this option for a number of reasons:</p>
+<ul>
+<li>After running an assessment and generating a report you often want to share it with other teams inside your organization. A Power BI report can be published to the Power BI service and then easily shared with and consumed by your other stakeholders</li>
+<li>The default generate reports might not fully satisfy your needs, using Power BI Desktop is easy to update the generated report to fit your needs</li>
+</ul>
+<h3 id="dependency-on-power-bi-desktop-windows-version">Dependency on Power BI Desktop (Windows version)</h3>
+<p>After generating the Power BI report the Microsoft 365 Assessment tool will automatically open the report in Power BI Desktop. If you've not installed Power BI Desktop the report will still be generated, but opening it will fail. You can install Power BI Desktop from <a href="https://aka.ms/pbidesktopstore">https://aka.ms/pbidesktopstore</a>. After the report has opened in the Power BI Desktop the data will refresh, depending on the data size this can take a while to complete, so please allow Power BI Desktop enough time to complete the data refresh. When the data refresh is done you can start using the report, given the generated report is based upon a Power BI pbit file it means that you can save the report using the pbix format. Doing so will combine the data and the report into a single Power BI pbix file, which can then be easily copied and shared.</p>
+<div class="NOTE">
+<h5>Note</h5>
+<p>When you're using the macOS or Linux version there never will a Power BI report generated as there's no Power BI Desktop product for macOS and Linux. If you later on want to generate the Power BI report for an assessment ran on Linux of macOS, you then can copy the assessment output folder (guid = assessment id, located in the folder containing the Microsoft 365 Assessment tool) to the folder on a Windows machine where you've put the Windows version of the Microsoft 365 Assessment tool. When you then use <code>microsoft365-assessment.exe report --id &lt;assessment id&gt;</code> the report will be generated and opened in Power BI Desktop.</p>
+</div>
+<h2 id="command-line-arguments">Command line arguments</h2>
+<p>The easiest way to see all possible command line arguments for a command (e.g. for <code>report</code>) is using the <code>--help</code> parameter.</p>
+<p><img src="../images/reportargumentshelp.png" alt="report argument overview"></p>
+<h2 id="mandatory-arguments">Mandatory arguments</h2>
+<p>The key argument to specify is the <code>--id</code> argument as that will allow you to select the assessment for which a report must be generated. It's the easiest to copy the needed assessment id by using the <code>list</code> option as described in the <a href="assess-operations.html">assessment operations</a> documentation. The report mode argument (<code>--mode</code>) is also required but since it defaults to <code>PowerBI</code> you don't need to specify it to create a Power BI report. If you however only want to generate CSV files then you need to set <code>--mode</code> to <code>CsvOnly</code>.</p>
+<h2 id="report-location-via---path">Report location via <code>--path</code></h2>
+<p>By default the assessment Power BI report and CSV files are generated inside a subfolder named <code>Report</code> underneath the report containing your assessment data. So assuming the Microsoft 365 Assessment tool was added in folder <code>c:\Microsoft365AssessmentTool</code> and the assessment id is <code>22989c75-f08f-4af9-8857-6f19e333d6d3</code>, then the report will live in <code>c:\Microsoft365AssessmentTool\22989c75-f08f-4af9-8857-6f19e333d6d3\report</code>. If you prefer to put the created Power BI report and CSV files in another location then you can specify the custom location via the <code>--path</code> argument. A sample: <code>--path &quot;c:\reports&quot;</code>.</p>
+<h2 id="report-delimiter-setting-via---delimiter">Report delimiter setting via <code>--delimiter</code></h2>
+<p>When exporting the CSV files, which are used as data source for the Power BI report, by default the comma (',') is used as delimiter. If you're planning to also consume the CSV files directly and you're living in a country that uses semicolon (<code>;</code>) as delimiter then you can override the default delimiter via the <code>--delimiter</code> argument. A sample: <code>--delimiter Semicolon</code>.</p>
+<h2 id="controlling-the-power-bi-report-opening-via---open">Controlling the Power BI report opening via <code>--open</code></h2>
+<p>By default the generated Power BI report will open in Power BI Desktop. If you prefer to not open the report you can specify that via the <code>--open</code> argument. A sample: <code>--open:$false</code>.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

@@ -60,10 +60,109 @@
     },
     {
       "type": "Resource",
+      "source_relative_path": "images/listargumentshelp.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/listargumentshelp.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/listoutput.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/listoutput.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/pause.gif",
+      "output": {
+        "resource": {
+          "relative_path": "images/pause.gif"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/pauseargumentshelp.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/pauseargumentshelp.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/reportargumentshelp.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/reportargumentshelp.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/restart.gif",
+      "output": {
+        "resource": {
+          "relative_path": "images/restart.gif"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/restartargumentshelp.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/restartargumentshelp.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
       "source_relative_path": "images/startargumentshelp.png",
       "output": {
         "resource": {
           "relative_path": "images/startargumentshelp.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/status.gif",
+      "output": {
+        "resource": {
+          "relative_path": "images/status.gif"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/statusoutput.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/statusoutput.png"
         }
       },
       "is_incremental": false,
@@ -351,7 +450,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-operations.html",
-          "hash": "n+VPIr62BxdEUIxXigFmTg=="
+          "hash": "4gFc4bcXkmGwRTI8P/iEYw=="
         }
       },
       "is_incremental": false,
@@ -363,7 +462,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-report.html",
-          "hash": "mmxR4mn6Gt6gnumbqy7AAg=="
+          "hash": "GAzETWDqUP4BYevkippmjA=="
         }
       },
       "is_incremental": false,
@@ -387,7 +486,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-stop.html",
-          "hash": "PKn8p5Dm7iIJnKL0gd6+1w=="
+          "hash": "wWedFxg+WCki6kOXVZ6WOw=="
         }
       },
       "is_incremental": false,
@@ -424,6 +523,18 @@
         ".html": {
           "relative_path": "using-the-assessment-tool/configuration-port.html",
           "hash": "XdrMLGzOtQpNW8A5fb6ijQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/configuration-telemetry.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/configuration-telemetry.html",
+          "hash": "+i7pldceUwrenxZ6DRG0LA=="
         }
       },
       "is_incremental": false,
@@ -555,7 +666,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/toc.html",
-          "hash": "JCGNwzNcHXG5kTds5pBOmQ=="
+          "hash": "mbV1oO7AV31tMGTkYtg/dQ=="
         }
       },
       "is_incremental": false,
@@ -576,7 +687,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 39,
+          "total_file_count": 40,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {

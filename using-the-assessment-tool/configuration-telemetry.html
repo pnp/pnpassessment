@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Stop the assessment tool | Microsoft 365 Assessment Tool </title>
+    <title> | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Stop the assessment tool | Microsoft 365 Assessment Tool ">
+    <meta name="title" content=" | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -78,31 +78,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
                   <div class="contribution-panel mobile-hide pull-right">
-                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/using-the-assessment-tool/assess-stop.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/using-the-assessment-tool/configuration-telemetry.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="stop-the-assessment-tool">Stop the assessment tool</h1>
-
-<p>Once you've used the assessment tool there will be a background process (<code>microsoft365-assessment.exe</code>) that stays running. This is by design as the Microsoft 365 Assessment tool actually is a web server that runs on your computer. When you use the CLI to instruct the Microsoft 365 Assessment tool you're launching also <code>microsoft365-assessment.exe</code>, but this time in CLI mode. This CLI process will use gRPC to communicate with the running background process on localhost, port 25025.</p>
-<p>The background <code>microsoft365-assessment.exe</code> process can be stopped using various means like your OS task manager or command line, but there's also a <code>stop</code> command that you can use.</p>
-<h2 id="sample-stop-commands">Sample stop commands</h2>
-<table>
-<thead>
-<tr>
-<th>Task</th>
-<th>CLI</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Stop the running background Microsoft 365 Assessment tool process</td>
-<td>microsoft365-assessment.exe stop</td>
-</tr>
-</tbody>
-</table>
-<div class="NOTE">
-<h5>Note</h5>
-<p>Using the <code>stop</code> command while there was no Microsoft 365 Assessment tool process running will first trigger this process to start. Using <code>Stop</code> is only needed if you've used the Microsoft 365 Assessment tool before.</p>
-</div>
+                    
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

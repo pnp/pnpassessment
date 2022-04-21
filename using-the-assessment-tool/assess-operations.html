@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Pause/Restart an assessment | Microsoft 365 Assessment Tool </title>
+    <title>Assessment operational tasks | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Pause/Restart an assessment | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Assessment operational tasks | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -80,8 +80,175 @@
                   <div class="contribution-panel mobile-hide pull-right">
                       <a href="https://github.com/pnp/pnpassessment/blob/main/docs/using-the-assessment-tool/assess-operations.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="pauserestart-an-assessment">Pause/Restart an assessment</h1>
+                    <h1 id="assessment-operational-tasks">Assessment operational tasks</h1>
 
+<p>So you've kicked off an assessment and want to followup on the assessment progress or you want to pause a running assessment because you need to shut down the computer running the assessment. All of these tasks, and more, are possible using the operational actions supported by the Microsoft 365 Assessment tool.</p>
+<h2 id="listing-the-available-assessments">Listing the available assessments</h2>
+<p>Assessment data is gathered inside folders underneath the folder hosting the Microsoft 365 Assessment tool and you can enumerate the done, running, paused and terminated assessments via the <code>list</code> action.</p>
+<h3 id="sample-list-commands">Sample list commands</h3>
+<p>Before diving into all the possible command line arguments let's first show some typical use cases:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>List all the assessments</td>
+<td>microsoft365-assessment.exe list</td>
+</tr>
+<tr>
+<td>List the paused assessments</td>
+<td>microsoft365-assessment.exe list --paused</td>
+</tr>
+</tbody>
+</table>
+<h3 id="command-line-arguments">Command line arguments</h3>
+<p>The easiest way to see all possible command line arguments for a command (e.g. for <code>list</code>) is using the <code>--help</code> parameter.</p>
+<p><img src="../images/listargumentshelp.png" alt="list argument overview"></p>
+<h3 id="listing-specific-assessments">Listing specific assessments</h3>
+<p>By default all assessments will be returned ordered by assessment status, followed by a order on assessment age. This means that most recent assessments will be at the bottom of the list. You can however only list assessments in a given status by using either the <code>--running</code>, <code>--paused</code>, <code>--finished</code> or <code>--terminated</code> arguments. These argument can be combined to for example list all paused and terminated assessments.</p>
+<h3 id="list-output">List output</h3>
+<p>When using the <code>list</code> action a table is generated listing all the assessment that match the criteria. Following columns are listed in the table:</p>
+<p><img src="../images/listoutput.png" alt="list output"></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Id</td>
+<td>The assessment id</td>
+</tr>
+<tr>
+<td>Mode</td>
+<td>The assessment mode (e.g. Syntex) defines the adoption or deprecation scenario the assessment is targeting</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>The assessment status: <code>finished</code> is a successfully ended assessment, <code>paused</code> is a paused assessment, <code>running</code> is an assessment that still is in progress and <code>terminated</code> means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)</td>
+</tr>
+<tr>
+<td>Progress</td>
+<td>Shows how many site collections of the total in scope site collections are assessed</td>
+</tr>
+<tr>
+<td>Started at</td>
+<td>When was this assessment for the first time started</td>
+</tr>
+<tr>
+<td>Ended at</td>
+<td>When was this assessment finished</td>
+</tr>
+</tbody>
+</table>
+<h2 id="getting-a-live-status-overview-of-a-running-assessment">Getting a live status overview of a running assessment</h2>
+<p>Once an assessment is started you often want to see it's progress. For that you can use the above described <code>list</code> action, but more convenient for this purpose is the <code>status</code> action as it does a continuos refresh, hence providing a live status overview.</p>
+<h3 id="sample-status-command">Sample status command</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Realtime status update of the running assessments</td>
+<td>microsoft365-assessment.exe status</td>
+</tr>
+</tbody>
+</table>
+<p><img src="../images/status.gif" alt="status gif"></p>
+<h3 id="status-output">Status output</h3>
+<p>When using the <code>status</code> action a table is generated listing all the running assessments. Following columns are listed in the table:</p>
+<p><img src="../images/listoutput.png" alt="list output"></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Id</td>
+<td>The assessment id</td>
+</tr>
+<tr>
+<td>Mode</td>
+<td>The assessment mode (e.g. Syntex) defines the adoption or deprecation scenario the assessment is targeting</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>The assessment status: <code>finished</code> is a successfully ended assessment, <code>paused</code> is a paused assessment, <code>running</code> is an assessment that still is in progress and <code>terminated</code> means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)</td>
+</tr>
+<tr>
+<td>Progress</td>
+<td>Shows how many site collections of the total in scope site collections are assessed</td>
+</tr>
+<tr>
+<td>Retries</td>
+<td>Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot)</td>
+</tr>
+<tr>
+<td>Session start</td>
+<td>When was this assessment run started. If you've restarted an assessment the restart time is shown here</td>
+</tr>
+<tr>
+<td>Session duration</td>
+<td>How long has the current assessment session been running</td>
+</tr>
+</tbody>
+</table>
+<h2 id="pausing-a-running-assessment">Pausing a running assessment</h2>
+<p>Sometimes you need to pause a running assessment because you need to shutdown the computer running the assessment or the assessment is very heavily throttled. This is possible using the <code>pause</code> action.</p>
+<h3 id="sample-pause-command">Sample pause command</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pause a running assessment</td>
+<td>microsoft365-assessment.exe pause --id 22989c75-f08f-4af9-8857-6f19e333d6d3</td>
+</tr>
+</tbody>
+</table>
+<p><img src="../images/pause.gif" alt="pause gif"></p>
+<h3 id="command-line-arguments-1">Command line arguments</h3>
+<p>The easiest way to see all possible command line arguments for a command (e.g. for <code>pause</code>) is using the <code>--help</code> parameter.</p>
+<p><img src="../images/pauseargumentshelp.png" alt="pause argument overview"></p>
+<p>By default you pause one assessment by specifying the assessment to pause using the <code>--id</code> argument, but you can also opt to pause all running assessments using the <code>-all:$true</code> argument.</p>
+<h2 id="restarting-a-paused-or-terminated-assessment">Restarting a paused or terminated assessment</h2>
+<h3 id="sample-restart-command">Sample restart command</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Restart a paused or terminated assessment</td>
+<td>microsoft365-assessment.exe restart --id 22989c75-f08f-4af9-8857-6f19e333d6d3</td>
+</tr>
+</tbody>
+</table>
+<p><img src="../images/restart.gif" alt="restart gif"></p>
+<h3 id="command-line-arguments-2">Command line arguments</h3>
+<p>The easiest way to see all possible command line arguments for a command (e.g. for <code>restart</code>) is using the <code>--help</code> parameter.</p>
+<p><img src="../images/restartargumentshelp.png" alt="restart argument overview"></p>
+<p>Restarting happens per assessment and you specify the assessment to restart via the <code>--id</code> argument. When restarting an assessment you do have the option to change the number of parallel operations via the <code>--threads</code> argument. If you omit this argument the assessment will restart using the number of parallel operations set at assessment start.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
