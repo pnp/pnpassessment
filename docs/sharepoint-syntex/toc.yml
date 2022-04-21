@@ -40,4 +40,6 @@
     - name: syntexcontenttypeoverview.csv
       href: csv-contenttypeoverview.md      
     - name: syntexmodelusage.csv
-      href: csv-modelusage.md      
+      href: csv-modelusage.md
+    - name: sitecollections.csv
+      href: ../using-the-assessment-tool/csv-sitecollections.md

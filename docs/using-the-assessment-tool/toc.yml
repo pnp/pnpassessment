@@ -4,8 +4,6 @@
   href: download.md
 - name: Setup authentication
   href: setupauth.md
-- name: Download
-  href: download.md
 - name: Run the Microsoft 365 Assessment tool
   href: assess.md
   items:
@@ -18,6 +16,7 @@
     - name: Assessment tool options 
       href: assess-operations.md
 - name: Configuration
+  href: configuration.md
   items:
     - name: Cloud environment
       href: configuration-environment.md
