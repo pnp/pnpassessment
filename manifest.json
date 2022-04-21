@@ -61,6 +61,102 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/assess.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/assess.html",
+          "hash": "A27NC6MEjwSwbN5YExbMcw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/authrequirements.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/authrequirements.html",
+          "hash": "l6R4OvobVcdjIxfHryGTHA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-contentfields.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-contentfields.html",
+          "hash": "C8xdGe4roAsn/EuIXHuNMw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-contenttypeoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-contenttypeoverview.html",
+          "hash": "/tp8tRut18+EnzyrHldwpQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-contenttypes.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-contenttypes.html",
+          "hash": "/wXYLG88ys9tHu7xgS9YjA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-fields.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-fields.html",
+          "hash": "opwd97JpgEdC2kPr8YCq8w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-lists.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-lists.html",
+          "hash": "yGEdyRvy1Df5HAVamBO8hw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-modelusage.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-modelusage.html",
+          "hash": "RkSTjB53rcxemWgmDQVW/Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "sharepoint-syntex/readme.md",
       "output": {
         ".html": {
@@ -72,12 +168,144 @@
       "version": ""
     },
     {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-assessmentoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-assessmentoverview.html",
+          "hash": "pU3IxCOLMF4HwnzIaWDZug=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-columnusage.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-columnusage.html",
+          "hash": "/UG0Ww+TiaOrH2OGMbBgOQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-contenttypeusage.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-contenttypeusage.html",
+          "hash": "a4ApZusnjnoPHWYH6J8oZQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-customcolumns.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-customcolumns.html",
+          "hash": "j2tg+1sjSzM+MJOFsshS0A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-customcontenttypes.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-customcontenttypes.html",
+          "hash": "qrbqV12UpGYAimA3PAWlug=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-intro.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-intro.html",
+          "hash": "4CB0/6c8kgsLoE444GK3qQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-librarymodernization.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-librarymodernization.html",
+          "hash": "RX+/i37C3kiTi6Gh6gYvAw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-librarysize.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-librarysize.html",
+          "hash": "SBP82UK14HUGRfQgZo+aMg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-prebuiltmodelcandidates.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-prebuiltmodelcandidates.html",
+          "hash": "yYkF68VLgwSVYTJr4Z0UCw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-retentionlabels.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-retentionlabels.html",
+          "hash": "3pjsGAAJfzhHISQvk0adrg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/report-syntexmodelusage.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/report-syntexmodelusage.html",
+          "hash": "32pooPMHD4a4o7/+3MwI6g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
       "type": "Toc",
       "source_relative_path": "sharepoint-syntex/toc.yml",
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/toc.html",
-          "hash": "jSM4Pw5SwTWD56FyMMsD/g=="
+          "hash": "qpIX/VFdlWiSgyh+yLakwA=="
         }
       },
       "is_incremental": false,
@@ -97,6 +325,174 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/assess-operations.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/assess-operations.html",
+          "hash": "1v56B18mRUAAcde9w2RDYw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/assess-report.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/assess-report.html",
+          "hash": "JKM5ibqPYNN6Zz0k1+NsEw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/assess-start.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/assess-start.html",
+          "hash": "DnYlqs742wacFJDYMf2xyA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/assess-stop.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/assess-stop.html",
+          "hash": "fTzUhURMT4Yh+u5Bm8wG9w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/assess.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/assess.html",
+          "hash": "xKynEJ/rOh6rJBbBrWxS5w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/configuration-environment.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/configuration-environment.html",
+          "hash": "y0AQMT/gU+yHY64WQFwOfQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/configuration-port.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/configuration-port.html",
+          "hash": "jC27SH7Qipu/OJRRNoCgqQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/configuration-vanityurls.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/configuration-vanityurls.html",
+          "hash": "r2DIuw5v1/LiRUNSzubzRg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/csv-history.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/csv-history.html",
+          "hash": "HowVyoYXsf8wKOXL46/o6g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/csv-properties.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/csv-properties.html",
+          "hash": "2PH2veDAtn0VHipQVZd1sQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/csv-scans.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/csv-scans.html",
+          "hash": "AmQow05GdvdxJ6vOPcQR+w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/csv-sitecollections.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/csv-sitecollections.html",
+          "hash": "BbGtCuUIxSFx0uNjJ5Uc6g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/csv-webs.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/csv-webs.html",
+          "hash": "CBG0rka3h95cTx2JsDg7yA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/download.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/download.html",
+          "hash": "xLqF1rZJ11TkIu65xRHjeg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "using-the-assessment-tool/readme.md",
       "output": {
         ".html": {
@@ -108,12 +504,24 @@
       "version": ""
     },
     {
+      "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/setupauth.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/setupauth.html",
+          "hash": "1Ry6nkm2AZxbFo0TJrrldA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
       "type": "Toc",
       "source_relative_path": "using-the-assessment-tool/toc.yml",
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/toc.html",
-          "hash": "jSM4Pw5SwTWD56FyMMsD/g=="
+          "hash": "MUtE7JtEkF9L1oQywt+XbQ=="
         }
       },
       "is_incremental": false,
@@ -134,7 +542,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 4,
+          "total_file_count": 38,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
