@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Download | Microsoft 365 Assessment Tool </title>
+    <title>Download the Microsoft 365 Assessment tool | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Download | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Download the Microsoft 365 Assessment tool | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -80,8 +80,19 @@
                   <div class="contribution-panel mobile-hide pull-right">
                       <a href="https://github.com/pnp/pnpassessment/blob/main/docs/using-the-assessment-tool/download.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="download">Download</h1>
+                    <h1 id="download-the-microsoft-365-assessment-tool">Download the Microsoft 365 Assessment tool</h1>
 
+<p>Before being able to use the Microsoft 365 Assessment tool you first wil have to download it.</p>
+<h2 id="download-the-latest-version">Download the latest version</h2>
+<p>The Microsoft 365 Assessment tool versions are available via the <a href="https://github.com/pnp/pnpassessment/releases">GitHub releases page</a> of the <a href="https://github.com/pnp/pnpassessment">repository</a> hosting the open source Microsoft 365 Assessment tool. There are three flavors of the Microsoft 365 Assessment tool, a Windows version, macOS version and Linux version. It's recommended to always use the latest version.</p>
+<p>When using the Microsoft 365 Assessment tool the tool outputs (reports, CSV files, logs) will be placed inside the folder containing the Microsoft 365 Assessment tool, hence it's recommended to put the downloaded Microsoft 365 Assessment tool somewhere inside a dedicated folder on your computer's file system. E.g. create a folder <code>c:\microsoft365assessment</code> and copy the <code>microsoft365-assessment.exe</code> file in that folder.</p>
+<h2 id="version-updates">Version updates</h2>
+<p>When you launch the Microsoft 365 Assessment tool it will check if there's a newer version and will notify you, downloading the newest version is a manual step and highly recommended whenever there is one.</p>
+<h2 id="is-it-safe-to-just-run-a-downloaded-executable">Is it safe to just run a downloaded executable</h2>
+<p>The Microsoft 365 Assessment tool is an open source managed tool, but the release process is a Microsoft managed one. This means that tool changes are reviewed by Microsoft and that the shipped Windows versions of the tool are code signed by Microsoft, which prevents tampering with the binary file. Furthermore it's not required and therefore not recommended to run the Microsoft 365 Assessment tool using elevated privileges.</p>
+<h2 id="running-on-macos-and-linux">Running on macOS and Linux</h2>
+<p>After copying the needed binary from the releases folder you need to mark the binary as executable via <code>sudo chmod +x microsoft365-assessment</code>. Once that's done you can use the Microsoft 365 Assessment tool, the Microsoft 365 Assessment tool binary itself contains all the needed dependencies (including the .NET 6 runtime).</p>
+<p>While the Microsoft 365 Assessment tool can be used on macOS and Linux, there are some limitations on these platforms: the Power BI report generation will be skipped since Power BI Desktop is only is available for Windows. You however will be able to run an assessment and generate the needed CSV files containing the assessment results. If you later on want to generate the Power BI report for an assessment ran on Linux of macOS, you then can copy the assessment output folder (guid = assessment id, located in the folder containing the Microsoft 365 Assessment tool) to the folder on a Windows machine where you've put the Windows version of the Microsoft 365 Assessment tool. When you then use <code>microsoft365-assessment.exe report --id &lt;assessment id&gt;</code> the report will be generated and opened in Power BI Desktop.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
