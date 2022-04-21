@@ -51,28 +51,28 @@
   },
   "sharepoint-syntex/report-assessmentoverview.html": {
     "href": "sharepoint-syntex/report-assessmentoverview.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Assessment overview | Microsoft 365 Assessment Tool",
+    "keywords": "Assessment overview Summary information about the assessment that has been carried out. Breakdown of scan status and duration for each site collection and site."
   },
   "sharepoint-syntex/report-columnusage.html": {
     "href": "sharepoint-syntex/report-columnusage.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Column usage | Microsoft 365 Assessment Tool",
+    "keywords": "Column usage Custom columns can be created on individual libraries, sites, or associated with content types. Across all of your sites, you are likely to have a mixture of reused and single use columns. Columns can be created to store information in various types- such as text, numbers, dates or a defined list of values. This page will help you identify columns that are commonly used across your document libraries, by name or by type. Where you have common columns across libraries or content types, there could be an opportunity to improve consistency and efficiency by using a model to populate the metadata."
   },
   "sharepoint-syntex/report-contenttypeusage.html": {
     "href": "sharepoint-syntex/report-contenttypeusage.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Content type usage | Microsoft 365 Assessment Tool",
+    "keywords": "Content type usage If you are already making use of content types in your SharePoint libraries, Syntex models can be used to automatically apply the correct content type to a file, and populate any metadata. This page will help you to identify content types that are heavily used, both by number of files and locations. Attaching a content understanding model to these widely used content types can amplify the benefit of Syntex."
   },
   "sharepoint-syntex/report-customcolumns.html": {
     "href": "sharepoint-syntex/report-customcolumns.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Libraries with custom columns | Microsoft 365 Assessment Tool",
+    "keywords": "Libraries with custom columns Custom columns are a simple yet powerful feature of SharePoint document libraries that enhance the discoverability and utility of content. They allow sorting and filtering, improve searchability, and can be used through process automation. Although powerful, they rely on users consistently and reliably adding metadata to files. Instead, content understanding models in Sytnex can be used to automatically populate metadata based on the contents of a document. This improves efficiency and the consistency of metadata. This page will help you identify which libraries are using custom columns, and the libraries which use the most columns. Libraries using a large number of columns are likely to be connected to metadata driven use cases. However they are also at greater risk from human error or omission when adding metadata."
   },
   "sharepoint-syntex/report-customcontenttypes.html": {
     "href": "sharepoint-syntex/report-customcontenttypes.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Libraries with custom content types | Microsoft 365 Assessment Tool",
+    "keywords": "Libraries with custom content types If you are already making use of content types in your SharePoint libraries, Syntex models can be used to automatically apply the correct content type to a file, and populate any metadata. Where multiple content types are used on a library, Syntex can act as an intelligent content organizer. This page will help you to identify libraries that are enabled to use custom content types. It will also show libraries that are using the most content types."
   },
   "sharepoint-syntex/report-intro.html": {
     "href": "sharepoint-syntex/report-intro.html",
@@ -81,28 +81,28 @@
   },
   "sharepoint-syntex/report-librarymodernization.html": {
     "href": "sharepoint-syntex/report-librarymodernization.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Library modernization status | Microsoft 365 Assessment Tool",
+    "keywords": "Library modernization status Files can be processed by Syntex models in either the classic or modern list experience. There are however many actions in Syntex that require a library to be in the modern experience- for example requesting on demand processing. This page will help you to identify libraries that are still using the classic experience, which may need to be temporarily or permanently switched to the modern experience to fully make use of Syntex."
   },
   "sharepoint-syntex/report-librarysize.html": {
     "href": "sharepoint-syntex/report-librarysize.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Library size | Microsoft 365 Assessment Tool",
+    "keywords": "Library size As document libraries become larger, it can be more challenging for users to find the specific content that they need. By applying Syntex models to large libraries, content can be classified and metadata extracted. This enables more effective searching, sorting and filtering by library users. This page will help you identify large libraries in the scan results."
   },
   "sharepoint-syntex/report-prebuiltmodelcandidates.html": {
     "href": "sharepoint-syntex/report-prebuiltmodelcandidates.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Prebuilt model candidates | Microsoft 365 Assessment Tool",
+    "keywords": "Prebuilt model candidates As well as custom models, Syntex also includes prebuilt models. These models are require no training, and can be used to classify invoices and receipts. This page will help you to identify libraries and content types where the name matches a prebuilt model type"
   },
   "sharepoint-syntex/report-retentionlabels.html": {
     "href": "sharepoint-syntex/report-retentionlabels.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Libraries with retention labels | Microsoft 365 Assessment Tool",
+    "keywords": "Libraries with retention labels Syntex can be used to automatically apply retention labels based on classification by a model. This page will help you identify which libraries are using retention labels, and the libraries which use the most labels."
   },
   "sharepoint-syntex/report-syntexmodelusage.html": {
     "href": "sharepoint-syntex/report-syntexmodelusage.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Syntex model usage | Microsoft 365 Assessment Tool",
+    "keywords": "Syntex model usage This page summarizes the Syntex content understanding models found during the assessment, as well as the items they have classified in the past 30 days"
   },
   "sharepoint-syntex/requirements.html": {
     "href": "sharepoint-syntex/requirements.html",
