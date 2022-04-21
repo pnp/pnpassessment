@@ -1,2 +1,27 @@
-- name: Getting started
+- name: Introduction
   href: readme.md
+- name: Download
+  href: download.md
+- name: Setup authentication
+  href: setupauth.md
+- name: Download
+  href: download.md
+- name: Run the Microsoft 365 Assessment tool
+  href: assess.md
+  items:
+    - name: Start an assessment 
+      href: assess-start.md
+    - name: Create assessment report
+      href: assess-report.md
+    - name: Stop the assessment tool
+      href: assess-stop.md
+    - name: Assessment tool options 
+      href: assess-operations.md
+- name: Configuration
+  items:
+    - name: Cloud environment
+      href: configuration-environment.md
+    - name: Vanity URLs
+      href: configuration-vanityurls.md
+    - name: Port
+      href: configuration-port.md

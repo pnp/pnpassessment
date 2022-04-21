@@ -1,2 +1,43 @@
-- name: Getting started
+- name: Introduction
   href: readme.md
+- name: Permission requirements
+  href: authrequirements.md
+- name: Run an assessment
+  href: assess.md
+- name: Report      
+  href: report-intro.md
+  items:
+    - name: Libraries with custom columns
+      href: report-customcolumns.md
+    - name: Column usage
+      href: report-columnusage.md
+    - name: Libraries with custom content types
+      href: report-customcontenttypes.md
+    - name: Content type usage
+      href: report-contenttypeusage.md
+    - name: Libraries with retention labels
+      href: report-retentionlabels.md
+    - name: Library size
+      href: report-librarysize.md
+    - name: Library modernization status
+      href: report-librarymodernization.md
+    - name: Prebuilt Model Candidates
+      href: report-prebuiltmodelcandidates.md
+    - name: Syntex Model Usage
+      href: report-syntexmodelusage.md
+    - name: Assessment overview
+      href: report-assessmentoverview.md
+- name: CSV files
+  items:
+    - name: syntexlists.csv
+      href: csv-lists.md      
+    - name: syntexfields.csv
+      href: csv-fields.md      
+    - name: syntexcontenttypes.csv
+      href: csv-contenttypes.md      
+    - name: syntexcontentfields.csv
+      href: csv-contentfields.md      
+    - name: syntexcontenttypeoverview.csv
+      href: csv-contenttypeoverview.md      
+    - name: syntexmodelusage.csv
+      href: csv-modelusage.md      
