@@ -38,10 +38,10 @@
     },
     {
       "type": "Resource",
-      "source_relative_path": "images/assessmentargumants.gif",
+      "source_relative_path": "images/assessmentarguments.gif",
       "output": {
         "resource": {
-          "relative_path": "images/assessmentargumants.gif"
+          "relative_path": "images/assessmentarguments.gif"
         }
       },
       "is_incremental": false,
@@ -60,10 +60,10 @@
     },
     {
       "type": "Resource",
-      "source_relative_path": "images/scannerrun.gif",
+      "source_relative_path": "images/startargumentshelp.png",
       "output": {
         "resource": {
-          "relative_path": "images/scannerrun.gif"
+          "relative_path": "images/startargumentshelp.png"
         }
       },
       "is_incremental": false,
@@ -375,7 +375,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "DnYlqs742wacFJDYMf2xyA=="
+          "hash": "ynxt05ZHt9HfpDIQ0y9LRQ=="
         }
       },
       "is_incremental": false,
@@ -399,7 +399,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess.html",
-          "hash": "l8bfQnnlB3W8dphiX/nb3g=="
+          "hash": "acM4HIad14XjOsqC2m2fqw=="
         }
       },
       "is_incremental": false,
