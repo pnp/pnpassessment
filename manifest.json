@@ -305,7 +305,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/toc.html",
-          "hash": "qpIX/VFdlWiSgyh+yLakwA=="
+          "hash": "ghdvtKAqMqEd08GbGtyTpg=="
         }
       },
       "is_incremental": false,
@@ -421,6 +421,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "using-the-assessment-tool/configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "using-the-assessment-tool/configuration.html",
+          "hash": "CUO60w6Fus05LsSrEF9Xfw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "using-the-assessment-tool/csv-history.md",
       "output": {
         ".html": {
@@ -461,7 +473,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/csv-sitecollections.html",
-          "hash": "BbGtCuUIxSFx0uNjJ5Uc6g=="
+          "hash": "FSYqy2zOMGRksoVRjnZPKA=="
         }
       },
       "is_incremental": false,
@@ -521,7 +533,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/toc.html",
-          "hash": "MUtE7JtEkF9L1oQywt+XbQ=="
+          "hash": "xbvjxGLwgwXK6iBl08aAhw=="
         }
       },
       "is_incremental": false,
@@ -542,7 +554,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 38,
+          "total_file_count": 39,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {

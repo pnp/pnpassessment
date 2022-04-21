@@ -134,6 +134,11 @@
     "title": "Stop the assessment tool | Microsoft 365 Assessment Tool",
     "keywords": "Stop the assessment tool"
   },
+  "using-the-assessment-tool/configuration.html": {
+    "href": "using-the-assessment-tool/configuration.html",
+    "title": "Configuration options via settings file | Microsoft 365 Assessment Tool",
+    "keywords": "Configuration options via settings file"
+  },
   "using-the-assessment-tool/configuration-environment.html": {
     "href": "using-the-assessment-tool/configuration-environment.html",
     "title": "Configure for other cloud environment | Microsoft 365 Assessment Tool",
@@ -166,8 +171,8 @@
   },
   "using-the-assessment-tool/csv-sitecollections.html": {
     "href": "using-the-assessment-tool/csv-sitecollections.html",
-    "title": "| Microsoft 365 Assessment Tool",
-    "keywords": ""
+    "title": "Site collections CSV file | Microsoft 365 Assessment Tool",
+    "keywords": "Site collections CSV file"
   },
   "using-the-assessment-tool/csv-webs.html": {
     "href": "using-the-assessment-tool/csv-webs.html",
