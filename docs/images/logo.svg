@@ -2,9 +2,7 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="38.000000pt"
-   height="38.000000pt"
-   viewBox="0 0 264.58332 264.58334"
+   width="38.000000pt" height="38.000000pt" viewBox="0 0 172.000000 172.000000" preserveAspectRatio="xMidYMid meet"
    version="1.1"
    id="svg5"
    xmlns="http://www.w3.org/2000/svg"
@@ -40,15 +38,15 @@
     </rdf:RDF>
   </metadata>
   <rect
-     style="fill:#f7f7f7;fill-opacity:1;stroke:none;stroke-width:10.5833;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
+     style="stroke:none;stroke-width:10.5833;stroke-linecap:square;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke markers fill"
      id="rect35197"
      width="264.58334"
      height="264.58334"
-     x="-1.350586e-05"
+     x="0"
      y="0" />
   <g
      id="g1009"
-     transform="translate(-1.2130983,-5.2916666)">
+     transform="translate(-40.2130983,-45.2916666)">
     <path
        id="rect924"
        style="fill:none;stroke:#4d4d4d;stroke-width:7.9375;stroke-linecap:butt;stroke-linejoin:round;stroke-opacity:1;paint-order:fill markers stroke"
