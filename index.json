@@ -142,27 +142,27 @@
   "using-the-assessment-tool/csv-history.html": {
     "href": "using-the-assessment-tool/csv-history.html",
     "title": "History.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "History.csv file details When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table. Column Description ScanId Id of the assessment Id Event id, also determines the order the events occurred Event Event name EventDate Timestamp the event occurred Message Event message"
+    "keywords": "History.csv file details Summary When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table. Columns The following columns are included: Column Description ScanId Id of the assessment Id Event id, also determines the order the events occurred Event Event name EventDate Timestamp the event occurred Message Event message"
   },
   "using-the-assessment-tool/csv-properties.html": {
     "href": "using-the-assessment-tool/csv-properties.html",
     "title": "Properties.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Properties.csv file details When an adoption or deprecation assessment module uses custom CLI arguments then these are stored here for reference. Column Description ScanId Id of the assessment Name Assessment module property Type Type of the property Value Value of the property"
+    "keywords": "Properties.csv file details Summary When an adoption or deprecation assessment module uses custom CLI arguments then these are stored here for reference. Columns The following columns are included: Column Description ScanId Id of the assessment Name Assessment module property Type Type of the property Value Value of the property"
   },
   "using-the-assessment-tool/csv-scans.html": {
     "href": "using-the-assessment-tool/csv-scans.html",
     "title": "Scans.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Scans.csv file details This table contains a single row describing information about the assessment itself. Column Description ScanId Id of the assessment StartDate Start date of the assessment EndDate Date when the assessment finished Status Status of the assessment PreScanStatus Status of the pre-assessment run PostScanStatus Status of the post-assessment run Version Version of the Microsoft 365 Assessent tool used CLIMode Used assessment mode via CLI CLITenant Tenant specified via CLI CLITenantId Tenant id provided via CLI CLIEnvironment Used environment (see here for more details on environment) CLISiteList Was a sites list used to scope the assessment? CLISiteFile Was a sites file used to scope the assessment? CLIAuthMode Authentication mode used for the assessment CLIApplicationId Azure AD application ID used CLICertPath Was a certificate path used? CLICertFile Was a certificate file used? CLICertFilePassword Encrypted PFX file password (see here for more details) CLIThreads Number of parallel operations used by the assessment"
+    "keywords": "Scans.csv file details Summary This table contains a single row describing information about the assessment itself. Columns The following columns are included: Column Description ScanId Id of the assessment StartDate Start date of the assessment EndDate Date when the assessment finished Status Status of the assessment PreScanStatus Status of the pre-assessment run PostScanStatus Status of the post-assessment run Version Version of the Microsoft 365 Assessent tool used CLIMode Used assessment mode via CLI CLITenant Tenant specified via CLI CLITenantId Tenant id provided via CLI CLIEnvironment Used environment (see here for more details on environment) CLISiteList Was a sites list used to scope the assessment? CLISiteFile Was a sites file used to scope the assessment? CLIAuthMode Authentication mode used for the assessment CLIApplicationId Azure AD application ID used CLICertPath Was a certificate path used? CLICertFile Was a certificate file used? CLICertFilePassword Encrypted PFX file password (see here for more details) CLIThreads Number of parallel operations used by the assessment"
   },
   "using-the-assessment-tool/csv-sitecollections.html": {
     "href": "using-the-assessment-tool/csv-sitecollections.html",
     "title": "Sitecollections.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Sitecollections.csv file details Column Description ScanId Id of the assessment SiteUrl Fully qualified site collection URL StartDate Start date of the assessment of this site collection EndDate End date of the assessment of this site collection ScanDuration Assessment duration in seconds Status Status of the site collection assessment"
+    "keywords": "Sitecollections.csv file details Summary This table contains a row for each site collection in scope of the assessment. Columns The following columns are included: Column Description ScanId Id of the assessment SiteUrl Fully qualified site collection URL StartDate Start date of the assessment of this site collection EndDate End date of the assessment of this site collection ScanDuration Assessment duration in seconds Status Status of the site collection assessment"
   },
   "using-the-assessment-tool/csv-webs.html": {
     "href": "using-the-assessment-tool/csv-webs.html",
     "title": "Webs.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Webs.csv file details This table contains a row for each assessed web. Column Description WebUrlAbsolute Fully qualified web URL StartDate Start date of the assessment of this web EndDate End date of the assessment of this web ScanDuration Assessment duration in seconds Status Status of the web assessment Template Web template used by this web ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
+    "keywords": "Webs.csv file details Summary This table contains a row for each assessed web. Columns The following columns are included: Column Description WebUrlAbsolute Fully qualified web URL StartDate Start date of the assessment of this web EndDate End date of the assessment of this web ScanDuration Assessment duration in seconds Status Status of the web assessment Template Web template used by this web ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
   },
   "using-the-assessment-tool/download.html": {
     "href": "using-the-assessment-tool/download.html",
