@@ -62,7 +62,7 @@ A handful tenants use custom URLs due to historic reasons (so called vanity URLs
 > [!Important]
 > Both URLs have to specified when you're using vanity URLs.
 
-## Using different port than 25025
+## Using a different port than 25025
 
 The Microsoft 365 Assessment tool process accepts commands by listening on localhost port 25025. For most computers this port is a free and can be used, but if for some reason you prefer to use another port than that's possible as well:
 
