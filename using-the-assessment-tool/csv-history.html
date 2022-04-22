@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title> | Microsoft 365 Assessment Tool </title>
+    <title>History.csv file details | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content=" | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="History.csv file details | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -80,7 +80,39 @@
                   <div class="contribution-panel mobile-hide pull-right">
                       <a href="https://github.com/pnp/pnpassessment/blob/main/docs/using-the-assessment-tool/csv-history.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    
+                    <h1 id="historycsv-file-details">History.csv file details</h1>
+
+<p>When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ScanId</td>
+<td>Id of the assessment</td>
+</tr>
+<tr>
+<td>Id</td>
+<td>Event id, also determines the order the events occurred</td>
+</tr>
+<tr>
+<td>Event</td>
+<td>Event name</td>
+</tr>
+<tr>
+<td>EventDate</td>
+<td>Timestamp the event occurred</td>
+</tr>
+<tr>
+<td>Message</td>
+<td>Event message</td>
+</tr>
+</tbody>
+</table>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
