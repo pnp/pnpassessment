@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title> | Microsoft 365 Assessment Tool </title>
+    <title>Run a SharePoint Syntex adoption assessment | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content=" | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Run a SharePoint Syntex adoption assessment | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -80,7 +80,64 @@
                   <div class="contribution-panel mobile-hide pull-right">
                       <a href="https://github.com/pnp/pnpassessment/blob/main/docs/sharepoint-syntex/assess.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    
+                    <h1 id="run-a-sharepoint-syntex-adoption-assessment">Run a SharePoint Syntex adoption assessment</h1>
+
+<p>Running the SharePoint Syntex adoption assessment is just like running any other adoption or deprecation module of the Microsoft 365 Assessment tool: you use the CLI with the <code>Start</code> action to launch an assessment. By specifying the <code>--mode</code> to be <code>Syntex</code> the Microsoft 365 Assessment tool will run the SharePoint Syntex adoption assessment for you.</p>
+<h2 id="quick-starts">Quick starts</h2>
+<p>Below are some quick start samples that show how to run an SharePoint Syntex assessment. More details on the <code>Start</code> action can be found in the <a href="../using-the-assessment-tool/assess-start.html">Microsoft 365 Assessment tool Start documentation</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Start a new Syntex full assessment (application permissions) for a complete tenant</td>
+<td>microsoft365-assessment.exe start --mode syntex --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot; <br> --syntexfull</td>
+</tr>
+<tr>
+<td>Start a new Syntex assessment (delegated permissions) for a set of site collections</td>
+<td>microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com <br> --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales&quot;</td>
+</tr>
+</tbody>
+</table>
+<p>Once an assessment is launched you'd typically followup on it's status via the <code>Status</code> action. Below is a quick start, more details can be found in the <a href="../using-the-assessment-tool/assess-operations.html#getting-a-live-status-overview-of-a-running-assessment">Microsoft 365 Assessment tool operations documentation</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Realtime status update of the running assessments</td>
+<td>microsoft365-assessment.exe status</td>
+</tr>
+</tbody>
+</table>
+<p>When an assessment has finished you can continue with the next step and that's generating the Power BI report by using the <code>Report</code> action. Below is a quick start, more details can be found in the <a href="../using-the-assessment-tool/assess-report.html">Microsoft 365 Assessment tool Report documentation</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generate Power BI report (includes CSV export) in the default location</td>
+<td>microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3</td>
+</tr>
+<tr>
+<td>Export the gathered data as CSV files in a custom location</td>
+<td>microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --mode CsvOnly --path &quot;c:\reports&quot;</td>
+</tr>
+</tbody>
+</table>
+<p>To better understand the generated Power BI report and accompanying CSV files use the nodes in the left navigation.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
