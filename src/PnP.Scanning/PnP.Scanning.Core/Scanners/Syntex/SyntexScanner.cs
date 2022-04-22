@@ -582,26 +582,33 @@ namespace PnP.Scanning.Core.Scanners
                 return;
             }
 
-            using (var context = GetClientContext())
+            try
             {
-                var servicesManager = new WorkflowServicesManager(context, context.Web);
-                var subscriptionService = servicesManager.GetWorkflowSubscriptionService();
-                var subscriptions = subscriptionService.EnumerateSubscriptions();
-                context.Load(subscriptions);
-
-                await context.ExecuteQueryRetryAsync();
-
-                foreach (var listSubscription in subscriptions)
+                using (var context = GetClientContext())
                 {
-                    if (Guid.TryParse(GetWorkflowProperty(listSubscription, "Microsoft.SharePoint.ActivationProperties.ListId"), out Guid associatedListIdValue))
+                    var servicesManager = new WorkflowServicesManager(context, context.Web);
+                    var subscriptionService = servicesManager.GetWorkflowSubscriptionService();
+                    var subscriptions = subscriptionService.EnumerateSubscriptions();
+                    context.Load(subscriptions);
+
+                    await context.ExecuteQueryRetryAsync();
+
+                    foreach (var listSubscription in subscriptions)
                     {
-                        var inScopeList = syntexLists.FirstOrDefault(p => p.ListId == associatedListIdValue);
-                        if (inScopeList != null)
+                        if (Guid.TryParse(GetWorkflowProperty(listSubscription, "Microsoft.SharePoint.ActivationProperties.ListId"), out Guid associatedListIdValue))
                         {
-                            inScopeList.WorkflowInstanceCount++;
+                            var inScopeList = syntexLists.FirstOrDefault(p => p.ListId == associatedListIdValue);
+                            if (inScopeList != null)
+                            {
+                                inScopeList.WorkflowInstanceCount++;
+                            }
                         }
                     }
                 }
+            }
+            catch(Exception ex)
+            {
+                Logger.Warning(ex, "Failed to read workflow 2013 data for {Web}", WebUrl);
             }
         }
 
