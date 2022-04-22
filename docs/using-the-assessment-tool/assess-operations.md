@@ -105,3 +105,16 @@ The easiest way to see all possible command line arguments for a command (e.g. f
 ![restart argument overview](../images/restartargumentshelp.png)
 
 Restarting happens per assessment and you specify the assessment to restart via the `--id` argument. When restarting an assessment you do have the option to change the number of parallel operations via the `--threads` argument. If you omit this argument the assessment will restart using the number of parallel operations set at assessment start.
+
+## Clearing authentication caches
+
+When using delegated permissions in combination with either `--authmode` equal to `Interactive` or `Device` then you're seeing a one time prompt for credentials when you use this option for the first time. As part of this operation the authentication library (MSAL) state is cached on disk using machine/user specific encryption. With this cache the Microsoft 365 Assessment tool can automatically request new access tokens whenever that's needed. If you're however switching between tenants or you want to remove this stored cache you can do so via the `cache` action.
+
+### Sample pause command
+
+Task | CLI
+-----|------
+Clear authentication cache | microsoft365-assessment.exe cache --clearauthentication
+
+> [!Note]
+> An alternative way of clearing this cache is by deleting the `msalcache.bin` file inside the folder hosting `microsoft365-assessment.exe`.

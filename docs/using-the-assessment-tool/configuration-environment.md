@@ -1,1 +1,0 @@
-# Configure for other cloud environment

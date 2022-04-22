@@ -17,12 +17,3 @@
       href: assess-operations.md
 - name: Configuration
   href: configuration.md
-  items:
-    - name: Cloud environment
-      href: configuration-environment.md
-    - name: Vanity URLs
-      href: configuration-vanityurls.md
-    - name: Port
-      href: configuration-port.md
-    - name: Telemetry
-      href: configuration-telemetry.md

@@ -70,6 +70,13 @@ When using `--certpath` some additional information is needed to understand how 
 > [!Note]
 > If you're using the `LocalMachine` store location then be aware that you'll need to ensure the user running the Microsoft 365 Assessment tool has permissions to read the certificate private key in the `LocalMachine` store. You can do this by granting the account you're using to run the Microsoft 365 Assessment tool permissions to read the private key by opening up the local machine certificate console (`certlm.msc`), navigating to the certificate you're using, right click on the certificate, choose `All Tasks -> Manage private keys...` and add your user account with read permissions.
 
+### Clearing the authentication cache
+
+When using delegated permissions in combination with either `--authmode` equal to `Interactive` or `Device` then you're seeing a one time prompt for credentials when you use this option for the first time. As part of this operation the authentication library (MSAL) state is cached on disk using machine/user specific encryption. With this cache the Microsoft 365 Assessment tool can automatically request new access tokens whenever that's needed. If you're however switching between tenants or you want to remove this stored cache you can do so via the `cache` action. Sample: `microsoft365-assessment.exe cache --clearauthentication`.
+
+> [!Note]
+> An alternative way of clearing this cache is by deleting the `msalcache.bin` file inside the folder hosting `microsoft365-assessment.exe`.
+
 ## Other configuration options
 
 Depending on the chosen assessment mode (`--mode` argument) you can optionally define extra arguments.
