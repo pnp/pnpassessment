@@ -249,6 +249,27 @@
 <p>The easiest way to see all possible command line arguments for a command (e.g. for <code>restart</code>) is using the <code>--help</code> parameter.</p>
 <p><img src="../images/restartargumentshelp.png" alt="restart argument overview"></p>
 <p>Restarting happens per assessment and you specify the assessment to restart via the <code>--id</code> argument. When restarting an assessment you do have the option to change the number of parallel operations via the <code>--threads</code> argument. If you omit this argument the assessment will restart using the number of parallel operations set at assessment start.</p>
+<h2 id="clearing-authentication-caches">Clearing authentication caches</h2>
+<p>When using delegated permissions in combination with either <code>--authmode</code> equal to <code>Interactive</code> or <code>Device</code> then you're seeing a one time prompt for credentials when you use this option for the first time. As part of this operation the authentication library (MSAL) state is cached on disk using machine/user specific encryption. With this cache the Microsoft 365 Assessment tool can automatically request new access tokens whenever that's needed. If you're however switching between tenants or you want to remove this stored cache you can do so via the <code>cache</code> action.</p>
+<h3 id="sample-pause-command-1">Sample pause command</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Clear authentication cache</td>
+<td>microsoft365-assessment.exe cache --clearauthentication</td>
+</tr>
+</tbody>
+</table>
+<div class="NOTE">
+<h5>Note</h5>
+<p>An alternative way of clearing this cache is by deleting the <code>msalcache.bin</code> file inside the folder hosting <code>microsoft365-assessment.exe</code>.</p>
+</div>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

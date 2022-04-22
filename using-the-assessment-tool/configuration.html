@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Configuration options via settings file | Microsoft 365 Assessment Tool </title>
+    <title>Microsoft 365 Assessment tool configuration | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Configuration options via settings file | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Microsoft 365 Assessment tool configuration | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -80,8 +80,64 @@
                   <div class="contribution-panel mobile-hide pull-right">
                       <a href="https://github.com/pnp/pnpassessment/blob/main/docs/using-the-assessment-tool/configuration.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="configuration-options-via-settings-file">Configuration options via settings file</h1>
+                    <h1 id="microsoft-365-assessment-tool-configuration">Microsoft 365 Assessment tool configuration</h1>
 
+<p>For the majority of users no additional configuration is needed, but for example when you're using a tenant in another cloud or using vanity URLs additional configuration is needed before the Microsoft 365 Assessment tool can be used.</p>
+<h2 id="the-appsettingsjson-configuration-file">The <code>appsettings.json</code> configuration file</h2>
+<p>Additional configuration settings are all defined via a settings file named <code>appsettings.json</code>. By default this file is not present, so when you need additional configuration you first need to start with adding a file named <code>appsettings.json</code> in the same location as where you've put the assessment tool <code>microsoft365-assessment.exe</code>. The empty starting contents for this file are shown below:</p>
+<pre><code class="lang-json">{
+  &quot;CustomSettings&quot;: {
+  }
+}
+</code></pre>
+<p>A fully configured file could look like this:</p>
+<pre><code class="lang-json">{
+  &quot;PnPCore&quot;: {
+    &quot;Environment&quot;: &quot;USGovernment&quot;
+  },
+  &quot;CustomSettings&quot;: {
+    &quot;Environment&quot;: &quot;USGovernment&quot;,    
+    &quot;Port&quot;: 7887,
+    &quot;AdminCenterUrl&quot;: &quot;https://spo-admin.contoso.com&quot;,
+    &quot;MySiteHostUrl&quot;: &quot;https://my.contoso.com&quot;
+  }
+}
+</code></pre>
+<h2 id="cloud-environment-configuration">Cloud environment configuration</h2>
+<p>The assessment tool can be used to run against tenants hosted in other cloud environments by specifying the environment to use in the settings file as shown below.</p>
+<pre><code class="lang-json">{
+  &quot;PnPCore&quot;: {
+    &quot;Environment&quot;: &quot;USGovernment&quot;
+  },
+  &quot;CustomSettings&quot;: {
+    &quot;Environment&quot;: &quot;USGovernment&quot;    
+  }
+}
+</code></pre>
+<p>Valid values for environment are: <code>Production</code>, <code>PreProduction</code> (Microsoft internal only), <code>USGovernment</code> (a.k.a GCC), <code>USGovernmentHigh</code> (a.k.a GCC High), <code>USGovernmentDoD</code> (a.k.a DoD), <code>China</code> and <code>Germany</code>.</p>
+<h2 id="vanity-url-configuration">Vanity URL configuration</h2>
+<p>A handful tenants use custom URLs due to historic reasons (so called vanity URLs) and when you want to use the Microsoft 365 Assessment tool you'll need to let the tool know these custom URLs by specifying them in the settings file:</p>
+<pre><code class="lang-json">{
+  &quot;CustomSettings&quot;: {
+    &quot;AdminCenterUrl&quot;: &quot;https://spo-admin.contoso.com&quot;,
+    &quot;MySiteHostUrl&quot;: &quot;https://my.contoso.com&quot;
+  }
+}
+</code></pre>
+<div class="IMPORTANT">
+<h5>Important</h5>
+<p>Both URLs have to specified when you're using vanity URLs.</p>
+</div>
+<h2 id="using-different-port-than-25025">Using different port than 25025</h2>
+<p>The Microsoft 365 Assessment tool process accepts commands by listening on localhost port 25025. For most computers this port is a free and can be used, but if for some reason you prefer to use another port than that's possible as well:</p>
+<pre><code class="lang-json">{
+  &quot;CustomSettings&quot;: {
+    &quot;Port&quot;: 7887
+  }
+}
+</code></pre>
+<h2 id="disabling-telemetry">Disabling telemetry</h2>
+<p>When using the Microsoft 365 Assessment tool basic telemetry information is sent to Microsoft. This information is used to understand how the tool is being used which helps us improve the Microsoft 365 Assessment tool going forward. If you however prefer to not sent and telemetry information then that's possible by adding an environment variable named <code>PNP_DISABLETELEMETRY</code> with a value of <code>true</code>. After restarting the Microsoft 365 Assessment tool no telemetry data will be sent anymore.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

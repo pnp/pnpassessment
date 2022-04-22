@@ -450,7 +450,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-operations.html",
-          "hash": "4gFc4bcXkmGwRTI8P/iEYw=="
+          "hash": "4I+uXJlhd0hxKTFtYSVMJQ=="
         }
       },
       "is_incremental": false,
@@ -474,7 +474,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "TqElI0l2/zw9nnDZzuTJyA=="
+          "hash": "fhAK0gvwc5Dm3nxF8gel+A=="
         }
       },
       "is_incremental": false,
@@ -506,59 +506,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/configuration-environment.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/configuration-environment.html",
-          "hash": "izD+W0b1OOcXaSwrR0AnZA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/configuration-port.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/configuration-port.html",
-          "hash": "XdrMLGzOtQpNW8A5fb6ijQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/configuration-telemetry.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/configuration-telemetry.html",
-          "hash": "+i7pldceUwrenxZ6DRG0LA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/configuration-vanityurls.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/configuration-vanityurls.html",
-          "hash": "2eLxwi3zdbBMviS12FXzVA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "using-the-assessment-tool/configuration.md",
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/configuration.html",
-          "hash": "VzVU4cB7RxsREHkrjzH3SA=="
+          "hash": "L1pmuTGpSB1abhQEoPWC6A=="
         }
       },
       "is_incremental": false,
@@ -666,7 +618,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/toc.html",
-          "hash": "mbV1oO7AV31tMGTkYtg/dQ=="
+          "hash": "ke2ve8tdmdTvtAbhKSeHrQ=="
         }
       },
       "is_incremental": false,
@@ -687,7 +639,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 40,
+          "total_file_count": 36,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
