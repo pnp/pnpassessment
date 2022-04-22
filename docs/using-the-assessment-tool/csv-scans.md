@@ -1,6 +1,12 @@
 # Scans.csv file details
 
+## Summary
+
 This table contains a single row describing information about the assessment itself.
+
+## Columns
+
+The following columns are included:
 
 Column | Description
 -------|------------

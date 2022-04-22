@@ -1,6 +1,12 @@
 # History.csv file details
 
+## Summary
+
 When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table.
+
+## Columns
+
+The following columns are included:
 
 Column | Description
 -------|------------

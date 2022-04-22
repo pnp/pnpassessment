@@ -1,5 +1,13 @@
 # Sitecollections.csv file details
 
+## Summary
+
+This table contains a row for each site collection in scope of the assessment.
+
+## Columns
+
+The following columns are included:
+
 Column | Description
 -------|------------
 ScanId | Id of the assessment

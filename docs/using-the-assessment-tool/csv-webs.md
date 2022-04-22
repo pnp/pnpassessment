@@ -1,6 +1,12 @@
 # Webs.csv file details
 
+## Summary
+
 This table contains a row for each assessed web.
+
+## Columns
+
+The following columns are included:
 
 Column | Description
 -------|------------
