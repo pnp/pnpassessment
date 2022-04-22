@@ -1,3 +1,5 @@
+- name: Home
+  href: index.md
 - name: Getting started
   href: using-the-assessment-tool/
 - name: SharePoint Syntex Assessment
