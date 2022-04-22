@@ -18,7 +18,7 @@
       "output": {
         ".html": {
           "relative_path": "contributing/readme.html",
-          "hash": "Y6a6cqcae8Nxmhp8BiLdMQ=="
+          "hash": "q6+m+hDBPcOn+4BgypzxUQ=="
         }
       },
       "is_incremental": false,
@@ -75,6 +75,17 @@
       "output": {
         "resource": {
           "relative_path": "images/listoutput.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/logo.svg",
+      "output": {
+        "resource": {
+          "relative_path": "images/logo.svg"
         }
       },
       "is_incremental": false,
@@ -306,7 +317,7 @@
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "4O9jhziK/oq4WL/VfuiHMA=="
+          "hash": "XNUroAG/py98rVDh2DYRWQ=="
         }
       },
       "is_incremental": false,
@@ -318,7 +329,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/assess.html",
-          "hash": "czyC1xjPUopZwbXmo/OR1Q=="
+          "hash": "v4k9dwB05xpMQmwMSF3yDA=="
         }
       },
       "is_incremental": false,
@@ -330,7 +341,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/csv-contentfields.html",
-          "hash": "P9JDNv4VyJ1PGuPEugkAiA=="
+          "hash": "IgwVEoxFsn6McC4MisI7Tw=="
         }
       },
       "is_incremental": false,
@@ -342,7 +353,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/csv-contenttypeoverview.html",
-          "hash": "OVz7Sz4YhBm3HEGJWfDnXw=="
+          "hash": "6QFUYbo1W2VgvgAYvwB5ww=="
         }
       },
       "is_incremental": false,
@@ -354,7 +365,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/csv-contenttypes.html",
-          "hash": "TOn2LAfANAPt8pk4ycVSXg=="
+          "hash": "5nNDUdq6zpqw4zrVaDSyXQ=="
         }
       },
       "is_incremental": false,
@@ -366,7 +377,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/csv-fields.html",
-          "hash": "Jg+qGnY0ANBaroJz0x1JGQ=="
+          "hash": "OibYq+7V6nsoz6g4cdwdYA=="
         }
       },
       "is_incremental": false,
@@ -378,7 +389,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/csv-lists.html",
-          "hash": "DPFpepbmQScHWEb5CBSqSw=="
+          "hash": "sPapEEPbPvlbgy4RAkUHaA=="
         }
       },
       "is_incremental": false,
@@ -390,7 +401,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/csv-modelusage.html",
-          "hash": "+uWIu29FSQHjLXtDyaPPgQ=="
+          "hash": "NtDa4chdTrj97c7ZN7nakQ=="
         }
       },
       "is_incremental": false,
@@ -402,7 +413,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/readme.html",
-          "hash": "KskYLoX1VCKYIk86SAfFWA=="
+          "hash": "qsDIXDrU9RbkiidOeG0RdA=="
         }
       },
       "is_incremental": false,
@@ -414,7 +425,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-assessmentoverview.html",
-          "hash": "yyOIiFKU0gz/M33OXTD2pA=="
+          "hash": "ninWE0Iw5y7BXVTZvWRkOQ=="
         }
       },
       "is_incremental": false,
@@ -426,7 +437,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-columnusage.html",
-          "hash": "apX3bb5cHOd0sUgpVtDDaA=="
+          "hash": "CBp534QCx6Kt1sjRSGM0EA=="
         }
       },
       "is_incremental": false,
@@ -438,7 +449,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-contenttypeusage.html",
-          "hash": "LVgn6hXCYapzaHz/jyqGqw=="
+          "hash": "jCeFBnAbVuHJkqyDb9r3bA=="
         }
       },
       "is_incremental": false,
@@ -450,7 +461,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-customcolumns.html",
-          "hash": "0z2K4wIA2VGmcygAZx4WTA=="
+          "hash": "3m1Q+f1eaV+nFGZvOxu5Ug=="
         }
       },
       "is_incremental": false,
@@ -462,7 +473,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-customcontenttypes.html",
-          "hash": "5b5k5AgMo1t0wBgWRGUJmg=="
+          "hash": "zisosplnAaiham/tw1T1Og=="
         }
       },
       "is_incremental": false,
@@ -474,7 +485,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-intro.html",
-          "hash": "tyCOQ96OqtGyXke9Fr8TGQ=="
+          "hash": "xu40ewj+XiTOHqkAqYOPjg=="
         }
       },
       "is_incremental": false,
@@ -486,7 +497,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-librarymodernization.html",
-          "hash": "HIIGq/ZINnTNzbcFGLutaw=="
+          "hash": "ip/OGMOYmIynPhE6QA/8Mg=="
         }
       },
       "is_incremental": false,
@@ -498,7 +509,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-librarysize.html",
-          "hash": "r/VNF7lv93qCxsRH3aW52w=="
+          "hash": "HGYF+bz0ai9CLz+/GIzGJg=="
         }
       },
       "is_incremental": false,
@@ -510,7 +521,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-prebuiltmodelcandidates.html",
-          "hash": "wn6Z8ewF2WL+vZMmkIe/dg=="
+          "hash": "UOmiYKgZsrWFVLa+/FFa2Q=="
         }
       },
       "is_incremental": false,
@@ -522,7 +533,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-retentionlabels.html",
-          "hash": "lkFZw1aIBtLY9PTg/yhb1w=="
+          "hash": "LdEBVZIt6SldQ4iO+7fQLw=="
         }
       },
       "is_incremental": false,
@@ -534,7 +545,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-syntexmodelusage.html",
-          "hash": "KK0OuvUZV+UHmMTl/l+tlA=="
+          "hash": "DY6ZJi2udcOZZOrWvWK0Rw=="
         }
       },
       "is_incremental": false,
@@ -546,7 +557,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/requirements.html",
-          "hash": "3vsBecDpvcmVo289N2exUQ=="
+          "hash": "PV1J5LSw0uS07rWHtJekSg=="
         }
       },
       "is_incremental": false,
@@ -582,7 +593,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-operations.html",
-          "hash": "4I+uXJlhd0hxKTFtYSVMJQ=="
+          "hash": "MMy5LmJ5DJ58XDJ/IQUmzw=="
         }
       },
       "is_incremental": false,
@@ -594,7 +605,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-report.html",
-          "hash": "3nOFmzgqYEmREWA2VbWREg=="
+          "hash": "RNdCHQuVwTfn6PJej6tM6Q=="
         }
       },
       "is_incremental": false,
@@ -606,7 +617,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "fhAK0gvwc5Dm3nxF8gel+A=="
+          "hash": "xaSA5ZPzeuE3ZyzwSeMNjw=="
         }
       },
       "is_incremental": false,
@@ -618,7 +629,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-stop.html",
-          "hash": "wWedFxg+WCki6kOXVZ6WOw=="
+          "hash": "P1H3Fsu613tdRZnOm4Q3sA=="
         }
       },
       "is_incremental": false,
@@ -630,7 +641,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess.html",
-          "hash": "fJCch/faOcGQh/ZoHZFdEA=="
+          "hash": "gzfGY2zDuGd+sPh4PpL+EA=="
         }
       },
       "is_incremental": false,
@@ -642,7 +653,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/configuration.html",
-          "hash": "kupygfG3LUzpqCNs0ESjqA=="
+          "hash": "ePxh0Z7SmuCtNWxxQYJVkQ=="
         }
       },
       "is_incremental": false,
@@ -654,7 +665,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/csv-history.html",
-          "hash": "C6F9AEqKvAxNf92rW7HXAg=="
+          "hash": "JsXVOwocNViwjpcu0WkQQQ=="
         }
       },
       "is_incremental": false,
@@ -666,7 +677,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/csv-properties.html",
-          "hash": "npmXDOPIL8J1wOcH7L2PhA=="
+          "hash": "Bfki+kaVAoC5iRRboY8YJA=="
         }
       },
       "is_incremental": false,
@@ -678,7 +689,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/csv-scans.html",
-          "hash": "WvTd8O4JrEPAD7K/EOAgHA=="
+          "hash": "yh0GhsHbt7k2zThxi6jX0w=="
         }
       },
       "is_incremental": false,
@@ -690,7 +701,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/csv-sitecollections.html",
-          "hash": "Ee45XDnGdtJHWtsjXSfY7Q=="
+          "hash": "4xq4BhBhhQjD7nZrfuGr7g=="
         }
       },
       "is_incremental": false,
@@ -702,7 +713,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/csv-webs.html",
-          "hash": "SgKPeZW1HDRRYUIH8K52wg=="
+          "hash": "R0qoA6DoEzrSxtdyDXp0Nw=="
         }
       },
       "is_incremental": false,
@@ -714,7 +725,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/download.html",
-          "hash": "ign1sV680wUDG9E07hIKHA=="
+          "hash": "Yl2OsA0ma4zL8UyLe7uUkw=="
         }
       },
       "is_incremental": false,
@@ -726,7 +737,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/readme.html",
-          "hash": "D58CsqbO6kIaeVb2O5EQ+A=="
+          "hash": "imVht1lJYUsEP7u4m3MXAg=="
         }
       },
       "is_incremental": false,
@@ -738,7 +749,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/setupauth.html",
-          "hash": "yBErR+40zxh0HnPqcoytVw=="
+          "hash": "29hSvf/epGyeZdQTUkTrtA=="
         }
       },
       "is_incremental": false,
