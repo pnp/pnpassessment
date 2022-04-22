@@ -14,7 +14,7 @@ A configured Azure AD application is a pre-requisite for using the Microsoft 365
 
 ### Permissions required
 
-The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the authentication page of the respective modules.
+The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the permission requirements of the respective modules.
 
 - [SharePoint Syntex adoption](../sharepoint-syntex/requirements.md)
 

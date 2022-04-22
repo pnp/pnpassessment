@@ -13,10 +13,7 @@ Export the gathered data as CSV files in a custom location | microsoft365-assess
 
 ## Power BI
 
-The report format used by the Microsoft 365 Assessment tool is Power BI and we've chosen this option for a number of reasons:
-
-- After running an assessment and generating a report you often want to share it with other teams inside your organization. A Power BI report can be published to the Power BI service and then easily shared with and consumed by your other stakeholders
-- The default generate reports might not fully satisfy your needs, using Power BI Desktop is easy to update the generated report to fit your needs
+The report format used by the Microsoft 365 Assessment tool is Power BI and we've chosen this option for a number of reasons: after running an assessment and generating a report you often want to share it with other teams inside your organization. A Power BI report can be published to the Power BI service and then easily shared with and consumed by your other stakeholders. Also, sometimes the default generated reports might not fully satisfy your needs, using Power BI Desktop it is easy to update the generated report to fit your needs.
 
 ### Dependency on Power BI Desktop (Windows version)
 

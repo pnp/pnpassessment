@@ -13,4 +13,7 @@ Delegated | **Graph:** Sites.Read.All, User.Read <br> **SharePoint:** AllSites.R
 
 ## Command line arguments for starting an assessment
 
-When starting the SharePoint Syntex adoption assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the above chapter to learn more.
+When starting the SharePoint Syntex adoption assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this as was explained in previous chapter.
+
+> [!Note]
+> To learn more about starting an assessment checkout the Microsoft 365 Assessment tool [Start documentation](../using-the-assessment-tool/assess-start.md).

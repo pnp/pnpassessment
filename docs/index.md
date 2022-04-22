@@ -1,6 +1,6 @@
 # Microsoft 365 Assessment tool
 
-The Microsoft 365 Assessment tool is an [open source community tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various deprecation and adoption scenarios. At launch the tool only supports a SharePoint Syntex adoption module but additional modules are under development.
+The Microsoft 365 Assessment tool is an [open source community tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various deprecation and adoption scenarios. At launch the tool only supports a [SharePoint Syntex adoption](sharepoint-syntex/readme.md) module but additional modules are under development.
 
 ## Getting started 🚀
 
@@ -11,6 +11,8 @@ Step | Description
 [Download the tool](using-the-assessment-tool/download.md) | Download the the Microsoft 365 Assessment tool for the OS you're using. The assessment tool versions can be found in the [releases](https://github.com/pnp/pnpassessment/releases) folder
 [Configure authentication](using-the-assessment-tool/setupauth.md) | Setup an Azure AD application that can be used to authenticate the Microsoft 365 Assessment tool to your tenant
 [Run an assessment](using-the-assessment-tool/assess.md) | Use the Microsoft 365 Assessment tool CLI to run an assessment: `microsoft365-assessment.exe --help` will show the available commands
+
+Once you're ready to run an assessment you can choose any of the available modules, use the top navigation to learn more about the specifics for a given module: you'll find information about to run the assessment for that module and a detailed description of the created report and CSV files.
 
 ## I want to help 🙋‍♂️
 
