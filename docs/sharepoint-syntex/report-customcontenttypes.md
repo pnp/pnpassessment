@@ -4,4 +4,6 @@ If you are already making use of content types in your SharePoint libraries, Syn
 
 This page will help you to identify libraries that are enabled to use custom content types. It will also show libraries that are using the most content types.
 
+## Sample page
+
 ![libraries with custom content types](../images/syntexlibrarieswithcustomcontenttypes.png)

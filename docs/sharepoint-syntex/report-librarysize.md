@@ -4,4 +4,6 @@ As document libraries become larger, it can be more challenging for users to fin
 
 This page will help you identify large libraries in the scan results.
 
+## Sample page
+
 ![library size](../images/syntexlibrarysize.png)

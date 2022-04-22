@@ -4,4 +4,6 @@ Files can be processed by Syntex models in either the classic or modern list exp
 
 This page will help you to identify libraries that are still using the classic experience, which may need to be temporarily or permanently switched to the modern experience to fully make use of Syntex.
 
+## Sample page
+
 ![library modernization](../images/syntexlibrarymodernizationstatus.png)

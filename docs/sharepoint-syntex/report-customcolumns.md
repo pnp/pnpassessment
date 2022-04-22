@@ -4,4 +4,6 @@ Custom columns are a simple yet powerful feature of SharePoint document librarie
 
 This page will help you identify which libraries are using custom columns, and the libraries which use the most columns. Libraries using a large number of columns are likely to be connected to metadata driven use cases. However they are also at greater risk from human error or omission when adding metadata.
 
+## Sample page
+
 ![custom columns](../images/syntexcustomcolumns.png)

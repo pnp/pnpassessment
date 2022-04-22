@@ -4,4 +4,6 @@ As well as custom models, Syntex also includes prebuilt models. These models are
 
 This page will help you to identify libraries and content types where the name matches a prebuilt model type.
 
+## Sample page
+
 ![prebuilt model candidates](../images/syntexprebuiltmodelcandidates.png)
