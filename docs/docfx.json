@@ -52,7 +52,8 @@
       "_appLogoPath": "",
       "_description":"The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.",
       "_enableSearch": true,
-      "_enableNewTab": true
+      "_enableNewTab": true,
+      "_disableBreadcrumb" : true
     }
   }
 }
