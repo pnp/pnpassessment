@@ -56,7 +56,7 @@ Realtime status update of the running assessments | microsoft365-assessment.exe 
 
 When using the `status` action a table is generated listing all the running assessments. Following columns are listed in the table:
 
-![list output](../images/listoutput.png)
+![list output](../images/statusoutput.png)
 
 Column | Description
 -------|------------

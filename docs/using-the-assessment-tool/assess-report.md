@@ -38,7 +38,7 @@ By default the assessment Power BI report and CSV files are generated inside a s
 
 ## Report delimiter setting via `--delimiter`
 
-When exporting the CSV files, which are used as data source for the Power BI report, by default the comma (',') is used as delimiter. If you're planning to also consume the CSV files directly and you're living in a country that uses semicolon (`;`) as delimiter then you can override the default delimiter via the `--delimiter` argument. A sample: `--delimiter Semicolon`.
+When exporting the CSV files, which are used as data source for the Power BI report, by default the comma (`,`) is used as delimiter. If you're planning to also consume the CSV files directly and you're living in a country that uses semicolon (`;`) as delimiter then you can override the default delimiter via the `--delimiter` argument. A sample: `--delimiter Semicolon`.
 
 ## Controlling the Power BI report opening via `--open`
 
