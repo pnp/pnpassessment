@@ -169,12 +169,144 @@
       "version": ""
     },
     {
+      "type": "Resource",
+      "source_relative_path": "images/syntexassessmentoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexassessmentoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexcolumnusage.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexcolumnusage.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexcontenttypeusage.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexcontenttypeusage.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexcustomcolumns.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexcustomcolumns.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexlibrarieswithcustomcontenttypes.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexlibrarieswithcustomcontenttypes.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexlibrarymodernizationstatus.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexlibrarymodernizationstatus.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexlibrarysize.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexlibrarysize.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexmodelusage.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexmodelusage.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexpowerbidesktop.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexpowerbidesktop.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexprebuiltmodelcandidates.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexprebuiltmodelcandidates.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/syntexretentionlabels.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/syntexretentionlabels.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
       "type": "Conceptual",
       "source_relative_path": "index.md",
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "oHvaTcJhpEd+aTBK05xqkw=="
+          "hash": "4O9jhziK/oq4WL/VfuiHMA=="
         }
       },
       "is_incremental": false,
@@ -186,7 +318,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/assess.html",
-          "hash": "sOq81HVvR7tmyJHSIPjTxQ=="
+          "hash": "czyC1xjPUopZwbXmo/OR1Q=="
         }
       },
       "is_incremental": false,
@@ -282,7 +414,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-assessmentoverview.html",
-          "hash": "11BScYG9SldlkB232Gagcg=="
+          "hash": "SnOmJiL8qVoMC7hRl2J6cQ=="
         }
       },
       "is_incremental": false,
@@ -294,7 +426,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-columnusage.html",
-          "hash": "KYX5f3rf7bT3tHeXl3P/MQ=="
+          "hash": "75+ASkna0oxsk8chsEesFw=="
         }
       },
       "is_incremental": false,
@@ -306,7 +438,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-contenttypeusage.html",
-          "hash": "ET3nvMRnZZym5RkyJ9Bdpg=="
+          "hash": "0MylFR3Amz64T6jS52dznA=="
         }
       },
       "is_incremental": false,
@@ -318,7 +450,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-customcolumns.html",
-          "hash": "KCIbtHHfpgU2c+mm2PReqA=="
+          "hash": "bEooc8905e2wFD3p37rvng=="
         }
       },
       "is_incremental": false,
@@ -330,7 +462,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-customcontenttypes.html",
-          "hash": "jmJCiej3/B9f9SW8bIHEAQ=="
+          "hash": "SOSj7rGgJeDEP8565JZ+Eg=="
         }
       },
       "is_incremental": false,
@@ -342,7 +474,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-intro.html",
-          "hash": "hizBFe7t+mbn+5URAsj9VA=="
+          "hash": "tyCOQ96OqtGyXke9Fr8TGQ=="
         }
       },
       "is_incremental": false,
@@ -354,7 +486,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-librarymodernization.html",
-          "hash": "na00xHHNJ/fnnjhRJwneuw=="
+          "hash": "RefIHh/mG5lRRrtpgDsNwQ=="
         }
       },
       "is_incremental": false,
@@ -366,7 +498,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-librarysize.html",
-          "hash": "fG0rILIZ7he/72TsIapxuw=="
+          "hash": "aN6LgL1k8ezEvkQvHlmiUA=="
         }
       },
       "is_incremental": false,
@@ -378,7 +510,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-prebuiltmodelcandidates.html",
-          "hash": "V+68y7xTyy64yIpFzVRi8w=="
+          "hash": "fvvOrOP2+tF8Lvwf8mZQ2g=="
         }
       },
       "is_incremental": false,
@@ -390,7 +522,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-retentionlabels.html",
-          "hash": "4CbBiiDR5wENPSn44gNG3g=="
+          "hash": "G81AHVevehkI99yj7L07kA=="
         }
       },
       "is_incremental": false,
@@ -402,7 +534,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/report-syntexmodelusage.html",
-          "hash": "o61dYxv1KX6zh9Joz9nZhg=="
+          "hash": "9jFKTxVDY6rOKOpLQDFUWw=="
         }
       },
       "is_incremental": false,
