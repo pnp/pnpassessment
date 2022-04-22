@@ -1,6 +1,6 @@
 # Microsoft 365 Assessment tool
 
-The Microsoft 365 Assessment tool is an [open source community tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various deprecation and adoption scenarios. At launch the tool only supports a [SharePoint Syntex adoption](sharepoint-syntex/readme.md) module but additional modules are under development.
+The Microsoft 365 Assessment tool is an [open source community tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various deprecation and adoption scenarios. At launch the tool only supports a [SharePoint Syntex adoption](https://pnp.github.io/pnpassessment/sharepoint-syntex/readme.html) module but additional modules are under development.
 
 ## Getting started 🚀
 
@@ -8,19 +8,19 @@ The minimal steps to get started are:
 
 Step | Description
 -----|------------
-[Download the tool](using-the-assessment-tool/download.md) | Download the the Microsoft 365 Assessment tool for the OS you're using. The assessment tool versions can be found in the [releases](https://github.com/pnp/pnpassessment/releases) folder
-[Configure authentication](using-the-assessment-tool/setupauth.md) | Setup an Azure AD application that can be used to authenticate the Microsoft 365 Assessment tool to your tenant
-[Run an assessment](using-the-assessment-tool/assess.md) | Use the Microsoft 365 Assessment tool CLI to run an assessment: `microsoft365-assessment.exe --help` will show the available commands
+[Download the tool](https://pnp.github.io/pnpassessment/using-the-assessment-tool/download.html) | Download the the Microsoft 365 Assessment tool for the OS you're using. The assessment tool versions can be found in the [releases](https://github.com/pnp/pnpassessment/releases) folder
+[Configure authentication](https://pnp.github.io/pnpassessment/using-the-assessment-tool/setupauth.html) | Setup an Azure AD application that can be used to authenticate the Microsoft 365 Assessment tool to your tenant
+[Run an assessment](https://pnp.github.io/pnpassessment/using-the-assessment-tool/assess.html) | Use the Microsoft 365 Assessment tool CLI to run an assessment: `microsoft365-assessment.exe --help` will show the available commands
 
 Once you're ready to run an assessment you can choose any of the available modules, use the top navigation to learn more about the specifics for a given module: you'll find information about to run the assessment for that module and a detailed description of the created report and CSV files. Currently supported modules are:
 
 Module | Type | Description
 -------|------|------------
-[SharePoint Syntex](sharepoint-syntex/readme.md) | Adoption | Helps you assess your tenant to understand where using SharePoint Syntex will bring value to your organization
+[SharePoint Syntex](https://pnp.github.io/pnpassessment/sharepoint-syntex/readme.html) | Adoption | Helps you assess your tenant to understand where using SharePoint Syntex will bring value to your organization
 
 ## I want to help 🙋‍♂️
 
-If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with suggested improvements. Check out our [Contribution guidance](contributing/readme.md) to learn more.
+If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with suggested improvements. Check out our [Contribution guidance](https://pnp.github.io/pnpassessment/contributing/readme.html) to learn more.
 
 ## Supportability and SLA 💁🏾‍♀️
 
