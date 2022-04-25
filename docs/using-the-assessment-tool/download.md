@@ -12,6 +12,19 @@ When using the Microsoft 365 Assessment tool the tool outputs (reports, CSV file
 
 When you launch the Microsoft 365 Assessment tool it will check if there's a newer version and will notify you, downloading the newest version is a manual step and highly recommended whenever there is one.
 
+> [!Important]
+> When you download the new version you need to ensure the previous Microsoft 365 Assessment tool is not running anymore as otherwise you might get "file in use" errors while overwriting or the new version will still connected to the old running process. 
+
+Below are some strategies to ensure the current Microsoft 365 Assessment tool is fully shutdown.
+
+### Using the Microsoft 365 Assessment tool CLI
+
+First check if there's no running assessment anymore via `microsoft365-assessment.exe status`, if OK then use `microsoft365-assessment.exe stop` to stop the running Microsoft 365 Assessment process.
+
+### Using your OS's task manager
+
+List all the running tasks and stop all `microsoft365-assessment.exe` processes on Windows or all `microsoft365-assessment` processes on macOS or Linux.
+
 ## Is it safe to just run a downloaded executable
 
 The Microsoft 365 Assessment tool is an open source managed tool, but the release process is a Microsoft managed one. This means that tool changes are reviewed by Microsoft and that the shipped Windows versions of the tool are code signed by Microsoft, which prevents tampering with the binary file. Furthermore it's not required and therefore not recommended to run the Microsoft 365 Assessment tool using elevated privileges.
