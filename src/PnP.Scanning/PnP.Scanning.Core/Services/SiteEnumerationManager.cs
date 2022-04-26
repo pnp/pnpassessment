@@ -63,6 +63,9 @@ namespace PnP.Scanning.Core.Services
                 {
                     // Enumerate all site collections
                     VanityUrlOptions vanityUrlOptions = null;
+
+                    Log.Information("Vanity URLs passed in: my site host {MySiteHostUrl} and tenant admin {AdminCenterUrl}", start.MySiteHostUrl, start.AdminCenterUrl);
+
                     if (!string.IsNullOrEmpty(start.MySiteHostUrl) && !string.IsNullOrEmpty(start.AdminCenterUrl))
                     {
                         vanityUrlOptions = new VanityUrlOptions
@@ -70,6 +73,8 @@ namespace PnP.Scanning.Core.Services
                             AdminCenterUri = new Uri(start.AdminCenterUrl),
                             MySiteHostUri = new Uri(start.MySiteHostUrl)
                         };
+
+                        Log.Information("VanityUrlOptions instance populated");
                     }
 
                     var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(filter: SiteCollectionFilter.ExcludePersonalSites, vanityUrlOptions: vanityUrlOptions);
