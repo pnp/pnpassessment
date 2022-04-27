@@ -104,6 +104,10 @@
 <p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Syntex</code>. Overtime more assessment modules will be added.</p>
 <h2 id="assessment-scope">Assessment scope</h2>
 <p>When running an assessment you do have the option to scope the assessment to either the complete tenant or a set of site collections. When running an assessment for all site collections in your tenant then you have to specify the required <code>--tenant</code> argument. Some samples are: <code>--tenant bertonline.sharepoint.com</code> or <code>--tenant sites.contoso.com</code> in case you're using vanity URLs. If you want to limit the assessment to one or more site collections then you additionally can add either the <code>--siteslist</code> argument or the <code>--sitesfile</code> argument.</p>
+<div class="IMPORTANT">
+<h5>Important</h5>
+<p>When you're using a vanity URL tenant you also need to either use the <code>--sitesfile</code> or <code>--siteslist</code> arguments when <a href="assess-start.html">starting a new assessment</a>. Enumerating all site collections in a vanity URL tenant will be added in a future release.</p>
+</div>
 <h3 id="scoping-via---siteslist">Scoping via <code>--siteslist</code></h3>
 <p>When using the <code>--siteslist</code> argument you can on the command line provided a comma delimited list of site collections that will have to be assessed. A sample: <code>--siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales,https://bertonline.sharepoint.com/sites/apacsales&quot;</code>.</p>
 <div class="NOTE">
