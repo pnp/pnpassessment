@@ -1,4 +1,4 @@
-# SharePoint Syntex adoption assessment
+# SharePoint Syntex Assessment
 
 [SharePoint Syntex](https://www.microsoft.com/en-ww/microsoft-365/enterprise/sharepoint-syntex-overview) uses advanced AI and machine teaching to amplify human expertise, automate content processing, and transform content into knowledge. It does so in three areas:
 
@@ -6,4 +6,4 @@
 - **Content processing**: Automate the capture, ingestion, and categorization of content and streamline content-centric processes.
 - **Content compliance**: Connect and manage content to improve security and compliance.
 
-The SharePoint Syntex features bring a ton of added value in the content management space, but how do you know which sites in your tenant can truly benefit from the value that SharePoint Syntex brings? Tenants can have thousands of sites and manually assessing them is not an easy task. Using the SharePoint Syntex adoption module of the Microsoft 365 Assessment tool this assessment is done for you: after [running an assessment](assess.md) you can generate a [Power BI report](report-intro.md) that will explain to you where using SharePoint Syntex will add value to your organization.
+If you are considering a trial of SharePoint Syntex, or have purchased and have just started on your journey, you might be wondering where to begin. Many customers start their SharePoint Syntex journey with a specific scenario in mind but want to know where else SharePoint Syntex might be able to help. Others see value in the technology, but can’t identify that first use case to make it real. Using the SharePoint Syntex Assessment, the first module of the new Microsoft 365 Assessment Tool, enables you to [gather data about your SharePoint libraries](assess.md), and generate a [Power BI report](report-intro.md) with recommendations of where Syntex might fit and bring added value for your organization. These recommendations are based on factors such as the size and structure of libraries, the existing use of metadata or content types, and the use of retention labels.
