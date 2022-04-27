@@ -26,14 +26,12 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 > If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Azure AD admins for help.
 
 ```PowerShell
-# Sample for the SharePoint Syntex adoption module
+# Sample for the SharePoint Syntex adoption module. Remove the application/delegated permissions depending on your needs
 Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
-                       # Keep these if you want to use application permissions
                        -GraphApplicationPermissions "Sites.Read.All" `
                        -SharePointApplicationPermissions "Sites.FullControl.All" `
-                       # Keep these if you want to use delegated permissions
                        -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
                        -SharePointDelegatePermissions "AllSites.Manage" `
                        -Username "joe@contoso.onmicrosoft.com" `
