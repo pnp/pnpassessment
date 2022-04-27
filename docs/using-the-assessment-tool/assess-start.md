@@ -27,6 +27,9 @@ The main argument to use is the `--mode` argument that enables you to pick the a
 
 When running an assessment you do have the option to scope the assessment to either the complete tenant or a set of site collections. When running an assessment for all site collections in your tenant then you have to specify the required `--tenant` argument. Some samples are: `--tenant bertonline.sharepoint.com` or `--tenant sites.contoso.com` in case you're using vanity URLs. If you want to limit the assessment to one or more site collections then you additionally can add either the `--siteslist` argument or the `--sitesfile` argument.
 
+> [!Important]
+> When you're using a vanity URL tenant you also need to either use the `--sitesfile` or `--siteslist` arguments when [starting a new assessment](assess-start.md). Enumerating all site collections in a vanity URL tenant will be added in a future release.
+
 ### Scoping via `--siteslist`
 
 When using the `--siteslist` argument you can on the command line provided a comma delimited list of site collections that will have to be assessed. A sample: `--siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales,https://bertonline.sharepoint.com/sites/apacsales"`.
