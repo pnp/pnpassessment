@@ -50,6 +50,14 @@ https://bertonline.sharepoint.com/sites/apacsales
 > [!Note]
 > You cannot combine both `--siteslist` and `--sitesfile`.
 
+When you don't have a sites file available it's quite easy to generate one following these steps:
+
+- Go to your SharePoint admin center and under **Sites** select **Active sites**
+- Select the view that the most closely matches the list of sites you want to assess and click on **Export**. This will generate a sites CSV file
+- Open the CSV file in Excel, select the URL column (column B) and press CTRL-C to copy that column
+- Open a text editor (e.g. Notepad) and paste the copied column
+- Final step will be to remove the first line as that's the column title (URL) and save the file
+
 ## Authentication configuration
 
 The main authentication argument to use the `--authmode` argument that allows you to choose how the Microsoft 365 Assessment tool will authenticate to your tenant. Possible values are:
