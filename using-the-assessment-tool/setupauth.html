@@ -97,14 +97,12 @@
 <h5>Important</h5>
 <p>If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Azure AD admins for help.</p>
 </div>
-<pre><code class="lang-PowerShell"># Sample for the SharePoint Syntex adoption module
+<pre><code class="lang-PowerShell"># Sample for the SharePoint Syntex adoption module. Remove the application/delegated permissions depending on your needs
 Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
-                       # Keep these if you want to use application permissions
                        -GraphApplicationPermissions &quot;Sites.Read.All&quot; `
                        -SharePointApplicationPermissions &quot;Sites.FullControl.All&quot; `
-                       # Keep these if you want to use delegated permissions
                        -GraphDelegatePermissions &quot;Sites.Read.All&quot;, &quot;User.Read&quot; `
                        -SharePointDelegatePermissions &quot;AllSites.Manage&quot; `
                        -Username &quot;joe@contoso.onmicrosoft.com&quot; `
