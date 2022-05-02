@@ -199,6 +199,19 @@
 </tr>
 </tbody>
 </table>
+<h3 id="im-scanning-a-huge-number-of-site-collections-and-the-assessment-seems-to-be-stuck-what-should-i-do">I'm scanning a huge number of site collections and the assessment seems to be stuck, what should I do?</h3>
+<p>When the assessment runs it will use 2 parallel operations per site collection for processing the sites and sub sites combined with multiple parallel operations processing site collections. This means that when the assessment is processing site collections with a large amount of sub sites this can take a while. The easiest approach to understand if an assessment is still progressing in checking the status output (Progress column), but if that's not changing anymore taking a peek at the last log entries will provide clarity:</p>
+<ul>
+<li>Go the folder hosting the Microsoft 365 Assessment tool</li>
+<li>Open the sub folder for your assessment (assessment id = sub folder name)</li>
+<li>On Windows use <code>Get-Content .\log_a9dc3fda-e14b-421e-8a85-cbb9b1c4ebfa.txt -Tail 20 -Wait</code> to keep showing the last 20 lines of your log file, on macOS and Linux use <code>tail log_e1396c6c-5ff0-4b4f-af00-a7c596ea82f0.txt -n 20 -f</code></li>
+</ul>
+<p>If the log file is not showing any meaningful updates for a long time then the assessment might be stuck. If that's the case then:</p>
+<ul>
+<li>Continue with pausing the assessment via <code>microsoft365-assessment.exe pause --id &lt;assessment id&gt;</code>. See next chapters for details</li>
+<li>Stop all assessment processes <code>microsoft365-assessment.exe stop</code>. See <a href="assess-stop.html">here</a> for details</li>
+<li>Restart the assessment via <code>microsoft365-assessment.exe restart --id &lt;assessment id&gt;</code>. See next chapters for details</li>
+</ul>
 <h2 id="pausing-a-running-assessment">Pausing a running assessment</h2>
 <p>Sometimes you need to pause a running assessment because you need to shutdown the computer running the assessment or the assessment is very heavily throttled. This is possible using the <code>pause</code> action.</p>
 <h3 id="sample-pause-command">Sample pause command</h3>
