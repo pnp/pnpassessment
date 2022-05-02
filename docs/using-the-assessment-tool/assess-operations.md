@@ -68,6 +68,20 @@ Retries | Whenever a request is queued for retry a counter will increased. Throt
 Session start | When was this assessment run started. If you've restarted an assessment the restart time is shown here
 Session duration | How long has the current assessment session been running
 
+### I'm scanning a huge number of site collections and the assessment seems to be stuck, what should I do?
+
+When the assessment runs it will use 2 parallel operations per site collection for processing the sites and sub sites combined with multiple parallel operations processing site collections. This means that when the assessment is processing site collections with a large amount of sub sites this can take a while. The easiest approach to understand if an assessment is still progressing in checking the status output (Progress column), but if that's not changing anymore taking a peek at the last log entries will provide clarity:
+
+- Go the folder hosting the Microsoft 365 Assessment tool
+- Open the sub folder for your assessment (assessment id = sub folder name)
+- On Windows use `Get-Content .\log_a9dc3fda-e14b-421e-8a85-cbb9b1c4ebfa.txt -Tail 20 -Wait` to keep showing the last 20 lines of your log file, on macOS and Linux use `tail log_e1396c6c-5ff0-4b4f-af00-a7c596ea82f0.txt -n 20 -f`
+
+If the log file is not showing any meaningful updates for a long time then the assessment might be stuck. If that's the case then: 
+
+- Continue with pausing the assessment via `microsoft365-assessment.exe pause --id <assessment id>`. See next chapters for details
+- Stop all assessment processes `microsoft365-assessment.exe stop`. See [here](assess-stop.md) for details
+- Restart the assessment via `microsoft365-assessment.exe restart --id <assessment id>`. See next chapters for details
+
 ## Pausing a running assessment
 
 Sometimes you need to pause a running assessment because you need to shutdown the computer running the assessment or the assessment is very heavily throttled. This is possible using the `pause` action.
