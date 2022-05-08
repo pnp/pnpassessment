@@ -308,7 +308,7 @@ namespace PnP.Scanning.Core.Authentication
                     }
                 }
 
-                throw new Exception($"Certificate ciould not be loaded with using this path information {certPathLocation}");
+                throw new Exception($"Certificate could not be loaded using this path information {certPathLocation}");
             }
             else
             {
