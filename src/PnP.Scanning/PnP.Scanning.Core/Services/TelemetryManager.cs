@@ -1,6 +1,7 @@
 ﻿using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
 
@@ -227,6 +228,7 @@ namespace PnP.Scanning.Core.Services
                 int count = 0;
                 List<Guid> uniqueDefinitions = new();
                 List<Guid> uniqueSubscriptions = new();
+                Dictionary<string, int> actionCounts = new();
                 int instanceCount = 0;
                 int actionCount = 0;
                 int unsupportedActionCount = 0;
@@ -234,6 +236,12 @@ namespace PnP.Scanning.Core.Services
                 int listScopedCount = 0;
                 int contentTypeScopedCount = 0;
                 int considerUpgradingToFlowCount = 0;
+
+                // Add a line for each possible action
+                foreach(var defaultWorkflow in WorkflowManager.Instance.DefaultActions)
+                {
+                    actionCounts.Add(defaultWorkflow.ActionNameShort, 0);
+                }
 
                 foreach(var workflow in dbContext.Workflows)
                 {
@@ -269,6 +277,18 @@ namespace PnP.Scanning.Core.Services
                     {
                         considerUpgradingToFlowCount++;
                     }
+
+                    if (!string.IsNullOrEmpty(workflow.UsedActions))
+                    {
+                        var actionList = workflow.UsedActions.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach(var action in actionList)
+                        {
+                            if (actionCounts.ContainsKey(action))
+                            {
+                                actionCounts[action]++;
+                            }
+                        }
+                    }
                 }
 
                 metric.Add("WorkflowCount", count);
@@ -280,6 +300,11 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("SiteScopedCount", siteScopedCount);
                 metric.Add("ListScopedCount", listScopedCount);
                 metric.Add("ContentTypeScopedCount", contentTypeScopedCount);
+
+                foreach(var workflowAction in actionCounts)
+                {
+                    metric.Add($"Activity{workflowAction.Key}", workflowAction.Value);
+                }
             }
         }
 

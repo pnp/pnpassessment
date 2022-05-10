@@ -108,7 +108,7 @@ namespace PnP.Scanning.Process.Commands
                                                  procent,
                                                  throttling,
                                                  new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
-                                                 new Markup(item.Duration.ToTimeSpan().ToString(@"dd\hh\:mm\:ss")));
+                                                 new Markup(item.Duration.ToTimeSpan().ToString(@"dd\:hh\:mm\:ss")));
                                 }
                             }
                             else

@@ -12,6 +12,14 @@ namespace PnP.Scanning.Core.Scanners
         private static readonly Lazy<WorkflowManager> lazyInstance = new(() => new WorkflowManager());
         private WorkflowActions defaultWorkflowActions;
 
+        private static readonly string[] SP2013UnsupportedFlowActions = new string[]
+        {
+            "Microsoft.SharePoint.WorkflowServices.Activities.SingleTask",
+            "Microsoft.SharePoint.WorkflowServices.Activities.CompositeTask",
+            "Microsoft.SharePoint.WorkflowServices.Activities.WorkflowInterop",
+            "Microsoft.SharePoint.WorkflowServices.Activities.SetWorkflowStatus",
+        };
+
         private static readonly string[] SP2013SupportedFlowActions = new string[]
         {
             "Microsoft.SharePoint.WorkflowServices.Activities.Comment",
@@ -57,6 +65,14 @@ namespace PnP.Scanning.Core.Scanners
             get
             {
                 return lazyInstance.Value;
+            }
+        }
+
+        internal List<WorkflowAction> DefaultActions
+        {
+            get
+            {
+                return defaultWorkflowActions.SP2013DefaultActions;
             }
         }
 
@@ -174,7 +190,6 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     usedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
                 }
-
 
                 if (!SP2013SupportedFlowActions.Contains(defaultOOBWorkflowAction.ActionName))
                 {
