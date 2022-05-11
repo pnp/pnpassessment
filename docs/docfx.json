@@ -7,6 +7,8 @@
           "using-the-assessment-tool/toc.yml",
           "sharepoint-syntex/**.md",
           "sharepoint-syntex/toc.yml",
+          "workflow/**.md",
+          "workflow/toc.yml",
           "contributing/**.md",
           "contributing/toc.yml",
           "toc.yml",
