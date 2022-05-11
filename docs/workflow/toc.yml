@@ -10,6 +10,7 @@
   items:
     - name: workflows.csv
       href: csv-workflows.md      
+    - name: sitecollections.csv
       href: ../using-the-assessment-tool/csv-sitecollections.md
     - name: webs.csv
       href: ../using-the-assessment-tool/csv-webs.md
