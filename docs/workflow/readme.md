@@ -1,0 +1,3 @@
+# Workflow 2013 Assessment
+
+The Workflow 2013 platform has been introduced 10 years ago and it's not further evolving. It's predecessor Workflow 2010 has been deprecated a while ago in favor of Power Automate flows and it's strongly recommended to also consider moving your 2013 workflows to the Power Automate platform. To understand where workflow 2013 is used inside your organization you use the Workflow module of the new Microsoft 365 Assessment Tool: it enables you to [gather data about your SharePoint Workflow 2013 usage](assess.md), and generate a [Power BI report](report-intro.md) that you can use to better understand workflow 2013 usage and it's relevance.

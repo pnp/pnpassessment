@@ -1,0 +1,21 @@
+- name: Introduction
+  href: readme.md
+- name: Requirements
+  href: requirements.md
+- name: Run an assessment
+  href: assess.md
+- name: Report      
+  href: report-intro.md
+- name: CSV files
+  items:
+    - name: workflows.csv
+      href: csv-workflows.md      
+      href: ../using-the-assessment-tool/csv-sitecollections.md
+    - name: webs.csv
+      href: ../using-the-assessment-tool/csv-webs.md
+    - name: scans.csv
+      href: ../using-the-assessment-tool/csv-scans.md
+    - name: properties.csv
+      href: ../using-the-assessment-tool/csv-properties.md
+    - name: history.csv
+      href: ../using-the-assessment-tool/csv-history.md

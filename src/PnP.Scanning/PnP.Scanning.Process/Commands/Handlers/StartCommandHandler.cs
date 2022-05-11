@@ -251,7 +251,7 @@ namespace PnP.Scanning.Process.Commands
             workflowAnalyzeOption = new(
                 name: $"--{Constants.StartWorkflowAnalyze}",
                 getDefaultValue: () => true,
-                description: "Perform worlflow analysis")
+                description: "Perform workflow analysis")
             {
                 IsRequired = false
             };
