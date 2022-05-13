@@ -27,6 +27,7 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 
 ```PowerShell
 # Sample for the SharePoint Syntex adoption module. Remove the application/delegated permissions depending on your needs
+# and update the Tenant and Username properties to match your environment
 Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
@@ -39,4 +40,23 @@ Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
 ```
 
 > [!Note]
-> Replace contoso.onmicrosoft.com with your Azure AD tenant name and ensure you replace joe@contoso.onmicrosoft.com with the user id that's an Azure AD admin (or global admin)
+> Replace `contoso.onmicrosoft.com` with your Azure AD tenant name and ensure you replace `joe@contoso.onmicrosoft.com` with the user id that's an Azure AD admin (or global admin). If you're unsure what your Azure AD tenant name is then go to https://aad.portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview check for the value of **Primary domain**.
+
+Once you've pressed enter on above command you'll be prompted to sign-in and you should sign-in using the user you've specified for the `Username` argument. After that's done the Azure AD application will be created and configured, followed by a wait of 60 seconds to ensure the creation has been propagated across all systems. The final step is the admin consent flow: you'll again be prompted to sign-in with the specified admin user, followed by consent dialog showing the permissions that are being granted to the application. Press **Accept** to finalize the consent flow. In the resulting output you'll get some key information:
+
+```text
+Pfx file               : D:\assessment\Microsoft365AssessmentToolForSyntexDemo1.pfx
+Cer file               : D:\assessment\Microsoft365AssessmentToolForSyntexDemo1.cer
+AzureAppId/ClientId    : 95610f5d-729a-4cd1-9ad7-1fa9052e50dd
+Certificate Thumbprint : 165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE
+```
+
+Running the `Register-PnPAzureADApp` did not only create and configure the Azure AD application, it also did create a certificate for the application permission flow. This certificate has been added to the current user's certificate store, under the personal node. You can use `certmgr` on the command line to open up the local user's certificate store.
+
+> [!Note]
+> The certificate is also exported as PFX file on the file system, feel free to delete this exported file as it's easier to use the certificate from the certificate store.
+
+When you now want to use the certificate for an assessment operation you need to set `--authmode` to `application` and tell the assessment tool which certificate to use via the certificate path parameter: `--certpath "My|CurrentUser|165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE"`. Next to that you also need to specify the Azure AD application to use via the `--applicationid` argument. More details on how to configure authentication when starting an assessment can be found [here](assess-start.md#authentication-configuration).
+
+> [!Important]
+> Notice that the last part in the string is the certificate thumbprint to use.
