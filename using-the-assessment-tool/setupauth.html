@@ -111,23 +111,23 @@ Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
 </code></pre>
 <div class="NOTE">
 <h5>Note</h5>
-<p>Replace <code>contoso.onmicrosoft.com</code> with your Azure AD tenant name and ensure you replace <code>joe@contoso.onmicrosoft.com</code> with the user id that's an Azure AD admin (or global admin). If you're unsure what your Azure AD tenant name is then go to <a href="https://aad.portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview">https://aad.portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview</a> check for the value of <strong>Primary domain</strong>.</p>
+<p>Replace <code>contoso.onmicrosoft.com</code> with your Azure AD tenant name and ensure you replace <code>joe@contoso.onmicrosoft.com</code> with the user id that's an Azure AD admin (or global admin). If you're unsure what your Azure AD tenant name is then go to <a href="https://aad.portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview">https://aad.portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview</a> and check for the value of <strong>Primary domain</strong>.</p>
 </div>
-<p>Once you've pressed enter on above command you'll be prompted to sign-in and you should sign-in using the user you've specified for the <code>Username</code> argument. After that's done the Azure AD application will be created and configured, followed by a wait of 60 seconds to ensure the creation has been propagated across all systems. The final step is the admin consent flow: you'll again be prompted to sign-in with the specified admin user, followed by consent dialog showing the permissions that are being granted to the application. Press <strong>Accept</strong> to finalize the consent flow. In the resulting output you'll get some key information:</p>
-<pre><code class="lang-text">Pfx file               : D:\assessment\Microsoft365AssessmentToolForSyntexDemo1.pfx
-Cer file               : D:\assessment\Microsoft365AssessmentToolForSyntexDemo1.cer
+<p>Once you've pressed enter on above command, you'll be prompted to sign-in and you should sign-in using the user you've specified for the <code>Username</code> parameter. After that's done the Azure AD application will be created and configured, followed by a wait of 60 seconds to ensure the creation has been propagated across all systems. The final step is the admin consent flow: you'll again be prompted to sign-in with the specified admin user, followed by a consent dialog showing the permissions that are being granted to the application. Press <strong>Accept</strong> to finalize the consent flow. In the resulting output you'll get some key information:</p>
+<pre><code class="lang-text">Pfx file               : D:\assessment\Microsoft365AssessmentTool.pfx
+Cer file               : D:\assessment\Microsoft365AssessmentTool.cer
 AzureAppId/ClientId    : 95610f5d-729a-4cd1-9ad7-1fa9052e50dd
 Certificate Thumbprint : 165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE
 </code></pre>
 <p>Running the <code>Register-PnPAzureADApp</code> did not only create and configure the Azure AD application, it also did create a certificate for the application permission flow. This certificate has been added to the current user's certificate store, under the personal node. You can use <code>certmgr</code> on the command line to open up the local user's certificate store.</p>
 <div class="NOTE">
 <h5>Note</h5>
-<p>The certificate is also exported as PFX file on the file system, feel free to delete this exported file as it's easier to use the certificate from the certificate store.</p>
+<p>The certificate is also exported as PFX file and cer file on the file system, feel free to delete these exported files as it's easier to use the certificate from the certificate store.</p>
 </div>
-<p>When you now want to use the certificate for an assessment operation you need to set <code>--authmode</code> to <code>application</code> and tell the assessment tool which certificate to use via the certificate path parameter: <code>--certpath &quot;My|CurrentUser|165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE&quot;</code>. Next to that you also need to specify the Azure AD application to use via the <code>--applicationid</code> argument. More details on how to configure authentication when starting an assessment can be found <a href="assess-start.html#authentication-configuration">here</a>.</p>
+<p>When you now want to use the certificate for starting an assessment, you need to set <code>--authmode</code> to <code>application</code> and tell the Microsoft 365 Assessment tool which certificate to use via the certificate path parameter: <code>--certpath &quot;My|CurrentUser|165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE&quot;</code>. Next to that you also need to specify the Azure AD application to use via the <code>--applicationid</code> parameter. More details on how to configure authentication when starting an assessment can be found <a href="assess-start.html#authentication-configuration">here</a>.</p>
 <div class="IMPORTANT">
 <h5>Important</h5>
-<p>Notice that the last part in the string is the certificate thumbprint to use.</p>
+<p>Notice that the last part in the <code>--certpath</code> string is the certificate thumbprint to use.</p>
 </div>
 </article>
           </div>
