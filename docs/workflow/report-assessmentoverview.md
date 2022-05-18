@@ -6,4 +6,4 @@ Breakdown of scan status and duration for each site collection and site.
 
 ## Sample page
 
-![overview](../images/workflowassessmentoverview.png)
+![overview](../images/workflowscanoverview.png)
