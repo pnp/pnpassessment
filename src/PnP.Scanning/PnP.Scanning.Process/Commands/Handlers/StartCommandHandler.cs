@@ -7,6 +7,7 @@ using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
 using Spectre.Console;
 using System.CommandLine;
+using System.CommandLine.Help;
 
 namespace PnP.Scanning.Process.Commands
 {
@@ -326,6 +327,21 @@ namespace PnP.Scanning.Process.Commands
                 {
                     arguments.TenantId = tenantId.ToString();
                 }
+            }
+
+            // Additional argument validation
+            if (arguments.AuthMode == AuthenticationMode.Application && string.IsNullOrEmpty(arguments.CertPath) && arguments.CertFile == null)
+            {
+                // we need certfile or certpath
+                AnsiConsole.MarkupLine($"[red]When using --authMode Application you need to either use --CertPath or --CertFile to specify the certificate to use[/]");
+                AnsiConsole.MarkupLine("");
+
+                // Show cmd help
+                var helpBld = new HelpBuilder(LocalizationResources.Instance, Console.WindowWidth);
+                var hc = new HelpContext(helpBld, cmd, Console.Out);
+                helpBld.Write(hc);
+
+                return;
             }
 
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting Microsoft 365 Assessment...", async ctx =>
