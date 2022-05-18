@@ -12,16 +12,17 @@ namespace PnP.Scanning.Core.Scanners
         private static readonly Lazy<WorkflowManager> lazyInstance = new(() => new WorkflowManager());
         private WorkflowActions defaultWorkflowActions;
 
-        private static readonly string[] SP2013UnsupportedFlowActions = new string[]
+
+        private static readonly string[] SP2013ExcludedFromCalculationActions = new string[]
         {
-            "Microsoft.SharePoint.WorkflowServices.Activities.SingleTask",
-            "Microsoft.SharePoint.WorkflowServices.Activities.CompositeTask",
-            "Microsoft.SharePoint.WorkflowServices.Activities.WorkflowInterop",
-            "Microsoft.SharePoint.WorkflowServices.Activities.SetWorkflowStatus",
+            "Microsoft.SharePoint.WorkflowServices.Activities.Comment",
+            "Microsoft.SharePoint.WorkflowServices.Activities.WriteToHistory",
+            "Microsoft.SharePoint.WorkflowServices.Activities.SetWorkflowStatus"
         };
 
         private static readonly string[] SP2013SupportedFlowActions = new string[]
         {
+            "Microsoft.SharePoint.WorkflowServices.Activities.SetWorkflowStatus",
             "Microsoft.SharePoint.WorkflowServices.Activities.Comment",
             "Microsoft.SharePoint.WorkflowServices.Activities.CallHTTPWebService",
             "Microsoft.Activities.BuildDynamicValue",
@@ -32,8 +33,6 @@ namespace PnP.Scanning.Core.Scanners
             "Microsoft.SharePoint.WorkflowServices.Activities.CreateListItem",
             "Microsoft.SharePoint.WorkflowServices.Activities.UpdateListItem",
             "Microsoft.SharePoint.WorkflowServices.Activities.DeleteListItem",
-            "Microsoft.SharePoint.WorkflowServices.Activities.WaitForFieldChange",
-            "Microsoft.SharePoint.WorkflowServices.Activities.WaitForItemEvent",
             "Microsoft.SharePoint.WorkflowServices.Activities.CheckOutItem",
             "Microsoft.SharePoint.WorkflowServices.Activities.UndoCheckOutItem",
             "Microsoft.SharePoint.WorkflowServices.Activities.CheckInItem",
@@ -54,8 +53,19 @@ namespace PnP.Scanning.Core.Scanners
             "Microsoft.SharePoint.WorkflowServices.Activities.Calc",
             "Microsoft.SharePoint.WorkflowServices.Activities.WriteToHistory",
             "Microsoft.SharePoint.WorkflowServices.Activities.TranslateDocument",
-            "Microsoft.SharePoint.WorkflowServices.Activities.SetModerationStatus"
+            "Microsoft.SharePoint.WorkflowServices.Activities.SetModerationStatus",
+            "Microsoft.SharePoint.WorkflowServices.Activities.WorkflowInterop",
         };
+
+        // Added here for reference, not used in code
+        private static readonly string[] SP2013UnsupportedFlowActions = new string[]
+        {
+            "Microsoft.SharePoint.WorkflowServices.Activities.WaitForFieldChange",
+            "Microsoft.SharePoint.WorkflowServices.Activities.WaitForItemEvent",
+            "Microsoft.SharePoint.WorkflowServices.Activities.SingleTask",
+            "Microsoft.SharePoint.WorkflowServices.Activities.CompositeTask",
+        };
+
 
         /// <summary>
         /// Get's the single workflow manager instance, singleton pattern
@@ -193,8 +203,12 @@ namespace PnP.Scanning.Core.Scanners
 
                 if (!SP2013SupportedFlowActions.Contains(defaultOOBWorkflowAction.ActionName))
                 {
-                    unsupportedActionCounter++;
-                    unsupportedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
+                    // Skip "workflow 2013 specific" activities
+                    if (!SP2013ExcludedFromCalculationActions.Contains(defaultOOBWorkflowAction.ActionName))
+                    {
+                        unsupportedActionCounter++;
+                        unsupportedOOBWorkflowActivities.Add(defaultOOBWorkflowAction.ActionNameShort);
+                    }
                 }
             }
         }
