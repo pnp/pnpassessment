@@ -12,7 +12,7 @@
     - name: Overview
       href: report-overview.md
     - name: Details
-      href: report-overview.md
+      href: report-details.md
 - name: CSV files
   items:
     - name: workflows.csv
