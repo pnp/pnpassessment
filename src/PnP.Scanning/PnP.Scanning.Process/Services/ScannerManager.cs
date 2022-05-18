@@ -74,6 +74,34 @@ namespace PnP.Scanning.Process.Services
             }
         }
 
+        internal async Task<bool> IsScannerRunningAsync()
+        {
+            int port = DefaultScannerPort;
+
+            if (CurrentScannerPort != 0)
+            {
+                port = CurrentScannerPort;
+            }
+
+            // First check if we can identify an existing running scanning process
+            var currentScannerProcessId = await CanConnectRunningScannerAsync(port);
+            if (currentScannerProcessId > -1)
+            {
+                return true;
+            }
+            else if (CurrentScannerPort != 0 && CurrentScannerPort != DefaultScannerPort)
+            {
+                // try to connect to the default port 
+                currentScannerProcessId = await CanConnectRunningScannerAsync(DefaultScannerPort);
+                if (currentScannerProcessId > -1)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void RegisterScanner(int processId, int port)
         {
             CurrentScannerProcessId = processId;

@@ -64,9 +64,9 @@ A handful tenants use custom URLs due to historic reasons (so called vanity URLs
 
 Next to the using the configuration file you also need to either use the `--sitesfile` or `--siteslist` arguments when [starting a new assessment](assess-start.md). Enumerating all site collections in a vanity URL tenant will be added in a future release.
 
-## Using a different port than 25025
+## Using a different port than 25010
 
-The Microsoft 365 Assessment tool process accepts commands by listening on localhost port 25025. For most computers this port is a free and can be used, but if for some reason you prefer to use another port than that's possible as well:
+The Microsoft 365 Assessment tool process accepts commands by listening on localhost port 25010. For most computers this port is a free and can be used, but if for some reason you prefer to use another port than that's possible as well:
 
 ```json
 {

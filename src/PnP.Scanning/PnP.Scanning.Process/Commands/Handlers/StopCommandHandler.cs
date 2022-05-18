@@ -30,42 +30,52 @@ namespace PnP.Scanning.Process.Commands
             try
             {
                 AnsiConsole.MarkupLine("[gray]Requesting the Microsoft 365 Assessment process to shutdown...[/]");
-                await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "" });
 
-                bool isGrpcUpAndRunning = true;
-                var retryAttempt = 1;
-                do
+                // Verify if a stop operation is really needed
+                if (await processManager.IsScannerRunningAsync())
                 {
-                    try
+                    // Connect to the scanner process
+                    await (await processManager.GetScannerClientAsync()).StopAsync(new StopRequest() { Site = "" });
+
+                    bool isGrpcUpAndRunning = true;
+                    var retryAttempt = 1;
+                    do
                     {
-                        using (var process = System.Diagnostics.Process.GetProcessById(processManager.CurrentScannerProcessId))
+                        try
                         {
-                            if (process == null || process.HasExited)
+                            using (var process = System.Diagnostics.Process.GetProcessById(processManager.CurrentScannerProcessId))
                             {
-                                AnsiConsole.MarkupLine($"[green]OK[/]");
-                                isGrpcUpAndRunning = false;
-                            }
-                            else
-                            {
-                                // Wait in between checks
-                                await Task.Delay(TimeSpan.FromMilliseconds(500));
-                                retryAttempt++;
+                                if (process == null || process.HasExited)
+                                {
+                                    AnsiConsole.MarkupLine($"[green]OK[/]");
+                                    isGrpcUpAndRunning = false;
+                                }
+                                else
+                                {
+                                    // Wait in between checks
+                                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                                    retryAttempt++;
+                                }
                             }
                         }
-                    }
-                    catch
-                    {
-                        AnsiConsole.MarkupLine($"[green]OK[/]");
+                        catch
+                        {
+                            AnsiConsole.MarkupLine($"[green]OK[/]");
 
-                        // Exception means the process is not found
-                        isGrpcUpAndRunning = false;
+                            // Exception means the process is not found
+                            isGrpcUpAndRunning = false;
+                        }
+                    }
+                    while (isGrpcUpAndRunning && retryAttempt <= 20);
+
+                    if (isGrpcUpAndRunning)
+                    {
+                        AnsiConsole.MarkupLine($"[red]FAIL[/]");
                     }
                 }
-                while (isGrpcUpAndRunning && retryAttempt <= 20);
-
-                if (isGrpcUpAndRunning)
+                else
                 {
-                    AnsiConsole.MarkupLine($"[red]FAIL[/]");
+                    AnsiConsole.MarkupLine("[gray]The Microsoft 365 Assessment process was not running[/]");
                 }
             }
             catch
