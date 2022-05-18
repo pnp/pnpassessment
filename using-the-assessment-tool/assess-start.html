@@ -94,6 +94,10 @@
 <td>Start a new Syntex assessment (delegated permissions) for a set of site collections</td>
 <td>microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com <br> --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales&quot;</td>
 </tr>
+<tr>
+<td>Start a new Workflow 2013 assessment (application permissions) for a complete tenant</td>
+<td>microsoft365-assessment.exe start --mode workflow --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot;</td>
+</tr>
 </tbody>
 </table>
 <h2 id="command-line-arguments">Command line arguments</h2>
@@ -101,7 +105,28 @@
 <p><img src="../images/startargumentshelp.png" alt="start argument overview"></p>
 <p>In the next chapters the arguments are described in more details, grouped by category</p>
 <h2 id="assessment-mode">Assessment mode</h2>
-<p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Syntex</code>. Overtime more assessment modules will be added.</p>
+<p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Syntex</code>. Overtime more assessment modules will be added. Currently supported assessments are:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../sharepoint-syntex/readme.html">SharePoint Syntex</a></td>
+<td>Adoption</td>
+<td>Helps you assess your tenant to understand where using SharePoint Syntex will bring value to your organization</td>
+</tr>
+<tr>
+<td><a href="../workflow/readme.html">Workflow 2013</a></td>
+<td>Deprecation</td>
+<td>Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. <strong>Available as of pre-release version 1.0.1</strong></td>
+</tr>
+</tbody>
+</table>
 <h2 id="assessment-scope">Assessment scope</h2>
 <p>When running an assessment you do have the option to scope the assessment to either the complete tenant or a set of site collections. When running an assessment for all site collections in your tenant then you have to specify the required <code>--tenant</code> argument. Some samples are: <code>--tenant bertonline.sharepoint.com</code> or <code>--tenant sites.contoso.com</code> in case you're using vanity URLs. If you want to limit the assessment to one or more site collections then you additionally can add either the <code>--siteslist</code> argument or the <code>--sitesfile</code> argument.</p>
 <div class="IMPORTANT">

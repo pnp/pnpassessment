@@ -301,12 +301,56 @@
       "version": ""
     },
     {
+      "type": "Resource",
+      "source_relative_path": "images/workflowdetails.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/workflowdetails.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/workflowoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/workflowoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/workflowpowerbidesktop.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/workflowpowerbidesktop.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/workflowscanoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/workflowscanoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
       "type": "Conceptual",
       "source_relative_path": "index.md",
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "GuzDC/sOqKhwIInxViqvxg=="
+          "hash": "45+GqWIi4eu5714fk7+fYQ=="
         }
       },
       "is_incremental": false,
@@ -570,7 +614,7 @@
       "output": {
         ".html": {
           "relative_path": "toc.html",
-          "hash": "TRtdIDB82kHJQQX88oxLDg=="
+          "hash": "8n2i2xORuAL6qquc3V4X1A=="
         }
       },
       "is_incremental": false,
@@ -606,7 +650,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "AqMj4wa9CSP+6TtwvYj+3g=="
+          "hash": "yZvIyGKh/MgpMqzXCpYe7A=="
         }
       },
       "is_incremental": false,
@@ -794,11 +838,47 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "workflow/report-assessmentoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/report-assessmentoverview.html",
+          "hash": "E1SRpA3I1K43rvldZG0CeA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/report-details.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/report-details.html",
+          "hash": "PJLyJNNPKhTvw6TPgDs5sg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "workflow/report-intro.md",
       "output": {
         ".html": {
           "relative_path": "workflow/report-intro.html",
-          "hash": "EWZG7QdxSEq8pF8afKsjxA=="
+          "hash": "3xEQUse4UCNVoIvrvUrpQA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/report-overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/report-overview.html",
+          "hash": "4fEoiEPJg6+cRLMgaEoF5A=="
         }
       },
       "is_incremental": false,
@@ -843,7 +923,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 41,
+          "total_file_count": 44,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {

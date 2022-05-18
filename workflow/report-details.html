@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>The Power BI report | Microsoft 365 Assessment Tool </title>
+    <title>Details | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="The Power BI report | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Details | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -71,19 +71,80 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
                   <div class="contribution-panel mobile-hide pull-right">
-                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/workflow/report-intro.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/workflow/report-details.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="the-power-bi-report">The Power BI report</h1>
+                    <h1 id="details">Details</h1>
 
-<p>The generated report is a Power BI report and can be opened in Power BI Desktop (see <a href="https://aka.ms/pbidesktopstore">https://aka.ms/pbidesktopstore</a> to install Power BI Desktop).</p>
-<p><img src="../images/workflowpowerbidesktop.png" alt="powerbi report"></p>
-<p>When using the report from Power BI Desktop there are some things to understand:</p>
-<ul>
-<li>The report is built using multiple pages, use the bottom tabs to switch to different report pages. The Overview page will give you a quick overview while the Details page allows you to further drill in</li>
-<li>When the report is opened from the generated Power BI pbit file it's not saved, meaning if you close Power BI Desktop it will ask you to save the file. You can also save the opened report yourselves using the <strong>save</strong> icon top left, when saving as a Power BI pbix file the data and report are combined into a single file, making it easier for your to move around and share the report</li>
-<li>If you want to update the visalizations used you can use the toolbar and visualizations and fields sections at the right</li>
-</ul>
-<p>You can use the left navigation to learn more about each report page.</p>
+<p>SharePoint 2013 workflows are typically scoped to a list, although that workflows can also be scoped to a site. A workflow consists out of a definition and possible one or more subscriptions of that definition. Workflows having a subscription can be run. This page will help you identify the available workflows allowing you to filter them by site collection or web and providing detailed information that will help you assess the need to upgrade this workflow to Power Automate.</p>
+<p>You can use the presented filter to scope down to the workflows you're interested in. In table these columns are presented:</p>
+<table>
+<thead>
+<tr>
+<th>Column name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web</td>
+<td>The fully qualified URL of the web hosting the workflow</td>
+</tr>
+<tr>
+<td>Workflow definition name</td>
+<td>Definition name of the workflow</td>
+</tr>
+<tr>
+<td>Workflow Definition ID</td>
+<td>ID of the workflow definition</td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>Workflow scope, will be List or Site</td>
+</tr>
+<tr>
+<td>Subscriptions</td>
+<td>Does this workflow have a subscription?</td>
+</tr>
+<tr>
+<td>Subscription name</td>
+<td>Name of the workflow subscription</td>
+</tr>
+<tr>
+<td>Runs</td>
+<td>Lists the number workflow instances that have been started, completed, cancelled or terminated in the last 30 days</td>
+</tr>
+<tr>
+<td>Replace</td>
+<td>Should this workflow be considered for replacement by Power Automate</td>
+</tr>
+<tr>
+<td>List URL</td>
+<td>Server relative URL of the list this workflow is connected to</td>
+</tr>
+<tr>
+<td>ContentType</td>
+<td>If a workflow is connected to a specific content type on a list then this column will contain the content type name</td>
+</tr>
+<tr>
+<td>Upgradability</td>
+<td>Percentage indication of how good the actions used in this workflow can be upgraded to Power Automate. &quot;Add a Comment&quot;, &quot;Log to History List&quot; and &quot;Set Workflow Status&quot; workflow actions are excluded from the calculation as they're not relevant for the Power Automate platform (not available when <code>--workflowanalyze:false</code> was specified)</td>
+</tr>
+<tr>
+<td>Unsupported actions count</td>
+<td>The number of actions which cannot fully be migrated to Power Automate (not available when <code>--workflowanalyze:false</code> was specified)</td>
+</tr>
+<tr>
+<td>Unsupported actions on Power Automate</td>
+<td>The discovered actions which cannot fully be migrated to Power Automate (not available when <code>--workflowanalyze:false</code> was specified)</td>
+</tr>
+<tr>
+<td>Actions used</td>
+<td>The discovered list of workflow actions (not available when <code>--workflowanalyze:false</code> was specified)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sample-page">Sample page</h2>
+<p><img src="../images/workflowdetails.png" alt="workflow details"></p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
