@@ -20,12 +20,12 @@ Version | Version of the Microsoft 365 Assessent tool used
 CLIMode | Used assessment mode via CLI
 CLITenant | Tenant specified via CLI
 CLITenantId | Tenant id provided via CLI
-CLIEnvironment | Used environment (see [here](configuration.md) for more details on environment)
+CLIEnvironment | Used environment (see [here](../using-the-assessment-tool/configuration.md) for more details on environment)
 CLISiteList | Was a sites list used to scope the assessment?
 CLISiteFile | Was a sites file used to scope the assessment?
 CLIAuthMode | Authentication mode used for the assessment
 CLIApplicationId | Azure AD application ID used
 CLICertPath | Was a certificate path used?
 CLICertFile | Was a certificate file used?
-CLICertFilePassword | Encrypted PFX file password (see [here](assess-start.md#authentication-configuration) for more details)
+CLICertFilePassword | Encrypted PFX file password (see [here](../using-the-assessment-tool/assess-start.md#authentication-configuration) for more details)
 CLIThreads | Number of parallel operations used by the assessment
