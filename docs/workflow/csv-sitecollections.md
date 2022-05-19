@@ -1,1 +1,1 @@
-[!INCLUDE [CSV Site Collections](./../fragments/csv-sitecollections.md.md)]
+[!INCLUDE [CSV Site Collections](./../fragments/csv-sitecollections.md)]

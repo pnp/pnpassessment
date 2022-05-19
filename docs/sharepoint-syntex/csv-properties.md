@@ -1,1 +1,1 @@
-[!INCLUDE [CSV Properties](./../fragments/csv-properties.md.md)]
+[!INCLUDE [CSV Properties](./../fragments/csv-properties.md)]

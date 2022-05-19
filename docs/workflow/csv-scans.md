@@ -1,1 +1,1 @@
-[!INCLUDE [CSV Scans](./../fragments/csv-scans.md.md)]
+[!INCLUDE [CSV Scans](./../fragments/csv-scans.md)]
