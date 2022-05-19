@@ -42,12 +42,12 @@
     - name: syntexmodelusage.csv
       href: csv-modelusage.md
     - name: sitecollections.csv
-      href: ../using-the-assessment-tool/csv-sitecollections.md
+      href: csv-sitecollections.md
     - name: webs.csv
-      href: ../using-the-assessment-tool/csv-webs.md
+      href: csv-webs.md
     - name: scans.csv
-      href: ../using-the-assessment-tool/csv-scans.md
+      href: csv-scans.md
     - name: properties.csv
-      href: ../using-the-assessment-tool/csv-properties.md
+      href: csv-properties.md
     - name: history.csv
-      href: ../using-the-assessment-tool/csv-history.md
+      href: csv-history.md
