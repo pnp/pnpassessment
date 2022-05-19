@@ -90,15 +90,22 @@
 <p>The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the permission requirements of the respective modules.</p>
 <ul>
 <li><a href="../sharepoint-syntex/requirements.html">SharePoint Syntex adoption</a></li>
+<li><a href="../workflow/requirements.html">Workflow 2013 deprecation</a></li>
 </ul>
 <h3 id="creating-an-azure-ad-application-using-pnp-powershell">Creating an Azure AD application using PnP PowerShell</h3>
-<p>Using <a href="https://pnp.github.io/powershell/">PnP PowerShell</a> creating an Azure AD application becomes really simple. Below cmdlet will create a new Azure AD application, will create a new self-signed certificate and will hookup that cert with the created Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.</p>
+<p>Using <a href="https://pnp.github.io/powershell/">PnP PowerShell</a> creating an Azure AD application becomes really simple. The <a href="https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html">Register-PnPAzureADApp</a> cmdlet will create a new Azure AD application, will create a new self-signed certificate inside the <strong>Personal</strong> node (= <strong>My</strong>) of the <strong>CurrentUser</strong> certificate store, and will hookup that cert with the created Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.</p>
 <div class="IMPORTANT">
 <h5>Important</h5>
 <p>If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Azure AD admins for help.</p>
 </div>
 <pre><code class="lang-PowerShell"># Sample for the SharePoint Syntex adoption module. Remove the application/delegated permissions depending on your needs
-# and update the Tenant and Username properties to match your environment
+# and update the Tenant and Username properties to match your environment.
+#
+# If you prefer to have a password set to secure the created PFX file then add below parameter
+# -CertificatePassword (ConvertTo-SecureString -String &quot;password&quot; -AsPlainText -Force)
+#
+# See https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html for more options
+#
 Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
@@ -127,8 +134,28 @@ Certificate Thumbprint : 165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE
 <p>When you now want to use the certificate for starting an assessment, you need to set <code>--authmode</code> to <code>application</code> and tell the Microsoft 365 Assessment tool which certificate to use via the certificate path parameter: <code>--certpath &quot;My|CurrentUser|165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE&quot;</code>. Next to that you also need to specify the Azure AD application to use via the <code>--applicationid</code> parameter. More details on how to configure authentication when starting an assessment can be found <a href="assess-start.html#authentication-configuration">here</a>.</p>
 <div class="IMPORTANT">
 <h5>Important</h5>
-<p>Notice that the last part in the <code>--certpath</code> string is the certificate thumbprint to use.</p>
+<p>Notice that the last part in the <code>--certpath</code> string is the certificate thumbprint to use. If you've not captured that thumbprint earlier on you can get it by looking up your certificate via <code>certmgr</code>, opening it to the <strong>Details</strong> tab and scrolling down to the <strong>Thumbprint</strong> field. Select the shown value and press <code>CTRL-C</code> to copy it.</p>
 </div>
+<h3 id="creating-an-azure-ad-application-using-the-azure-ad-portal">Creating an Azure AD application using the Azure AD Portal</h3>
+<p>Previous chapter described approach that creates and configures an Azure AD application by using <a href="https://pnp.github.io/powershell/">PnP PowerShell</a>. If you want to manually create the Azure AD application that's an option as well. Follow below steps to create and configure your Azure AD application:</p>
+<ol>
+<li>Navigate to <a href="https://aad.portal.azure.com/">Azure AD Portal</a> and click on <strong>Azure Active Directory</strong> from the left navigation</li>
+<li>Click on <strong>Add</strong> in the toolbar and choose <strong>App registration</strong>, this will open up the <strong>Register an application</strong> page</li>
+<li>Provide a <strong>Name</strong> for your Azure AD application (e.g. Microsoft365AssessmentToolForWorkflow)</li>
+<li>Select <strong>Public client/native (mobile &amp; desktop)</strong> and enter <strong>http://localhost</strong> as redirect URI</li>
+<li>Click on <strong>Register</strong> and the Azure AD application gets created and opened</li>
+<li>Choose <strong>API permissions</strong> from the left navigation and add the needed delegated and/or application permissions. See the requirements page of the module you want to use for the exact permissions</li>
+<li>Click on <strong>Grant admin consent for...</strong> to consent the added permissions</li>
+</ol>
+<p>When you want to use the <strong>Device</strong> authentication then also:</p>
+<ol>
+<li>Under <strong>Authentication</strong> set <strong>Allow public client flows</strong> to <strong>Yes</strong></li>
+</ol>
+<p>When you want to use <strong>Application</strong> authentication then also:</p>
+<ol>
+<li>Ensure you've defined the needed application permissions via the <strong>API permissions</strong> link the left navigation. See the requirements page of the module you want to use for the exact permissions and don't forget to click on <strong>Grant admin consent for...</strong> to consent the added permissions</li>
+<li>Go to <strong>Certificates &amp; secrets</strong>, click on <strong>Certificates</strong> and <strong>Upload certificate</strong>, pick the .cer file of your certificate and add it</li>
+</ol>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
