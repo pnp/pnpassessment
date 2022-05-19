@@ -17,17 +17,24 @@ A configured Azure AD application is a pre-requisite for using the Microsoft 365
 The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the permission requirements of the respective modules.
 
 - [SharePoint Syntex adoption](../sharepoint-syntex/requirements.md)
+- [Workflow 2013 deprecation](../workflows/requirements.md)
 
 ### Creating an Azure AD application using PnP PowerShell
 
- Using [PnP PowerShell](https://pnp.github.io/powershell/) creating an Azure AD application becomes really simple. Below cmdlet will create a new Azure AD application, will create a new self-signed certificate and will hookup that cert with the created Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.
+ Using [PnP PowerShell](https://pnp.github.io/powershell/) creating an Azure AD application becomes really simple. The [Register-PnPAzureADApp](https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html) cmdlet will create a new Azure AD application, will create a new self-signed certificate inside the **Personal** node (= **My**) of the **CurrentUser** certificate store, and will hookup that cert with the created Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.
 
 > [!Important]
 > If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Azure AD admins for help.
 
 ```PowerShell
 # Sample for the SharePoint Syntex adoption module. Remove the application/delegated permissions depending on your needs
-# and update the Tenant and Username properties to match your environment
+# and update the Tenant and Username properties to match your environment.
+#
+# If you prefer to have a password set to secure the created PFX file then add below parameter
+# -CertificatePassword (ConvertTo-SecureString -String "password" -AsPlainText -Force)
+#
+# See https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html for more options
+#
 Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
@@ -59,4 +66,26 @@ Running the `Register-PnPAzureADApp` did not only create and configure the Azure
 When you now want to use the certificate for starting an assessment, you need to set `--authmode` to `application` and tell the Microsoft 365 Assessment tool which certificate to use via the certificate path parameter: `--certpath "My|CurrentUser|165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE"`. Next to that you also need to specify the Azure AD application to use via the `--applicationid` parameter. More details on how to configure authentication when starting an assessment can be found [here](assess-start.md#authentication-configuration).
 
 > [!Important]
-> Notice that the last part in the `--certpath` string is the certificate thumbprint to use.
+> Notice that the last part in the `--certpath` string is the certificate thumbprint to use. If you've not captured that thumbprint earlier on you can get it by looking up your certificate via `certmgr`, opening it to the **Details** tab and scrolling down to the **Thumbprint** field. Select the shown value and press `CTRL-C` to copy it.
+
+### Creating an Azure AD application using the Azure AD Portal
+
+Previous chapter described approach that creates and configures an Azure AD application by using [PnP PowerShell](https://pnp.github.io/powershell/). If you want to manually create the Azure AD application that's an option as well. Follow below steps to create and configure your Azure AD application:
+
+1. Navigate to [Azure AD Portal](https://aad.portal.azure.com/) and click on **Azure Active Directory** from the left navigation
+2. Click on **Add** in the toolbar and choose **App registration**, this will open up the **Register an application** page
+3. Provide a **Name** for your Azure AD application (e.g. Microsoft365AssessmentToolForWorkflow)
+4. Select **Public client/native (mobile & desktop)** and enter **http://localhost** as redirect URI
+5. Click on **Register** and the Azure AD application gets created and opened
+6. Choose **API permissions** from the left navigation and add the needed delegated and/or application permissions. See the requirements page of the module you want to use for the exact permissions
+7. Click on **Grant admin consent for...** to consent the added permissions
+
+When you want to use the **Device** authentication then also:
+
+1. Under **Authentication** set **Allow public client flows** to **Yes**
+
+When you want to use **Application** authentication then also:
+
+1. Ensure you've defined the needed application permissions via the **API permissions** link the left navigation. See the requirements page of the module you want to use for the exact permissions and don't forget to click on **Grant admin consent for...** to consent the added permissions
+2. Go to **Certificates & secrets**, click on **Certificates** and **Upload certificate**, pick the .cer file of your certificate and add it
+
