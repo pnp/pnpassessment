@@ -34,6 +34,11 @@
     "title": "syntexfields.csv file details | Microsoft 365 Assessment Tool",
     "keywords": "syntexfields.csv file details Summary This csv file contains information about the custom library fields that sourced from the library or site. Columns The following columns are included: Column Description ListId Id of library holding the custom field FieldId Id of the field in the library InternalName Internal name of the field Name Display name of the field TypeAsString Field type Required Is this a required field? Hidden Is this field hidden? TermSetId Connected termset (if any) ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
   },
+  "sharepoint-syntex/csv-history.html": {
+    "href": "sharepoint-syntex/csv-history.html",
+    "title": "History.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "History.csv file details Summary When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table. Columns The following columns are included: Column Description ScanId Id of the assessment Id Event id, also determines the order the events occurred Event Event name EventDate Timestamp the event occurred Message Event message"
+  },
   "sharepoint-syntex/csv-lists.html": {
     "href": "sharepoint-syntex/csv-lists.html",
     "title": "syntexlists.csv file details | Microsoft 365 Assessment Tool",
@@ -43,6 +48,26 @@
     "href": "sharepoint-syntex/csv-modelusage.html",
     "title": "syntexmodelusage.csv file details | Microsoft 365 Assessment Tool",
     "keywords": "syntexmodelusage.csv file details Summary This csv file contains information about the Syntex content understanding models that have been assessed. Only will be populated whenever the Syntex Content Centers were in scope of the assessment. Columns The following columns are included: Column Description Classifier Name of the document understanding or form processing model TargetSiteId Id of the site collection using the classifier TargetWebId Id of web using the classifier TargetListId Id of the list using the classifier ClassifiedItemCount Number of documents classified NotProcessedItemCount Number of documents not processed AverageConfidenceScore Average classifier confidence score ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
+  },
+  "sharepoint-syntex/csv-properties.html": {
+    "href": "sharepoint-syntex/csv-properties.html",
+    "title": "Properties.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Properties.csv file details Summary When an adoption or deprecation assessment module uses custom CLI arguments then these are stored here for reference. Columns The following columns are included: Column Description ScanId Id of the assessment Name Assessment module property Type Type of the property Value Value of the property"
+  },
+  "sharepoint-syntex/csv-scans.html": {
+    "href": "sharepoint-syntex/csv-scans.html",
+    "title": "Scans.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Scans.csv file details Summary This table contains a single row describing information about the assessment itself. Columns The following columns are included: Column Description ScanId Id of the assessment StartDate Start date of the assessment EndDate Date when the assessment finished Status Status of the assessment PreScanStatus Status of the pre-assessment run PostScanStatus Status of the post-assessment run Version Version of the Microsoft 365 Assessent tool used CLIMode Used assessment mode via CLI CLITenant Tenant specified via CLI CLITenantId Tenant id provided via CLI CLIEnvironment Used environment (see here for more details on environment) CLISiteList Was a sites list used to scope the assessment? CLISiteFile Was a sites file used to scope the assessment? CLIAuthMode Authentication mode used for the assessment CLIApplicationId Azure AD application ID used CLICertPath Was a certificate path used? CLICertFile Was a certificate file used? CLICertFilePassword Encrypted PFX file password (see here for more details) CLIThreads Number of parallel operations used by the assessment"
+  },
+  "sharepoint-syntex/csv-sitecollections.html": {
+    "href": "sharepoint-syntex/csv-sitecollections.html",
+    "title": "Sitecollections.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Sitecollections.csv file details Summary This table contains a row for each site collection in scope of the assessment. Columns The following columns are included: Column Description ScanId Id of the assessment SiteUrl Fully qualified site collection URL StartDate Start date of the assessment of this site collection EndDate End date of the assessment of this site collection ScanDuration Assessment duration in seconds Status Status of the site collection assessment"
+  },
+  "sharepoint-syntex/csv-webs.html": {
+    "href": "sharepoint-syntex/csv-webs.html",
+    "title": "Webs.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Webs.csv file details Summary This table contains a row for each assessed web. Columns The following columns are included: Column Description WebUrlAbsolute Fully qualified web URL StartDate Start date of the assessment of this web EndDate End date of the assessment of this web ScanDuration Assessment duration in seconds Status Status of the web assessment Template Web template used by this web ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
   },
   "sharepoint-syntex/readme.html": {
     "href": "sharepoint-syntex/readme.html",
@@ -139,31 +164,6 @@
     "title": "Microsoft 365 Assessment tool configuration | Microsoft 365 Assessment Tool",
     "keywords": "Microsoft 365 Assessment tool configuration For the majority of users no additional configuration is needed, but for example when you're using a tenant in another cloud or using vanity URLs additional configuration is needed before the Microsoft 365 Assessment tool can be used. The appsettings.json configuration file Additional configuration settings are all defined via a settings file named appsettings.json . By default this file is not present, so when you need additional configuration you first need to start with adding a file named appsettings.json in the same location as where you've put the assessment tool microsoft365-assessment.exe . The empty starting contents for this file are shown below: { \"CustomSettings\": { } } A fully configured file could look like this: { \"PnPCore\": { \"Environment\": \"USGovernment\" }, \"CustomSettings\": { \"Environment\": \"USGovernment\", \"Port\": 7887, \"AdminCenterUrl\": \"https://spo-admin.contoso.com\", \"MySiteHostUrl\": \"https://my.contoso.com\" } } Cloud environment configuration The assessment tool can be used to run against tenants hosted in other cloud environments by specifying the environment to use in the settings file as shown below. { \"PnPCore\": { \"Environment\": \"USGovernment\" }, \"CustomSettings\": { \"Environment\": \"USGovernment\" } } Valid values for environment are: Production , PreProduction (Microsoft internal only), USGovernment (a.k.a GCC), USGovernmentHigh (a.k.a GCC High), USGovernmentDoD (a.k.a DoD), China and Germany . Vanity URL configuration A handful tenants use custom URLs due to historic reasons (so called vanity URLs) and when you want to use the Microsoft 365 Assessment tool you'll need to let the tool know these custom URLs by specifying them in the settings file: { \"CustomSettings\": { \"AdminCenterUrl\": \"https://spo-admin.contoso.com\", \"MySiteHostUrl\": \"https://my.contoso.com\" } } Important Both URLs have to specified when you're using vanity URLs. Next to the using the configuration file you also need to either use the --sitesfile or --siteslist arguments when starting a new assessment . Enumerating all site collections in a vanity URL tenant will be added in a future release. Using a different port than 25010 The Microsoft 365 Assessment tool process accepts commands by listening on localhost port 25010. For most computers this port is a free and can be used, but if for some reason you prefer to use another port than that's possible as well: { \"CustomSettings\": { \"Port\": 7887 } } Disabling telemetry When using the Microsoft 365 Assessment tool basic telemetry information is sent to Microsoft. This information is used to understand how the tool is being used which helps us improve the Microsoft 365 Assessment tool going forward. If you however prefer to not sent and telemetry information then that's possible by adding an environment variable named PNP_DISABLETELEMETRY with a value of true . After restarting the Microsoft 365 Assessment tool no telemetry data will be sent anymore."
   },
-  "using-the-assessment-tool/csv-history.html": {
-    "href": "using-the-assessment-tool/csv-history.html",
-    "title": "History.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "History.csv file details Summary When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table. Columns The following columns are included: Column Description ScanId Id of the assessment Id Event id, also determines the order the events occurred Event Event name EventDate Timestamp the event occurred Message Event message"
-  },
-  "using-the-assessment-tool/csv-properties.html": {
-    "href": "using-the-assessment-tool/csv-properties.html",
-    "title": "Properties.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Properties.csv file details Summary When an adoption or deprecation assessment module uses custom CLI arguments then these are stored here for reference. Columns The following columns are included: Column Description ScanId Id of the assessment Name Assessment module property Type Type of the property Value Value of the property"
-  },
-  "using-the-assessment-tool/csv-scans.html": {
-    "href": "using-the-assessment-tool/csv-scans.html",
-    "title": "Scans.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Scans.csv file details Summary This table contains a single row describing information about the assessment itself. Columns The following columns are included: Column Description ScanId Id of the assessment StartDate Start date of the assessment EndDate Date when the assessment finished Status Status of the assessment PreScanStatus Status of the pre-assessment run PostScanStatus Status of the post-assessment run Version Version of the Microsoft 365 Assessent tool used CLIMode Used assessment mode via CLI CLITenant Tenant specified via CLI CLITenantId Tenant id provided via CLI CLIEnvironment Used environment (see here for more details on environment) CLISiteList Was a sites list used to scope the assessment? CLISiteFile Was a sites file used to scope the assessment? CLIAuthMode Authentication mode used for the assessment CLIApplicationId Azure AD application ID used CLICertPath Was a certificate path used? CLICertFile Was a certificate file used? CLICertFilePassword Encrypted PFX file password (see here for more details) CLIThreads Number of parallel operations used by the assessment"
-  },
-  "using-the-assessment-tool/csv-sitecollections.html": {
-    "href": "using-the-assessment-tool/csv-sitecollections.html",
-    "title": "Sitecollections.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Sitecollections.csv file details Summary This table contains a row for each site collection in scope of the assessment. Columns The following columns are included: Column Description ScanId Id of the assessment SiteUrl Fully qualified site collection URL StartDate Start date of the assessment of this site collection EndDate End date of the assessment of this site collection ScanDuration Assessment duration in seconds Status Status of the site collection assessment"
-  },
-  "using-the-assessment-tool/csv-webs.html": {
-    "href": "using-the-assessment-tool/csv-webs.html",
-    "title": "Webs.csv file details | Microsoft 365 Assessment Tool",
-    "keywords": "Webs.csv file details Summary This table contains a row for each assessed web. Columns The following columns are included: Column Description WebUrlAbsolute Fully qualified web URL StartDate Start date of the assessment of this web EndDate End date of the assessment of this web ScanDuration Assessment duration in seconds Status Status of the web assessment Template Web template used by this web ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
-  },
   "using-the-assessment-tool/download.html": {
     "href": "using-the-assessment-tool/download.html",
     "title": "Download the Microsoft 365 Assessment tool | Microsoft 365 Assessment Tool",
@@ -183,6 +183,31 @@
     "href": "workflow/assess.html",
     "title": "Run a Workflow 2013 assessment | Microsoft 365 Assessment Tool",
     "keywords": "Run a Workflow 2013 assessment Running the Workflow 2013 assessment is just like running any other adoption or deprecation module of the Microsoft 365 Assessment tool: you use the CLI with the Start action to launch an assessment. By specifying the --mode to be Workflow the Microsoft 365 Assessment tool will run the Workflow 2013 assessment for you. This page provides you with a quick start and links to the relevant Microsoft 365 Assessment tool documentation for more details. Quick start Download the Microsoft 365 Assessment tool The Microsoft 365 Assessment tool must first be downloaded from https://github.com/pnp/pnpassessment/releases . More details can be found in the download documentation. Start assessment Below are some quick start samples that show how to run a Workflow 2013 assessment. More details on the Start action can be found in the Microsoft 365 Assessment tool Start documentation . Task CLI Start a new Workflow 2013 assessment (application permissions) for a complete tenant microsoft365-assessment.exe start --mode Workflow --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath \"My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84\" Start a new Workflow 2013 assessment (delegated permissions) for a set of site collections microsoft365-assessment.exe start --mode Workflow --authmode interactive --tenant bertonline.sharepoint.com --siteslist \"https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales\" Live status updates Once an assessment is launched you'd typically followup on it's status via the Status action. Below is a quick start, more details can be found in the Microsoft 365 Assessment tool operations documentation . Task CLI Realtime status update of the running assessments microsoft365-assessment.exe status Generate report When an assessment has finished you can continue with the next step and that's generating the Power BI report by using the Report action. Below is a quick start, more details can be found in the Microsoft 365 Assessment tool Report documentation . Task CLI Generate Power BI report (includes CSV export) in the default location microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 Export the gathered data as CSV files in a custom location microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 --mode CsvOnly --path \"c:\\reports\" To better understand the generated Power BI report and accompanying CSV files use the nodes in the left navigation."
+  },
+  "workflow/csv-history.html": {
+    "href": "workflow/csv-history.html",
+    "title": "History.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "History.csv file details Summary When an assessment is started, paused, restarted, finished then these status transitions are logged in this history table. Columns The following columns are included: Column Description ScanId Id of the assessment Id Event id, also determines the order the events occurred Event Event name EventDate Timestamp the event occurred Message Event message"
+  },
+  "workflow/csv-properties.html": {
+    "href": "workflow/csv-properties.html",
+    "title": "Properties.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Properties.csv file details Summary When an adoption or deprecation assessment module uses custom CLI arguments then these are stored here for reference. Columns The following columns are included: Column Description ScanId Id of the assessment Name Assessment module property Type Type of the property Value Value of the property"
+  },
+  "workflow/csv-scans.html": {
+    "href": "workflow/csv-scans.html",
+    "title": "Scans.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Scans.csv file details Summary This table contains a single row describing information about the assessment itself. Columns The following columns are included: Column Description ScanId Id of the assessment StartDate Start date of the assessment EndDate Date when the assessment finished Status Status of the assessment PreScanStatus Status of the pre-assessment run PostScanStatus Status of the post-assessment run Version Version of the Microsoft 365 Assessent tool used CLIMode Used assessment mode via CLI CLITenant Tenant specified via CLI CLITenantId Tenant id provided via CLI CLIEnvironment Used environment (see here for more details on environment) CLISiteList Was a sites list used to scope the assessment? CLISiteFile Was a sites file used to scope the assessment? CLIAuthMode Authentication mode used for the assessment CLIApplicationId Azure AD application ID used CLICertPath Was a certificate path used? CLICertFile Was a certificate file used? CLICertFilePassword Encrypted PFX file password (see here for more details) CLIThreads Number of parallel operations used by the assessment"
+  },
+  "workflow/csv-sitecollections.html": {
+    "href": "workflow/csv-sitecollections.html",
+    "title": "Sitecollections.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Sitecollections.csv file details Summary This table contains a row for each site collection in scope of the assessment. Columns The following columns are included: Column Description ScanId Id of the assessment SiteUrl Fully qualified site collection URL StartDate Start date of the assessment of this site collection EndDate End date of the assessment of this site collection ScanDuration Assessment duration in seconds Status Status of the site collection assessment"
+  },
+  "workflow/csv-webs.html": {
+    "href": "workflow/csv-webs.html",
+    "title": "Webs.csv file details | Microsoft 365 Assessment Tool",
+    "keywords": "Webs.csv file details Summary This table contains a row for each assessed web. Columns The following columns are included: Column Description WebUrlAbsolute Fully qualified web URL StartDate Start date of the assessment of this web EndDate End date of the assessment of this web ScanDuration Assessment duration in seconds Status Status of the web assessment Template Web template used by this web ScanId Id of the assessment SiteUrl Fully qualified site collection URL WebUrl Relative URL of this web"
   },
   "workflow/csv-workflows.html": {
     "href": "workflow/csv-workflows.html",

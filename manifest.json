@@ -418,6 +418,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-history.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-history.html",
+          "hash": "qPK/5lcYkaw5QaHuKmo3pA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "sharepoint-syntex/csv-lists.md",
       "output": {
         ".html": {
@@ -435,6 +447,54 @@
         ".html": {
           "relative_path": "sharepoint-syntex/csv-modelusage.html",
           "hash": "iucj1hlRSrNUqqABCDHK1A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-properties.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-properties.html",
+          "hash": "uj6agMI9k6Dl1xkLgwuKEw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-scans.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-scans.html",
+          "hash": "+oHNB98+LHTY2TBBN1i2LQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-sitecollections.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-sitecollections.html",
+          "hash": "RwlqzL4b5H+X9Jj+YHl/mQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "sharepoint-syntex/csv-webs.md",
+      "output": {
+        ".html": {
+          "relative_path": "sharepoint-syntex/csv-webs.html",
+          "hash": "nN4rPegGldF7w6PNwct3Tw=="
         }
       },
       "is_incremental": false,
@@ -602,7 +662,7 @@
       "output": {
         ".html": {
           "relative_path": "sharepoint-syntex/toc.html",
-          "hash": "591nNKIwj2zv55v7vmYi0w=="
+          "hash": "wGEdLcyOHvT3NRI8DK1cSw=="
         }
       },
       "is_incremental": false,
@@ -694,66 +754,6 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/csv-history.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/csv-history.html",
-          "hash": "TUmg3rXtJG+2yYCMeO1m6A=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/csv-properties.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/csv-properties.html",
-          "hash": "/dUlY5HT80UXcmDbnGoSfw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/csv-scans.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/csv-scans.html",
-          "hash": "+eYnIZPdvrvIOT0lnUJ09g=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/csv-sitecollections.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/csv-sitecollections.html",
-          "hash": "rLvKxKBuqaEHO4G85fFjlA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "using-the-assessment-tool/csv-webs.md",
-      "output": {
-        ".html": {
-          "relative_path": "using-the-assessment-tool/csv-webs.html",
-          "hash": "Rny9wZacRPbigglEZfbPUw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "using-the-assessment-tool/download.md",
       "output": {
         ".html": {
@@ -807,6 +807,66 @@
         ".html": {
           "relative_path": "workflow/assess.html",
           "hash": "4dHtKLRJcjLyjurc6CGG4g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/csv-history.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/csv-history.html",
+          "hash": "fzOTJkdETyREss9pxDm8yw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/csv-properties.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/csv-properties.html",
+          "hash": "ihfrhkCux48tNz6qryhHsQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/csv-scans.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/csv-scans.html",
+          "hash": "dAZRaJUOORr65TsekgDE0A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/csv-sitecollections.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/csv-sitecollections.html",
+          "hash": "U2DR+Onyyt77SHd3qRNs1A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "workflow/csv-webs.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/csv-webs.html",
+          "hash": "/QnN+blxfVk4hZqxe0DQhA=="
         }
       },
       "is_incremental": false,
@@ -902,7 +962,7 @@
       "output": {
         ".html": {
           "relative_path": "workflow/toc.html",
-          "hash": "QFcUQ+3C+GZegk+Sif+dVA=="
+          "hash": "OO9IqS4a2wSiC7cV+CNaQg=="
         }
       },
       "is_incremental": false,
@@ -923,7 +983,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 44,
+          "total_file_count": 49,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
