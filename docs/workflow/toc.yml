@@ -6,13 +6,13 @@
   href: assess.md
 - name: Report      
   href: report-intro.md
-- name: Report      
-  href: report-intro.md
   items:
     - name: Overview
       href: report-overview.md
     - name: Details
       href: report-details.md
+- name: Migrate to Power Automate
+  href: migrate-intro.md
 - name: CSV files
   items:
     - name: workflows.csv
