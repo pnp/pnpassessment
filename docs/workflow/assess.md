@@ -8,6 +8,10 @@ Running the Workflow 2013 assessment is just like running any other adoption or 
 
 The Microsoft 365 Assessment tool must first be downloaded from https://github.com/pnp/pnpassessment/releases. More details can be found in the [download](../using-the-assessment-tool/download.md) documentation.
 
+### Ensure you've an Azure AD application setup
+
+The Microsoft 365 Assessment tool requires an Azure AD application for authenticating to SharePoint. More details in the [authentication](../using-the-assessment-tool/setupauth.md) documentation.
+
 ### Start assessment
 
 Below are some quick start samples that show how to run a Workflow 2013 assessment. More details on the `Start` action can be found in the [Microsoft 365 Assessment tool Start documentation](../using-the-assessment-tool/assess-start.md).
