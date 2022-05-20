@@ -886,6 +886,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "workflow/migrate-intro.md",
+      "output": {
+        ".html": {
+          "relative_path": "workflow/migrate-intro.html",
+          "hash": "U2JIWpJDxD/uK/89rtp/pA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "workflow/readme.md",
       "output": {
         ".html": {
@@ -962,7 +974,7 @@
       "output": {
         ".html": {
           "relative_path": "workflow/toc.html",
-          "hash": "OO9IqS4a2wSiC7cV+CNaQg=="
+          "hash": "RWnGaPUciMybl85/gYyRWg=="
         }
       },
       "is_incremental": false,
@@ -983,7 +995,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 49,
+          "total_file_count": 50,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
