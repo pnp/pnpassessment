@@ -6,9 +6,9 @@ You can use the presented filter to scope down to the workflows you're intereste
 
 Column name | Description
 ------------|------------
-Web | The fully qualified URL of the web hosting the workflow
+Web URL | The fully qualified URL of the web hosting the workflow
 Workflow definition name | Definition name of the workflow
-Workflow Definition ID | ID of the workflow definition
+Workflow definition ID | ID of the workflow definition
 Scope | Workflow scope, will be List or Site
 Subscriptions | Does this workflow have a subscription?
 Subscription name | Name of the workflow subscription
