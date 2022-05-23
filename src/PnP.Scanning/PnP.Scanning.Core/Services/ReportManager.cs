@@ -47,10 +47,10 @@ namespace PnP.Scanning.Core.Services
 
                 if (scan.CLIMode == Mode.Syntex.ToString())
                 {
-                    reportFile = "SyntexScanReport.pbit";
+                    reportFile = "SyntexAssessmentReport.pbit";
                     // Put the report file in the report folder
-                    string pbitFile = Path.Combine(exportPath, "SyntexScanReport.pbit");
-                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Syntex.SyntexScanReport.pbit", pbitFile);
+                    string pbitFile = Path.Combine(exportPath, "SyntexAssessmentReport.pbit");
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Syntex.SyntexAssessmentReport.pbit", pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
