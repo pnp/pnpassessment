@@ -217,7 +217,7 @@
   "workflow/migrate-intro.html": {
     "href": "workflow/migrate-intro.html",
     "title": "Migrate Workflow 2013 to Power Automate | Microsoft 365 Assessment Tool",
-    "keywords": "Migrate Workflow 2013 to Power Automate todo"
+    "keywords": "Migrate Workflow 2013 to Power Automate Once you've defined a list of SharePoint 2013 workflows to migrate to Power Automate you use the Migrate from classic workflows to Power Automate flows in SharePoint article to get guidance on the needed migration work."
   },
   "workflow/readme.html": {
     "href": "workflow/readme.html",
