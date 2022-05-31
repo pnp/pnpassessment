@@ -216,13 +216,13 @@
   },
   "workflow/migrate-intro.html": {
     "href": "workflow/migrate-intro.html",
-    "title": "Migrate Workflow 2013 to Power Automate | Microsoft 365 Assessment Tool",
-    "keywords": "Migrate Workflow 2013 to Power Automate Once you've defined a list of SharePoint 2013 workflows to migrate to Power Automate you use the Migrate from classic workflows to Power Automate flows in SharePoint article to get guidance on the needed migration work."
+    "title": "Migrate SharePoint 2013 workflows to Power Automate | Microsoft 365 Assessment Tool",
+    "keywords": "Migrate SharePoint 2013 workflows to Power Automate Once you've identified a list of SharePoint 2013 workflows to migrate to Power Automate you use the Migrate from classic workflows to Power Automate flows in SharePoint article to get guidance on the needed migration work."
   },
   "workflow/readme.html": {
     "href": "workflow/readme.html",
-    "title": "Workflow 2013 Assessment | Microsoft 365 Assessment Tool",
-    "keywords": "Workflow 2013 Assessment The Workflow 2013 platform has been introduced 10 years ago and it's not further evolving. It's predecessor Workflow 2010 has been deprecated a while ago in favor of Power Automate flows and it's strongly recommended to also consider moving your 2013 workflows to the Power Automate platform. To understand where workflow 2013 is used inside your organization you use the Workflow module of the new Microsoft 365 Assessment Tool: it enables you to gather data about your SharePoint Workflow 2013 usage , and generate a Power BI report that you can use to better understand workflow 2013 usage and it's relevance."
+    "title": "SharePoint 2013 Workflow Assessment | Microsoft 365 Assessment Tool",
+    "keywords": "SharePoint 2013 Workflow Assessment SharePoint 2013 Workflows platform was introduced 10 years ago. Since the release of SharePoint workflows, Microsoft has evolved workflow orchestration to not only encompass SharePoint, but all the productivity services you use within Microsoft 365 and extend to 3rd parties. Power Automate is the Microsoft solution for workflow orchestration. It connects to all Microsoft 365 services and over 220 other services to let an enterprise build custom workflows. There are also many 3rd party solutions that can directly orchestrate SharePoint data via SharePoint’s open API platform. SharePoint 2010 Workflows was retired as of November 1st 2020 and it is strongly recommended to also move your 2013 workflows to the Power Automate platform or other modern workflow orchestration solutions. The new Microsoft 365 Assessment Tool helps you identify and evaluate the SharePoint 2013 workflows on your tenant by providing you the usage data of SharePoint 2013 Workflows , and generating a Power BI report to help plan migrating 2013 workflows to a modern workflow orchestration service."
   },
   "workflow/report-assessmentoverview.html": {
     "href": "workflow/report-assessmentoverview.html",
