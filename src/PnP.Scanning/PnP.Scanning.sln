@@ -12,6 +12,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{C99B5E45-E
 		Resources.txt = Resources.txt
 		scanner runs.txt = scanner runs.txt
 		sites.txt = sites.txt
+		sitesmultigeo.txt = sitesmultigeo.txt
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PnP.Core", "..\..\..\pnpcore\src\sdk\PnP.Core\PnP.Core.csproj", "{51EF8827-8551-449E-AC38-029891A6F0B0}"

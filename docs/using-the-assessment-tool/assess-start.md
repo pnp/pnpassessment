@@ -109,3 +109,16 @@ By default the Microsoft 365 Assessment tool will use multiple parallel operatio
 ## Running multiple parallel assessments
 
 The Microsoft 365 Assessment tool supports running up to 3 parallel assessments, but do note that just like with bumping up the amount of parallel operations this will increase the likelihood of getting throttled.
+
+## Assessing a Multi-Geo tenant
+
+When you want to assess all sites in a Multi-Geo tenant you do have to run an assessment per geo location. For the main geo location you follow the standard flow like described above, for the other geo locations you need to specify the site collections to start via using either the `--sitesfile` or `--siteslist` arguments. Below table shows an example for a SharePoint Workflow 2013 assessment:
+
+Url | Geo location | Main | Assessment start arguments
+----|-------------|------|---------------------------
+contoso.sharepoint.com | EUR | Yes | start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD"
+contosonam.sharepoint.com | NAM | No |  start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" **--sitesfile "c:\assessment\namsites.txt"**
+contosoapc.sharepoint.com | APC | No |  start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" **--sitesfile "c:\assessment\apcsites.txt"**
+
+> [!Note]
+> The `--tenant` parameter is the same for each assessment, no matter which geo location is being assessed.
