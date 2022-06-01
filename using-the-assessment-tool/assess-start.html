@@ -208,6 +208,42 @@ https://bertonline.sharepoint.com/sites/apacsales
 </div>
 <h2 id="running-multiple-parallel-assessments">Running multiple parallel assessments</h2>
 <p>The Microsoft 365 Assessment tool supports running up to 3 parallel assessments, but do note that just like with bumping up the amount of parallel operations this will increase the likelihood of getting throttled.</p>
+<h2 id="assessing-a-multi-geo-tenant">Assessing a Multi-Geo tenant</h2>
+<p>When you want to assess all sites in a Multi-Geo tenant you do have to run an assessment per geo location. For the main geo location you follow the standard flow like described above, for the other geo locations you need to specify the site collections to start via using either the <code>--sitesfile</code> or <code>--siteslist</code> arguments. Below table shows an example for a SharePoint Workflow 2013 assessment:</p>
+<table>
+<thead>
+<tr>
+<th>Url</th>
+<th>Geo location</th>
+<th>Main</th>
+<th>Assessment start arguments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>contoso.sharepoint.com</td>
+<td>EUR</td>
+<td>Yes</td>
+<td>start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot;</td>
+</tr>
+<tr>
+<td>contosonam.sharepoint.com</td>
+<td>NAM</td>
+<td>No</td>
+<td>start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot; <strong>--sitesfile &quot;c:\assessment\namsites.txt&quot;</strong></td>
+</tr>
+<tr>
+<td>contosoapc.sharepoint.com</td>
+<td>APC</td>
+<td>No</td>
+<td>start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot; <strong>--sitesfile &quot;c:\assessment\apcsites.txt&quot;</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="NOTE">
+<h5>Note</h5>
+<p>The <code>--tenant</code> parameter is the same for each assessment, no matter which geo location is being assessed.</p>
+</div>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
