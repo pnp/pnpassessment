@@ -25,7 +25,7 @@ If you want to join our team and help, then feel free to check the issue list fo
 
 ## Supportability and SLA 💁🏾‍♀️
 
-This tool is an open-source and community provided tool backed by an active community supporting it. This is not a Microsoft provided tool, so there's no SLA or direct support for this open-source component from Microsoft. Please report any issues using the [issues list](https://github.com/pnp/pnpassessment/issues).
+The Microsoft 365 Assessment tool in an open-source tool maintained by Microsoft and the community. When you do have a Premier support contract with Microsoft, you can use that route for opening a support ticket. When opening a support ticket is not possible for you, then please report any issues using the [issues list](https://github.com/pnp/pnpassessment/issues).
 
 ## Relationship with the "Modernization Scanner" ❓
 
