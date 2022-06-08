@@ -12,7 +12,7 @@ Step | Description
 [Configure authentication](https://pnp.github.io/pnpassessment/using-the-assessment-tool/setupauth.html) | Setup an Azure AD application that can be used to authenticate the Microsoft 365 Assessment tool to your tenant
 [Run an assessment](https://pnp.github.io/pnpassessment/using-the-assessment-tool/assess.html) | Use the Microsoft 365 Assessment tool CLI to run an assessment: `microsoft365-assessment.exe --help` will show the available commands
 
-Once you're ready to run an assessment you can choose any of the available modules, use the top navigation to learn more about the specifics for a given module: you'll find information about to run the assessment for that module and a detailed description of the created report and CSV files. Currently supported modules are:
+Once you're ready to run an assessment you can choose any of the available modules, use below table to learn more about the specifics for a given module: you'll find information about to run the assessment for that module and a detailed description of the created report and CSV files. Currently supported modules are:
 
 Module | Type | Description
 -------|------|------------
