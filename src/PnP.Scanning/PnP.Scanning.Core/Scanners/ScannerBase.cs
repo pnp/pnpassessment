@@ -9,6 +9,9 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class ScannerBase
     {
+        private static readonly string LineSeparator = ((char)0x2028).ToString();
+        private static readonly string ParagraphSeparator = ((char)0x2029).ToString();
+
         internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl)
         {
             ScanManager = scanManager;
@@ -229,5 +232,19 @@ namespace PnP.Scanning.Core.Scanners
             return $"{ScanId}-{key}";
         }
 
+
+        protected static string Clean(string input)
+        {
+            if (!string.IsNullOrEmpty(input))
+            {
+                return input.Replace("\r\n", string.Empty)
+                            .Replace("\n", string.Empty)
+                            .Replace("\r", string.Empty)
+                            .Replace(LineSeparator, string.Empty)
+                            .Replace(ParagraphSeparator, string.Empty);
+            }
+
+            return input;
+        }
     }
 }
