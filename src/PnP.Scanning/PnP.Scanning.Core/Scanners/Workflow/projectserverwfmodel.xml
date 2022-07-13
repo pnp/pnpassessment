@@ -1,0 +1,163 @@
+﻿<WorkflowInfo Language="~!en-us~~id_language/{StringCategory=TXT}!~">
+   <Conditions>
+     <Condition Name="~!Include this Stage~~id_conditionRequestedStage/{StringCategory=TXT}!~"
+                ClassName="Microsoft.Office.Project.Server.WorkflowActivities.RequestedCurrentStage"
+                Category="~!PROJ_PWA_SHORT_NAME Conditions~~id_categoryProjectCondition/{StringCategory=TXT}Name for a category of conditions that check project server!~"
+                AppliesTo="project">
+       <RuleDesigner Sentence="~!PROJ_PWA_SHORT_NAME starts the workflow normally or restarts the workflow and includes this stage~~id_sentenceRequestedStage/{StringCategory=TXT}!~" />
+       <Parameters />
+     </Condition>
+   </Conditions>
+   <Actions>
+     <Action Name="~!Create Project from Current Item~~id_actionCreateProjectFromListItem/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of creating a project from an idea list item!~"
+            ClassName="Microsoft.Office.Project.Server.WorkflowActivities.CreateProjectFromListItem"
+            Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~"
+            AppliesTo="list"
+            RequiresPWA="true">
+      <RuleDesigner Sentence="~!Create a project from the current list item with %1~~id_sentenceCreateProjectFromListItem/{StringCategory=TXT}{Placeholder=%1}!~">
+        <FieldBind Field="eptId" 
+		           Text="~!this Enterprise Project Type~~id_field1CreateProjectFromListItem/{StringCategory=TXT}this represents Enterprise project type list designer can select from!~" 
+				   Id="1" 
+				   DesignerType="EnterpriseProjectType" 
+				   DisplayName="~!Enterprise Project Type~~id_field1CreateProjectFromListItemDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~"/>
+      </RuleDesigner>
+      <Parameters>
+        <Parameter Name="eptId" Type="System.String, mscorlib" Direction="In" DesignerType="EnterpriseProjectType" />
+      </Parameters>
+    </Action>
+    <Action Name="~!Set Project Field~~id_actionSetField/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of setting a project field with a specified value!~"
+      ClassName="Microsoft.Office.Project.Server.WorkflowActivities.UpdateProjectProperty"
+      Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~"
+      AppliesTo="project">
+      <RuleDesigner Sentence="~!Set %1 in the project to %2~~id_sentenceSetField/{Placeholder=%1,%2}{StringCategory=TXT} set a specified field of the project to a specified value!~">
+        <FieldBind Field="PropertyId" 
+		           Text="~!this field~~id_field1PropertyId/{StringCategory=TXT}PropertyId identifies the property to be updated!~" 
+				   Id="1" 
+				   DesignerType="ProjectFields"
+				   DisplayName="~!Field~~id_field1PropertyIdDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~" />
+        <FieldBind Field="Value,ValueType" 
+		           Text="~!this value~~id_field2PropertyValue/{StringCategory=TXT}Property value to be set!~" 
+				   Id="2" 
+				   TypeFrom="PropertyId" 
+				   DesignerType="Dependent"
+				   DisplayName="~!Value~~id_field2PropertyValueDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~" />
+      </RuleDesigner>
+      <Parameters>
+        <Parameter Name="PropertyId" Type="System.String, mscorlib" Direction="In" DesignerType="ProjectFields"
+            Description="~!Field to set the value of.~~id_actionSetFieldParamFieldName/{StringCategory=TXT}String that shows up in the workflow property grid that instructs the user how to use the PropertyId property!~" />
+        <Parameter Name="Value" Type="System.Object, mscorlib" Direction="In" DesignerType="Dependent"
+            Description="~!Value to set the field to.~~id_actionSetFieldParamValue/{StringCategory=TXT}String that shows up in the workflow property grid that instructs the user how to use the Value property!~" />
+         <Parameter Name="ValueType" Type="System.String, mscorlib" Direction="In" DesignerType="Hide" />
+      </Parameters>
+    </Action>
+	   <Action Name="~!Set Status Field in Idea List~~id_actionUpdateIdeaListItemStatus/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of setting the idea list item status field to a specified value!~"
+		 ClassName="Microsoft.Office.Project.Server.WorkflowActivities.UpdateIdeaListItemStatus"
+		 AppliesTo="project"
+		 Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~">
+		   <RuleDesigner Sentence="~!Set the status field in the idea list item to %1~~id_sentenceUpdateIdeaListItemStatus/{Placeholder=%1}{StringCategory=TXT}!~">
+			   <FieldBind Field="status"
+						  Text="~!this value~~id_field1UpdateIdeaListItemStatus/{StringCategory=TXT}This value represents the status value designer can set to the idea list item status field!~"
+						  Id="1"
+						  DesignerType="TextArea"
+						  DisplayName="~!Status~~id_field1UpdateIdeaListItemStatusDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~"/>
+		   </RuleDesigner>
+		   <Parameters>
+			   <Parameter Name="status" Type="System.String, mscorlib" Direction="In" DesignerType="TextArea" />
+		   </Parameters>
+	   </Action>
+	   <Action Name="~!Set Project Stage Status~~id_actionSetStageStatus/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of setting the current project stage status to a specified value!~"
+		 ClassName="Microsoft.Office.Project.Server.WorkflowActivities.UpdateProjectStageStatus"
+		 AppliesTo="project"
+		 Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~)">
+		   <RuleDesigner Sentence="~!Set the current project stage status to %1 with status information : %2~~id_sentenceSetStageStatus/{StringCategory=TXT}{Placeholder=%1,%2}!~">
+			   <FieldBind Field="StageStatusValue"
+						  Text="~!this value~~id_field1SetStageStatus/{StringCategory=TXT}This value represents value designer can set to project stage status!~"
+						  Id="1"
+						  DesignerType="Dropdown"
+						  DisplayName="~!Stage Status~~id_field1StageStatusDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~">
+				   <Option Name="~!None~~id_optNone/{StringCategory=TXT}!~" Value="0" />
+				   <Option Name="~!WaitingForInput~~id_optWaitingForInput/{StringCategory=TXT}!~" Value="1" />
+				   <Option Name="~!WaitingForApproval~~id_optWaitingForApproval/{StringCategory=TXT}!~" Value="2" />
+				   <Option Name="~!WorkflowProcessing~~id_optWorkflowProcessing/{StringCategory=TXT}!~" Value="3" />
+			   </FieldBind>
+			   <FieldBind Field="StatusInfo"
+						  Text="~!this value~~id_field2SetStageInformation/{StringCategory=TXT}This value represents value designer can set to project stage information!~"
+						  Id="2"
+						  DesignerType="TextArea"
+						  DisplayName="~!Status Information~~id_field2SetStageInformationDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~"/>
+		   </RuleDesigner>
+		   <Parameters>
+			   <Parameter Name="StageStatusValue" Type="System.Int32, mscorlib" Direction="In" DesignerType="Dropdown"/>
+			   <Parameter Name="StatusInfo" Type="System.String, mscorlib" Direction="In" DesignerType="TextArea"/>
+			   <Parameter Name="Append" Type="System.Boolean, mscorlib" InitialValue="false" Direction="In" DesignerType="Dropdown" />
+			   <Parameter Name="StageId" Type="System.Guid, mscorlib" InitialValue="00000000-0000-0000-0000-000000000000" Direction="In" DesignerType="Hide"/>
+		   </Parameters>
+	   </Action>
+    <Action Name="~!Publish Project~~id_actionPublishProject/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of publishing a project!~"
+      ClassName="Microsoft.Office.Project.Server.WorkflowActivities.PublishProject"
+      AppliesTo="project"
+      Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~">
+      <RuleDesigner Sentence="~!Publish the project~~id_sentencePublishProject/{StringCategory=TXT}!~">
+        <Parameters></Parameters>
+      </RuleDesigner>
+    </Action>
+    <Action Name="~!Publish Project Summary~~id_actionPublishSummaryProject/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of publishing summary information for a project!~"
+      ClassName="Microsoft.Office.Project.Server.WorkflowActivities.PublishSummaryProject"
+      AppliesTo="project"
+      Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~">
+      <RuleDesigner Sentence="~!Publish summary information for the project~~id_sentencePublishProjectSummary/{StringCategory=TXT}!~">
+        <Parameters></Parameters>
+      </RuleDesigner>
+    </Action>
+    <Action Name="~!Check in Project~~id_actionCheckinProject/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of publishing a project!~"
+      ClassName="Microsoft.Office.Project.Server.WorkflowActivities.CheckinProject"
+      AppliesTo="project"
+      Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~">
+      <RuleDesigner Sentence="~!Check in the project~~id_sentenceCheckinProject/{StringCategory=TXT}!~">
+        <Parameters></Parameters>
+      </RuleDesigner>
+    </Action>
+    <Action Name="~!Check out Project~~id_actionCheckoutProject/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow action of publishing a project!~"
+      ClassName="Microsoft.Office.Project.Server.WorkflowActivities.CheckoutProject"
+      AppliesTo="project"
+      Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~">
+      <RuleDesigner Sentence="~!Check out the project~~id_sentenceCheckoutProject/{StringCategory=TXT}!~">
+        <Parameters></Parameters>
+      </RuleDesigner>
+    </Action>
+    <Action Name="~!Wait for Project Event~~id_actionWaitForProjectEvent/{StringCategory=TXT} Note to translators: Please match the translation with VISIO and PROJECTSERVER project. Project workflow WaitForProjectEvent action!~"
+      ClassName="Microsoft.Office.Project.Server.WorkflowActivities.WaitForProjectEvent"
+      AppliesTo="project"
+      Category="~!PROJ_PWA_SHORT_NAME Actions~~id_categoryProjectAction/{StringCategory=TXT}Name for a category of actions that manipulate project serve!~">
+      <RuleDesigner Sentence="~!Wait for %1~~id_sentenceWaitForProjectEvent/{StringCategory=TXT}{Duplicate=Master,osfserver.actions4;id_sentenceWaitForItemEvent}{Placeholder=%1}It will wait until %1 event happens.!~">
+        <FieldBind Field="EventName" 
+		           Text="~!this project event~~id_field1ProjectEvent/{StringCategory=TXT}Description for project event name which the workflow activity is waiting for.!~" 
+				   Id="1"
+				   DesignerType="EventDropdown"
+				   EventCategory="ProjectEvent"
+				   DisplayName="~!Event Name~~id_field1ProjectEventDispName/{StringCategory=TXT}Please match the translation with VISIO and OSFSERVER project. Display name of the field!~" />
+      </RuleDesigner>
+      <Parameters>
+        <Parameter Name="EventName" Type="System.String, mscorlib" Direction="In" DesignerType="EventDropdown" EventCategory="ProjectEvent"  
+                   Description="~!Name of the project event~~id_descriptionWaitForProjectEventName/{StringCategory=TXT}Description for project event name which the workflow activity is waiting for.!~" />/>
+      </Parameters>
+    </Action>
+  </Actions>
+  <Events>
+    <Event Name="OnProjectCheckin" DisplayName="~!Event: When a project is checked in~~id_eventProjectCheckin/{StringCategory=TXT}Event name which is fired when a project is checked in.!~"
+           EventGroup="~!PROJ_PWA_SHORT_NAME Event~~id_eventGroupProject/{StringCategory=TXT}Name for a group of events that associates with project server!~" 
+           Category="ProjectEvent" RankDefault="2" />
+    <Event Name="OnProjectCommit" DisplayName="~!Event: When a project is committed~~id_eventProjectCommit/{StringCategory=TXT}Event name which is fired when a project is committed.!~"
+           EventGroup="~!PROJ_PWA_SHORT_NAME Event~~id_eventGroupProject/{StringCategory=TXT}Name for a group of events associated with project server!~"
+           Category="ProjectEvent" RankDefault="2" />
+    <Event Name="OnProjectSubmit" DisplayName="~!Event: When a project is submitted~~id_eventProjectSubmit/{StringCategory=TXT}Event name which is fired when a project is submitted.!~"
+           EventGroup="~!PROJ_PWA_SHORT_NAME Event~~id_eventGroupProject/{StringCategory=TXT}Name for a group of events associated with project server!~" 
+           Category="ProjectEvent" RankDefault="2" />
+    <Event Name="OnProjectPublish" DisplayName="~!Event: When a project is published~~id_eventProjectPublish/{StringCategory=TXT}Event name which is fired when a project is published.!~"
+           EventGroup="~!PROJ_PWA_SHORT_NAME Event~~id_eventGroupProject/{StringCategory=TXT}Name for a group of events associated with project server!~" 
+           Category="ProjectEvent" RankDefault="2" />
+    <Event Name="OnProjectPublishSummary" DisplayName="~!Event: When project summary information is published~~id_eventProjectPublishSummary/{StringCategory=TXT}Event name which is fired when project summary information is published.!~"
+           EventGroup="~!PROJ_PWA_SHORT_NAME Event~~id_eventGroupProject/{StringCategory=TXT}Name for a group of events associated with project server!~" 
+           Category="ProjectEvent" RankDefault="2" />
+  </Events>
+</WorkflowInfo>

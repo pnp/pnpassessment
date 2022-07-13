@@ -413,7 +413,9 @@
                 <s:enumeration value="TextArea" />
                 <s:enumeration value="TextBox" />
                 <s:enumeration value="WritableFieldNames" />
-              </s:restriction>
+         		<s:enumeration value="EnterpriseProjectType" />
+				<s:enumeration value="ProjectFields" />
+			  </s:restriction>
             </s:simpleType>
           </s:attribute>
           <s:attribute name="ShowLookupForDropdown" type="s:boolean" default="false" />
@@ -521,7 +523,8 @@
       <s:enumeration value="doclib" />
       <s:enumeration value="all" />
       <s:enumeration value="displayonly" />
-    </s:restriction>
+      <s:enumeration value="project" />
+	</s:restriction>
   </s:simpleType>
   <s:attributeGroup name="invocationTagAttributeGroup">
     <s:attribute name="RequiredInvocationTags" type="s:string" />

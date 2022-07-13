@@ -64,8 +64,17 @@ namespace PnP.Scanning.Core.Scanners
             "Microsoft.SharePoint.WorkflowServices.Activities.WaitForItemEvent",
             "Microsoft.SharePoint.WorkflowServices.Activities.SingleTask",
             "Microsoft.SharePoint.WorkflowServices.Activities.CompositeTask",
+            // Project server actions
+            "Microsoft.Office.Project.Server.WorkflowActivities.CreateProjectFromListItem",
+            "Microsoft.Office.Project.Server.WorkflowActivities.UpdateProjectProperty",
+            "Microsoft.Office.Project.Server.WorkflowActivities.UpdateIdeaListItemStatus",
+            "Microsoft.Office.Project.Server.WorkflowActivities.UpdateProjectStageStatus",
+            "Microsoft.Office.Project.Server.WorkflowActivities.PublishProject",
+            "Microsoft.Office.Project.Server.WorkflowActivities.PublishSummaryProject",
+            "Microsoft.Office.Project.Server.WorkflowActivities.CheckinProject",
+            "Microsoft.Office.Project.Server.WorkflowActivities.CheckoutProject",
+            "Microsoft.Office.Project.Server.WorkflowActivities.WaitForProjectEvent"
         };
-
 
         /// <summary>
         /// Get's the single workflow manager instance, singleton pattern
@@ -217,9 +226,16 @@ namespace PnP.Scanning.Core.Scanners
         {
             WorkflowActions wfActions = new();
 
-            var sp2013Actions = LoadDefaultActions();
+            var sp2013Actions = LoadDefaultActions("PnP.Scanning.Core.Scanners.Workflow.sp2013wfmodel.xml");
 
             foreach (var action in sp2013Actions)
+            {
+                wfActions.SP2013DefaultActions.Add(new WorkflowAction() { ActionName = action, ActionNameShort = GetShortName(action) });
+            }
+
+            var projectServerActions = LoadDefaultActions("PnP.Scanning.Core.Scanners.Workflow.projectserverwfmodel.xml");
+
+            foreach (var action in projectServerActions)
             {
                 wfActions.SP2013DefaultActions.Add(new WorkflowAction() { ActionName = action, ActionNameShort = GetShortName(action) });
             }
@@ -237,12 +253,12 @@ namespace PnP.Scanning.Core.Scanners
             return action;
         }
 
-        private static List<string> LoadDefaultActions()
+        private static List<string> LoadDefaultActions(string resource)
         {
             List<string> wfActionsList = new();
 
             var wfModelString = "";
-            using (Stream stream = typeof(WorkflowManager).Assembly.GetManifestResourceStream("PnP.Scanning.Core.Scanners.Workflow.sp2013wfmodel.xml"))
+            using (Stream stream = typeof(WorkflowManager).Assembly.GetManifestResourceStream(resource))
             {
                 using (StreamReader reader = new(stream))
                 {

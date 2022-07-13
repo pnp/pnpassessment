@@ -1166,7 +1166,7 @@ namespace PnP.Scanning.Core.Scanners {
         /// <remarks/>
         WritableFieldNames,
     }
-    
+
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.8.3928.0")]
     [System.SerializableAttribute()]
@@ -1679,8 +1679,14 @@ namespace PnP.Scanning.Core.Scanners {
         
         /// <remarks/>
         WritableFieldNames,
+
+        /// <remarks/>
+        EnterpriseProjectType,
+
+        /// <remarks/>
+        ProjectFields,
     }
-    
+
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.8.3928.0")]
     [System.SerializableAttribute()]
@@ -1710,8 +1716,11 @@ namespace PnP.Scanning.Core.Scanners {
         
         /// <remarks/>
         displayonly,
+
+        /// <remarks/>
+        project,
     }
-    
+
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.8.3928.0")]
     [System.SerializableAttribute()]

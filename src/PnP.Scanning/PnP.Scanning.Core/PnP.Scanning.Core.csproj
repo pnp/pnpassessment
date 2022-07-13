@@ -10,6 +10,7 @@
 	<ItemGroup>
 	  <None Remove="Scanners\Syntex\SyntexAssessmentReport.pbit" />
 	  <None Remove="Scanners\Test\TestReport.pbit" />
+	  <None Remove="Scanners\Workflow\projectserverwfmodel.xml" />
 	  <None Remove="Scanners\Workflow\sp2013wfmodel.xml" />
 	  <None Remove="Scanners\Workflow\WorkflowReport.pbit" />
 	</ItemGroup>
@@ -17,6 +18,7 @@
 	<ItemGroup>
 	  <EmbeddedResource Include="Scanners\Syntex\SyntexAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Test\TestReport.pbit" />
+	  <EmbeddedResource Include="Scanners\Workflow\projectserverwfmodel.xml" />
 	  <EmbeddedResource Include="Scanners\Workflow\sp2013wfmodel.xml" />
 	  <EmbeddedResource Include="Scanners\Workflow\WorkflowReport.pbit" />
 	</ItemGroup>
