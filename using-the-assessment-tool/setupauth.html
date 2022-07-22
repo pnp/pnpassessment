@@ -84,7 +84,7 @@
 <p>A configured Azure AD application is a pre-requisite for using the Microsoft 365 Assessment tool. When you <a href="assess-start.html">start an assessment</a> you'll be able to specify the Azure AD application to use and how you want to authenticate. When you don't specify an Azure AD application when starting an assessment the <strong>PnP Management Shell</strong> application will be assumed, if you're using a recent <a href="https://pnp.github.io/powershell/">PnP PowerShell</a> version then this application most likely was setup.</p>
 <div class="NOTE">
 <h5>Note</h5>
-<p>It's strongly recommended to create a dedicated Azure AD application so you can limit the needed permissions to what's needed by the module you're using in the Microsoft 365 Assessment tool.</p>
+<p>It's strongly recommended to create a dedicated Azure AD application so you can limit the needed permissions to what's needed by the module you're using in the Microsoft 365 Assessment tool. Also as throttling rules are bound to applications there's less throttling impact if you use a dedicated Azure AD application for the assessments.</p>
 </div>
 <h3 id="permissions-required">Permissions required</h3>
 <p>The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the permission requirements of the respective modules.</p>
@@ -154,8 +154,12 @@ Certificate Thumbprint : 165CCE93E08FD3CD85B7B25D5E91C05B1D1E49FE
 <p>When you want to use <strong>Application</strong> authentication then also:</p>
 <ol>
 <li>Ensure you've defined the needed application permissions via the <strong>API permissions</strong> link the left navigation. See the requirements page of the module you want to use for the exact permissions and don't forget to click on <strong>Grant admin consent for...</strong> to consent the added permissions</li>
-<li>Go to <strong>Certificates &amp; secrets</strong>, click on <strong>Certificates</strong> and <strong>Upload certificate</strong>, pick the .cer file of your certificate and add it</li>
+<li>Go to <strong>Certificates &amp; secrets</strong>, click on <strong>Certificates</strong> and <strong>Upload certificate</strong>, pick the .cer file of your certificate and add it.</li>
 </ol>
+<div class="NOTE">
+<h5>Note</h5>
+<p>If you don't have a certificate available then you can use Windows PowerShell to create one: <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-self-signed-certificate">https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-self-signed-certificate</a>.</p>
+</div>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
