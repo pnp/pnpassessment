@@ -10,7 +10,7 @@ The Microsoft 365 Assessment tool uses Azure AD based authentication and require
 A configured Azure AD application is a pre-requisite for using the Microsoft 365 Assessment tool. When you [start an assessment](assess-start.md) you'll be able to specify the Azure AD application to use and how you want to authenticate. When you don't specify an Azure AD application when starting an assessment the **PnP Management Shell** application will be assumed, if you're using a recent [PnP PowerShell](https://pnp.github.io/powershell/) version then this application most likely was setup.
 
 > [!Note]
-> It's strongly recommended to create a dedicated Azure AD application so you can limit the needed permissions to what's needed by the module you're using in the Microsoft 365 Assessment tool.
+> It's strongly recommended to create a dedicated Azure AD application so you can limit the needed permissions to what's needed by the module you're using in the Microsoft 365 Assessment tool. Also as throttling rules are bound to applications there's less throttling impact if you use a dedicated Azure AD application for the assessments.
 
 ### Permissions required
 
@@ -87,5 +87,7 @@ When you want to use the **Device** authentication then also:
 When you want to use **Application** authentication then also:
 
 1. Ensure you've defined the needed application permissions via the **API permissions** link the left navigation. See the requirements page of the module you want to use for the exact permissions and don't forget to click on **Grant admin consent for...** to consent the added permissions
-2. Go to **Certificates & secrets**, click on **Certificates** and **Upload certificate**, pick the .cer file of your certificate and add it
+2. Go to **Certificates & secrets**, click on **Certificates** and **Upload certificate**, pick the .cer file of your certificate and add it.
 
+> [!Note]
+> If you don't have a certificate available then you can use Windows PowerShell to create one: https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-self-signed-certificate.
