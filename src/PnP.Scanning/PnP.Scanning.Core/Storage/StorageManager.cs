@@ -897,6 +897,10 @@ namespace PnP.Scanning.Core.Storage
             {
                 dbContext.SyntexModelUsage.Remove(syntexModelUsage);
             }
+            foreach (var syntexFileType in await dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.SyntexFileTypes.Remove(syntexFileType);
+            }
             Log.Information("Consolidating assessment {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 

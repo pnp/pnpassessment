@@ -25,6 +25,7 @@ namespace PnP.Scanning.Core.Services
         private const string SyntexContentTypeOverviewCsv = "syntexcontenttypeoverview.csv";
         private const string SyntexFieldsCsv = "syntexfields.csv";
         private const string SyntexModelUsageCsv = "syntexmodelusage.csv";
+        private const string SyntexFileTypesCsv = "syntexfiletypes.csv";
 
         private const string WorkflowsCsv = "workflows.csv";
 
@@ -200,6 +201,14 @@ namespace PnP.Scanning.Core.Services
                         using (var csv = new CsvWriter(writer, config))
                         {
                             await csv.WriteRecordsAsync(dbContext.SyntexModelUsage.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexFileTypesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
                 }
