@@ -91,12 +91,12 @@ namespace PnP.Scanning.Core.Scanners
 
             using (var context = await GetPnPContextAsync(options))
             {
-                //List<IList> syntexListInstances = new();
                 List<SyntexList> syntexLists = new();
                 List<SyntexContentType> syntexContentTypes = new();
                 List<SyntexContentTypeField> syntexContentTypeFields = new();
                 List<SyntexField> syntexFields = new();
                 List<SyntexModelUsage> syntexModelUsage = new();
+                List<SyntexFileType> syntexFileTypes = new();
 
                 List<ContentTypeInfo> uniqueContentTypesInWeb = new();
 
@@ -177,10 +177,10 @@ namespace PnP.Scanning.Core.Scanners
                 }
 
                 // Calculate content type file and label counts
-                await CalculateContentTypeCountsAsync(context, syntexContentTypes, syntexLists);
+                await CalculateContentTypeCountsAsync(context, syntexContentTypes, syntexLists, syntexFileTypes);
 
                 // Calculate label counts for the remaining lists
-                await CalculateCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists);
+                await CalculateCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists, syntexFileTypes);
 
                 // Scan for Workflow 2013 instances on the collected lists
                 await ScanForListWorkflowAsync(syntexLists);
@@ -195,7 +195,7 @@ namespace PnP.Scanning.Core.Scanners
                 }
 
                 // Persist the gathered data
-                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields, syntexModelUsage);
+                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields, syntexModelUsage, syntexFileTypes);
             }
 
             Logger.Information("Syntex assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
@@ -339,7 +339,7 @@ namespace PnP.Scanning.Core.Scanners
             return input;
         }
 
-        private async Task CalculateContentTypeCountsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
+        private async Task CalculateContentTypeCountsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists, List<SyntexFileType> syntexFileTypes)
         {
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
@@ -364,10 +364,10 @@ namespace PnP.Scanning.Core.Scanners
                     RowLimit = 0,
                     RowsPerPage = 0,
                     SortProperties = new List<SortOption>() { new SortOption("DocId") },
-                    RefineProperties = new List<string> { "contenttypeid", "compliancetag" },
+                    RefineProperties = new List<string> { "contenttypeid", "compliancetag", "filetype" },
                     ClientType = "PnPMicrosoft365Scanner"
                 });
-                
+
                 if (result.Refinements.Count > 0)
                 {
                     if (result.Refinements.ContainsKey("contenttypeid"))
@@ -389,7 +389,7 @@ namespace PnP.Scanning.Core.Scanners
                                     if (contentTypeId.StartsWith(BuiltInContentTypes.Folder))
                                     {
                                         listToUpdate.FolderCount += (int)refinementResult.Count;
-                                    } 
+                                    }
                                     else if (contentTypeId.StartsWith(BuiltInContentTypes.Document))
                                     {
                                         listToUpdate.DocumentCount += (int)refinementResult.Count;
@@ -412,11 +412,42 @@ namespace PnP.Scanning.Core.Scanners
                             }
                         }
                     }
+
+                    if (result.Refinements.ContainsKey("filetype"))
+                    {
+                        foreach (var refinementResult in result.Refinements["filetype"])
+                        {
+                            var extension = refinementResult.Value;
+
+                            if (extension != null)
+                            {
+                                var fileTypeToUpdate = syntexFileTypes.FirstOrDefault(p => p.ListId == listId && p.FileType == extension);
+                                if (fileTypeToUpdate != null)
+                                {
+                                    fileTypeToUpdate.ItemCount += (int)refinementResult.Count;
+                                }
+                                else
+                                {
+                                    var syntexFileType = new SyntexFileType
+                                    {
+                                        ScanId = ScanId,
+                                        SiteUrl = SiteUrl,
+                                        WebUrl = WebUrl,
+                                        ListId = listId,
+                                        FileType = extension,
+                                        ItemCount = (int)refinementResult.Count
+                                    };
+
+                                    syntexFileTypes.Add(syntexFileType);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        private async Task CalculateCountsForRemainingListsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists)
+        private async Task CalculateCountsForRemainingListsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists, List<SyntexFileType> syntexFileTypes)
         {
             if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
             {
@@ -442,7 +473,7 @@ namespace PnP.Scanning.Core.Scanners
                         RowLimit = 0,
                         RowsPerPage = 0,
                         SortProperties = new List<SortOption>() { new SortOption("DocId") },
-                        RefineProperties = new List<string> { "contenttypeid", "compliancetag" },
+                        RefineProperties = new List<string> { "contenttypeid", "compliancetag", "filetype" },
                         ClientType = "PnPMicrosoft365Scanner"
                     });
 
@@ -482,6 +513,37 @@ namespace PnP.Scanning.Core.Scanners
                                 if (listToUpdate != null && (int)refinementResult.Count > 0)
                                 {
                                     listToUpdate.RetentionLabelCount += (int)refinementResult.Count;
+                                }
+                            }
+                        }
+
+                        if (result.Refinements.ContainsKey("filetype"))
+                        {
+                            foreach (var refinementResult in result.Refinements["filetype"])
+                            {
+                                var extension = refinementResult.Value;
+
+                                if (extension != null)
+                                {
+                                    var fileTypeToUpdate = syntexFileTypes.FirstOrDefault(p => p.ListId == list.ListId && p.FileType == extension);
+                                    if (fileTypeToUpdate != null)
+                                    {
+                                        fileTypeToUpdate.ItemCount += (int)refinementResult.Count;
+                                    }
+                                    else
+                                    {
+                                        var syntexFileType = new SyntexFileType
+                                        {
+                                            ScanId = ScanId,
+                                            SiteUrl = SiteUrl,
+                                            WebUrl = WebUrl,
+                                            ListId = list.ListId,
+                                            FileType = extension,
+                                            ItemCount = (int)refinementResult.Count
+                                        };
+
+                                        syntexFileTypes.Add(syntexFileType);
+                                    }
                                 }
                             }
                         }

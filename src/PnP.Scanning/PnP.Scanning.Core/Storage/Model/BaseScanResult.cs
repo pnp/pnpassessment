@@ -1,6 +1,4 @@
-﻿#nullable disable
-
-namespace PnP.Scanning.Core.Storage
+﻿namespace PnP.Scanning.Core.Storage
 {
     internal abstract class BaseScanResult
     {

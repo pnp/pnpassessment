@@ -5,8 +5,6 @@ using PnP.Core;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
-#nullable disable
-
 namespace PnP.Scanning.Core.Storage
 {
 
@@ -814,7 +812,7 @@ namespace PnP.Scanning.Core.Storage
         #region Syntex
         internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, 
                                                                      List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields,
-                                                                     List<SyntexModelUsage> syntexModelUsage)
+                                                                     List<SyntexModelUsage> syntexModelUsage, List<SyntexFileType> syntexFileTypes)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -823,6 +821,7 @@ namespace PnP.Scanning.Core.Storage
                 await dbContext.SyntexContentTypeFields.AddRangeAsync(syntexContentTypeFields.ToArray());
                 await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
                 await dbContext.SyntexModelUsage.AddRangeAsync(syntexModelUsage.ToArray());
+                await dbContext.SyntexFileTypes.AddRangeAsync(syntexFileTypes.ToArray());
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StoreSyntexInformationAsync succeeded");

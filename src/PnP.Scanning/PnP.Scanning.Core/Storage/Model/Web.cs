@@ -1,7 +1,5 @@
 ﻿using CsvHelper.Configuration.Attributes;
 
-#nullable disable
-
 namespace PnP.Scanning.Core.Storage
 {
     [Microsoft.EntityFrameworkCore.Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl) }, IsUnique = true)]

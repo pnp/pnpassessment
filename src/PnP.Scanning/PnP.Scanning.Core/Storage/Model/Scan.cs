@@ -1,7 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-#nullable disable
-
 namespace PnP.Scanning.Core.Storage
 {
     internal sealed class Scan

@@ -1,8 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
-#nullable disable
-
 namespace PnP.Scanning.Core.Storage
 {
     /// <summary>
@@ -37,6 +35,8 @@ namespace PnP.Scanning.Core.Storage
         internal DbSet<SyntexField> SyntexFields { get; set; }
 
         internal DbSet<SyntexModelUsage> SyntexModelUsage { get; set; }
+
+        internal DbSet<SyntexFileType> SyntexFileTypes { get; set; }
 
         internal DbSet<Workflow> Workflows { get; set; }
 
@@ -128,6 +128,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<SyntexModelUsage>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.Classifier, e.TargetSiteId, e.TargetWebId, e.TargetListId });
+            });
+
+            modelBuilder.Entity<SyntexFileType>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FileType });
             });
 
             modelBuilder.Entity<Workflow>(entity =>

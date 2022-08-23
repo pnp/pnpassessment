@@ -2,8 +2,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-#nullable disable
-
 namespace PnP.Scanning.Core.Storage
 {
     [Index(new string[] { nameof(ScanId), nameof(Event), nameof(EventDate) }, IsUnique = true)]
