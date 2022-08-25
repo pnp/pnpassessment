@@ -3,6 +3,7 @@
 ## Report updates
 
 - Generate existing report with CSV files
+- Ensure you're not signed in with your MSFT account
 - Edit report, add new CSV files as data source if needed
 - Save as PBIX
 
