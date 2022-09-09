@@ -1,6 +1,7 @@
 ﻿using Microsoft.SharePoint.Client;
 using PnP.Core.Auth;
 using PnP.Core.Services;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using Serilog;
@@ -131,6 +132,7 @@ namespace PnP.Scanning.Core.Scanners
                 Tag = new ClientContextInfo(ScanId, CsomEventHub, Logger, cancellationToken)
             };
 
+            // Hookup event handler to insert the access token
             clientContext.ExecutingWebRequest += (sender, args) =>
             {
                 var uri = new Uri($"{SiteUrl}{WebUrl}");
@@ -139,6 +141,9 @@ namespace PnP.Scanning.Core.Scanners
                 string accessToken = ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                 args.WebRequestExecutor.RequestHeaders["Authorization"] = "Bearer " + accessToken;
             };
+
+            // Hookup custom WebRequestExecutorFactory 
+            clientContext.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(AuthenticationManager.HttpClient);
 
             return clientContext;
         }

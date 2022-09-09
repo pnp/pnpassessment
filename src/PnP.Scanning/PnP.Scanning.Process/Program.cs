@@ -206,6 +206,7 @@ namespace PnP.Scanning.Process
 
                           services.AddSingleton<StorageManager>();
                           services.AddSingleton<CsomEventHub>();
+                          services.AddSingleton<RateLimiter>();
                           services.AddSingleton<ScanManager>();
                           services.AddSingleton<TelemetryManager>();
                           services.AddTransient<SiteEnumerationManager>();

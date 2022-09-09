@@ -23,17 +23,19 @@ namespace PnP.Scanning.Core.Services
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly IPnPContextFactory contextFactory;
         private readonly CsomEventHub eventHub;
+        private readonly RateLimiter rateLimiter;
         private readonly TelemetryManager telemetryManager;
         private object scanListLock = new();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, TelemetryManager telemetry,
-                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub)
+                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, RateLimiter limiter)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
             contextFactory = pnpContextFactory;
             eventHub = csomEventHub;
+            rateLimiter = limiter;
             telemetryManager = telemetry;
 
             // Get notified whenever the scan engine is getting throttled (only applies for calls made via PnP Core SDK!)
@@ -42,10 +44,35 @@ namespace PnP.Scanning.Core.Services
                 HandleRetryEvent(retryEvent);
             };
 
+            contextFactory.EventHub.RequestRateLimitUpdate = (rateLimitEvent) =>
+            {
+                HandleRateLimitUpdateEvent(rateLimitEvent);
+            };
+
+            contextFactory.EventHub.RequestRateLimitWaitAsync = async (cancellationToken) =>
+            {
+                await HandleRateLimitUpdateEventAsync(cancellationToken);                
+            };
+
             // Get notified whenever a CSOM request is getting throttled
             eventHub.RequestRetry = (retryEvent) =>
             {
                 HandleCsomRetryEvent(retryEvent);
+            };
+
+            eventHub.RequestRateLimitUpdate = (rateLimitEvent) =>
+            {
+                if (rateLimitEvent.Remaining   > -1)
+                {
+                    Log.Information("CSOM Rate limit update. Limit = {Limit}, Remaining = {Remaining}, Reset = {Reset}", rateLimitEvent.Limit, rateLimitEvent.Remaining, rateLimitEvent.Reset);
+                }
+
+                HandleRateLimitUpdateEvent(rateLimitEvent);
+            };
+
+            eventHub.RequestRateLimitWaitAsync = async (cancellationToken) =>
+            {
+                await HandleRateLimitUpdateEventAsync(cancellationToken);
             };
 
             // Hook the application stopping as that allows for cleanup 
@@ -604,6 +631,16 @@ namespace PnP.Scanning.Core.Services
                     Log.Warning("[Retry] CSOM request for assessment {ScanId}, http status code is {StatusCode} and no exception set", eventName.ScanId, eventName.HttpStatusCode);
                 }
             }
+        }
+
+        private void HandleRateLimitUpdateEvent(IRateLimitEvent rateLimitEvent)
+        {
+            rateLimiter.UpdateWindow(rateLimitEvent);
+        }
+
+        private async Task HandleRateLimitUpdateEventAsync(CancellationToken cancellationToken)
+        {
+            await rateLimiter.WaitAsync(cancellationToken);
         }
 
         internal int NumberOfScansRunning()

@@ -29,7 +29,7 @@ namespace Microsoft.SharePoint.Client
             {
                 throw new ArgumentException("Provide a retry count greater than zero.");
             }
-
+            
             // Do while retry attempt is less than retry count
             while (retryAttempts < retryCount)
             {
@@ -38,8 +38,6 @@ namespace Microsoft.SharePoint.Client
 
                 try
                 {
-                    //clientContext.ClientTag = SetClientTag(clientTag);
-
                     // Make CSOM request more reliable by disabling the return value cache. Given we 
                     // often clone context objects and the default value is
                     clientContext.DisableReturnValueCache = true;
@@ -116,8 +114,7 @@ namespace Microsoft.SharePoint.Client
                         //find innermost Error and check if it is a SocketException
                         Exception innermostEx = wex;
                         while (innermostEx.InnerException != null) innermostEx = innermostEx.InnerException;
-                        var socketEx = innermostEx as System.Net.Sockets.SocketException;
-                        if (socketEx != null)
+                        if (innermostEx is System.Net.Sockets.SocketException socketEx)
                         {
                             errorSb.AppendLine($"ErrorCode: {socketEx.ErrorCode}"); //10054
                             errorSb.AppendLine($"SocketErrorCode: {socketEx.SocketErrorCode}"); //ConnectionReset
@@ -142,7 +139,7 @@ namespace Microsoft.SharePoint.Client
                                 retryAfterInterval = backoffInterval;
                                 backoffInterval *= 2;
                             }
-                            
+
                             int retryAfterInSeconds = retryAfterInterval / 1000;
 
                             clientContextInfo.CsomEventHub.RequestRetry?.Invoke(new CsomRetryEvent(clientContextInfo.ScanId, 0, retryAfterInSeconds, socketEx));
