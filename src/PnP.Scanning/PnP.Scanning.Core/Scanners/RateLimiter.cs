@@ -41,7 +41,7 @@ namespace PnP.Scanning.Core.Scanners
         /// <summary>
         /// Minimum % of requests left before the next request will get delayed until the current window is reset.
         /// </summary>
-        private int minimumCapacityLeft = 10;
+        private readonly int minimumCapacityLeft = 10;
 
         /// <summary>
         /// Default constructor
@@ -82,7 +82,7 @@ namespace PnP.Scanning.Core.Scanners
                 if (limit > 0 && remaining > 0)
                 {
                     // Calculate percentage requests left in the current window
-                    capacityLeft = ((float)remaining / limit) * 100;
+                    capacityLeft = (float)remaining / limit * 100;
 
                     // If getting below the minimum required capacity then lets wait until the current window is reset
                     if (capacityLeft <= minimumCapacityLeft)
