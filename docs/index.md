@@ -1,6 +1,6 @@
 # Microsoft 365 Assessment tool
 
-The Microsoft 365 Assessment tool is an [open source tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various deprecation and adoption scenarios. Currently the tool supports a [SharePoint Syntex adoption](sharepoint-syntex/readme.md) and [Workflow 2013](workflow/readme.md) module but additional modules are under development.
+The Microsoft 365 Assessment tool is an [open source tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various deprecation and adoption scenarios. Currently the tool supports a [Microsoft Syntex adoption](sharepoint-syntex/readme.md) and [Workflow 2013](workflow/readme.md) module but additional modules are under development.
 
 ## Getting started 🚀
 

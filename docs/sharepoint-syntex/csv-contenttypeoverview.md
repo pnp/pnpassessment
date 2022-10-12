@@ -25,6 +25,6 @@ ItemCountMax| Maximum item count
 ItemCountMedian| Item count median value
 ItemCountLowerQuartile| Item count Q1 value
 ItemCountUpperQuartile| Item count Q3 value
-IsSyntexContentType| Is this a content type created via SharePoint Syntex?
+IsSyntexContentType| Is this a content type created via Microsoft Syntex?
 SyntexModelDriveId| Syntex Content center library drive id
 SyntexModelObjectId| Syntex Content center library drive item id

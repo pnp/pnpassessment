@@ -16,7 +16,7 @@ A configured Azure AD application is a pre-requisite for using the Microsoft 365
 
 The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the permission requirements of the respective modules.
 
-- [SharePoint Syntex adoption](../sharepoint-syntex/requirements.md)
+- [Microsoft Syntex adoption](../sharepoint-syntex/requirements.md)
 - [Workflow 2013 deprecation](../workflow/requirements.md)
 
 ### Creating an Azure AD application using PnP PowerShell
@@ -27,7 +27,7 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 > If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Azure AD admins for help.
 
 ```PowerShell
-# Sample for the SharePoint Syntex adoption module. Remove the application/delegated permissions depending on your needs
+# Sample for the Microsoft Syntex adoption module. Remove the application/delegated permissions depending on your needs
 # and update the Tenant and Username properties to match your environment.
 #
 # If you prefer to have a password set to secure the created PFX file then add below parameter

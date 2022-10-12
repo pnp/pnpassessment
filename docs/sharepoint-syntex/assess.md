@@ -1,6 +1,6 @@
-# Run a SharePoint Syntex adoption assessment
+# Run a Microsoft Syntex adoption assessment
 
-Running the SharePoint Syntex adoption assessment is just like running any other adoption or deprecation module of the Microsoft 365 Assessment tool: you use the CLI with the `Start` action to launch an assessment. By specifying the `--mode` to be `Syntex` the Microsoft 365 Assessment tool will run the SharePoint Syntex adoption assessment for you. This page provides you with a quick start and links to the relevant Microsoft 365 Assessment tool documentation for more details.
+Running the Microsoft Syntex adoption assessment is just like running any other adoption or deprecation module of the Microsoft 365 Assessment tool: you use the CLI with the `Start` action to launch an assessment. By specifying the `--mode` to be `Syntex` the Microsoft 365 Assessment tool will run the Microsoft Syntex adoption assessment for you. This page provides you with a quick start and links to the relevant Microsoft 365 Assessment tool documentation for more details.
 
 ## Quick start
 
@@ -14,7 +14,7 @@ The Microsoft 365 Assessment tool requires an Azure AD application for authentic
 
 ### Start assessment
 
-Below are some quick start samples that show how to run an SharePoint Syntex assessment. More details on the `Start` action can be found in the [Microsoft 365 Assessment tool Start documentation](../using-the-assessment-tool/assess-start.md).
+Below are some quick start samples that show how to run an Microsoft Syntex assessment. More details on the `Start` action can be found in the [Microsoft 365 Assessment tool Start documentation](../using-the-assessment-tool/assess-start.md).
 
 Task | CLI
 -----|------
