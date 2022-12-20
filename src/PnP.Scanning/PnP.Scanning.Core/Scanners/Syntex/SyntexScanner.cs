@@ -59,8 +59,8 @@ namespace PnP.Scanning.Core.Scanners
 
 
         public SyntexScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, 
-                             CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl, SyntexOptions options) : 
-            base(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteUrl, webUrl)
+                             Guid scanId, string siteUrl, string webUrl, SyntexOptions options) : 
+            base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
         {
             Options = options;
         }
@@ -183,7 +183,7 @@ namespace PnP.Scanning.Core.Scanners
                 await CalculateCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists, syntexFileTypes);
 
                 // Scan for Workflow 2013 instances on the collected lists
-                await ScanForListWorkflowAsync(syntexLists);
+                await ScanForListWorkflowAsync(context, syntexLists);
 
                 // Scan for PowerAutomate flow instances on the collected lists
                 //await ScanForPowerAutomateFlowsAsync(context, syntexListInstances, syntexLists);
@@ -637,7 +637,7 @@ namespace PnP.Scanning.Core.Scanners
         //    }
         //}
 
-        private async Task ScanForListWorkflowAsync(List<SyntexList> syntexLists)
+        private async Task ScanForListWorkflowAsync(PnPContext pnpContext, List<SyntexList> syntexLists)
         {
             if (!GetBoolFromCache(HasPermissionsToReadWorkflowData))
             {
@@ -646,14 +646,14 @@ namespace PnP.Scanning.Core.Scanners
 
             try
             {
-                using (var context = GetClientContext())
+                using (var context = GetClientContext(pnpContext))
                 {
                     var servicesManager = new WorkflowServicesManager(context, context.Web);
                     var subscriptionService = servicesManager.GetWorkflowSubscriptionService();
                     var subscriptions = subscriptionService.EnumerateSubscriptions();
                     context.Load(subscriptions);
 
-                    await context.ExecuteQueryRetryAsync();
+                    await context.ExecuteQueryAsync();
 
                     foreach (var listSubscription in subscriptions)
                     {

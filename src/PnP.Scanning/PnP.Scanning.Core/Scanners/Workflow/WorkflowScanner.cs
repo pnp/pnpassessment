@@ -33,8 +33,8 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         public WorkflowScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
-                               CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl, WorkflowOptions options) :
-                               base(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteUrl, webUrl)
+                               Guid scanId, string siteUrl, string webUrl, WorkflowOptions options) :
+                               base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
         {
             Options = options;
         }
@@ -66,7 +66,7 @@ namespace PnP.Scanning.Core.Scanners
             };
 
             using (var context = await GetPnPContextAsync(options))
-            using (var csomContext = GetClientContext())
+            using (var csomContext = GetClientContext(context))
             {
                 Microsoft.SharePoint.Client.Web web = csomContext.Web;
 
@@ -85,7 +85,7 @@ namespace PnP.Scanning.Core.Scanners
                     var subscriptions = subscriptionService.EnumerateSubscriptions();
                     web.Context.Load(subscriptions);
 
-                    await web.Context.ExecuteQueryRetryAsync();
+                    await web.Context.ExecuteQueryAsync();
 
                     siteDefinitions = definitions.ToArray();
                     siteSubscriptions = subscriptions.ToArray();
@@ -362,7 +362,7 @@ namespace PnP.Scanning.Core.Scanners
             ClientResult<int> terminated = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Terminated);
             ClientResult<int> completed = instanceService.CountInstancesWithStatus(subscription, WorkflowStatus.Completed);
 
-            await clientContext.ExecuteQueryRetryAsync();
+            await clientContext.ExecuteQueryAsync();
 
             instanceCounts.Total = total.Value;
             instanceCounts.Started = started.Value;

@@ -22,23 +22,21 @@ namespace PnP.Scanning.Core.Services
         private readonly IHostApplicationLifetime hostApplicationLifetime;
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly IPnPContextFactory contextFactory;
-        private readonly CsomEventHub eventHub;
         private readonly RateLimiter rateLimiter;
         private readonly TelemetryManager telemetryManager;
         private object scanListLock = new();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, TelemetryManager telemetry,
-                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, RateLimiter limiter)
+                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, RateLimiter limiter)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
             contextFactory = pnpContextFactory;
-            eventHub = csomEventHub;
             rateLimiter = limiter;
             telemetryManager = telemetry;
 
-            // Get notified whenever the scan engine is getting throttled (only applies for calls made via PnP Core SDK!)
+            // Get notified whenever the scan engine is getting throttled
             contextFactory.EventHub.RequestRetry = (retryEvent) =>
             {
                 HandleRetryEvent(retryEvent);
@@ -52,27 +50,6 @@ namespace PnP.Scanning.Core.Services
             contextFactory.EventHub.RequestRateLimitWaitAsync = async (cancellationToken) =>
             {
                 await HandleRateLimitUpdateEventAsync(cancellationToken);                
-            };
-
-            // Get notified whenever a CSOM request is getting throttled
-            eventHub.RequestRetry = (retryEvent) =>
-            {
-                HandleCsomRetryEvent(retryEvent);
-            };
-
-            eventHub.RequestRateLimitUpdate = (rateLimitEvent) =>
-            {
-                if (rateLimitEvent.Remaining   > -1)
-                {
-                    Log.Information("CSOM Rate limit update. Limit = {Limit}, Remaining = {Remaining}, Reset = {Reset}", rateLimitEvent.Limit, rateLimitEvent.Remaining, rateLimitEvent.Reset);
-                }
-
-                HandleRateLimitUpdateEvent(rateLimitEvent);
-            };
-
-            eventHub.RequestRateLimitWaitAsync = async (cancellationToken) =>
-            {
-                await HandleRateLimitUpdateEventAsync(cancellationToken);
             };
 
             // Hook the application stopping as that allows for cleanup 
@@ -145,7 +122,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, eventHub, scanId, siteCollectionList[0], "/", options);
+            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", options);
             if (scanner != null)
             {
                 try
@@ -170,7 +147,7 @@ namespace PnP.Scanning.Core.Services
             // Enqueue the received site collections
             foreach (var site in siteCollectionList)
             {
-                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, eventHub, site));
+                await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site));
             }
             Log.Information("Enqueued {SiteCollectionCount} site collections for assessment {ScanId}", siteCollectionList.Count, scanId);
 
@@ -296,7 +273,7 @@ namespace PnP.Scanning.Core.Services
                 // Enqueue the received site collections
                 foreach (var site in siteCollectionList)
                 {
-                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, eventHub, site) { Restart = true });
+                    await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site) { Restart = true });
                 }
 
                 feedback.Invoke($"{siteCollectionList.Count} site collections queued for assessing again");
@@ -580,12 +557,12 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        private void HandleRetryEvent(RetryEvent eventName)
+        private void HandleRetryEvent(IRetryEvent eventName)
         {
             // Skip the retries due to network issues (socket exceptions)
             if (eventName != null)
             {
-                if (eventName.PnpContextProperties.TryGetValue(Constants.PnPContextPropertyScanId, out object scanIdObject) && Guid.TryParse(scanIdObject?.ToString(), out Guid scanId))
+                if (eventName.Properties.TryGetValue(Constants.PnPContextPropertyScanId, out object scanIdObject) && Guid.TryParse(scanIdObject?.ToString(), out Guid scanId))
                 {
                     if (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503 || eventName.HttpStatusCode == 504)
                     {
@@ -602,34 +579,11 @@ namespace PnP.Scanning.Core.Services
                     else
                     {
                         Log.Warning("[Retry] request {Request} for assessment {ScanId}, http status code is {StatusCode} and no exception set", eventName.Request, scanId, eventName.HttpStatusCode);
+                        return;
                     }
                 }
              
-                Log.Warning("[Retry] request {Request}, no assessment id information found!");
-            }
-        }
-
-        private void HandleCsomRetryEvent(CsomRetryEvent eventName)
-        {
-            // Skip the retries due to network issues (socket exceptions)
-            if (eventName != null)
-            {
-                if (eventName.HttpStatusCode == 429 || eventName.HttpStatusCode == 503)
-                {
-                    RequestWasThrottled(eventName.ScanId, eventName.WaitTime);
-                    Log.Warning("[Throttling] CSOM request for assessment {ScanId}", eventName.ScanId);
-                    return;
-                }
-                else if (eventName.Exception != null)
-                {
-                    RequestsWasRetriedDueToNetworkIssues(eventName.ScanId, eventName.WaitTime);
-                    Log.Warning("[Retry] CSOM request for assessment {ScanId}", eventName.ScanId);
-                    return;
-                }
-                else
-                {
-                    Log.Warning("[Retry] CSOM request for assessment {ScanId}, http status code is {StatusCode} and no exception set", eventName.ScanId, eventName.HttpStatusCode);
-                }
+                Log.Warning("[Retry] request, no assessment id information found!");
             }
         }
 
@@ -699,7 +653,7 @@ namespace PnP.Scanning.Core.Services
                 foreach(var scanId in scansToMarkAsDone)
                 {
                     // Run post scanning step
-                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, eventHub, scanId, scans[scanId].FirstSiteCollection, "/", scans[scanId].Options);
+                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", scans[scanId].Options);
                     if (scanner != null)
                     {
                         try

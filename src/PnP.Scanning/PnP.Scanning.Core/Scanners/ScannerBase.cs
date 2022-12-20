@@ -13,12 +13,11 @@ namespace PnP.Scanning.Core.Scanners
         private static readonly string LineSeparator = ((char)0x2028).ToString();
         private static readonly string ParagraphSeparator = ((char)0x2029).ToString();
 
-        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, Guid scanId, string siteUrl, string webUrl)
+        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl)
         {
             ScanManager = scanManager;
             StorageManager = storageManager;
             PnPContextFactory = pnpContextFactory;
-            CsomEventHub = csomEventHub;
             ScanId = scanId;
             SiteUrl = siteUrl;
             WebUrl = webUrl;
@@ -34,8 +33,6 @@ namespace PnP.Scanning.Core.Scanners
         internal StorageManager StorageManager { get; private set; }
 
         internal IPnPContextFactory PnPContextFactory { get; private set; }
-
-        internal CsomEventHub CsomEventHub { get; private set; }
 
         internal Guid ScanId { get; set; }
 
@@ -55,21 +52,21 @@ namespace PnP.Scanning.Core.Scanners
         }
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
-        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, CsomEventHub csomEventHub, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
+        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
         {
             // PER SCAN COMPONENT: instantiate the scan component here
             if (options is SyntexOptions syntexOptions)
             {
-                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, syntexOptions);
+                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, syntexOptions);
             }
             else if (options is WorkflowOptions workflowOptions)
             {
-                return new WorkflowScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, workflowOptions);
+                return new WorkflowScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, workflowOptions);
             }
 #if DEBUG
             else if (options is TestOptions testOptions)
             {
-                return new TestScanner(scanManager, storageManager, pnpContextFactory, csomEventHub, scanId, siteCollectionUrl, webUrl, testOptions);
+                return new TestScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, testOptions);
             }
 #endif
 
@@ -119,7 +116,7 @@ namespace PnP.Scanning.Core.Scanners
                                                        contextOptions);
         }
 
-        protected ClientContext GetClientContext()
+        protected ClientContext GetClientContext(PnPContext currentPnPClientContext = null)
         {
             var cancellationToken = ScanManager.GetCancellationTokenSource(ScanId).Token;
 
@@ -129,7 +126,7 @@ namespace PnP.Scanning.Core.Scanners
             var clientContext = new ClientContext(new Uri($"{SiteUrl}{WebUrl}"))
             {
                 DisableReturnValueCache = true,
-                Tag = new ClientContextInfo(ScanId, CsomEventHub, Logger, cancellationToken)
+                Tag = new ClientContextInfo(ScanId, Logger, cancellationToken)
             };
 
             // Hookup event handler to insert the access token
@@ -143,7 +140,7 @@ namespace PnP.Scanning.Core.Scanners
             };
 
             // Hookup custom WebRequestExecutorFactory 
-            clientContext.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(AuthenticationManager.HttpClient);
+            clientContext.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(currentPnPClientContext == null ? AuthenticationManager.HttpClient : currentPnPClientContext.RestClient.Client);
 
             return clientContext;
         }

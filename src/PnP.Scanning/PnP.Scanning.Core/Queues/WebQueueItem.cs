@@ -5,8 +5,8 @@ namespace PnP.Scanning.Core.Queues
 {
     internal class WebQueueItem : SiteCollectionQueueItem
     {
-        internal WebQueueItem(OptionsBase optionsBase, IPnPContextFactory pnPContextFactory, CsomEventHub csomEventHub, string siteCollectionUrl, string webUrl) : 
-            base(optionsBase, pnPContextFactory, csomEventHub, siteCollectionUrl)
+        internal WebQueueItem(OptionsBase optionsBase, IPnPContextFactory pnPContextFactory, string siteCollectionUrl, string webUrl) : 
+            base(optionsBase, pnPContextFactory, siteCollectionUrl)
         {
             WebUrl = webUrl;
         }

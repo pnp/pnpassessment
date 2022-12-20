@@ -205,7 +205,6 @@ namespace PnP.Scanning.Process
                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 
                           services.AddSingleton<StorageManager>();
-                          services.AddSingleton<CsomEventHub>();
                           services.AddSingleton<RateLimiter>();
                           services.AddSingleton<ScanManager>();
                           services.AddSingleton<TelemetryManager>();

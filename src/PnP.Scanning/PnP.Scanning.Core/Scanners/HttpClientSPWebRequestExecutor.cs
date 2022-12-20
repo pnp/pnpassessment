@@ -1,8 +1,6 @@
 ﻿using Microsoft.SharePoint.Client;
-using PnP.Core.Services;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Reflection;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -32,7 +30,9 @@ namespace PnP.Scanning.Core.Scanners
 
             httpClient = httpClientInstance;
             request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+#pragma warning disable SYSLIB0014 // Type or member is obsolete
             webRequest = (HttpWebRequest)System.Net.WebRequest.Create(requestUrl);
+#pragma warning restore SYSLIB0014 // Type or member is obsolete
             clientContext = context;
 
             webRequest.Timeout = context.RequestTimeout;
@@ -108,13 +108,11 @@ namespace PnP.Scanning.Core.Scanners
                 request.Content.Headers.ContentType = parsedValue;
             }
 
-            // Do we need to pause the CSOM execution due to RateLimit headers?
-            await ((clientContext as ClientContext).Tag as ClientContextInfo).CsomEventHub.RequestRateLimitWaitAsync(((clientContext as ClientContext).Tag as ClientContextInfo).CancellationToken);
+            // Set request options
+            var info = ((clientContext as ClientContext).Tag as ClientContextInfo);
+            request.Options.Set(new HttpRequestOptionsKey<object>(Constants.PnPContextPropertyScanId), info.ScanId);
 
             response = await httpClient.SendAsync(request);
-
-            // Store the received RateLimit information
-            ((clientContext as ClientContext).Tag as ClientContextInfo).CsomEventHub.RequestRateLimitUpdate(new RateLimitEvent(response));
         }
 
         public override HttpWebRequest WebRequest => webRequest;

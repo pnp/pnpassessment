@@ -32,7 +32,7 @@
 		<PackageReference Include="MathNet.Numerics" Version="5.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.DataProtection.Abstractions" Version="6.0.5" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.5" />
-		<PackageReference Include="Microsoft.SharePointOnline.CSOM" Version="16.1.22413.12000" />
+		<PackageReference Include="Microsoft.SharePointOnline.CSOM" Version="16.1.23109.12000" />
 		<PackageReference Include="Serilog.AspNetCore" Version="5.0.0" />
 		<PackageReference Include="Serilog.Sinks.Map" Version="1.0.2" />
 		<PackageReference Include="System.Threading.Tasks.Dataflow" Version="6.0.0" />
