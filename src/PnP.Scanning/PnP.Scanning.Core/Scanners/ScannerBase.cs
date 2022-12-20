@@ -73,12 +73,12 @@ namespace PnP.Scanning.Core.Scanners
             return null;
         }
 
-        protected async Task<PnPContext> GetPnPContextAsync()
+        internal async Task<PnPContext> GetPnPContextAsync()
         {
             return await GetPnPContextImplementationAsync(null);
         }
 
-        protected async Task<PnPContext> GetPnPContextAsync(PnPContextOptions contextOptions)
+        internal async Task<PnPContext> GetPnPContextAsync(PnPContextOptions contextOptions)
         {
             return await GetPnPContextImplementationAsync(contextOptions);
         }
@@ -116,7 +116,7 @@ namespace PnP.Scanning.Core.Scanners
                                                        contextOptions);
         }
 
-        protected ClientContext GetClientContext(PnPContext currentPnPClientContext = null)
+        internal ClientContext GetClientContext(PnPContext currentPnPClientContext = null)
         {
             var cancellationToken = ScanManager.GetCancellationTokenSource(ScanId).Token;
 
@@ -235,7 +235,7 @@ namespace PnP.Scanning.Core.Scanners
         }
 
 
-        protected static string Clean(string input)
+        internal static string Clean(string input)
         {
             if (!string.IsNullOrEmpty(input))
             {

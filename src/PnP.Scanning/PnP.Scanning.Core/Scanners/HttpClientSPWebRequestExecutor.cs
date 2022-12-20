@@ -108,9 +108,12 @@ namespace PnP.Scanning.Core.Scanners
                 request.Content.Headers.ContentType = parsedValue;
             }
 
-            // Set request options
-            var info = ((clientContext as ClientContext).Tag as ClientContextInfo);
-            request.Options.Set(new HttpRequestOptionsKey<object>(Constants.PnPContextPropertyScanId), info.ScanId);
+            // Set request options, the request options are returned in the retry event (via property bag) fired from the PnP Core SDK retry logic
+            ClientContextInfo info = (clientContext as ClientContext).Tag as ClientContextInfo;
+            if (info != null)
+            {
+                request.Options.Set(new HttpRequestOptionsKey<object>(Constants.PnPContextPropertyScanId), info.ScanId);
+            }
 
             response = await httpClient.SendAsync(request);
         }
