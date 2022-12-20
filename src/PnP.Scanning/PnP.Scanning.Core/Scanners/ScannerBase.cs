@@ -140,6 +140,8 @@ namespace PnP.Scanning.Core.Scanners
             };
 
             // Hookup custom WebRequestExecutorFactory 
+            // Normally a PnPContext must be passed as we're reusing the SPO REST HttpClient. Reusing this
+            // HttpClient brings retry and ratelimit handling for CSOM!
             clientContext.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(currentPnPClientContext == null ? AuthenticationManager.HttpClient : currentPnPClientContext.RestClient.Client);
 
             return clientContext;
