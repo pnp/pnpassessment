@@ -170,13 +170,9 @@ namespace PnP.Scanning.Process.Commands
             {
                 // Custom validation of the provided option input 
                 string input = val.GetValueOrDefault<string>();
-                if (input != null && input.Split("|", StringSplitOptions.RemoveEmptyEntries).Length == 3)
+                if (input == null && input.Split("|", StringSplitOptions.RemoveEmptyEntries).Length != 3)
                 {
-                    return "";
-                }
-                else
-                {
-                    return $"Invalid --{Constants.StartCertPath} value";
+                    val.ErrorMessage = $"Invalid --{Constants.StartCertPath} value";
                 }
             });
             cmd.AddOption(certPathOption);

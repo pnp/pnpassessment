@@ -52,11 +52,7 @@ namespace PnP.Scanning.Process.Commands
                     (commandResult.FindResultFor(scanIdOption) != null && commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == true)
                    )
                 {
-                    return $"You need to either use the --{Constants.PauseScanId} with a valid Microsoft 365 Assessment id or the --{Constants.PauseAll} option";
-                }
-                else
-                {
-                    return null;
+                    commandResult.ErrorMessage = $"You need to either use the --{Constants.PauseScanId} with a valid Microsoft 365 Assessment id or the --{Constants.PauseAll} option"; 
                 }
             });
 
