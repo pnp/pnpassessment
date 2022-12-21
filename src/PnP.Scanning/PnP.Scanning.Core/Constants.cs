@@ -18,6 +18,7 @@
 
         internal const string StartSyntexFull = "syntexfull";
         internal const string StartWorkflowAnalyze = "workflowanalyze";
+        internal const string StartClassicInclude = "classicinclude";
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
         internal const string ListRunning = "running";

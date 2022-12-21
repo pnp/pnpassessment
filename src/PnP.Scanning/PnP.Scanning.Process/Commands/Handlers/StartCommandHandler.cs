@@ -33,6 +33,7 @@ namespace PnP.Scanning.Process.Commands
         // PER SCAN COMPONENT: add scan component specific options here
         private Option<bool> syntexFullOption;
         private Option<bool> workflowAnalyzeOption;
+        private Option<List<ClassicComponent>> classicIncludeOption;
 
 #if DEBUG
         // Specific options for the test handler
@@ -254,6 +255,15 @@ namespace PnP.Scanning.Process.Commands
             };
             cmd.AddOption(workflowAnalyzeOption);
 
+            classicIncludeOption = new(name: $"--{Constants.StartClassicInclude}",
+                //getDefaultValue: () => null,
+                description: "Included classic scan components")                
+            {
+                IsRequired = false,
+                AllowMultipleArgumentsPerToken = true,
+                Arity = ArgumentArity.ZeroOrMore
+            };
+            cmd.AddOption(classicIncludeOption);
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -300,6 +310,7 @@ namespace PnP.Scanning.Process.Commands
                                               // PER SCAN COMPONENT: implement scan component specific options
                                               , syntexFullOption
                                               , workflowAnalyzeOption
+                                              , classicIncludeOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -418,6 +429,31 @@ namespace PnP.Scanning.Process.Commands
                         Type = "bool",
                         Value = arguments.WorkflowAnalyze.ToString(),
                     });
+                }
+
+                if (arguments.Mode == Mode.Classic)
+                {
+                    List<ClassicComponent> classicComponents = new();
+                    if (arguments.ClassicInclude.Count > 0)
+                    {
+                        // Only add the requested classic scan components
+                        classicComponents = arguments.ClassicInclude;
+                    }
+                    else
+                    {
+                        // Add all possible classic scan components
+                        classicComponents = Enum.GetValues(typeof(ClassicComponent)).Cast<ClassicComponent>().ToList();
+                    }
+
+                    foreach (var classicComponent in classicComponents)
+                    {
+                        start.Properties.Add(new PropertyRequest
+                        {
+                            Property = $"{classicComponent}",
+                            Type = "bool",
+                            Value = true.ToString(),
+                        });
+                    }
                 }
 
 #if DEBUG

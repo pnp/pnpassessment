@@ -4,7 +4,7 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal abstract class OptionsBase
     {
-        internal string Mode { get; private set; }
+        internal string Mode { get; set; }
 
         internal static OptionsBase FromScannerInput(StartRequest request)
         {
@@ -28,6 +28,32 @@ namespace PnP.Scanning.Core.Scanners
                     if (property.Property == Constants.StartWorkflowAnalyze)
                     {
                         (options as WorkflowOptions).Analyze = bool.Parse(property.Value);
+                    }
+                }
+            }
+            else if (request.Mode.Equals(Services.Mode.Classic.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var property in request.Properties)
+                {
+                    if (property.Property == ClassicComponent.Workflow.ToString())
+                    {
+                        (options as ClassicOptions).Workflow = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == ClassicComponent.InfoPath.ToString())
+                    {
+                        (options as ClassicOptions).InfoPath = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == ClassicComponent.AzureACS.ToString())
+                    {
+                        (options as ClassicOptions).AzureACS = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == ClassicComponent.SharePointAddIns.ToString())
+                    {
+                        (options as ClassicOptions).SharePointAddIns = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == ClassicComponent.Pages.ToString())
+                    {
+                        (options as ClassicOptions).Pages = bool.Parse(property.Value);
                     }
                 }
             }
@@ -55,6 +81,13 @@ namespace PnP.Scanning.Core.Scanners
             else if (mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 return new WorkflowOptions
+                {
+                    Mode = mode,
+                };
+            }
+            else if (mode.Equals(Services.Mode.Classic.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new ClassicOptions
                 {
                     Mode = mode,
                 };

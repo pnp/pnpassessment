@@ -1,6 +1,7 @@
 ﻿using Microsoft.SharePoint.Client;
 using PnP.Core.Auth;
 using PnP.Core.Services;
+using PnP.Core.QueryModel;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -62,6 +63,10 @@ namespace PnP.Scanning.Core.Scanners
             else if (options is WorkflowOptions workflowOptions)
             {
                 return new WorkflowScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, workflowOptions);
+            }
+            else if (options is ClassicOptions classicOptions)
+            {
+                return new ClassicScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, classicOptions);
             }
 #if DEBUG
             else if (options is TestOptions testOptions)
@@ -145,6 +150,43 @@ namespace PnP.Scanning.Core.Scanners
             clientContext.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(currentPnPClientContext == null ? AuthenticationManager.HttpClient : currentPnPClientContext.RestClient.Client);
 
             return clientContext;
+        }
+
+        internal static List<PnP.Core.Model.SharePoint.IList> CleanLoadedLists(PnPContext context)
+        {
+            List<PnP.Core.Model.SharePoint.IList> lists = new();
+
+            foreach(var list in context.Web.Lists.AsRequested())
+            {
+                if (list.DefaultViewUrl.Contains("_catalogs"))
+                {
+                    // skip catalogs
+                    continue;
+                }
+
+                if ((int)list.TemplateType == 554)
+                {
+                    // skip MicroFeed (544)
+                    continue;
+                }
+
+                lists.Add(list);
+            }
+
+            return lists;
+        }
+
+        internal static bool ErrorIndicatesFileFolderDoesNotExists(PnP.Core.SharePointRestError error)
+        {
+            // Indicates the file/folder did not exist
+            if (error.HttpResponseCode == 404 && (error.ServerErrorCode == -2130575338 || error.ServerErrorCode == -2147024894))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         protected async Task SendRequestWithClientTagAsync()

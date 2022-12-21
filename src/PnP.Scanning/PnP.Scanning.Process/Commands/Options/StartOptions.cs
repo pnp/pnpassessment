@@ -1,5 +1,4 @@
-﻿using PnP.Core.Services;
-using PnP.Scanning.Core.Authentication;
+﻿using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Process.Commands
@@ -32,6 +31,8 @@ namespace PnP.Scanning.Process.Commands
         public bool SyntexDeepScan { get; set; }
 
         public bool WorkflowAnalyze { get; set; }
+
+        public List<ClassicComponent> ClassicInclude { get; set; }
 
 #if DEBUG
         public int TestNumberOfSites { get; set; }

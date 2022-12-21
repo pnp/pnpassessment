@@ -874,6 +874,20 @@ namespace PnP.Scanning.Core.Storage
         }
         #endregion
 
+        #region Classic
+        internal async Task StoreInfoPathInformationAsync(Guid scanId, List<InfoPath> InfoPathLists)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.InfoPath.AddRangeAsync(InfoPathLists.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreInfoPathInformationAsync succeeded");
+            }
+        }
+        #endregion
+
+
         // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
         private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {

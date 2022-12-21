@@ -6,6 +6,7 @@
         Test,
 #endif
         Syntex,
-        Workflow
+        Workflow,
+        Classic
     }
 }

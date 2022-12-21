@@ -22,6 +22,7 @@ namespace PnP.Scanning.Process.Commands
         // PER SCAN COMPONENT: implement scan component specific options
         private readonly Option<bool> syntexDeepScan;
         private readonly Option<bool> workflowAnalyze;
+        private readonly Option<List<ClassicComponent>> classicIncludeOption;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
@@ -31,6 +32,7 @@ namespace PnP.Scanning.Process.Commands
                            // PER SCAN COMPONENT: implement scan component specific options
                            , Option<bool> syntexDeepScanInput
                            , Option<bool> workflowAnalyzeInput
+                           , Option<List<ClassicComponent>> classicIncludeOptionInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
@@ -51,6 +53,7 @@ namespace PnP.Scanning.Process.Commands
             // PER SCAN COMPONENT: implement scan component specific options
             syntexDeepScan = syntexDeepScanInput;
             workflowAnalyze = workflowAnalyzeInput;
+            classicIncludeOption = classicIncludeOptionInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -73,6 +76,8 @@ namespace PnP.Scanning.Process.Commands
                 // PER SCAN COMPONENT: implement scan component specific options
                 SyntexDeepScan = bindingContext.ParseResult.GetValueForOption(syntexDeepScan),
                 WorkflowAnalyze = bindingContext.ParseResult.GetValueForOption(workflowAnalyze),
+                ClassicInclude = bindingContext.ParseResult.GetValueForOption(classicIncludeOption),
+
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),
 #endif
