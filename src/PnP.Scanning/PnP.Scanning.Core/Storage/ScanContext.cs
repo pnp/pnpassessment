@@ -42,6 +42,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<InfoPath> InfoPath { get; set; }
 
+        internal DbSet<Page> Pages { get; set; }
+
 #if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
@@ -145,6 +147,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<InfoPath>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
+            });
+
+            modelBuilder.Entity<Page>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });
             });
             #endregion
 

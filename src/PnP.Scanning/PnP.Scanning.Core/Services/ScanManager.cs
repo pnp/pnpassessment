@@ -122,7 +122,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", options);
+            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", null, options);
             if (scanner != null)
             {
                 try
@@ -653,7 +653,7 @@ namespace PnP.Scanning.Core.Services
                 foreach(var scanId in scansToMarkAsDone)
                 {
                     // Run post scanning step
-                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", scans[scanId].Options);
+                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", null, scans[scanId].Options);
                     if (scanner != null)
                     {
                         try

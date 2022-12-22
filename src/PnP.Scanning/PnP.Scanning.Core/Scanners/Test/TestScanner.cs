@@ -12,8 +12,8 @@ namespace PnP.Scanning.Core.Scanners
         private const string Cache1 = "Cache1";
 
         internal TestScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, 
-                             Guid scanId, string siteUrl, string webUrl, TestOptions options) : 
-                             base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
+                             Guid scanId, string siteUrl, string webUrl, string webTemplate, TestOptions options) : 
+                             base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl, webTemplate)
         {
             Options = options;            
         }

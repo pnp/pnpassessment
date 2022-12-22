@@ -14,7 +14,7 @@ namespace PnP.Scanning.Core.Scanners
         private static readonly string LineSeparator = ((char)0x2028).ToString();
         private static readonly string ParagraphSeparator = ((char)0x2029).ToString();
 
-        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl)
+        internal ScannerBase(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteUrl, string webUrl, string webTemplate)
         {
             ScanManager = scanManager;
             StorageManager = storageManager;
@@ -22,12 +22,15 @@ namespace PnP.Scanning.Core.Scanners
             ScanId = scanId;
             SiteUrl = siteUrl;
             WebUrl = webUrl;
+            WebTemplate = webTemplate;
             Logger = Log.ForContext("ScanId", scanId);
         }
 
         internal string WebUrl { get; set; }
 
         internal string SiteUrl { get; set; }
+
+        internal string WebTemplate { get; set; }
 
         internal ScanManager ScanManager { get; private set; }
 
@@ -53,25 +56,25 @@ namespace PnP.Scanning.Core.Scanners
         }
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
-        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, OptionsBase options)
+        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, string webTemplate, OptionsBase options)
         {
             // PER SCAN COMPONENT: instantiate the scan component here
             if (options is SyntexOptions syntexOptions)
             {
-                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, syntexOptions);
+                return new SyntexScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, syntexOptions);
             }
             else if (options is WorkflowOptions workflowOptions)
             {
-                return new WorkflowScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, workflowOptions);
+                return new WorkflowScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, workflowOptions);
             }
             else if (options is ClassicOptions classicOptions)
             {
-                return new ClassicScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, classicOptions);
+                return new ClassicScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, classicOptions);
             }
 #if DEBUG
             else if (options is TestOptions testOptions)
             {
-                return new TestScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, testOptions);
+                return new TestScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, testOptions);
             }
 #endif
 

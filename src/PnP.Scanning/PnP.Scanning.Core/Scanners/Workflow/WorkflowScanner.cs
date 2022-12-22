@@ -11,8 +11,8 @@ namespace PnP.Scanning.Core.Scanners
     internal class WorkflowScanner : ScannerBase
     {
         public WorkflowScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
-                               Guid scanId, string siteUrl, string webUrl, WorkflowOptions options) :
-                               base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
+                               Guid scanId, string siteUrl, string webUrl, string webTemplate, WorkflowOptions options) :
+                               base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl, webTemplate)
         {
             Options = options;
         }

@@ -59,8 +59,8 @@ namespace PnP.Scanning.Core.Scanners
 
 
         public SyntexScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, 
-                             Guid scanId, string siteUrl, string webUrl, SyntexOptions options) : 
-            base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
+                             Guid scanId, string siteUrl, string webUrl, string webTemplate, SyntexOptions options) : 
+            base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl, webTemplate)
         {
             Options = options;
         }

@@ -11,8 +11,8 @@ namespace PnP.Scanning.Core.Scanners
     internal class ClassicScanner : ScannerBase
     {
         public ClassicScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
-                               Guid scanId, string siteUrl, string webUrl, ClassicOptions options) :
-                               base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl)
+                               Guid scanId, string siteUrl, string webUrl, string webTemplate, ClassicOptions options) :
+                               base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl, webTemplate)
         {
             Options = options;
         }
@@ -42,10 +42,18 @@ namespace PnP.Scanning.Core.Scanners
                                                  r => r.ItemCount,
                                                  r => r.LastItemUserModifiedDate,
                                                  r => r.DocumentTemplate,
-                                                 r => r.RootFolder.QueryProperties(f => f.ServerRelativeUrl),
-                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl))
+                                                 r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl),
+                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl),
+                                                 r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title))
                 }
             };
+
+            if (Options.Pages)
+            {
+                // Also load site/web feature collections
+                options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
+                options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
+            }
 
             using (var context = await GetPnPContextAsync(options))
             using (var csomContext = GetClientContext(context))
@@ -69,6 +77,16 @@ namespace PnP.Scanning.Core.Scanners
                     await InfoPathScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
                     
                     Logger.Information("Classic InfoPath assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+                }
+
+                if (Options.Pages)
+                {
+                    Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+
+                    // Call the Page scan component
+                    await PageScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
+
+                    Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
             }
 

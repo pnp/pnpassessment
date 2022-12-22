@@ -545,6 +545,7 @@ namespace PnP.Scanning.Core.Storage
             // PER SCAN COMPONENT: For each scan component implement here the method to drop incomplete web scan results
             await DropSyntexIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropWorkflowIncompleteWebScanDataAsync(scanId, dbContext, site, web);
+            await DropClassicIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #if DEBUG
             await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
@@ -875,14 +876,25 @@ namespace PnP.Scanning.Core.Storage
         #endregion
 
         #region Classic
-        internal async Task StoreInfoPathInformationAsync(Guid scanId, List<InfoPath> InfoPathLists)
+        internal async Task StoreInfoPathInformationAsync(Guid scanId, List<InfoPath> infoPathLists)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                await dbContext.InfoPath.AddRangeAsync(InfoPathLists.ToArray());
+                await dbContext.InfoPath.AddRangeAsync(infoPathLists.ToArray());
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StoreInfoPathInformationAsync succeeded");
+            }
+        }
+
+        internal async Task StorePageInformationAsync(Guid scanId, List<Page> pagesLists)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.Pages.AddRangeAsync(pagesLists.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StorePageInformationAsync succeeded");
             }
         }
         #endregion
@@ -925,6 +937,26 @@ namespace PnP.Scanning.Core.Storage
                 dbContext.Workflows.Remove(workflow);
             }
             Log.Information("Consolidating assessment {ScanId}: dropping Workflow results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+        }
+
+        private async Task DropClassicIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        {
+            foreach (var workflow in await dbContext.Workflows.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.Workflows.Remove(workflow);
+            }
+
+            foreach (var infoPath in await dbContext.InfoPath.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.InfoPath.Remove(infoPath);
+            }
+
+            foreach (var page in await dbContext.Pages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.Pages.Remove(page);
+            }
+
+            Log.Information("Consolidating assessment {ScanId}: dropping Classic results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
 #if DEBUG

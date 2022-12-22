@@ -105,6 +105,46 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("InfoPath");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Page", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageType")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl")
+                        .IsUnique();
+
+                    b.ToTable("Pages");
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Property", b =>
                 {
                     b.Property<Guid>("ScanId")
