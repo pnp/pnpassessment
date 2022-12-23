@@ -44,7 +44,8 @@ namespace PnP.Scanning.Core.Scanners
                                                  r => r.DocumentTemplate,
                                                  r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl),
                                                  r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl),
-                                                 r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title))
+                                                 r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title),
+                                                 r => r.UserCustomActions)
                 }
             };
 
@@ -53,6 +54,12 @@ namespace PnP.Scanning.Core.Scanners
                 // Also load site/web feature collections
                 options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
                 options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
+            }
+
+            if (Options.UserCustomActions)
+            {
+                options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.UserCustomActions });
+                options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.UserCustomActions });
             }
 
             using (var context = await GetPnPContextAsync(options))
@@ -87,6 +94,26 @@ namespace PnP.Scanning.Core.Scanners
                     await PageScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
 
                     Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+                }
+
+                if (Options.Lists)
+                {
+                    Logger.Information("Starting classic Lists assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+
+                    // Call the List scan component
+                    await ListScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
+
+                    Logger.Information("Classic Lists assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+                }
+
+                if (Options.UserCustomActions)
+                {
+                    Logger.Information("Starting classic UserCustomAction assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+
+                    // Call the UserCustomAction scan component
+                    await UserCustomActionScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
+
+                    Logger.Information("Classic UserCustomAction assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
             }
 

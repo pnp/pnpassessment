@@ -897,6 +897,28 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("StorePageInformationAsync succeeded");
             }
         }
+
+        internal async Task StoreClassicListInformationAsync(Guid scanId, List<ClassicList> classicLists)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.ClassicLists.AddRangeAsync(classicLists.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreClassicListInformationAsync succeeded");
+            }
+        }
+
+        internal async Task StoreClassicUserCustomActionInformationAsync(Guid scanId, List<ClassicUserCustomAction> userCustomActionLists)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.ClassicUserCustomActions.AddRangeAsync(userCustomActionLists.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreClassicUserCustomActionInformationAsync succeeded");
+            }
+        }
         #endregion
 
 
@@ -954,6 +976,11 @@ namespace PnP.Scanning.Core.Storage
             foreach (var page in await dbContext.Pages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.Pages.Remove(page);
+            }
+
+            foreach (var list in await dbContext.ClassicLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicLists.Remove(list);
             }
 
             Log.Information("Consolidating assessment {ScanId}: dropping Classic results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);

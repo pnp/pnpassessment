@@ -55,6 +55,14 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         (options as ClassicOptions).Pages = bool.Parse(property.Value);
                     }
+                    else if (property.Property == ClassicComponent.Lists.ToString())
+                    {
+                        (options as ClassicOptions).Lists = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == ClassicComponent.UserCustomActions.ToString())
+                    {
+                        (options as ClassicOptions).UserCustomActions = bool.Parse(property.Value);
+                    }
                 }
             }
 #if DEBUG

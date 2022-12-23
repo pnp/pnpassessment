@@ -6,6 +6,9 @@
         Workflow,
         AzureACS,
         SharePointAddIns,
-        Pages
+        Pages,
+        Lists,
+        UserCustomActions,
+        
     }
 }

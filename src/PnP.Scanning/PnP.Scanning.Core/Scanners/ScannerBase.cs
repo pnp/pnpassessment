@@ -161,13 +161,19 @@ namespace PnP.Scanning.Core.Scanners
 
             foreach(var list in context.Web.Lists.AsRequested())
             {
+                if (list.Hidden)
+                {
+                    // Skip hidden lists
+                    continue;
+                }
+                
                 if (list.DefaultViewUrl.Contains("_catalogs"))
                 {
                     // skip catalogs
                     continue;
                 }
 
-                if ((int)list.TemplateType == 554)
+                if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.MySiteMicroBlogList)
                 {
                     // skip MicroFeed (544)
                     continue;

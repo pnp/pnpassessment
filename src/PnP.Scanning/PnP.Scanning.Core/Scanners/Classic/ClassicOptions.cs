@@ -11,5 +11,9 @@
         internal bool SharePointAddIns { get; set; }
 
         internal bool Pages { get; set; }
+
+        internal bool Lists { get; set; }
+
+        internal bool UserCustomActions { get; set; }
     }
 }

@@ -11,7 +11,7 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20221222133309_v1.5.0")]
+    [Migration("20221223163813_v1.5.0")]
     partial class v150
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -36,6 +36,122 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("Cache");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicList", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ClassicByDesign")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DefaultViewRenderType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListExperience")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTemplate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTemplateType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListUrl")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
+                        .IsUnique();
+
+                    b.ToTable("ClassicLists");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicUserCustomAction", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CommandAction")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CommandUIExtension")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Problem")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RegistrationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RegistrationType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ScriptBlock")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ScriptSrc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "Id");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "Id")
+                        .IsUnique();
+
+                    b.ToTable("ClassicUserCustomActions");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.History", b =>

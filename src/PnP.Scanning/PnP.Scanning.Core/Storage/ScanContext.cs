@@ -44,6 +44,10 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Page> Pages { get; set; }
 
+        internal DbSet<ClassicList> ClassicLists { get; set; }
+
+        internal DbSet<ClassicUserCustomAction> ClassicUserCustomActions { get; set; }
+        
 #if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
@@ -152,6 +156,16 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<Page>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });
+            });
+
+            modelBuilder.Entity<ClassicList>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
+            });
+
+            modelBuilder.Entity<ClassicUserCustomAction>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.Id });
             });
             #endregion
 
