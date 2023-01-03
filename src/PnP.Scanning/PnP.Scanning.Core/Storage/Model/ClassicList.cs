@@ -25,6 +25,8 @@ namespace PnP.Scanning.Core.Storage
 
         public int ItemCount { get; set; }
 
+        public string RemediationCode { get; set; }
+
         internal bool AddToDatabase()
         {
             // If a list uses a template which was never modernized

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PnP.Core;
 using PnP.Scanning.Core.Services;
 using Serilog;
+using stdole;
 
 namespace PnP.Scanning.Core.Storage
 {
@@ -876,22 +877,22 @@ namespace PnP.Scanning.Core.Storage
         #endregion
 
         #region Classic
-        internal async Task StoreInfoPathInformationAsync(Guid scanId, List<InfoPath> infoPathLists)
+        internal async Task StoreInfoPathInformationAsync(Guid scanId, List<ClassicInfoPath> infoPathLists)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                await dbContext.InfoPath.AddRangeAsync(infoPathLists.ToArray());
+                await dbContext.ClassicInfoPath.AddRangeAsync(infoPathLists.ToArray());
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StoreInfoPathInformationAsync succeeded");
             }
         }
 
-        internal async Task StorePageInformationAsync(Guid scanId, List<Page> pagesLists)
+        internal async Task StorePageInformationAsync(Guid scanId, List<ClassicPage> pagesLists)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                await dbContext.Pages.AddRangeAsync(pagesLists.ToArray());
+                await dbContext.ClassicPages.AddRangeAsync(pagesLists.ToArray());
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StorePageInformationAsync succeeded");
@@ -919,6 +920,237 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("StoreClassicUserCustomActionInformationAsync succeeded");
             }
         }
+
+        internal async Task StoreClassicExtensibilityInformationAsync(Guid scanId, List<ClassicExtensibility> classicExtensibilities)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.ClassicExtensibilities.AddRangeAsync(classicExtensibilities.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreClassicExtensibilityInformationAsync succeeded");
+            }
+        }
+
+        internal async Task StorePageSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, int modernPageCounter,
+                                                  int wikiPageCounter, int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                if (webSummary == null)
+                {
+                    webSummary = new ClassicWebSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = webUrl,
+                        Template = template,
+                    };
+                    
+                    UpdatePageSummaryData(modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter, webSummary);
+                    
+                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
+                }
+                else
+                {                
+                    UpdatePageSummaryData(modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter, webSummary);                    
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StorePageSummaryAsync succeeded");
+            }
+        }
+
+        private static void UpdatePageSummaryData(int modernPageCounter, int wikiPageCounter, int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter, ClassicWebSummary webSummary)
+        {
+            webSummary.ClassicASPXPages = aspxPageCounter;
+            webSummary.ClassicBlogPages = blogPageCounter;
+            webSummary.ClassicWikiPages = wikiPageCounter;
+            webSummary.ClassicWebPartPages = webPartPageCounter;
+            webSummary.ClassicPublishingPages = publishingPageCounter;
+            webSummary.ModernPages = modernPageCounter;
+            webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter + publishingPageCounter;
+        }
+
+        internal async Task StoreListSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, int modernListCounter,int classicListCounter)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                if (webSummary == null)
+                {
+                    webSummary = new ClassicWebSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = webUrl,
+                        Template = template,
+                        ClassicLists = classicListCounter,
+                        ModernLists = modernListCounter
+                    };
+
+                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
+                }
+                else
+                {
+                    webSummary.ClassicLists = classicListCounter;
+                    webSummary.ModernLists = modernListCounter;
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreListSummaryAsync succeeded");
+            }
+        }
+
+        internal async Task StoreWorkflowSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                // Check if there are workflows for this web
+                var workflows = await dbContext.Workflows.Where(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl).ToListAsync();
+
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                if (webSummary == null)
+                {
+                    webSummary = new ClassicWebSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = webUrl,
+                        Template = template,
+                    };
+
+                    if (workflows.Count > 0)
+                    {
+                        webSummary.ClassicWorkflows = workflows.Count;
+                        webSummary.HasClassicWorkflow = true;
+                    }
+                    else
+                    {
+                        webSummary.HasClassicWorkflow = false;
+                    }
+
+                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
+                }
+                else
+                {
+                    if (workflows.Count > 0)
+                    {
+                        webSummary.ClassicWorkflows = workflows.Count;
+                        webSummary.HasClassicWorkflow = true;
+                    }
+                    else
+                    {
+                        webSummary.HasClassicWorkflow = false;
+                    }
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreWorkflowSummaryAsync succeeded");
+            }
+        }
+
+        internal async Task StoreInfoPathSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, int infoPathForms)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                if (webSummary == null)
+                {
+                    webSummary = new ClassicWebSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = webUrl,
+                        Template = template,
+                    };
+
+                    if (infoPathForms > 0)
+                    {
+                        webSummary.ClassicInfoPathForms = infoPathForms;
+                        webSummary.HasClassicInfoPathForms = true;
+                    }
+                    else
+                    {
+                        webSummary.HasClassicInfoPathForms = false;
+                    }
+
+                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
+                }
+                else
+                {
+                    if (infoPathForms > 0)
+                    {
+                        webSummary.ClassicInfoPathForms = infoPathForms;
+                        webSummary.HasClassicInfoPathForms = true;
+                    }
+                    else
+                    {
+                        webSummary.HasClassicInfoPathForms = false;
+                    }
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreWorkflowSummaryAsync succeeded");
+            }
+        }
+
+        internal async Task StoreSiteSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                // Check if there are workflows for this web
+                var web = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                if (webSummary == null)
+                {
+                    webSummary = new ClassicWebSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = webUrl,
+                        Template = template,
+                    };
+
+                    UpdateSiteSummaryData(web, webSummary);
+
+                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
+                }
+                else
+                {
+                    UpdateSiteSummaryData(web, webSummary);
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreSiteSummaryAsync succeeded");
+            }
+        }
+
+        private static void UpdateSiteSummaryData(Web web, ClassicWebSummary webSummary)
+        {
+            var siteType = Scanners.ClassicScanner.GetSiteType(web.Template);
+
+            if (siteType == Scanners.SiteType.Modern)
+            {
+                webSummary.IsModernSite = true;
+            }
+            else if (siteType == Scanners.SiteType.Publishing)
+            {
+                webSummary.IsClassicPublishingSite = true;
+            }
+            else if (siteType == Scanners.SiteType.Communication)
+            {
+                webSummary.IsModernCommunicationSite = true;
+            }
+        }
+
         #endregion
 
 
@@ -968,14 +1200,14 @@ namespace PnP.Scanning.Core.Storage
                 dbContext.Workflows.Remove(workflow);
             }
 
-            foreach (var infoPath in await dbContext.InfoPath.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var infoPath in await dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
-                dbContext.InfoPath.Remove(infoPath);
+                dbContext.ClassicInfoPath.Remove(infoPath);
             }
 
-            foreach (var page in await dbContext.Pages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var page in await dbContext.ClassicPages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
-                dbContext.Pages.Remove(page);
+                dbContext.ClassicPages.Remove(page);
             }
 
             foreach (var list in await dbContext.ClassicLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())

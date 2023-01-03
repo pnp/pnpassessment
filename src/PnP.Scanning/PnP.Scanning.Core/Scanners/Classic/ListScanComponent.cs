@@ -11,6 +11,8 @@ namespace PnP.Scanning.Core.Scanners
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext)
         {
             List<ClassicList> classicLists = new();
+            int modernListsCounter = 0;
+            
             
             var lists = ScannerBase.CleanLoadedLists(context);
 
@@ -63,6 +65,7 @@ namespace PnP.Scanning.Core.Scanners
                 }
                 else
                 {
+                    modernListsCounter++;
                     scannerBase.Logger.Information("The list {ListUrl} renders in modern", listToAdd.ListUrl);
                 }
             }
@@ -72,6 +75,7 @@ namespace PnP.Scanning.Core.Scanners
                 await scannerBase.StorageManager.StoreClassicListInformationAsync(scannerBase.ScanId, classicLists);
             }
 
+            await scannerBase.StorageManager.StoreListSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, modernListsCounter, classicLists.Count);
         }
 
         private static bool IsClassicByDesign(PnP.Core.Model.SharePoint.IList list)

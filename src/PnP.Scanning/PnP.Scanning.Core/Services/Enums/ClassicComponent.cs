@@ -8,7 +8,7 @@
         SharePointAddIns,
         Pages,
         Lists,
-        UserCustomActions,
+        Extensibility,
         
     }
 }

@@ -1,4 +1,6 @@
-﻿using PnP.Core.Model;
+﻿using MathNet.Numerics.Statistics;
+using Microsoft.SharePoint.Client.WorkflowServices;
+using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
@@ -7,9 +9,6 @@ using PnP.Scanning.Core.Storage;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Xml;
-using MathNet.Numerics.Statistics;
-using Microsoft.SharePoint.Client.WorkflowServices;
-using Microsoft.SharePoint.Client;
 
 namespace PnP.Scanning.Core.Scanners
 {

@@ -14,6 +14,6 @@
 
         internal bool Lists { get; set; }
 
-        internal bool UserCustomActions { get; set; }
+        internal bool Extensibility { get; set; }
     }
 }

@@ -3,7 +3,7 @@
 namespace PnP.Scanning.Core.Storage
 {
     [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl), nameof(ListId) }, IsUnique = true)]
-    internal class InfoPath : BaseScanResult
+    internal class ClassicInfoPath : BaseScanResult
     {
         public string ListUrl { get; set; }
 
@@ -23,5 +23,7 @@ namespace PnP.Scanning.Core.Storage
         public int ItemCount { get; set; }
 
         public DateTime LastItemUserModifiedDate { get; set; }
+
+        public string RemediationCode { get; set; }
     }
 }

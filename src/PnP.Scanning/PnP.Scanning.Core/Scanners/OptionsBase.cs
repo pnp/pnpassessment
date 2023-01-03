@@ -59,9 +59,9 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         (options as ClassicOptions).Lists = bool.Parse(property.Value);
                     }
-                    else if (property.Property == ClassicComponent.UserCustomActions.ToString())
+                    else if (property.Property == ClassicComponent.Extensibility.ToString())
                     {
-                        (options as ClassicOptions).UserCustomActions = bool.Parse(property.Value);
+                        (options as ClassicOptions).Extensibility = bool.Parse(property.Value);
                     }
                 }
             }

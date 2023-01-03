@@ -37,6 +37,8 @@ namespace PnP.Scanning.Core.Storage
 
         public string ListTitle { get; set; }
 
+        public string RemediationCode { get; set; }
+
         public bool AddToDatabase()
         {
             return !string.IsNullOrEmpty(Problem);

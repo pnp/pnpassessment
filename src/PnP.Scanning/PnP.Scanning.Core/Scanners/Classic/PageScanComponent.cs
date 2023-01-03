@@ -25,10 +25,19 @@ namespace PnP.Scanning.Core.Scanners
         private const string TitleField = "Title";
         private const string BSNField = "BSN";
 
+        // Page Types
+        internal const string ModernPage = "ModernPage";
+        internal const string WebPartPage = "WebPartPage";
+        internal const string WikiPage = "WikiPage";
+        internal const string ASPXPage = "ASPXPage";
+        internal const string PublishingPage = "PublishingPage";
+        internal const string BlogPage = "BlogPage";
+
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext)
         {
             
-            List<Page> pagesList = new();
+            List<ClassicPage> pagesList = new();
+            int modernPageCounter = 0;
 
             var lists = ScannerBase.CleanLoadedLists(context);
 
@@ -46,7 +55,7 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         foreach (var listItem in listItems)
                         {
-                            pagesList.Add(new Page
+                            pagesList.Add(new ClassicPage
                             {
                                 ScanId = scannerBase.ScanId,
                                 SiteUrl = scannerBase.SiteUrl,
@@ -57,7 +66,7 @@ namespace PnP.Scanning.Core.Scanners
                                 ListTitle = blogList.Title,
                                 ListId = blogList.Id,
                                 ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                                PageType = "BlogPage"
+                                PageType = BlogPage
                             });
                         }
                     }).ConfigureAwait(false);
@@ -88,7 +97,7 @@ namespace PnP.Scanning.Core.Scanners
                         {
                             foreach (var listItem in listItems)
                             {
-                                pagesList.Add(new Page
+                                var pageToAdd = new ClassicPage
                                 {
                                     ScanId = scannerBase.ScanId,
                                     SiteUrl = scannerBase.SiteUrl,
@@ -100,7 +109,16 @@ namespace PnP.Scanning.Core.Scanners
                                     ListId = sitePagesLibrary.Id,
                                     ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
                                     PageType = GetPageType(listItem)
-                                });
+                                };
+
+                                if (pageToAdd.AddToDatabase())
+                                {
+                                    pagesList.Add(pageToAdd);
+                                }
+                                else
+                                {
+                                    modernPageCounter++;
+                                }
                             }
                         }).ConfigureAwait(false);
                     }
@@ -111,9 +129,41 @@ namespace PnP.Scanning.Core.Scanners
             {
                 await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
             }
+
+            // Loop over the found pages and save the page summary information
+            int wikiPageCounter = 0;
+            int blogPageCounter = 0;
+            int webPartPageCounter = 0;
+            int aspxPageCounter = 0;
+            int publishingPageCounter = 0;
+
+            foreach (var page in pagesList)
+            {
+                switch (page.PageType)
+                {
+                    case WikiPage:
+                        wikiPageCounter++;
+                        break;
+                    case BlogPage:
+                        blogPageCounter++;
+                        break;
+                    case WebPartPage:
+                        webPartPageCounter++;
+                        break;
+                    case ASPXPage:
+                        aspxPageCounter++;
+                        break;
+                    case PublishingPage:
+                        publishingPageCounter++;
+                        break;
+                }
+            }
+
+            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate,
+                                                                   modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
         }
 
-        private static async Task QueryPublishingPagesAsync(ScannerBase scannerBase, List<Page> pagesList, List<PnP.Core.Model.SharePoint.IList> lists)
+        private static async Task QueryPublishingPagesAsync(ScannerBase scannerBase, List<ClassicPage> pagesList, List<PnP.Core.Model.SharePoint.IList> lists)
         {
             var pagesLibrary = lists.FirstOrDefault(l => l.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.PublishingPagesLibrary);
             if (pagesLibrary != null)
@@ -123,7 +173,7 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     foreach (var listItem in listItems)
                     {
-                        pagesList.Add(new Page
+                        pagesList.Add(new ClassicPage
                         {
                             ScanId = scannerBase.ScanId,
                             SiteUrl = scannerBase.SiteUrl,
@@ -134,7 +184,7 @@ namespace PnP.Scanning.Core.Scanners
                             ListTitle = pagesLibrary.Title,
                             ListId = pagesLibrary.Id,
                             ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                            PageType = "PublishingPage"
+                            PageType = PublishingPage
                         });
                     }
                 }).ConfigureAwait(false);
@@ -235,26 +285,26 @@ namespace PnP.Scanning.Core.Scanners
         {
             if (GetFieldValue(listItem, HtmlFileTypeField, string.Empty) == "SharePoint.WebPartPage.Document")
             {
-                return "WebPartPage";
+                return WebPartPage;
             }
 
             if (GetFieldValue(listItem, ClientSideApplicationIdField, string.Empty).Equals($"{{{FeatureId_Web_ModernPage}}}", StringComparison.InvariantCultureIgnoreCase))
             {
-                return "ModernPage";
+                return ModernPage;
             }
 
             if (GetFieldValue<string>(listItem, WikiField) != null)
             {
-                return "WikiPage";
+                return WikiPage;
             }
 
             if (GetFieldValue<string>(listItem, BSNField) != "")
             {
-                return "ASPXPage";
+                return ASPXPage;
             }
             else
             {
-                return "WikiPage";
+                return WikiPage;
             }
         }
     }

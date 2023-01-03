@@ -40,14 +40,20 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Workflow> Workflows { get; set; }
 
-        internal DbSet<InfoPath> InfoPath { get; set; }
+        internal DbSet<ClassicInfoPath> ClassicInfoPath { get; set; }
 
-        internal DbSet<Page> Pages { get; set; }
+        internal DbSet<ClassicPage> ClassicPages { get; set; }
 
         internal DbSet<ClassicList> ClassicLists { get; set; }
 
         internal DbSet<ClassicUserCustomAction> ClassicUserCustomActions { get; set; }
-        
+
+        internal DbSet<ClassicExtensibility> ClassicExtensibilities { get; set; }
+
+        internal DbSet<ClassicSiteCollection> ClassicSiteCollections { get; set; }
+
+        internal DbSet<ClassicWebSummary> ClassicWebSummaries { get; set; }      
+
 #if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
@@ -142,18 +148,22 @@ namespace PnP.Scanning.Core.Storage
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FileType });
             });
+            #endregion
 
+            #region Workflow scanner
             modelBuilder.Entity<Workflow>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.DefinitionId, e.SubscriptionId });
             });
+            #endregion
 
-            modelBuilder.Entity<InfoPath>(entity =>
+            #region Classic scanner
+            modelBuilder.Entity<ClassicInfoPath>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
             });
 
-            modelBuilder.Entity<Page>(entity =>
+            modelBuilder.Entity<ClassicPage>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });
             });
@@ -166,6 +176,21 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<ClassicUserCustomAction>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.Id });
+            });
+
+            modelBuilder.Entity<ClassicExtensibility>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
+            });
+
+            modelBuilder.Entity<ClassicSiteCollection>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl });
+            });
+
+            modelBuilder.Entity<ClassicWebSummary>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
             });
             #endregion
 

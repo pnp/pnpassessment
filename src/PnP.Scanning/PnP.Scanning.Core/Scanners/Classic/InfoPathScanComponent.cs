@@ -12,7 +12,7 @@ namespace PnP.Scanning.Core.Scanners
         
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext)
         {
-            List<InfoPath> infoPathLists = new();
+            List<ClassicInfoPath> infoPathLists = new();
             
             var lists = ScannerBase.CleanLoadedLists(context);
 
@@ -21,7 +21,7 @@ namespace PnP.Scanning.Core.Scanners
                 if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.XMLForm ||
                     (!string.IsNullOrEmpty(list.DocumentTemplate) && list.DocumentTemplate.EndsWith(".xsn", StringComparison.InvariantCultureIgnoreCase)))
                 {
-                    infoPathLists.Add(new InfoPath
+                    infoPathLists.Add(new ClassicInfoPath
                     {
                         ScanId = scannerBase.ScanId,
                         SiteUrl = scannerBase.SiteUrl,
@@ -42,7 +42,7 @@ namespace PnP.Scanning.Core.Scanners
                     var formContentTypeFound = list.ContentTypes.AsRequested().Where(c => c.Id.StartsWith(FormBaseContentType, StringComparison.InvariantCultureIgnoreCase)).OrderBy(c => c.Id.Length).FirstOrDefault();
                     if (formContentTypeFound != null)
                     {
-                        infoPathLists.Add(new InfoPath
+                        infoPathLists.Add(new ClassicInfoPath
                         {
                             ScanId = scannerBase.ScanId,
                             SiteUrl = scannerBase.SiteUrl,
@@ -73,7 +73,7 @@ namespace PnP.Scanning.Core.Scanners
                                 infoPathEnabled = infoPathEnabledParsed;
                             }
                             
-                            infoPathLists.Add(new InfoPath
+                            infoPathLists.Add(new ClassicInfoPath
                             {
                                 ScanId = scannerBase.ScanId,
                                 SiteUrl = scannerBase.SiteUrl,
@@ -106,6 +106,8 @@ namespace PnP.Scanning.Core.Scanners
             {
                 await scannerBase.StorageManager.StoreInfoPathInformationAsync(scannerBase.ScanId, infoPathLists);
             }
+
+            await scannerBase.StorageManager.StoreInfoPathSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, infoPathLists.Count);
 
         }
 

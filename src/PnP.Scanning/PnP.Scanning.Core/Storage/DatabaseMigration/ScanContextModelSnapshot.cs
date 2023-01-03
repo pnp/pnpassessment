@@ -36,6 +36,95 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("Cache");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicExtensibility", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AlternateCSS")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomMasterPage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MasterPage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("UsesCustomCSS")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("UsesCustomMasterPage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("UsesCustomTheme")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("UsesUserCustomAction")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl")
+                        .IsUnique();
+
+                    b.ToTable("ClassicExtensibilities");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicInfoPath", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InfoPathTemplate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InfoPathUsage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastItemUserModifiedDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
+                        .IsUnique();
+
+                    b.ToTable("ClassicInfoPath");
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicList", b =>
                 {
                     b.Property<Guid>("ScanId")
@@ -77,12 +166,131 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ListUrl")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId");
 
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
                         .IsUnique();
 
                     b.ToTable("ClassicLists");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPage", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ListUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl")
+                        .IsUnique();
+
+                    b.ToTable("ClassicPages");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicSiteCollection", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AzureACSPrincipals")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicASPXPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicBlogPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicExtensibilities")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicInfoPathForms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicLists")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicPublishingPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicWebPartPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicWikiPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicWorkflows")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ModernLists")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ModernPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RootWebTemplate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SharePointAddIns")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SubWebCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SubWebDepth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SubWebTemplates")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl");
+
+                    b.HasIndex("ScanId", "SiteUrl")
+                        .IsUnique();
+
+                    b.ToTable("ClassicSiteCollections");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicUserCustomAction", b =>
@@ -132,6 +340,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("RegistrationType")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ScriptBlock")
                         .HasColumnType("TEXT");
 
@@ -150,6 +361,94 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("ClassicUserCustomActions");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebSummary", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AzureACSPrincipals")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicASPXPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicBlogPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicExtensibilities")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicInfoPathForms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicLists")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicPublishingPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicWebPartPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicWikiPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClassicWorkflows")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasAzureACSPrincipal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasClassicExtensibility")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasClassicInfoPathForms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasClassicWorkflow")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasSharePointAddIns")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsClassicPublishingSite")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsModernCommunicationSite")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsModernSite")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ModernLists")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ModernPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SharePointAddIns")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Template")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl")
+                        .IsUnique();
+
+                    b.ToTable("ClassicWebSummaries");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.History", b =>
@@ -176,89 +475,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("History");
-                });
-
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.InfoPath", b =>
-                {
-                    b.Property<Guid>("ScanId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SiteUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("WebUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("ListId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("InfoPathTemplate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("InfoPathUsage")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ItemCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("LastItemUserModifiedDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ListTitle")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ListUrl")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "ListId");
-
-                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
-                        .IsUnique();
-
-                    b.ToTable("InfoPath");
-                });
-
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.Page", b =>
-                {
-                    b.Property<Guid>("ScanId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SiteUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("WebUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PageUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("ListId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ListTitle")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ListUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ModifiedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PageName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PageType")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl");
-
-                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl")
-                        .IsUnique();
-
-                    b.ToTable("Pages");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Property", b =>
