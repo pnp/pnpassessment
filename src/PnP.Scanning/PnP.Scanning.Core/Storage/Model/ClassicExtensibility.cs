@@ -19,12 +19,9 @@ namespace PnP.Scanning.Core.Storage
 
         public bool UsesUserCustomAction { get; set; }
 
-        public string RemediationCode { get; set; }
+        public bool HasSharePointAddIns { get; set; }
 
-        internal bool AddToDatabase()
-        {
-            return true;
-        }
+        public string RemediationCode { get; set; }
 
     }
 }

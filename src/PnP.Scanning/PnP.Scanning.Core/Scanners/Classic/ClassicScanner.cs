@@ -32,7 +32,8 @@ namespace PnP.Scanning.Core.Scanners
                     w => w.RootWeb.QueryProperties(p => p.ContentTypes.QueryProperties(p => p.StringId, p => p.Name))
                 },
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
-                {                    
+                {   
+                    w => w.LastItemUserModifiedDate,                 
                     w => w.Lists.QueryProperties(r => r.Title, 
                                                  r => r.Hidden,
                                                  r => r.DefaultViewUrl,
@@ -77,7 +78,11 @@ namespace PnP.Scanning.Core.Scanners
                                                              this, context, csomContext).ConfigureAwait(false);
 
                     // Store workflow summary data
-                    await StorageManager.StoreWorkflowSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate).ConfigureAwait(false);
+                    HashSet<string> remediationCodes = new()
+                    {
+                        RemediationCodes.WF1.ToString()
+                    };
+                    await StorageManager.StoreWorkflowSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context, remediationCodes).ConfigureAwait(false);
 
                     Logger.Information("Classic Workflow assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
@@ -137,7 +142,7 @@ namespace PnP.Scanning.Core.Scanners
 
                     //Logger.Information("Classic Azure ACS assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
-
+                
                 if (Options.SharePointAddIns)
                 {
                     //Logger.Information("Starting SharePoint AddIns assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
@@ -148,7 +153,7 @@ namespace PnP.Scanning.Core.Scanners
                 }
 
                 // Store site summary
-                await StorageManager.StoreSiteSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate).ConfigureAwait(false);
+                await StorageManager.StoreSiteSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context).ConfigureAwait(false);
 
             }
 
@@ -178,27 +183,21 @@ namespace PnP.Scanning.Core.Scanners
                 // Iterate over the sites to populate the classic site collection overview table
                 string lastSiteUrl = null;
                 HashSet<string> webTemplates = null;
-                ClassicSiteCollection classicSiteCollection = null;
+                HashSet<string> remediationCodes = null;
+                ClassicSiteSummary classicSiteCollection = null;
                 
                 foreach (var web in dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId).OrderBy(p => p.SiteUrl).ThenBy(p => p.WebUrl))
                 {
                     if (lastSiteUrl == null || lastSiteUrl != web.SiteUrl)
                     {
-                        // We're processing a new site collection
-
+                        // We're starting to process a new site collection, so store the previous one
                         if (lastSiteUrl != null)
                         {
-                            // Get the unique list of sub web templates
-                            if (webTemplates.Count > 0)
-                            {
-                                classicSiteCollection.SubWebTemplates = string.Join(",", webTemplates);
-                            }
-                            
-                            // Persist the previously collected site collection data
-                            dbContext.ClassicSiteCollections.Add(classicSiteCollection);
+                            AddClassicSiteCollection(dbContext, webTemplates, remediationCodes, classicSiteCollection);
                         }
 
-                        classicSiteCollection = new ClassicSiteCollection
+                        // Initialize variables for the new site collection
+                        classicSiteCollection = new ClassicSiteSummary
                         {
                             ScanId = ScanId,
                             SiteUrl = web.SiteUrl,
@@ -206,6 +205,7 @@ namespace PnP.Scanning.Core.Scanners
 
                         lastSiteUrl = web.SiteUrl;
                         webTemplates = new HashSet<string>();
+                        remediationCodes = new HashSet<string>();
                     }
 
                     if (web.WebUrl != "/")
@@ -222,10 +222,16 @@ namespace PnP.Scanning.Core.Scanners
 
                         // maintain list of unique sub web templates
                         webTemplates.Add(web.Template);
+
+                        if (web.LastItemUserModifiedDate > classicSiteCollection.LastItemUserModifiedDate)
+                        {
+                            classicSiteCollection.LastItemUserModifiedDate = web.LastItemUserModifiedDate;
+                        }
                     }
                     else
                     {
                         classicSiteCollection.RootWebTemplate = web.Template;
+                        classicSiteCollection.LastItemUserModifiedDate = web.LastItemUserModifiedDate;
                     }
 
                     classicSiteCollection.ClassicLists += web.ClassicLists;
@@ -246,24 +252,40 @@ namespace PnP.Scanning.Core.Scanners
                     classicSiteCollection.ClassicExtensibilities += web.ClassicExtensibilities;
                     classicSiteCollection.SharePointAddIns += web.SharePointAddIns;
                     classicSiteCollection.AzureACSPrincipals += web.AzureACSPrincipals;
+
+                    AggregateRemediationCodes(remediationCodes, web.AggregatedRemediationCodes);
                 }
 
                 // Store the last site collection
-                if (webTemplates.Count > 0)
-                {
-                    classicSiteCollection.SubWebTemplates = string.Join(",", webTemplates);
-                }                
-                dbContext.ClassicSiteCollections.Add(classicSiteCollection);
-
+                AddClassicSiteCollection(dbContext, webTemplates, remediationCodes, classicSiteCollection);
+                
+                // Persist the changes
                 await dbContext.SaveChangesAsync();
             }
 
             Logger.Information("Post assessment work done");
         }
 
+        private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)
+        {
+            // Get the unique list of sub web templates
+            if (webTemplates.Count > 0)
+            {
+                classicSiteCollection.SubWebTemplates = string.Join(",", webTemplates);
+            }
+
+            if (remediationCodes.Count > 0)
+            {
+                classicSiteCollection.AggregatedRemediationCodes = string.Join(",", remediationCodes);
+            }
+
+            // Persist the previously collected site collection data
+            dbContext.ClassicSiteSummaries.Add(classicSiteCollection);
+        }
+
         internal static SiteType GetSiteType(string webTemplate)
         {
-            return webTemplate switch
+            return webTemplate.ToUpper() switch
             {
                 // Modern Communication site or Topic Center
                 "SITEPAGEPUBLISHING#0" => SiteType.Communication,
@@ -287,8 +309,23 @@ namespace PnP.Scanning.Core.Scanners
                 "BLANKINTERNET#0" => SiteType.Publishing,
                 // Publishing site with workflow
                 "BLANKINTERNET#2" => SiteType.Publishing,
+                // Blog
+                "BLOG#0" => SiteType.Blog,
+                // Everything else
                 _ => SiteType.Classic,
             };
+        }
+
+        private static void AggregateRemediationCodes(HashSet<string> remediationCodes, string input)
+        {
+            var split = input?.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (split != null)
+            {
+                foreach (var code in split)
+                {
+                    remediationCodes.Add(code);
+                }
+            }
         }
 
         private static int CountCharsUsingForeachSpan(string source, char toFind)

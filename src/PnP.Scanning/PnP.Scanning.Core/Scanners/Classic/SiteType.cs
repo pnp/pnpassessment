@@ -5,6 +5,7 @@
         Modern,
         Communication,
         Classic,
-        Publishing
+        Publishing,
+        Blog
     }
 }

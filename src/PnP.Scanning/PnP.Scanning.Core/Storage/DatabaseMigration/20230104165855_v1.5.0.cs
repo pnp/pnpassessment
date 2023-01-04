@@ -23,6 +23,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     AlternateCSS = table.Column<string>(type: "TEXT", nullable: true),
                     UsesCustomTheme = table.Column<bool>(type: "INTEGER", nullable: false),
                     UsesUserCustomAction = table.Column<bool>(type: "INTEGER", nullable: false),
+                    HasSharePointAddIns = table.Column<bool>(type: "INTEGER", nullable: false),
                     RemediationCode = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
@@ -98,11 +99,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 });
 
             migrationBuilder.CreateTable(
-                name: "ClassicSiteCollections",
+                name: "ClassicSiteSummaries",
                 columns: table => new
                 {
                     ScanId = table.Column<Guid>(type: "TEXT", nullable: false),
                     SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
+                    LastItemUserModifiedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     RootWebTemplate = table.Column<string>(type: "TEXT", nullable: true),
                     SubWebTemplates = table.Column<string>(type: "TEXT", nullable: true),
                     SubWebCount = table.Column<int>(type: "INTEGER", nullable: false),
@@ -121,11 +123,11 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     ClassicExtensibilities = table.Column<int>(type: "INTEGER", nullable: false),
                     SharePointAddIns = table.Column<int>(type: "INTEGER", nullable: false),
                     AzureACSPrincipals = table.Column<int>(type: "INTEGER", nullable: false),
-                    RemediationCode = table.Column<string>(type: "TEXT", nullable: true)
+                    AggregatedRemediationCodes = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ClassicSiteCollections", x => new { x.ScanId, x.SiteUrl });
+                    table.PrimaryKey("PK_ClassicSiteSummaries", x => new { x.ScanId, x.SiteUrl });
                 });
 
             migrationBuilder.CreateTable(
@@ -166,6 +168,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     SiteUrl = table.Column<string>(type: "TEXT", nullable: false),
                     WebUrl = table.Column<string>(type: "TEXT", nullable: false),
                     Template = table.Column<string>(type: "TEXT", nullable: true),
+                    LastItemUserModifiedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     ClassicLists = table.Column<int>(type: "INTEGER", nullable: false),
                     ModernLists = table.Column<int>(type: "INTEGER", nullable: false),
                     ClassicPages = table.Column<int>(type: "INTEGER", nullable: false),
@@ -187,7 +190,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     HasSharePointAddIns = table.Column<bool>(type: "INTEGER", nullable: false),
                     SharePointAddIns = table.Column<int>(type: "INTEGER", nullable: false),
                     HasAzureACSPrincipal = table.Column<bool>(type: "INTEGER", nullable: false),
-                    AzureACSPrincipals = table.Column<int>(type: "INTEGER", nullable: false)
+                    AzureACSPrincipals = table.Column<int>(type: "INTEGER", nullable: false),
+                    RemediationCode = table.Column<string>(type: "TEXT", nullable: true),
+                    AggregatedRemediationCodes = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -219,8 +224,8 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ClassicSiteCollections_ScanId_SiteUrl",
-                table: "ClassicSiteCollections",
+                name: "IX_ClassicSiteSummaries_ScanId_SiteUrl",
+                table: "ClassicSiteSummaries",
                 columns: new[] { "ScanId", "SiteUrl" },
                 unique: true);
 
@@ -252,7 +257,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 name: "ClassicPages");
 
             migrationBuilder.DropTable(
-                name: "ClassicSiteCollections");
+                name: "ClassicSiteSummaries");
 
             migrationBuilder.DropTable(
                 name: "ClassicUserCustomActions");

@@ -53,6 +53,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("CustomMasterPage")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("HasSharePointAddIns")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("MasterPage")
                         .HasColumnType("TEXT");
 
@@ -220,12 +223,15 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("ClassicPages");
                 });
 
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicSiteCollection", b =>
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicSiteSummary", b =>
                 {
                     b.Property<Guid>("ScanId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AggregatedRemediationCodes")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("AzureACSPrincipals")
@@ -261,14 +267,14 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<int>("ClassicWorkflows")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("LastItemUserModifiedDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("ModernLists")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ModernPages")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("RemediationCode")
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("RootWebTemplate")
                         .HasColumnType("TEXT");
@@ -290,7 +296,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl")
                         .IsUnique();
 
-                    b.ToTable("ClassicSiteCollections");
+                    b.ToTable("ClassicSiteSummaries");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicUserCustomAction", b =>
@@ -374,6 +380,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("WebUrl")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("AggregatedRemediationCodes")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("AzureACSPrincipals")
                         .HasColumnType("INTEGER");
 
@@ -431,11 +440,17 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<bool>("IsModernSite")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("LastItemUserModifiedDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("ModernLists")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ModernPages")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SharePointAddIns")
                         .HasColumnType("INTEGER");

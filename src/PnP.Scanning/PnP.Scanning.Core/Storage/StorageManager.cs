@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core;
+using PnP.Core.Services;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using Serilog;
 using stdole;
@@ -932,7 +934,7 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StorePageSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, int modernPageCounter,
+        internal async Task StorePageSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int modernPageCounter, 
                                                   int wikiPageCounter, int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -947,34 +949,41 @@ namespace PnP.Scanning.Core.Storage
                         SiteUrl = siteUrl,
                         WebUrl = webUrl,
                         Template = template,
+                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,                        
                     };
-                    
-                    UpdatePageSummaryData(modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter, webSummary);
                     
                     await dbContext.ClassicWebSummaries.AddAsync(webSummary);
                 }
-                else
-                {                
-                    UpdatePageSummaryData(modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter, webSummary);                    
-                }
+
+                webSummary.ClassicASPXPages = aspxPageCounter;
+                webSummary.ClassicBlogPages = blogPageCounter;
+                webSummary.ClassicWikiPages = wikiPageCounter;
+                webSummary.ClassicWebPartPages = webPartPageCounter;
+                webSummary.ClassicPublishingPages = publishingPageCounter;
+                webSummary.ModernPages = modernPageCounter;
+                webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter + publishingPageCounter;
+                webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StorePageSummaryAsync succeeded");
             }
         }
 
-        private static void UpdatePageSummaryData(int modernPageCounter, int wikiPageCounter, int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter, ClassicWebSummary webSummary)
+        private static string AggregateRemediationCodes(HashSet<string> remediationCodes, ClassicWebSummary webSummary)
         {
-            webSummary.ClassicASPXPages = aspxPageCounter;
-            webSummary.ClassicBlogPages = blogPageCounter;
-            webSummary.ClassicWikiPages = wikiPageCounter;
-            webSummary.ClassicWebPartPages = webPartPageCounter;
-            webSummary.ClassicPublishingPages = publishingPageCounter;
-            webSummary.ModernPages = modernPageCounter;
-            webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter + publishingPageCounter;
+            var split = webSummary.AggregatedRemediationCodes?.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (split != null)
+            {
+                foreach (var code in split)
+                {
+                    remediationCodes.Add(code);
+                }
+            }
+
+            return string.Join(",", remediationCodes);
         }
 
-        internal async Task StoreListSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, int modernListCounter,int classicListCounter)
+        internal async Task StoreListSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int modernListCounter,int classicListCounter)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -988,24 +997,22 @@ namespace PnP.Scanning.Core.Storage
                         SiteUrl = siteUrl,
                         WebUrl = webUrl,
                         Template = template,
-                        ClassicLists = classicListCounter,
-                        ModernLists = modernListCounter
+                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate
                     };
 
                     await dbContext.ClassicWebSummaries.AddAsync(webSummary);
                 }
-                else
-                {
-                    webSummary.ClassicLists = classicListCounter;
-                    webSummary.ModernLists = modernListCounter;
-                }
+
+                webSummary.ClassicLists = classicListCounter;
+                webSummary.ModernLists = modernListCounter;
+                webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StoreListSummaryAsync succeeded");
             }
         }
 
-        internal async Task StoreWorkflowSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template)
+        internal async Task StoreWorkflowSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -1022,31 +1029,21 @@ namespace PnP.Scanning.Core.Storage
                         SiteUrl = siteUrl,
                         WebUrl = webUrl,
                         Template = template,
+                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,
                     };
-
-                    if (workflows.Count > 0)
-                    {
-                        webSummary.ClassicWorkflows = workflows.Count;
-                        webSummary.HasClassicWorkflow = true;
-                    }
-                    else
-                    {
-                        webSummary.HasClassicWorkflow = false;
-                    }
 
                     await dbContext.ClassicWebSummaries.AddAsync(webSummary);
                 }
+
+                if (workflows.Count > 0)
+                {
+                    webSummary.ClassicWorkflows = workflows.Count;
+                    webSummary.HasClassicWorkflow = true;
+                    webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
+                }
                 else
                 {
-                    if (workflows.Count > 0)
-                    {
-                        webSummary.ClassicWorkflows = workflows.Count;
-                        webSummary.HasClassicWorkflow = true;
-                    }
-                    else
-                    {
-                        webSummary.HasClassicWorkflow = false;
-                    }
+                    webSummary.HasClassicWorkflow = false;
                 }
 
                 await dbContext.SaveChangesAsync();
@@ -1054,7 +1051,7 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreInfoPathSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, int infoPathForms)
+        internal async Task StoreInfoPathSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int infoPathForms)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -1068,31 +1065,21 @@ namespace PnP.Scanning.Core.Storage
                         SiteUrl = siteUrl,
                         WebUrl = webUrl,
                         Template = template,
+                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,
                     };
-
-                    if (infoPathForms > 0)
-                    {
-                        webSummary.ClassicInfoPathForms = infoPathForms;
-                        webSummary.HasClassicInfoPathForms = true;
-                    }
-                    else
-                    {
-                        webSummary.HasClassicInfoPathForms = false;
-                    }
 
                     await dbContext.ClassicWebSummaries.AddAsync(webSummary);
                 }
+
+                if (infoPathForms > 0)
+                {
+                    webSummary.ClassicInfoPathForms = infoPathForms;
+                    webSummary.HasClassicInfoPathForms = true;
+                    webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
+                }
                 else
                 {
-                    if (infoPathForms > 0)
-                    {
-                        webSummary.ClassicInfoPathForms = infoPathForms;
-                        webSummary.HasClassicInfoPathForms = true;
-                    }
-                    else
-                    {
-                        webSummary.HasClassicInfoPathForms = false;
-                    }
+                    webSummary.HasClassicInfoPathForms = false;
                 }
 
                 await dbContext.SaveChangesAsync();
@@ -1100,7 +1087,7 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreSiteSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template)
+        internal async Task StoreSiteSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -1117,15 +1104,21 @@ namespace PnP.Scanning.Core.Storage
                         SiteUrl = siteUrl,
                         WebUrl = webUrl,
                         Template = template,
+                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,
                     };
-
-                    UpdateSiteSummaryData(web, webSummary);
 
                     await dbContext.ClassicWebSummaries.AddAsync(webSummary);
                 }
-                else
+
+                var remediationCode = UpdateSiteSummaryData(web, webSummary);
+
+                if (!string.IsNullOrEmpty(remediationCode))
                 {
-                    UpdateSiteSummaryData(web, webSummary);
+                    HashSet<string> remediationCodes = new()
+                    {
+                        remediationCode
+                    };
+                    webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
                 }
 
                 await dbContext.SaveChangesAsync();
@@ -1133,21 +1126,65 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        private static void UpdateSiteSummaryData(Web web, ClassicWebSummary webSummary)
+        private static string UpdateSiteSummaryData(Web web, ClassicWebSummary webSummary)
         {
-            var siteType = Scanners.ClassicScanner.GetSiteType(web.Template);
+            var siteType = ClassicScanner.GetSiteType(web.Template);
 
-            if (siteType == Scanners.SiteType.Modern)
+            if (siteType == SiteType.Modern)
             {
                 webSummary.IsModernSite = true;
             }
-            else if (siteType == Scanners.SiteType.Publishing)
+            else if (siteType == SiteType.Publishing)
             {
                 webSummary.IsClassicPublishingSite = true;
+                webSummary.RemediationCode = RemediationCodes.CS2.ToString();
+                
             }
-            else if (siteType == Scanners.SiteType.Communication)
+            else if (siteType == SiteType.Communication)
             {
                 webSummary.IsModernCommunicationSite = true;
+            }
+            else if (siteType == SiteType.Blog)
+            {
+                webSummary.RemediationCode = RemediationCodes.CS1.ToString();
+            }
+
+            return webSummary.RemediationCode;
+        }
+
+        internal async Task StoreExtensibilitySummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int extensibilityCount)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+
+                if (webSummary == null)
+                {
+                    webSummary = new ClassicWebSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = webUrl,
+                        Template = template,
+                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,
+                    };
+
+                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
+                }
+
+                if (extensibilityCount > 0)
+                {
+                    webSummary.ClassicExtensibilities = extensibilityCount;
+                    webSummary.HasClassicExtensibility = true;
+                    webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
+                }
+                else
+                {
+                    webSummary.HasClassicExtensibility = false;
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreExtensibilitySummaryAsync succeeded");
             }
         }
 
@@ -1213,6 +1250,26 @@ namespace PnP.Scanning.Core.Storage
             foreach (var list in await dbContext.ClassicLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.ClassicLists.Remove(list);
+            }
+
+            foreach (var list in await dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicUserCustomActions.Remove(list);
+            }
+
+            foreach (var list in await dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicExtensibilities.Remove(list);
+            }
+            
+            foreach (var list in await dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicWebSummaries.Remove(list);
+            }
+
+            foreach (var list in await dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl).ToListAsync())
+            {
+                dbContext.ClassicSiteSummaries.Remove(list);
             }
 
             Log.Information("Consolidating assessment {ScanId}: dropping Classic results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);

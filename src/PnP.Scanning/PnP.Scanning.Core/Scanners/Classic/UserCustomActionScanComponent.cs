@@ -68,6 +68,7 @@ namespace PnP.Scanning.Core.Scanners
                         userCustomActionToAdd.ScriptBlock = userCustomAction.ScriptBlock ?? "";
                         userCustomActionToAdd.ScriptSrc = userCustomAction.ScriptSrc ?? "";
                         userCustomActionToAdd.Problem = "InvalidLocation";
+                        userCustomActionToAdd.RemediationCode = RemediationCodes.CE9.ToString();
                     }
                 }
 
@@ -85,6 +86,7 @@ namespace PnP.Scanning.Core.Scanners
                         {
                             userCustomActionToAdd.CommandAction = handler.Attributes["CommandAction"].Value;
                             userCustomActionToAdd.Problem = !string.IsNullOrEmpty(userCustomActionToAdd.Problem) ? $"{userCustomActionToAdd.Problem},JavaScriptEmbedded" : "JavaScriptEmbedded";
+                            userCustomActionToAdd.RemediationCode = RemediationCodes.CE8.ToString();
                             break;
                         }
                     }
@@ -95,6 +97,7 @@ namespace PnP.Scanning.Core.Scanners
                     userCustomActionToAdd.ListUrl = list.RootFolder.ServerRelativeUrl;
                     userCustomActionToAdd.ListTitle = list.Title;
                     userCustomActionToAdd.ListId = list.Id;
+                    userCustomActionToAdd.RemediationCode = RemediationCodes.CE6.ToString();
                 }
 
                 if (!string.IsNullOrEmpty(userCustomActionToAdd.Problem))

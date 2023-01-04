@@ -38,6 +38,7 @@ namespace PnP.Scanning.Core.Scanners
             
             List<ClassicPage> pagesList = new();
             int modernPageCounter = 0;
+            HashSet<string> remediationCodes = new();
 
             var lists = ScannerBase.CleanLoadedLists(context);
 
@@ -66,8 +67,11 @@ namespace PnP.Scanning.Core.Scanners
                                 ListTitle = blogList.Title,
                                 ListId = blogList.Id,
                                 ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                                PageType = BlogPage
+                                PageType = BlogPage,
+                                RemediationCode = RemediationCodes.CP4.ToString(),
                             });
+
+                            remediationCodes.Add(RemediationCodes.CP4.ToString());
                         }
                     }).ConfigureAwait(false);
                 }
@@ -76,14 +80,14 @@ namespace PnP.Scanning.Core.Scanners
                       scannerBase.WebTemplate == "SRCHCEN#0" || scannerBase.WebTemplate == "CMSPUBLISHING#0") &&
                      sitePublishingEnabled && webPublishingEnabled)
             {
-                await QueryPublishingPagesAsync(scannerBase, pagesList, lists).ConfigureAwait(false);
+                await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes).ConfigureAwait(false);
             }
             else
             {
                 // A team site can also have the publishing features enabled
                 if (sitePublishingEnabled && webPublishingEnabled)
                 {
-                    await QueryPublishingPagesAsync(scannerBase, pagesList, lists).ConfigureAwait(false);
+                    await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes).ConfigureAwait(false);
                 }
 
                 // Check for the regular pages library
@@ -110,6 +114,22 @@ namespace PnP.Scanning.Core.Scanners
                                     ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
                                     PageType = GetPageType(listItem)
                                 };
+
+                                switch (pageToAdd.PageType)
+                                {
+                                    case WikiPage:
+                                        pageToAdd.RemediationCode = RemediationCodes.CP2.ToString();
+                                        remediationCodes.Add(RemediationCodes.CP2.ToString());
+                                        break;
+                                    case WebPartPage:
+                                        pageToAdd.RemediationCode = RemediationCodes.CP1.ToString();
+                                        remediationCodes.Add(RemediationCodes.CP1.ToString());
+                                        break;
+                                    case ASPXPage:
+                                        pageToAdd.RemediationCode = RemediationCodes.CP5.ToString();
+                                        remediationCodes.Add(RemediationCodes.CP5.ToString());
+                                        break;
+                                }
 
                                 if (pageToAdd.AddToDatabase())
                                 {
@@ -159,11 +179,11 @@ namespace PnP.Scanning.Core.Scanners
                 }
             }
 
-            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate,
+            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, context, remediationCodes,
                                                                    modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
         }
 
-        private static async Task QueryPublishingPagesAsync(ScannerBase scannerBase, List<ClassicPage> pagesList, List<PnP.Core.Model.SharePoint.IList> lists)
+        private static async Task QueryPublishingPagesAsync(ScannerBase scannerBase, List<ClassicPage> pagesList, List<IList> lists, HashSet<string> remediationCodes)
         {
             var pagesLibrary = lists.FirstOrDefault(l => l.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.PublishingPagesLibrary);
             if (pagesLibrary != null)
@@ -184,8 +204,11 @@ namespace PnP.Scanning.Core.Scanners
                             ListTitle = pagesLibrary.Title,
                             ListId = pagesLibrary.Id,
                             ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                            PageType = PublishingPage
+                            PageType = PublishingPage,
+                            RemediationCode = RemediationCodes.CP3.ToString(),
                         });
+
+                        remediationCodes.Add(RemediationCodes.CP4.ToString());
                     }
                 }).ConfigureAwait(false);
             }

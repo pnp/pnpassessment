@@ -1,12 +1,14 @@
 ﻿namespace PnP.Scanning.Core.Storage
 {
     [Microsoft.EntityFrameworkCore.Index(new string[] { nameof(ScanId), nameof(SiteUrl) }, IsUnique = true)]
-    internal sealed class ClassicSiteCollection
+    internal sealed class ClassicSiteSummary
     {
         public Guid ScanId { get; set; }
 
         public string SiteUrl { get; set; }
 
+        public DateTime LastItemUserModifiedDate { get; set; }
+        
         public string RootWebTemplate { get; set; }
 
         public string SubWebTemplates { get; set; }
@@ -43,6 +45,7 @@
 
         public int AzureACSPrincipals { get; set; }
 
-        public string RemediationCode { get; set; }
+        public string AggregatedRemediationCodes { get; set; }
+
     }
 }

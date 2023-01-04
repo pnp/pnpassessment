@@ -13,7 +13,8 @@ namespace PnP.Scanning.Core.Scanners
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext)
         {
             List<ClassicInfoPath> infoPathLists = new();
-            
+            HashSet<string> remediationCodes = new();
+
             var lists = ScannerBase.CleanLoadedLists(context);
 
             foreach (var list in lists)
@@ -33,8 +34,11 @@ namespace PnP.Scanning.Core.Scanners
                         InfoPathTemplate = !string.IsNullOrEmpty(list.DocumentTemplate) ? Path.GetFileName(list.DocumentTemplate) : "",
                         Enabled = true,
                         ItemCount = list.ItemCount,
-                        LastItemUserModifiedDate = list.LastItemUserModifiedDate
+                        LastItemUserModifiedDate = list.LastItemUserModifiedDate,
+                        RemediationCode = RemediationCodes.IF2.ToString(),
                     });
+
+                    remediationCodes.Add(RemediationCodes.IF2.ToString());
                 }
                 else if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.DocumentLibrary ||
                          list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.WebPageLibrary)
@@ -54,8 +58,11 @@ namespace PnP.Scanning.Core.Scanners
                             InfoPathTemplate = !string.IsNullOrEmpty(formContentTypeFound.DocumentTemplateUrl) ? Path.GetFileName(formContentTypeFound.DocumentTemplateUrl) : "",
                             Enabled = true,
                             ItemCount = list.ItemCount,
-                            LastItemUserModifiedDate = list.LastItemUserModifiedDate
+                            LastItemUserModifiedDate = list.LastItemUserModifiedDate,
+                            RemediationCode = RemediationCodes.IF2.ToString(),
                         });
+
+                        remediationCodes.Add(RemediationCodes.IF2.ToString());
                     }                    
                 }
                 else if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.GenericList)
@@ -85,8 +92,11 @@ namespace PnP.Scanning.Core.Scanners
                                 InfoPathTemplate = folder.Properties.GetString("_ipfs_solutionName", string.Empty),
                                 Enabled = infoPathEnabled,
                                 ItemCount = list.ItemCount,
-                                LastItemUserModifiedDate = list.LastItemUserModifiedDate
+                                LastItemUserModifiedDate = list.LastItemUserModifiedDate,
+                                RemediationCode = RemediationCodes.IF1.ToString(),
                             });
+
+                            remediationCodes.Add(RemediationCodes.IF1.ToString());
                         }
                     }
                     catch (SharePointRestServiceException ex)
@@ -107,7 +117,7 @@ namespace PnP.Scanning.Core.Scanners
                 await scannerBase.StorageManager.StoreInfoPathInformationAsync(scannerBase.ScanId, infoPathLists);
             }
 
-            await scannerBase.StorageManager.StoreInfoPathSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, infoPathLists.Count);
+            await scannerBase.StorageManager.StoreInfoPathSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, context, remediationCodes, infoPathLists.Count);
 
         }
 

@@ -6,7 +6,9 @@ namespace PnP.Scanning.Core.Storage
     internal class ClassicWebSummary : BaseScanResult
     {
         public string Template { get; set; }
-        
+
+        public DateTime LastItemUserModifiedDate { get; set; }
+
         public int ClassicLists { get; set; }
 
         public int ModernLists { get; set; }
@@ -50,6 +52,10 @@ namespace PnP.Scanning.Core.Storage
         public bool HasAzureACSPrincipal { get; set; }
 
         public int AzureACSPrincipals { get; set; }
+
+        public string RemediationCode { get; set; }
+
+        public string AggregatedRemediationCodes { get; set; }
 
     }
 }
