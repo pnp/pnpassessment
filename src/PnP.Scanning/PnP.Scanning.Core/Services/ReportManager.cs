@@ -29,6 +29,14 @@ namespace PnP.Scanning.Core.Services
 
         private const string WorkflowsCsv = "workflows.csv";
 
+        private const string ClassicInfoPathCsv = "classicinfopath.csv";
+        private const string ClassicPagesCsv = "classicpages.csv";
+        private const string ClassicListsCsv = "classiclists.csv";
+        private const string ClassicUserCustomActionsCsv = "classicusercustomactions.csv";
+        private const string ClassicExtensibilitiesCsv = "classicextensibilities.csv";
+        private const string ClassicWebSummariesCsv = "classicwebsummaries.csv";
+        private const string ClassicSiteSummariesCsv = "classicsitesummaries.csv";
+
 #if DEBUG
         private const string TestDelaysCsv = "testdelays.csv";
 #endif
@@ -46,11 +54,12 @@ namespace PnP.Scanning.Core.Services
             {
                 var scan = await dbContext.Scans.Where(p => p.ScanId == scanId).FirstOrDefaultAsync();
 
+                // PER SCAN COMPONENT: Update report data per scan component
                 if (scan.CLIMode == Mode.Syntex.ToString())
                 {
                     reportFile = "SyntexAssessmentReport.pbit";
                     // Put the report file in the report folder
-                    string pbitFile = Path.Combine(exportPath, "SyntexAssessmentReport.pbit");
+                    string pbitFile = Path.Combine(exportPath, reportFile);
                     PersistPBitFromResource("PnP.Scanning.Core.Scanners.Syntex.SyntexAssessmentReport.pbit", pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
@@ -61,20 +70,30 @@ namespace PnP.Scanning.Core.Services
                 {
                     reportFile = "WorkflowReport.pbit";
                     // Put the report file in the report folder
-                    string pbitFile = Path.Combine(exportPath, "WorkflowReport.pbit");
+                    string pbitFile = Path.Combine(exportPath, reportFile);
                     PersistPBitFromResource("PnP.Scanning.Core.Scanners.Workflow.WorkflowReport.pbit", pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
                     RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Workflow\\\\", ",");
                 }
+                else if (scan.CLIMode == Mode.Classic.ToString())
+                {
+                    reportFile = "ClassicAssessmentReport.pbit";
+                    // Put the report file in the report folder
+                    string pbitFile = Path.Combine(exportPath, reportFile);
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit", pbitFile);
+
+                    // Update the report file to pick up the exported CSV files in the report folder
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\", ",");
+                }
 #if DEBUG
-                // PER SCAN COMPONENT: Update report data per scan component
                 else if (scan.CLIMode == Mode.Test.ToString())
                 {
                     reportFile = "TestReport.pbit";
                     // Put the report file in the report folder
-                    string pbitFile = Path.Combine(exportPath, "TestReport.pbit");
+                    string pbitFile = Path.Combine(exportPath, reportFile);
                     PersistPBitFromResource("PnP.Scanning.Core.Scanners.Test.TestReport.pbit", pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
@@ -115,7 +134,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     using (var csv = new CsvWriter(writer, config))
                     {
-                        await csv.WriteRecordsAsync(dbContext.Scans.Where(p=>p.ScanId == scanId).AsAsyncEnumerable());
+                        await csv.WriteRecordsAsync(dbContext.Scans.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                     }
                 }
 
@@ -224,6 +243,73 @@ namespace PnP.Scanning.Core.Services
                     }
                 }
 
+                if (scan.CLIMode == Mode.Classic.ToString())
+                {
+                    using (var writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicExtensibilitiesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicInfoPathCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicListsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPagesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicPages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicUserCustomActionsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicSiteSummariesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebSummariesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                }
 #if DEBUG
                 if (scan.CLIMode == Mode.Test.ToString())
                 {

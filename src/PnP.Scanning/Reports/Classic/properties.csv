@@ -1,0 +1,8 @@
+ScanId,Name,Type,Value
+f403c19c-0541-4b70-863d-f2a169b62980,AzureACS,bool,True
+f403c19c-0541-4b70-863d-f2a169b62980,Extensibility,bool,True
+f403c19c-0541-4b70-863d-f2a169b62980,InfoPath,bool,True
+f403c19c-0541-4b70-863d-f2a169b62980,Lists,bool,True
+f403c19c-0541-4b70-863d-f2a169b62980,Pages,bool,True
+f403c19c-0541-4b70-863d-f2a169b62980,SharePointAddIns,bool,True
+f403c19c-0541-4b70-863d-f2a169b62980,Workflow,bool,True

@@ -1,0 +1,906 @@
+Id,Title,Name,Location,RegistrationType,RegistrationId,CommandAction,CommandUIExtension,Description,ScriptBlock,ScriptSrc,Url,Problem,ListId,ListUrl,ListTitle,RemediationCode,ScanId,SiteUrl,WebUrl
+657be7c1-5fe2-4a43-97ab-54ba96501c52,,{657be7c1-5fe2-4a43-97ab-54ba96501c52},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=1';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130021,/
+1ccae5b4-fb01-4f92-b831-72d06427a6b2,,{1ccae5b4-fb01-4f92-b831-72d06427a6b2},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=1';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130023,/
+b6fabfb9-ba1a-40f7-855f-436b71ddf2d9,,{b6fabfb9-ba1a-40f7-855f-436b71ddf2d9},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=1';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130024,/
+644bb89e-7d2b-4a50-a651-4260ea7fc679,,{644bb89e-7d2b-4a50-a651-4260ea7fc679},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=1';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130025,/
+c811e5f0-c603-40f8-993c-2eb22ebc6432,,{c811e5f0-c603-40f8-993c-2eb22ebc6432},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=1';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130026,/
+bb62042a-470f-4444-8b4a-61ec51cee24f,,{bb62042a-470f-4444-8b4a-61ec51cee24f},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=1';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130027,/
+b78c1343-fb23-4d53-a6b2-cbb55b23dc6f,,{b78c1343-fb23-4d53-a6b2-cbb55b23dc6f},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130033,/
+9be7c6e6-73b2-41d2-bbb2-447886aa6a44,,{9be7c6e6-73b2-41d2-bbb2-447886aa6a44},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130035,/
+95406bdb-a9f4-4ea6-b2f8-6ae9d8a13c1e,,{95406bdb-a9f4-4ea6-b2f8-6ae9d8a13c1e},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130036,/
+3767417d-985b-4c22-bc52-b9e9d33780f5,,{3767417d-985b-4c22-bc52-b9e9d33780f5},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130037,/
+93185b0f-c179-4336-9a82-bb521b52fc58,,{93185b0f-c179-4336-9a82-bb521b52fc58},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130039,/
+6e39c081-6716-4cca-a7c2-e1bafb251f15,,{6e39c081-6716-4cca-a7c2-e1bafb251f15},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130042,/
+365be650-b7e6-49ba-8188-13a0dabd2fd8,,{365be650-b7e6-49ba-8188-13a0dabd2fd8},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130043,/
+4c091e14-2681-40e1-aea9-2b20530c407c,,{4c091e14-2681-40e1-aea9-2b20530c407c},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130044,/
+5788abb1-352a-413a-a998-a40147a862d4,,{5788abb1-352a-413a-a998-a40147a862d4},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130046,/
+971bc877-6485-44cb-b26b-953131f88a59,,{971bc877-6485-44cb-b26b-953131f88a59},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130047,/
+7746e239-2e3c-43e2-94f6-7db3a693029c,,{7746e239-2e3c-43e2-94f6-7db3a693029c},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130048,/
+b8f41acf-ae0b-4adb-9072-5bd83bd8f6d0,,{b8f41acf-ae0b-4adb-9072-5bd83bd8f6d0},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130049,/
+8c821e9a-bfa0-4e97-97d2-38d97bc53ad4,,{8c821e9a-bfa0-4e97-97d2-38d97bc53ad4},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130050,/
+16427c72-474c-4bf7-8802-d9e47be062c5,,{16427c72-474c-4bf7-8802-d9e47be062c5},ScriptLink,None,,,,sitesportal_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/Templates/teamsite_resources.js?rev=4';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130051,/
+32871673-077a-4d12-817a-f18bed153739,,{32871673-077a-4d12-817a-f18bed153739},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130051,/
+3caab53c-c38a-4f51-b24d-4d68e3b30c52,,{3caab53c-c38a-4f51-b24d-4d68e3b30c52},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130052,/
+78a227d6-9111-4cd8-888b-7bc65855d5a1,,{78a227d6-9111-4cd8-888b-7bc65855d5a1},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130053,/
+670880d2-06b8-4663-b826-fe5109e8f915,,{670880d2-06b8-4663-b826-fe5109e8f915},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130054,/
+ab984c31-098d-4a52-8eca-4789b7e0c9ee,,{ab984c31-098d-4a52-8eca-4789b7e0c9ee},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130055,/
+4b8695d5-ef70-4c73-b9ef-5dcf97fe3f9a,,{4b8695d5-ef70-4c73-b9ef-5dcf97fe3f9a},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130056,/
+6680cbf4-20b3-4c17-b806-ee19c38df862,Manage Reported Posts,{6680cbf4-20b3-4c17-b806-ee19c38df862},Microsoft.SharePoint.SiteSettings,None,,,,Manage posts that were reported as offensive.,,,/sites/130056/Lists/Community Discussion/Reported Posts.aspx?ShowModerationTab=1,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130056,/
+c759134f-ad8e-4cd6-8654-7ebf6083f003,,{c759134f-ad8e-4cd6-8654-7ebf6083f003},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130058,/
+bd746d1a-7f4c-4c76-893b-99edd8d45586,,{bd746d1a-7f4c-4c76-893b-99edd8d45586},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130059,/
+f4a84eb8-1c38-4955-a6b8-f3723c1b673f,,{f4a84eb8-1c38-4955-a6b8-f3723c1b673f},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130060,/
+610e1a55-76bb-4901-8a1b-5b873640c5f0,,{610e1a55-76bb-4901-8a1b-5b873640c5f0},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130062,/
+f43a9950-1465-4a7c-9de9-16fa5670426d,,{f43a9950-1465-4a7c-9de9-16fa5670426d},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130063,/
+7706fc1c-e7bc-4992-b3c8-770bc7344502,,{7706fc1c-e7bc-4992-b3c8-770bc7344502},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130064,/
+fb3a3773-d3f0-41b7-a0b2-766b550d5380,,{fb3a3773-d3f0-41b7-a0b2-766b550d5380},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130065,/
+931f8e85-4d38-45b3-8f1b-3169c31d854a,,{931f8e85-4d38-45b3-8f1b-3169c31d854a},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=2';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130066,/
+df8cd9b4-f87f-487a-8778-f59bb40728b2,,{df8cd9b4-f87f-487a-8778-f59bb40728b2},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130067,/
+591bcd79-fb79-41c3-8e90-e6bcc1bddb91,,{591bcd79-fb79-41c3-8e90-e6bcc1bddb91},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130068,/
+d8c95d93-f02b-493f-b193-39547384b6d0,,{d8c95d93-f02b-493f-b193-39547384b6d0},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130069,/
+712db48e-374c-40de-8c00-c23120b3ab26,,{712db48e-374c-40de-8c00-c23120b3ab26},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130070,/
+a33eba8f-5f67-4797-b214-2341a72be461,,{a33eba8f-5f67-4797-b214-2341a72be461},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130071,/
+e35ac186-fb62-4151-bd41-01a0ee05e50c,,{e35ac186-fb62-4151-bd41-01a0ee05e50c},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130072,/
+2cd0fc93-046b-46e3-bf51-231d43aef842,,{2cd0fc93-046b-46e3-bf51-231d43aef842},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130073,/
+f32a0ff3-8901-4d4e-a472-58fe1657de4b,,{f32a0ff3-8901-4d4e-a472-58fe1657de4b},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/templates/teamsite_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/130074,/
+268185c0-71eb-4d27-8034-b95e0acf5e74,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/PnPPartnerPack2,/
+6bb58ce9-3df0-4a03-aae4-c48c9497d785,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/PnPPartnerPack2,/
+a1332a7c-9e0f-4290-a4b7-81bd3edddfe1,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/PnPPartnerPack2,/
+e366c0a0-0900-4b69-8f89-ed898bb3f4de,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/PnPPartnerPackTest,/
+ed0644ea-dc45-4c2b-879e-9358c2bfd747,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/PnPPartnerPackTest,/
+f8efa5cf-5bfd-4287-97ff-681e9cc9a31d,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/PnPPartnerPackTest,/
+0c463a60-c693-4fa0-8b86-ba70349df655,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/ProvDemoget&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+          <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/ProvDemoget&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ProvDemoGet,/
+8d3c82a9-2c73-4d4a-8ec7-4bf6fc9df761,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/ProvDemoget&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+          <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/ProvDemoget&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ProvDemoGet,/
+d7414711-5569-44b5-90a6-69cdf36d99b1,Shows a banner on the classic pages,CA_PnP_Modernize_ClassicBanner,ScriptLink,None,,,,Shows a banner on the classic pages.,,https://bertonline.sharepoint.com//sites/ModernizationCenter/SiteAssets/pnppagetransformationclassicbanner.js?rev=beta.1,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ProvDemoGet,/
+77cc690b-b6cd-44d0-8156-6110df4956d0,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/cloudroadshownewyork,/
+8464f192-49d5-41b2-a433-add55349eebf,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/cloudroadshownewyork,/
+a0d35687-59cd-45f9-a88a-0f33dd83abca,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/cloudroadshownewyork,/
+47bfece0-a45e-404f-8a7d-6ee3cf30d974,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/clrdemo1,/
+d7120c68-b793-4702-9bdf-9dff5c0cf7bc,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/clrdemo1,/
+e79c7822-526b-42bd-b48c-2c8a4763fdcc,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/clrdemo1,/
+1ccfe83b-1678-4d97-9049-3d3959fe74b0,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/clrdemo3,/
+6352dbb7-af4c-44a6-86fc-e5ff0349ddc3,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/clrdemo3,/
+dee47aed-ac66-43b0-a756-7d4d0cdc7801,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/clrdemo3,/
+ec8b7348-325a-426c-b1b9-118c419138f9,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo5&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+          <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo5&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosodemo5,/
+ffeb1d0f-6d27-4014-bb9b-1b12ecd105dd,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo5&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+          <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo5&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosodemo5,/
+12793ba9-9333-4c65-abe8-eb37bb4ad66d,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo6&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+          <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo6&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosodemo6,/
+45762021-c804-49c2-baa1-3c91f3e202bb,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo6&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+          <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosodemo6&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosodemo6,/
+1402c0fd-112a-4171-a6c2-bfdcfd3c2878,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosoelectronicsdrones&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+          <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosoelectronicsdrones&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosoelectronicsdrones,/
+27cfbca8-1c71-4d06-8004-d85f0c7e46de,,CA_PnP_Modernize_ClassicBanner,ScriptLink,None,,,,,,https://bertonline.sharepoint.com/sites/ModernizationCenter/siteassets/pnppagetransformationclassicbanner.js?rev=12,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosoelectronicsdrones,/
+d5094a91-9611-43ac-8fcd-14999aca9b2f,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosoelectronicsdrones&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+          <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/contosoelectronicsdrones&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/contosoelectronicsdrones,/
+3841b5b4-bce1-4162-a642-e07e6a90b4c6,,{3841b5b4-bce1-4162-a642-e07e6a90b4c6},ScriptLink,None,,,,OfficeAMSProvisioning_JS,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/dev/contosoteam/OfficeAMSProvisioning_JS/OfficeAMS_InjectedJS.js';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/dev,/contosoteam
+0111d114-9e0b-469a-acd8-380fb577fd7c,,{0111d114-9e0b-469a-acd8-380fb577fd7c},ScriptLink,None,,,,OfficeAMSProvisioning_JS,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/dev/gtb/OfficeAMSProvisioning_JS/OfficeAMS_InjectedJS.js';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/dev,/gtb
+91650de9-5b4f-41cf-9a69-7a909804ba81,,{91650de9-5b4f-41cf-9a69-7a909804ba81},ScriptLink,None,,,,OfficeAMSProvisioning_JS,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/dev/gtb1/OfficeAMSProvisioning_JS/OfficeAMS_InjectedJS.js';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/dev,/gtb1
+349f2e1f-3430-456b-b668-274e69d5e004,,{349f2e1f-3430-456b-b668-274e69d5e004},ScriptLink,None,,,,OfficeAMSProvisioning_JS,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/dev/gtb2/OfficeAMSProvisioning_JS/OfficeAMS_InjectedJS.js';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/dev,/gtb2
+b29807f1-afdb-447d-917b-e48f854d24d1,Site Information,SiteInformationApp,Microsoft.SharePoint.StandardMenu,None,,,,,,,"javascript:LaunchApp('8ef824ea-863e-4e59-804e-2fb663295ea1', 'i:0i.t|ms.sp.ext|e4c5fc4b-ee62-4452-b70e-e065240b418a@d8623c9e-30c7-473a-83bc-d907df44a26e','https://localhost:44321/Pages/Default.aspx?{StandardTokens}', {width:600,height:400,title:'Site Information'});",InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/dev3,/
+50d75a15-0b7f-4acd-abf9-b43b68c336ce,,BulkEdit.Js.AppLauncher,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://bertonline.sharepoint.com/sites/devaccenture/Style Library/BulkEdit/AppLauncher.js?rev=69c90d0a77884286b1042f691ef8ab8f') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'BulkEdit.Js.AppLauncher';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://bertonline.sharepoint.com/sites/devaccenture/Style Library/BulkEdit/AppLauncher.js?rev=69c90d0a77884286b1042f691ef8ab8f';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://bertonline.sharepoint.com/sites/devaccenture/Style Library/BulkEdit/AppLauncher.js?rev=69c90d0a77884286b1042f691ef8ab8f');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devaccenture,/
+ee62e0ed-b49a-4819-98c8-5b480006148c,,CommandUI.Ribbon.List.BulkEdit,CommandUI.Ribbon,ContentType,0x01,javascript:BulkEditLaunchApp(),"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+  <CommandUIDefinitions>
+    <CommandUIDefinition Location=""Ribbon.List.Actions.Controls._children"">
+      <Button Id=""BulkEdit"" Sequence=""1000"" Command=""BulkEdit"" Image16by16=""_layouts/15/images/placeholder16x16.png"" Image32by32=""_layouts/15/images/placeholder32x32.png"" LabelText=""BulkEdit"" ToolTipTitle=""Launch BulkEdit"" ToolTipDescription=""Use the BulkEdit application to perform mass editing of the data in this list "" TemplateAlias=""o1"" />
+    </CommandUIDefinition>
+  </CommandUIDefinitions>
+  <CommandUIHandlers>
+    <CommandUIHandler Command=""BulkEdit"" EnabledScript="""" CommandAction=""javascript:BulkEditLaunchApp()""></CommandUIHandler>
+  </CommandUIHandlers>
+</CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devaccenture,/
+824215c4-7a18-47c6-a89b-5e5adac84385,,scenario2,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://localhost:44303/Scripts/scenario2.js?rev=1192a329601540bda362a3f28a0c3cf3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://localhost:44303/Scripts/scenario2.js?rev=1192a329601540bda362a3f28a0c3cf3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://localhost:44303/Scripts/scenario2.js?rev=1192a329601540bda362a3f28a0c3cf3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devbiwug,/
+2f311d40-678e-4bce-95cd-7a5c0740cd65,Invoke 'ribbon_calendar_based_lists_visual_column' action,75addc5d-3fa7-4234-91bc-756ef76ceffd.ribbon_calendar_based_lists_visual_column,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.Calendar.Calendar.Settings.Controls._children""><Button Id=""Ribbon.List.Settings.ribbon_calendar_based_lists_visual_columnButton"" Alt=""Visual Columns"" Sequence=""100"" Command=""Invoke_ribbon_calendar_based_lists_visual_columnButtonRequest"" LabelText=""Visual Columns"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIREaXTNpQAAAGzSURBVFjD5ZU7bhRBEIa/6pllH55dy6lF7AxZMgFOkRBwAl/BRJgDwB1ICJDMCbgFRBtCBAEQYREgoR3PY2enq4rAvJxNgGgh/1Krq1vV0q+/W1/L/uu3z4BjIOMfyN0REUaCruv6VG68euMvb+6RS8BwxOF909Gaoe707kR3eruof83+e70xu7z/R2/0y0PdMYRpED6dfSGQQAIUWUCr8zQGAIqQ0IAAkyBY26ZL4KeSGHBgbUaYzdIlUJmTFfN0CVTRyIo5khpEqd8gMqTp3ou9B8ATYPdvJZCHka6b9Wk+5FDZlkcntx/uHlw/IKrzoVxyVr9DTehV6VTZxEgXI13sf8yRTezpVC9qVXqN9KpEM0I+zqxsj0Oq4ItrC2JjCf+CfEGfzIAI03yKdnZVUexOExuySUhIwr5kNAuprsCpN+fks5AeRP8Hiofo8/3FLeApcDgkAfKxVut2GIqHKH4t94u7dw53Hj1GPy6Jy+f4ZozVilcRKyNeR6xSaA33efbNUqFYBIptVr2TzEAoFpTRE5JwskWjXFEUA3hbs5WlMuCOVysWI0lngGrFdi7pQfQdCfgptMTdMVgAAAAASUVORK5CYII="" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIQMPChF4sAAAGgSURBVDjLpZE9ixRBEIaf6pm5mR3nVkEQRC8ShBNTDUw10kgQAzH1Dxj5Hwz9AUZGB2JgaiiYCGJgoGcieyiH4H7MTPd8dLXBfqjsgrK+UNRLdfNCPSX33x1+2S8Ge06VH52nD4EuBDpd9BBoF75f9kWFthnFF06ke3fPnmbSez7bBqeK9UrllVqVeun9fG5VV39kas8btlQA0taxdYAATZoRfyzd+NnR91NOlXHvV/t1v7PQX7Pluw+gaT6RTelXHvPQCD6NEozIoszKiwgiEBEfrQVcfXLm8osHz99P3FjefDtg1jZMnWVi7bw7S9k0lI0jddk6AxFC3dViO0fb9/Te03tFVVENhDAHqEHJumJ7iEvFa+cJSJ7kofOt7MQxjXriyGCMwZj57gIYMbikZI3Bzaf7+fHs+JER43eiHINQpcbaNGr+gAhEsgHiJo1uDF4Xt+5c859eESpFy55QeRzR5N8YeL20e/se+cUh2bmCdJiRYCiT4cntIYaAjfP/uIIIg67GfLi++3cOkXlbvjzAHs5wXyvaWUOHUvTT0U/quQdtSAEGaQAAAABJRU5ErkJggg=="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_calendar_based_lists_visual_columnButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+5196c3da-4040-4dd0-b391-5f38b50fb697,Invoke 'ribbon_promoted_links_visual_column' action,c3641a1c-7f5d-4c9e-a6eb-adecd968c223.ribbon_promoted_links_visual_column,CommandUI.Ribbon,List,170,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.List.Settings.Controls._children""><Button Id=""Ribbon.List.Settings.ribbon_promoted_links_visual_columnButton"" Alt=""Visual Columns"" Sequence=""100"" Command=""Invoke_ribbon_promoted_links_visual_columnButtonRequest"" LabelText=""Visual Columns"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIREaXTNpQAAAGzSURBVFjD5ZU7bhRBEIa/6pllH55dy6lF7AxZMgFOkRBwAl/BRJgDwB1ICJDMCbgFRBtCBAEQYREgoR3PY2enq4rAvJxNgGgh/1Krq1vV0q+/W1/L/uu3z4BjIOMfyN0REUaCruv6VG68euMvb+6RS8BwxOF909Gaoe707kR3eruof83+e70xu7z/R2/0y0PdMYRpED6dfSGQQAIUWUCr8zQGAIqQ0IAAkyBY26ZL4KeSGHBgbUaYzdIlUJmTFfN0CVTRyIo5khpEqd8gMqTp3ou9B8ATYPdvJZCHka6b9Wk+5FDZlkcntx/uHlw/IKrzoVxyVr9DTehV6VTZxEgXI13sf8yRTezpVC9qVXqN9KpEM0I+zqxsj0Oq4ItrC2JjCf+CfEGfzIAI03yKdnZVUexOExuySUhIwr5kNAuprsCpN+fks5AeRP8Hiofo8/3FLeApcDgkAfKxVut2GIqHKH4t94u7dw53Hj1GPy6Jy+f4ZozVilcRKyNeR6xSaA33efbNUqFYBIptVr2TzEAoFpTRE5JwskWjXFEUA3hbs5WlMuCOVysWI0lngGrFdi7pQfQdCfgptMTdMVgAAAAASUVORK5CYII="" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIQMPChF4sAAAGgSURBVDjLpZE9ixRBEIaf6pm5mR3nVkEQRC8ShBNTDUw10kgQAzH1Dxj5Hwz9AUZGB2JgaiiYCGJgoGcieyiH4H7MTPd8dLXBfqjsgrK+UNRLdfNCPSX33x1+2S8Ge06VH52nD4EuBDpd9BBoF75f9kWFthnFF06ke3fPnmbSez7bBqeK9UrllVqVeun9fG5VV39kas8btlQA0taxdYAATZoRfyzd+NnR91NOlXHvV/t1v7PQX7Pluw+gaT6RTelXHvPQCD6NEozIoszKiwgiEBEfrQVcfXLm8osHz99P3FjefDtg1jZMnWVi7bw7S9k0lI0jddk6AxFC3dViO0fb9/Te03tFVVENhDAHqEHJumJ7iEvFa+cJSJ7kofOt7MQxjXriyGCMwZj57gIYMbikZI3Bzaf7+fHs+JER43eiHINQpcbaNGr+gAhEsgHiJo1uDF4Xt+5c859eESpFy55QeRzR5N8YeL20e/se+cUh2bmCdJiRYCiT4cntIYaAjfP/uIIIg67GfLi++3cOkXlbvjzAHs5wXyvaWUOHUvTT0U/quQdtSAEGaQAAAABJRU5ErkJggg=="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_promoted_links_visual_columnButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+7b6143d4-227b-478b-8fbb-801046d1ce9d,Invoke 'ribbon_calendar_based_lists' action,3c768e08-0800-4044-9b2d-cc3bdd17d327.ribbon_calendar_based_lists,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.Calendar.Events.Actions.Controls._children""><Button Id=""Ribbon.ListItem.Actions.ribbon_calendar_based_listsButton"" Alt=""Visualize"" Sequence=""100"" Command=""Invoke_ribbon_calendar_based_listsButtonRequest"" LabelText=""Visualize"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,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"" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAASdAAAEnQB3mYfeAAAAAd0SU1FB90IDAoiJmD6FyMAAAOWSURBVDjLTZN9TNR1HMdf399xcHKnPD8/HQVhCAiIBVRSZICjPyggmOZWpq5Fi63BIIqla20xt8jJcuEkJ5PFApNEViMqChVQigiCBAQbgzt5vOM4jofj2x8w6v3X+5/35/P6vLePYEuLxgF2+uyhruWLsJrW0ZMF8Rl5pmpDsGv6lKUj8dGOJ9yHe3LjiiqEEIv8TwrApGEVnXek44/9xVWB96aHr54uKJ5dMQUZu43U3fpLl+Ufme7RH/1+c9HH5msj5cUAD767CoAAkPPSdd8vlU0B2j8PRNfGEpgaKuN2eYgR6yQ+IT5E14Xj+7kvAEtaW6/p4hm55hKZrT+UM+YA8JKhq3Dn3tQDc0qqdHjaU7xn9BcODwWooSLBwsFLTtvI2iVN7LhdRaU56QPgDeWtbOmZPqw+JefmpWZsh6g2BeDiKNCqQQu8e0PH7d3WrbjEFgh97S/KqK8mo6WUKtWZetOFbE1KlN6SKe5PvMw/Nn+ElCAESImTAM0RO0FTRtQZ91BXBDF6+0mxMNUeMNhe5uxgGEpTfjd3iKDwINZ1wLTcxpWbM9DYVYwnjeFT6M6G+SiKZzgxmjAZ8IJar0zo1vKXhy8y3zhKTnsQC4LN7VsNy1XJXe8Jrr8eik0dhmHHebzyJNOfTuNn2Z8sxhpqh0pL5yIs8VE0dD9CxWu9fO2WwYMlR1ydFzHGTLLmsgqAm0qS02vmSEochaUJNHeGzKjyTKoTpucCffpC2qVvzLoYcd9DScINqrJGsIb602Zf3CQSAtuGoDzCjT5xiwvnrLLkh3MjqqpTBcqQVrmSr3WLjh3398RhmX1Tx0DfQ8dyAu1ruu2TAN5xspLvHSxb/W6KEI/es4oxJbcl8823e8LMUUt+swpt/r6IkBi+NcSR4WrFRy6AWgEpeHXVxGNO66CyC4uSwurcRL2iD/YeHz92PLNrr3O8+ewyD496kZZYgMWpn2866mlct1FQ8ys/b4xRq5+j9o/fGDUIVr6MrTycXD+mupudw1N1Vzp3xyY/v9yyGLLY1Uy5NpwZixm70YNpBztZzybSdd1dei27ixa9N4/Pbnx/qCzuKICS0NjAJ1WXObE/N23mdGfRoKeazy43cafBRZbs6sUvUiWrmqxydKFNSI8B28mVweqEZ+Izfqqv+e+ZAMrt8JFqy5d/WDdAhNtBdBmvHE/6u+yapTuMlpvFhy+1Cq8796VNIjSb0X8B2F53c39rUAQAAAAASUVORK5CYII="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_calendar_based_listsButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+8c7b77f5-dba7-4af2-9ff7-e31b97639316,Invoke 'generic_based_lists_visual_column' action,6500b6f7-f63c-4d3e-a9e1-399cad3053e0.generic_based_lists_visual_column,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.List.Settings.Controls._children""><Button Id=""Ribbon.List.Settings.generic_based_lists_visual_columnButton"" Alt=""Visual Columns"" Sequence=""100"" Command=""Invoke_generic_based_lists_visual_columnButtonRequest"" LabelText=""Visual Columns"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIREaXTNpQAAAGzSURBVFjD5ZU7bhRBEIa/6pllH55dy6lF7AxZMgFOkRBwAl/BRJgDwB1ICJDMCbgFRBtCBAEQYREgoR3PY2enq4rAvJxNgGgh/1Krq1vV0q+/W1/L/uu3z4BjIOMfyN0REUaCruv6VG68euMvb+6RS8BwxOF909Gaoe707kR3eruof83+e70xu7z/R2/0y0PdMYRpED6dfSGQQAIUWUCr8zQGAIqQ0IAAkyBY26ZL4KeSGHBgbUaYzdIlUJmTFfN0CVTRyIo5khpEqd8gMqTp3ou9B8ATYPdvJZCHka6b9Wk+5FDZlkcntx/uHlw/IKrzoVxyVr9DTehV6VTZxEgXI13sf8yRTezpVC9qVXqN9KpEM0I+zqxsj0Oq4ItrC2JjCf+CfEGfzIAI03yKdnZVUexOExuySUhIwr5kNAuprsCpN+fks5AeRP8Hiofo8/3FLeApcDgkAfKxVut2GIqHKH4t94u7dw53Hj1GPy6Jy+f4ZozVilcRKyNeR6xSaA33efbNUqFYBIptVr2TzEAoFpTRE5JwskWjXFEUA3hbs5WlMuCOVysWI0lngGrFdi7pQfQdCfgptMTdMVgAAAAASUVORK5CYII="" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIQMPChF4sAAAGgSURBVDjLpZE9ixRBEIaf6pm5mR3nVkEQRC8ShBNTDUw10kgQAzH1Dxj5Hwz9AUZGB2JgaiiYCGJgoGcieyiH4H7MTPd8dLXBfqjsgrK+UNRLdfNCPSX33x1+2S8Ge06VH52nD4EuBDpd9BBoF75f9kWFthnFF06ke3fPnmbSez7bBqeK9UrllVqVeun9fG5VV39kas8btlQA0taxdYAATZoRfyzd+NnR91NOlXHvV/t1v7PQX7Pluw+gaT6RTelXHvPQCD6NEozIoszKiwgiEBEfrQVcfXLm8osHz99P3FjefDtg1jZMnWVi7bw7S9k0lI0jddk6AxFC3dViO0fb9/Te03tFVVENhDAHqEHJumJ7iEvFa+cJSJ7kofOt7MQxjXriyGCMwZj57gIYMbikZI3Bzaf7+fHs+JER43eiHINQpcbaNGr+gAhEsgHiJo1uDF4Xt+5c859eESpFy55QeRzR5N8YeL20e/se+cUh2bmCdJiRYCiT4cntIYaAjfP/uIIIg67GfLi++3cOkXlbvjzAHs5wXyvaWUOHUvTT0U/quQdtSAEGaQAAAABJRU5ErkJggg=="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_generic_based_lists_visual_columnButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+8d990c55-36b5-4aa3-98c7-6547d1ca8905,Invoke 'generic_based_lists' action,7b0ee9b7-a7d4-44d4-93e7-68694f46ce33.generic_based_lists,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.ListItem.Actions.Controls._children""><Button Id=""Ribbon.ListItem.Actions.generic_based_listsButton"" Alt=""Visualize"" Sequence=""100"" Command=""Invoke_generic_based_listsButtonRequest"" LabelText=""Visualize"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,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"" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAASdAAAEnQB3mYfeAAAAAd0SU1FB90IDAoiJmD6FyMAAAOWSURBVDjLTZN9TNR1HMdf399xcHKnPD8/HQVhCAiIBVRSZICjPyggmOZWpq5Fi63BIIqla20xt8jJcuEkJ5PFApNEViMqChVQigiCBAQbgzt5vOM4jofj2x8w6v3X+5/35/P6vLePYEuLxgF2+uyhruWLsJrW0ZMF8Rl5pmpDsGv6lKUj8dGOJ9yHe3LjiiqEEIv8TwrApGEVnXek44/9xVWB96aHr54uKJ5dMQUZu43U3fpLl+Ufme7RH/1+c9HH5msj5cUAD767CoAAkPPSdd8vlU0B2j8PRNfGEpgaKuN2eYgR6yQ+IT5E14Xj+7kvAEtaW6/p4hm55hKZrT+UM+YA8JKhq3Dn3tQDc0qqdHjaU7xn9BcODwWooSLBwsFLTtvI2iVN7LhdRaU56QPgDeWtbOmZPqw+JefmpWZsh6g2BeDiKNCqQQu8e0PH7d3WrbjEFgh97S/KqK8mo6WUKtWZetOFbE1KlN6SKe5PvMw/Nn+ElCAESImTAM0RO0FTRtQZ91BXBDF6+0mxMNUeMNhe5uxgGEpTfjd3iKDwINZ1wLTcxpWbM9DYVYwnjeFT6M6G+SiKZzgxmjAZ8IJar0zo1vKXhy8y3zhKTnsQC4LN7VsNy1XJXe8Jrr8eik0dhmHHebzyJNOfTuNn2Z8sxhpqh0pL5yIs8VE0dD9CxWu9fO2WwYMlR1ydFzHGTLLmsgqAm0qS02vmSEochaUJNHeGzKjyTKoTpucCffpC2qVvzLoYcd9DScINqrJGsIb602Zf3CQSAtuGoDzCjT5xiwvnrLLkh3MjqqpTBcqQVrmSr3WLjh3398RhmX1Tx0DfQ8dyAu1ruu2TAN5xspLvHSxb/W6KEI/es4oxJbcl8823e8LMUUt+swpt/r6IkBi+NcSR4WrFRy6AWgEpeHXVxGNO66CyC4uSwurcRL2iD/YeHz92PLNrr3O8+ewyD496kZZYgMWpn2866mlct1FQ8ys/b4xRq5+j9o/fGDUIVr6MrTycXD+mupudw1N1Vzp3xyY/v9yyGLLY1Uy5NpwZixm70YNpBztZzybSdd1dei27ixa9N4/Pbnx/qCzuKICS0NjAJ1WXObE/N23mdGfRoKeazy43cafBRZbs6sUvUiWrmqxydKFNSI8B28mVweqEZ+Izfqqv+e+ZAMrt8JFqy5d/WDdAhNtBdBmvHE/6u+yapTuMlpvFhy+1Cq8796VNIjSb0X8B2F53c39rUAQAAAAASUVORK5CYII="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_generic_based_listsButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+a4658c04-00f9-424f-919a-0b22ec016601,Invoke 'ribbon_doc_lib_based_lists' action,d68c3418-b07c-40bf-9871-fff6d4aaae09.ribbon_doc_lib_based_lists,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.Documents.Manage.Controls._children""><Button Id=""Ribbon.Documents.Manage.ribbon_doc_lib_based_listsButton"" Alt=""Visualize"" Sequence=""100"" Command=""Invoke_ribbon_doc_lib_based_listsButtonRequest"" LabelText=""Visualize"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,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"" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAASdAAAEnQB3mYfeAAAAAd0SU1FB90IDAoiJmD6FyMAAAOWSURBVDjLTZN9TNR1HMdf399xcHKnPD8/HQVhCAiIBVRSZICjPyggmOZWpq5Fi63BIIqla20xt8jJcuEkJ5PFApNEViMqChVQigiCBAQbgzt5vOM4jofj2x8w6v3X+5/35/P6vLePYEuLxgF2+uyhruWLsJrW0ZMF8Rl5pmpDsGv6lKUj8dGOJ9yHe3LjiiqEEIv8TwrApGEVnXek44/9xVWB96aHr54uKJ5dMQUZu43U3fpLl+Ufme7RH/1+c9HH5msj5cUAD767CoAAkPPSdd8vlU0B2j8PRNfGEpgaKuN2eYgR6yQ+IT5E14Xj+7kvAEtaW6/p4hm55hKZrT+UM+YA8JKhq3Dn3tQDc0qqdHjaU7xn9BcODwWooSLBwsFLTtvI2iVN7LhdRaU56QPgDeWtbOmZPqw+JefmpWZsh6g2BeDiKNCqQQu8e0PH7d3WrbjEFgh97S/KqK8mo6WUKtWZetOFbE1KlN6SKe5PvMw/Nn+ElCAESImTAM0RO0FTRtQZ91BXBDF6+0mxMNUeMNhe5uxgGEpTfjd3iKDwINZ1wLTcxpWbM9DYVYwnjeFT6M6G+SiKZzgxmjAZ8IJar0zo1vKXhy8y3zhKTnsQC4LN7VsNy1XJXe8Jrr8eik0dhmHHebzyJNOfTuNn2Z8sxhpqh0pL5yIs8VE0dD9CxWu9fO2WwYMlR1ydFzHGTLLmsgqAm0qS02vmSEochaUJNHeGzKjyTKoTpucCffpC2qVvzLoYcd9DScINqrJGsIb602Zf3CQSAtuGoDzCjT5xiwvnrLLkh3MjqqpTBcqQVrmSr3WLjh3398RhmX1Tx0DfQ8dyAu1ruu2TAN5xspLvHSxb/W6KEI/es4oxJbcl8823e8LMUUt+swpt/r6IkBi+NcSR4WrFRy6AWgEpeHXVxGNO66CyC4uSwurcRL2iD/YeHz92PLNrr3O8+ewyD496kZZYgMWpn2866mlct1FQ8ys/b4xRq5+j9o/fGDUIVr6MrTycXD+mupudw1N1Vzp3xyY/v9yyGLLY1Uy5NpwZixm70YNpBztZzybSdd1dei27ixa9N4/Pbnx/qCzuKICS0NjAJ1WXObE/N23mdGfRoKeazy43cafBRZbs6sUvUiWrmqxydKFNSI8B28mVweqEZ+Izfqqv+e+ZAMrt8JFqy5d/WDdAhNtBdBmvHE/6u+yapTuMlpvFhy+1Cq8796VNIjSb0X8B2F53c39rUAQAAAAASUVORK5CYII="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_doc_lib_based_listsButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+a6f77b4a-8f49-4f17-8980-3e1a2c8c9716,Invoke 'ribbon_task_based_lists' action,9d5f3aee-2f2d-452f-b6b9-535f26d957a4.ribbon_task_based_lists,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.Tasks.Actions.Controls._children""><Button Id=""Ribbon.ListItem.Actions.ribbon_task_based_listsButton"" Alt=""Visualize"" Sequence=""100"" Command=""Invoke_ribbon_task_based_listsButtonRequest"" LabelText=""Visualize"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,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"" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAASdAAAEnQB3mYfeAAAAAd0SU1FB90IDAoiJmD6FyMAAAOWSURBVDjLTZN9TNR1HMdf399xcHKnPD8/HQVhCAiIBVRSZICjPyggmOZWpq5Fi63BIIqla20xt8jJcuEkJ5PFApNEViMqChVQigiCBAQbgzt5vOM4jofj2x8w6v3X+5/35/P6vLePYEuLxgF2+uyhruWLsJrW0ZMF8Rl5pmpDsGv6lKUj8dGOJ9yHe3LjiiqEEIv8TwrApGEVnXek44/9xVWB96aHr54uKJ5dMQUZu43U3fpLl+Ufme7RH/1+c9HH5msj5cUAD767CoAAkPPSdd8vlU0B2j8PRNfGEpgaKuN2eYgR6yQ+IT5E14Xj+7kvAEtaW6/p4hm55hKZrT+UM+YA8JKhq3Dn3tQDc0qqdHjaU7xn9BcODwWooSLBwsFLTtvI2iVN7LhdRaU56QPgDeWtbOmZPqw+JefmpWZsh6g2BeDiKNCqQQu8e0PH7d3WrbjEFgh97S/KqK8mo6WUKtWZetOFbE1KlN6SKe5PvMw/Nn+ElCAESImTAM0RO0FTRtQZ91BXBDF6+0mxMNUeMNhe5uxgGEpTfjd3iKDwINZ1wLTcxpWbM9DYVYwnjeFT6M6G+SiKZzgxmjAZ8IJar0zo1vKXhy8y3zhKTnsQC4LN7VsNy1XJXe8Jrr8eik0dhmHHebzyJNOfTuNn2Z8sxhpqh0pL5yIs8VE0dD9CxWu9fO2WwYMlR1ydFzHGTLLmsgqAm0qS02vmSEochaUJNHeGzKjyTKoTpucCffpC2qVvzLoYcd9DScINqrJGsIb602Zf3CQSAtuGoDzCjT5xiwvnrLLkh3MjqqpTBcqQVrmSr3WLjh3398RhmX1Tx0DfQ8dyAu1ruu2TAN5xspLvHSxb/W6KEI/es4oxJbcl8823e8LMUUt+swpt/r6IkBi+NcSR4WrFRy6AWgEpeHXVxGNO66CyC4uSwurcRL2iD/YeHz92PLNrr3O8+ewyD496kZZYgMWpn2866mlct1FQ8ys/b4xRq5+j9o/fGDUIVr6MrTycXD+mupudw1N1Vzp3xyY/v9yyGLLY1Uy5NpwZixm70YNpBztZzybSdd1dei27ixa9N4/Pbnx/qCzuKICS0NjAJ1WXObE/N23mdGfRoKeazy43cafBRZbs6sUvUiWrmqxydKFNSI8B28mVweqEZ+Izfqqv+e+ZAMrt8JFqy5d/WDdAhNtBdBmvHE/6u+yapTuMlpvFhy+1Cq8796VNIjSb0X8B2F53c39rUAQAAAAASUVORK5CYII="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_task_based_listsButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+ed1d1672-1201-40f1-8477-5a47a23c36f7,Invoke 'ribbon_promoted_links' action,aa048b20-c667-4403-91fe-571df39d02b7.ribbon_promoted_links,CommandUI.Ribbon,List,170,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.ListItem.Actions.Controls._children""><Button Id=""Ribbon.ListItem.Actions.ribbon_promoted_linksButton"" Alt=""Visualize"" Sequence=""100"" Command=""Invoke_ribbon_promoted_linksButtonRequest"" LabelText=""Visualize"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,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"" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAASdAAAEnQB3mYfeAAAAAd0SU1FB90IDAoiJmD6FyMAAAOWSURBVDjLTZN9TNR1HMdf399xcHKnPD8/HQVhCAiIBVRSZICjPyggmOZWpq5Fi63BIIqla20xt8jJcuEkJ5PFApNEViMqChVQigiCBAQbgzt5vOM4jofj2x8w6v3X+5/35/P6vLePYEuLxgF2+uyhruWLsJrW0ZMF8Rl5pmpDsGv6lKUj8dGOJ9yHe3LjiiqEEIv8TwrApGEVnXek44/9xVWB96aHr54uKJ5dMQUZu43U3fpLl+Ufme7RH/1+c9HH5msj5cUAD767CoAAkPPSdd8vlU0B2j8PRNfGEpgaKuN2eYgR6yQ+IT5E14Xj+7kvAEtaW6/p4hm55hKZrT+UM+YA8JKhq3Dn3tQDc0qqdHjaU7xn9BcODwWooSLBwsFLTtvI2iVN7LhdRaU56QPgDeWtbOmZPqw+JefmpWZsh6g2BeDiKNCqQQu8e0PH7d3WrbjEFgh97S/KqK8mo6WUKtWZetOFbE1KlN6SKe5PvMw/Nn+ElCAESImTAM0RO0FTRtQZ91BXBDF6+0mxMNUeMNhe5uxgGEpTfjd3iKDwINZ1wLTcxpWbM9DYVYwnjeFT6M6G+SiKZzgxmjAZ8IJar0zo1vKXhy8y3zhKTnsQC4LN7VsNy1XJXe8Jrr8eik0dhmHHebzyJNOfTuNn2Z8sxhpqh0pL5yIs8VE0dD9CxWu9fO2WwYMlR1ydFzHGTLLmsgqAm0qS02vmSEochaUJNHeGzKjyTKoTpucCffpC2qVvzLoYcd9DScINqrJGsIb602Zf3CQSAtuGoDzCjT5xiwvnrLLkh3MjqqpTBcqQVrmSr3WLjh3398RhmX1Tx0DfQ8dyAu1ruu2TAN5xspLvHSxb/W6KEI/es4oxJbcl8823e8LMUUt+swpt/r6IkBi+NcSR4WrFRy6AWgEpeHXVxGNO66CyC4uSwurcRL2iD/YeHz92PLNrr3O8+ewyD496kZZYgMWpn2866mlct1FQ8ys/b4xRq5+j9o/fGDUIVr6MrTycXD+mupudw1N1Vzp3xyY/v9yyGLLY1Uy5NpwZixm70YNpBztZzybSdd1dei27ixa9N4/Pbnx/qCzuKICS0NjAJ1WXObE/N23mdGfRoKeazy43cafBRZbs6sUvUiWrmqxydKFNSI8B28mVweqEZ+Izfqqv+e+ZAMrt8JFqy5d/WDdAhNtBdBmvHE/6u+yapTuMlpvFhy+1Cq8796VNIjSb0X8B2F53c39rUAQAAAAASUVORK5CYII="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_promoted_linksButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fspa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}\u0026Source=List\u0026IsDlg=0\u0026Mode=New', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+ef317db6-327e-49db-a94e-6b60c9b5f632,Invoke 'ribbon_doc_lib_based_lists_visual_column' action,9ae2a450-2da7-4a28-ada5-c3c9737b3f13.ribbon_doc_lib_based_lists_visual_column,CommandUI.Ribbon,ContentType,0x01,"javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);","<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/""><!-- 
+      Update the UI definitions below with the controls and the command actions
+      that you want to enable for the custom action.
+      --><CommandUIDefinitions><CommandUIDefinition Location=""Ribbon.Library.Settings.Controls._children""><Button Id=""Ribbon.List.Settings.ribbon_doc_lib_based_lists_visual_columnButton"" Alt=""Visual Columns"" Sequence=""100"" Command=""Invoke_ribbon_doc_lib_based_lists_visual_columnButtonRequest"" LabelText=""Visual Columns"" TemplateAlias=""o1"" Image32by32=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIREaXTNpQAAAGzSURBVFjD5ZU7bhRBEIa/6pllH55dy6lF7AxZMgFOkRBwAl/BRJgDwB1ICJDMCbgFRBtCBAEQYREgoR3PY2enq4rAvJxNgGgh/1Krq1vV0q+/W1/L/uu3z4BjIOMfyN0REUaCruv6VG68euMvb+6RS8BwxOF909Gaoe707kR3eruof83+e70xu7z/R2/0y0PdMYRpED6dfSGQQAIUWUCr8zQGAIqQ0IAAkyBY26ZL4KeSGHBgbUaYzdIlUJmTFfN0CVTRyIo5khpEqd8gMqTp3ou9B8ATYPdvJZCHka6b9Wk+5FDZlkcntx/uHlw/IKrzoVxyVr9DTehV6VTZxEgXI13sf8yRTezpVC9qVXqN9KpEM0I+zqxsj0Oq4ItrC2JjCf+CfEGfzIAI03yKdnZVUexOExuySUhIwr5kNAuprsCpN+fks5AeRP8Hiofo8/3FLeApcDgkAfKxVut2GIqHKH4t94u7dw53Hj1GPy6Jy+f4ZozVilcRKyNeR6xSaA33efbNUqFYBIptVr2TzEAoFpTRE5JwskWjXFEUA3hbs5WlMuCOVysWI0lngGrFdi7pQfQdCfgptMTdMVgAAAAASUVORK5CYII="" Image16by16=""data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAOwwAADsMBx2+oZAAAAAd0SU1FB98MFgIQMPChF4sAAAGgSURBVDjLpZE9ixRBEIaf6pm5mR3nVkEQRC8ShBNTDUw10kgQAzH1Dxj5Hwz9AUZGB2JgaiiYCGJgoGcieyiH4H7MTPd8dLXBfqjsgrK+UNRLdfNCPSX33x1+2S8Ge06VH52nD4EuBDpd9BBoF75f9kWFthnFF06ke3fPnmbSez7bBqeK9UrllVqVeun9fG5VV39kas8btlQA0taxdYAATZoRfyzd+NnR91NOlXHvV/t1v7PQX7Pluw+gaT6RTelXHvPQCD6NEozIoszKiwgiEBEfrQVcfXLm8osHz99P3FjefDtg1jZMnWVi7bw7S9k0lI0jddk6AxFC3dViO0fb9/Te03tFVVENhDAHqEHJumJ7iEvFa+cJSJ7kofOt7MQxjXriyGCMwZj57gIYMbikZI3Bzaf7+fHs+JER43eiHINQpcbaNGr+gAhEsgHiJo1uDF4Xt+5c859eESpFy55QeRzR5N8YeL20e/se+cUh2bmCdJiRYCiT4cntIYaAjfP/uIIIg67GfLi++3cOkXlbvjzAHs5wXyvaWUOHUvTT0U/quQdtSAEGaQAAAABJRU5ErkJggg=="" /></CommandUIDefinition></CommandUIDefinitions><CommandUIHandlers><CommandUIHandler Command=""Invoke_ribbon_doc_lib_based_lists_visual_columnButtonRequest"" CommandAction=""javascript:LaunchApp('fde7c318-da4c-46ca-b7f5-dc7f543f63fd', 'i:0i.t|ms.sp.int|a5aee6ea-3f85-4810-8224-9bda42be5f02@d8623c9e-30c7-473a-83bc-d907df44a26e', '~appWebUrl\u002fPages\u002fbcvsp_field_spa.aspx?{StandardTokens}\u0026SPListItemId={ItemId}\u0026SPListId={ListId}\u0026SiteCollectionUrl={SiteCollection}\u0026SourceUrl={Source}\u0026SiteUrl={SiteUrl}', null);"" /></CommandUIHandlers></CommandUIExtension>",,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/devclr,/
+4c59e328-d602-45c0-8d8d-2de288a5d1d4,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ecs2018demo1,/
+b935388d-bd7d-413a-a50d-385b37dd0bb8,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ecs2018demo1,/
+1a1b19cc-48a0-4657-8484-9919319af0cc,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ecs2018demo2,/
+1c3f2341-f894-4734-8b2c-aa75c0a05b9a,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ecs2018demo2,/
+6191470a-aa7f-46d1-9e9d-6b29751b1c7b,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ecs2018test1,/
+74f2fc8c-3aa7-44b5-af5c-4144fea990d5,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/ecs2018test1,/
+4e37edeb-eeaf-4ac0-ab94-2bd8f8466f67,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize01,/
+fc9c0e4c-52ac-4565-b962-2c79cf6ee42c,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize01,/
+0c25f8bf-82c7-4a02-9f8b-fb03a19138f4,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize02,/
+fda58250-535d-4628-80a8-f7fb69510991,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize02,/
+d212a226-ac2e-48b9-b65e-7044880369ba,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize03,/
+fa74dd91-2d4e-4c18-a059-f2c0dfb665af,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize03,/
+516e4733-d827-4dbd-abf2-c62c526e6a62,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize04,/
+cb48acb0-49d3-4523-8450-fbaec95b2c91,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espc2019Modernize04,/
+35d04874-c095-4bde-aba3-6ab01f9f2d12,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espcteamsite1&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+<CommandUIDefinitions>
+  <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+    <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+  </CommandUIDefinition>
+</CommandUIDefinitions>
+<CommandUIHandlers>
+  <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espcteamsite1&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+</CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espcteamsite1,/
+8d462daa-6fbf-46bc-811c-e9d59f277007,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espcteamsite1,/
+de71a317-afb8-4b78-8ed3-e63737a4b5d4,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espcteamsite1,/
+fd719da8-8e42-4f51-a213-bddeb03edd25,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espcteamsite1&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+<CommandUIDefinitions>
+  <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+    <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+  </CommandUIDefinition>
+</CommandUIDefinitions>
+<CommandUIHandlers>
+  <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espcteamsite1&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+</CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espcteamsite1,/
+2a7a2332-9116-43a8-86de-8065b2b61939,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest1&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+<CommandUIDefinitions>
+  <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+    <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+  </CommandUIDefinition>
+</CommandUIDefinitions>
+<CommandUIHandlers>
+  <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest1&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+</CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espctest1,/
+c34b67d3-5250-4d15-8750-24849322473e,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest1&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+<CommandUIDefinitions>
+  <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+    <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+  </CommandUIDefinition>
+</CommandUIDefinitions>
+<CommandUIHandlers>
+  <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest1&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+</CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espctest1,/
+7bb952df-9b61-4406-bfd2-a7fedbeaa8ce,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest2&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+<CommandUIDefinitions>
+  <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+    <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+  </CommandUIDefinition>
+</CommandUIDefinitions>
+<CommandUIHandlers>
+  <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest2&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+</CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espctest2,/
+cec35fdc-739d-4cef-a711-418532ffad89,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest2&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+<CommandUIDefinitions>
+  <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+    <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+  </CommandUIDefinition>
+</CommandUIDefinitions>
+<CommandUIHandlers>
+  <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/espctest2&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+</CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/espctest2,/
+1c80d10a-21e7-4cee-803a-7f593e6257da,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/jsloadtest,/
+835d5f58-8220-46d4-a23e-5e1a93afce66,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/jsloadtest,/
+c172aeec-9ab0-4bb3-bcb2-0824167e21a2,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/jsloadtest,/
+8588fe0f-4d94-4bfa-9a8e-b1d6706c06a7,,{8588fe0f-4d94-4bfa-9a8e-b1d6706c06a7},ScriptLink,None,,,,sitesportal_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://spprov.set1.bertonline.info/Templates/sitesportal_resources.js?rev=3';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/kbcportal,/
+0abe5a90-406f-4251-bd8b-9304db0fb0c4,Create modern version,CA_Modernize_WikiPage,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtest&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+  <CommandUIDefinitions>
+    <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+      <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+    </CommandUIDefinition>
+  </CommandUIDefinitions>
+  <CommandUIHandlers>
+    <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtest&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+  </CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizationtest,/
+d26385d1-11ff-41c4-a5bb-b6936055ce6c,Create modern version,CA_Modernize_WebPartPage,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtest&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+  <CommandUIDefinitions>
+    <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+      <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/modernizationcenter/siteassets/modernize16x16.png"" Image32by32=""/sites/modernizationcenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+    </CommandUIDefinition>
+  </CommandUIDefinitions>
+  <CommandUIHandlers>
+    <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/modernizationcenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtest&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+  </CommandUIHandlers>
+</CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizationtest,/
+5ed52311-271a-47d1-8ecd-1079311955fb,Shows a banner on the classic pages,CA_PnP_Modernize_ClassicBanner,ScriptLink,None,,,,Shows a banner on the classic pages.,,https://bertonline.sharepoint.com//sites/ModernizationCenter/SiteAssets/pnppagetransformationclassicbanner.js?rev=beta.1,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizationtestpages,/
+79252c9d-9d42-4dbd-918a-b0fbedbdb1d6,Create modern version,CA_PnP_Modernize_WebPartPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtestpages&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WebPartPage.Actions.Controls._children"">
+          <Button Id=""Ribbon.WebPartPage.Actions.ModernizeWebPartPage"" Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWebPartPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtestpages&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizationtestpages,/
+b928dc8e-9d02-4850-84e1-22ef8eaa4cca,Create modern version,CA_PnP_Modernize_WikiPage_RIBBON,CommandUI.Ribbon,None,,javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtestpages&ListId=' + _spPageContextInfo.listId + '&ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();,"<CommandUIExtension xmlns=""http://schemas.microsoft.com/sharepoint/"">
+      <CommandUIDefinitions>
+        <CommandUIDefinition Location=""Ribbon.WikiPageTab.PageActions.Controls._children"">
+          <Button Id=""Ribbon.WikiPageTab.PageActions.ModernizeWikiPage"" Command=""SharePointPnP.Cmd.ModernizeWikiPage"" Image16by16=""/sites/ModernizationCenter/siteassets/modernize16x16.png"" Image32by32=""/sites/ModernizationCenter/siteassets/modernize32x32.png"" LabelText=""Create modern version"" Description=""Create a modern version of this page."" ToolTipTitle=""Create modern version"" ToolTipDescription=""Create a modern version of this page."" TemplateAlias=""o1"" Sequence=""1500"" />
+        </CommandUIDefinition>
+      </CommandUIDefinitions>
+      <CommandUIHandlers>
+        <CommandUIHandler Command=""SharePointPnP.Cmd.ModernizeWikiPage"" CommandAction=""javascript:function redirect(){ var url = '/sites/ModernizationCenter/SitePages/modernize.aspx?SiteUrl=/sites/modernizationtestpages&amp;ListId=' + _spPageContextInfo.listId + '&amp;ItemId=' + _spPageContextInfo.pageItemId; window.location = url; } redirect();"" />
+      </CommandUIHandlers>
+    </CommandUIExtension>",Create a modern version of this page.,,,,JavaScriptEmbedded,00000000-0000-0000-0000-000000000000,,,CE8,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizationtestpages,/
+5cafe1eb-c20d-4c09-b663-b3f4d62cd242,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizefrp01,/
+e5c8b622-9a1d-47ed-b0b6-3f5152d77f8a,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizefrp01,/
+dde441e0-79b1-431f-b71a-30ea4b930e3e,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizefrp02,/
+ebd57159-6626-4ffb-a8e3-415f3b333885,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizefrp02,/
+780aadf1-eba0-4dfc-8cd8-78104afaa200,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizefrp03,/
+d77abc70-151d-4d1b-8cca-e5d044d8adaf,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizefrp03,/
+75d31a25-5920-4e47-9532-b6076b339d63,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizeme02,/
+abb649cd-e83c-4476-b22a-1829bbebfcd6,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizeme02,/
+0b4ddee1-ae6b-4f44-a319-8bdcd5f9f295,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizeme03,/
+2591ea19-387f-43b8-8ca5-8ef694234a44,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizeme03,/
+339e95b5-e06d-4421-8c22-d1aaca775120,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizeme04,/
+a0c6999c-c87b-4780-8eb5-ea5ff3ae85ea,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/modernizeme04,/
+b8e3c107-366f-4963-9a48-1d858610dd02,,{b8e3c107-366f-4963-9a48-1d858610dd02},ScriptLink,None,,,,teamsite_resources,"
+var headID = document.getElementsByTagName('head')[0]; 
+var
+newScript = document.createElement('script');
+newScript.type = 'text/javascript';
+newScript.src = 'https://bertonline.sharepoint.com/sites/scripts/_catalogs/masterpage/KBC/js/teamsite_resources.js';
+headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/p2,/
+280d01ce-1b31-4371-933d-a752c05254bd,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/pnppartnerpack3,/
+3861764b-7389-430a-a808-7f68d2664cc2,,spoResponsive,ScriptLink,None,,,,spoResponsive,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Responsive/SPO-Responsive.js';
+                newScript.id = 'spoResponsive';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/pnppartnerpacktest2,/
+5079ea0d-7a5c-43b2-a3d9-fb062c217c0e,,jQueryLink,ScriptLink,None,,,,jQueryLink,"
+                var headID = document.getElementsByTagName('head')[0]; 
+                var
+                newScript = document.createElement('script');
+                newScript.type = 'text/javascript';
+                newScript.src = 'https://code.jquery.com/jquery-1.11.3.min.js';
+                newScript.id = 'jQueryLink';
+                headID.appendChild(newScript);",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/pnppartnerpacktest2,/
+516b1517-a728-452e-ad39-ea9cb85dd5fe,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/pnppartnerpacktest2,/
+a11205c5-d437-4e53-8b0f-a2aff5fc9777,,PnPPartnerPackOverrides,ScriptLink,None,,,,," var headID = document.getElementsByTagName('head')[0]; 
+var scripts = document.getElementsByTagName('script');
+var scriptsSrc = [];
+for(var i = 0; i < scripts.length; i++) {
+    if(scripts[i].type === 'text/javascript'){
+        scriptsSrc.push(scripts[i].src);
+    }
+}
+
+if (scriptsSrc.indexOf('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3') === -1)  {  
+    var newScript = document.createElement('script');
+    newScript.id = 'PnPPartnerPackOverrides';
+    newScript.type = 'text/javascript';
+    newScript.src = 'https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3';
+    headID.appendChild(newScript);
+    scriptsSrc.push('https://pnppartnerpack-bertonline.azurewebsites.net/Templates/Overrides/PnP-Partner-Pack-Overrides.js?rev=457cefaa69cc4d6d9d37cecc6cb04dc3');
+}",,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/pnptemplate1,/
+0fc0386e-e736-4255-bbc2-660a3b46ae53,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcna01,/
+72edaa91-6a8e-48cb-a60f-cbad28094e96,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcna01,/
+0cd2e8c6-ca49-4597-b8a7-2eea584c60b5,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcna02,/
+ce85b2c4-b24e-46c6-abe3-968b952d9b5a,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcna02,/
+388b31d9-3cf8-470e-b0a0-3f0b1317ec53,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcna03,/
+91f4cf63-dc53-4d0c-894d-a994a3e3d1f7,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcna03,/
+25b5682d-9bde-4355-98d7-240bf8c3b7c3,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcnatest01,/
+2e726350-f601-4ee3-883d-4972f1c511d5,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcnatest01,/
+2e32a40c-1831-43df-80db-235581d3988f,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcnatest02,/
+a6a6d48a-8c46-460e-861a-06a31354a42c,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/spcnatest02,/
+5916c1e9-e51b-464c-a227-a6cf6d53e458,jQueryCDN,jQueryCDN,ScriptLink,None,,,,Loads jQuery from the public CDN,,https://code.jquery.com/jquery-3.2.1.slim.min.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/teamsitemodernizationtemplate,/
+928dc828-72b7-49a2-8f60-a40ad1626cb7,spoCustomBar,spoCustomBar,ScriptLink,None,,,,Loads a script to rendere a custom footer,,~SiteCollection/siteassets/spocustomui.js,,InvalidLocation,00000000-0000-0000-0000-000000000000,,,CE9,f403c19c-0541-4b70-863d-f2a169b62980,https://bertonline.sharepoint.com/sites/teamsitemodernizationtemplate,/

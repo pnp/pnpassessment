@@ -7,7 +7,7 @@
     <Nullable>disable</Nullable>
     <AssemblyName>microsoft365-assessment</AssemblyName>
 	<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-	<Version>1.4.0</Version>  
+	<Version>1.5.0</Version>  
   </PropertyGroup>
 
   <ItemGroup>
