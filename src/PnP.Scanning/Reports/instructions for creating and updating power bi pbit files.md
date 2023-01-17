@@ -1,6 +1,8 @@
 # Guidelines on report development for the Assessment tool
 
+Here are the instuctions for creating and updating the Power BI reports which are included in the assessment tool.
 
+**Important:** All report files must live in a subfolder under folder D:\github\pnpscanning\src\PnP.Scanning\Reports ==> this path is hardcoded used in the code at the moment. If you change this path then please do this for all reports.
 
 
 ## Start developing a report for a new assessment module
