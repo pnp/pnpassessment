@@ -10,6 +10,6 @@
         InfoPath,
         //AddIns,
         //AzureACS,
-        Classic
+        //Classic
     }
 }
