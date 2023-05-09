@@ -100,6 +100,13 @@ namespace PnP.Scanning.Core.Scanners
                     Mode = mode,
                 };
             }
+            else if (mode.Equals(Services.Mode.InfoPath.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new InfoPathOptions
+                {
+                    Mode = mode,
+                };
+            }
 #if DEBUG
             else if (mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
             {

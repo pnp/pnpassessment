@@ -7,6 +7,9 @@
 #endif
         Syntex,
         Workflow,
+        InfoPath,
+        //AddIns,
+        //AzureACS,
         Classic
     }
 }

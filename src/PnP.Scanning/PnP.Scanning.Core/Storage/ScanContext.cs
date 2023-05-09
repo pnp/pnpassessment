@@ -157,12 +157,14 @@ namespace PnP.Scanning.Core.Storage
             });
             #endregion
 
-            #region Classic scanner
+            #region InfoPath scanner
             modelBuilder.Entity<ClassicInfoPath>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
             });
+            #endregion
 
+            #region Classic scanner
             modelBuilder.Entity<ClassicPage>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });

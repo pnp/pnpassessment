@@ -1,0 +1,10 @@
+WebUrlAbsolute,StartDate,EndDate,ScanDuration,Status,Template,ScanId,SiteUrl,WebUrl
+https://bertonline.sharepoint.com/sites/devinfopath,05/09/2023 14:25:48,05/09/2023 14:25:50,1,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/devinfopath,/
+https://bertonline.sharepoint.com/sites/modernizationtestpages,05/09/2023 14:25:51,05/09/2023 14:25:52,1,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/modernizationtestpages,/
+https://bertonline.sharepoint.com/sites/modernizationtestpages/blog,05/09/2023 14:25:52,05/09/2023 14:25:53,0,Finished,BLOG#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/modernizationtestpages,/blog
+https://bertonline.sharepoint.com/sites/modernizationtestpages/blognl,05/09/2023 14:25:53,05/09/2023 14:25:55,1,Finished,BLOG#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/modernizationtestpages,/blognl
+https://bertonline.sharepoint.com/sites/modernizationtestpages/metadata,05/09/2023 14:25:55,05/09/2023 14:25:56,0,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/modernizationtestpages,/metadata
+https://bertonline.sharepoint.com/sites/modernizationtestpages/metadata2,05/09/2023 14:25:56,05/09/2023 14:25:56,0,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/modernizationtestpages,/metadata2
+https://bertonline.sharepoint.com/sites/modernizationtestpages/subsite,05/09/2023 14:25:57,05/09/2023 14:25:57,0,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/modernizationtestpages,/subsite
+https://bertonline.sharepoint.com/sites/temp3,05/09/2023 14:25:45,05/09/2023 14:25:47,1,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/temp3,/
+https://bertonline.sharepoint.com/sites/temp3/demo1,05/09/2023 14:25:47,05/09/2023 14:25:48,0,Finished,STS#0,408f7dc5-3290-447a-9278-d28f08ee97e2,https://bertonline.sharepoint.com/sites/temp3,/demo1

@@ -88,6 +88,17 @@ namespace PnP.Scanning.Core.Services
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
                     RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\", ",");
                 }
+                else if (scan.CLIMode == Mode.InfoPath.ToString())
+                {
+                    reportFile = "InfoPathAssessmentReport.pbit";
+                    // Put the report file in the report folder
+                    string pbitFile = Path.Combine(exportPath, reportFile);
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.InfoPath.InfoPathAssessmentReport.pbit", pbitFile);
+
+                    // Update the report file to pick up the exported CSV files in the report folder
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\InfoPath\\\\", ",");
+                }
 #if DEBUG
                 else if (scan.CLIMode == Mode.Test.ToString())
                 {
@@ -310,6 +321,18 @@ namespace PnP.Scanning.Core.Services
                     }
 
                 }
+
+                if (scan.CLIMode == Mode.InfoPath.ToString())
+                {
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicInfoPathCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+                }
+
 #if DEBUG
                 if (scan.CLIMode == Mode.Test.ToString())
                 {

@@ -549,6 +549,7 @@ namespace PnP.Scanning.Core.Storage
             await DropSyntexIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropWorkflowIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropClassicIncompleteWebScanDataAsync(scanId, dbContext, site, web);
+            await DropInfoPathIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #if DEBUG
             await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
@@ -878,7 +879,7 @@ namespace PnP.Scanning.Core.Storage
         }
         #endregion
 
-        #region Classic
+        #region InfoPath
         internal async Task StoreInfoPathInformationAsync(Guid scanId, List<ClassicInfoPath> infoPathLists)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -889,7 +890,9 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("StoreInfoPathInformationAsync succeeded");
             }
         }
+        #endregion
 
+        #region Classic
         internal async Task StorePageInformationAsync(Guid scanId, List<ClassicPage> pagesLists)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -1228,6 +1231,15 @@ namespace PnP.Scanning.Core.Storage
                 dbContext.Workflows.Remove(workflow);
             }
             Log.Information("Consolidating assessment {ScanId}: dropping Workflow results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+        }
+
+        private async Task DropInfoPathIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        {
+            foreach (var infoPath in await dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicInfoPath.Remove(infoPath);
+            }
+            Log.Information("Consolidating assessment {ScanId}: dropping InfoPath results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
         private async Task DropClassicIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)

@@ -71,6 +71,10 @@ namespace PnP.Scanning.Core.Scanners
             {
                 return new ClassicScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, classicOptions);
             }
+            else if (options is InfoPathOptions infoPathOptions)
+            {
+                return new InfoPathScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, infoPathOptions);
+            }
 #if DEBUG
             else if (options is TestOptions testOptions)
             {
