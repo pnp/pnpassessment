@@ -17,7 +17,8 @@ Once you're ready to run an assessment you can choose any of the available modul
 Module | Type | Description
 -------|------|------------
 [Microsoft Syntex](https://pnp.github.io/pnpassessment/sharepoint-syntex/readme.html) | Adoption | Helps you assess your tenant to understand where using Microsoft Syntex will bring value to your organization
-[Workflow 2013](https://pnp.github.io/pnpassessment/workflow/readme.html) | Deprecation | Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. **Available as of pre-release version 1.0.1**
+[Workflow 2013](https://pnp.github.io/pnpassessment/workflow/readme.html) | Retirement | Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. **Available as of pre-release version 1.0.1**
+[InfoPath Forms Services](https://pnp.github.io/pnpassessment/infopath/readme.md) | Retirement | Helps you assess your tenant to understand where you're using InfoPath Forms Services and how upgradable those to alternative solutions. **Available as of version 1.5.0**
 
 ## I want to help 🙋‍♂️
 
