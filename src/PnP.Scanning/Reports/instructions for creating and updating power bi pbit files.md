@@ -40,3 +40,10 @@ Since MSFT enforces a sensitivity setting on each created Power BI report we nee
 11. In Visual Studio set the Build Action the copied pbit file to "Embedded resource", copy to output directory is set to "Do not copy"
 12. Update the code in ReportManager.CreatePowerBiReportAsync to use the added pbit file
 
+## Dealing with DateTime values
+
+To ensure datetime values are handled correctly they should be imported as Text from the CSV file:
+1. Click on "Transform Data"
+2. For the imported tables verify that type is set to Text, e.g. `{"StartDate", type text}` and click on "Apply and close"
+3. Go to the "Model view" (3rd icon left side)
+4. Select the fields which represent dates (they're now listed as regular text field) and change "Data type" to "*14/03/2001 13:30:55 (General Date)"

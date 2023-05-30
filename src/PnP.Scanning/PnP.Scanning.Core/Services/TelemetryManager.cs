@@ -172,14 +172,20 @@ namespace PnP.Scanning.Core.Services
                 // Populate generic metrics
                 await PopulateMetricsAsync(scanId, metrics);
 
+                // PER SCAN COMPONENT: Update telemetry data per scan component
+
                 // Populate event specific metrics
                 if (Scan.CLIMode.Equals(Mode.Syntex.ToString()))
                 {
                     await PopulateSyntexMetricsAsync(scanId, metrics);
                 }
-                else if(Scan.CLIMode.Equals(Mode.Workflow.ToString()))
+                else if (Scan.CLIMode.Equals(Mode.Workflow.ToString()))
                 {
                     await PopulateWorkflowMetricsAsync(scanId, metrics);
+                }
+                else if (Scan.CLIMode.Equals(Mode.InfoPath.ToString()))
+                {
+                    await PopulateInfoPathMetricsAsync(scanId, metrics);
                 }
 
                 // Send the event
@@ -218,6 +224,39 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("FailedSiteCollectionCount", failedSiteCollectionCount);
                 metric.Add("FailedWebCount", failedWebCount);
                 metric.Add("ScanDurationInMinutes", scanDurationInMinutes);
+            }
+        }
+
+        private async Task PopulateInfoPathMetricsAsync(Guid scanId, Dictionary<string, double> metric)
+        {
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            {
+                int count = 0;
+                int formLibraryCount = 0;
+                int contentTypeCount = 0;
+                int customFormCount = 0;
+
+                foreach (var infoPath in dbContext.ClassicInfoPath)
+                {
+                    count++;
+                    if (infoPath.InfoPathUsage.Equals("FormLibrary", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        formLibraryCount++;
+                    }
+                    else if (infoPath.InfoPathUsage.Equals("ContentType", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        contentTypeCount++;
+                    }
+                    else if (infoPath.InfoPathUsage.Equals("CustomForm", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        customFormCount++;
+                    }                    
+                }
+
+                metric.Add("InfoPathCount", count);
+                metric.Add("InfoPathFormLibraryCount", formLibraryCount);
+                metric.Add("InfoPathContentTypeCount", contentTypeCount);
+                metric.Add("InfoPathCustomFormCount", customFormCount);
             }
         }
 
