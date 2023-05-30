@@ -1,0 +1,29 @@
+- name: Introduction
+  href: readme.md
+- name: Requirements
+  href: requirements.md
+- name: Run an assessment
+  href: assess.md
+- name: Report      
+  href: report-intro.md
+  items:
+    - name: Overview
+      href: report-overview.md
+    - name: Details
+      href: report-details.md
+- name: Migrate guidance
+  href: migrate-intro.md
+- name: CSV files
+  items:
+    - name: classicinfopath.csv
+      href: csv-classicinfopath.md      
+    - name: sitecollections.csv
+      href: csv-sitecollections.md
+    - name: webs.csv
+      href: csv-webs.md
+    - name: scans.csv
+      href: csv-scans.md
+    - name: properties.csv
+      href: csv-properties.md
+    - name: history.csv
+      href: csv-history.md
