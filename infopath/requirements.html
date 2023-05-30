@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>The Power BI report | Microsoft 365 Assessment Tool </title>
+    <title>Requirements | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="The Power BI report | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Requirements | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -71,19 +71,37 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
                   <div class="contribution-panel mobile-hide pull-right">
-                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/workflow/report-intro.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/infopath/requirements.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="the-power-bi-report">The Power BI report</h1>
+                    <h1 id="requirements">Requirements</h1>
 
-<p>The generated report is a Power BI report and can be opened in Power BI Desktop (see <a href="https://aka.ms/pbidesktopstore">https://aka.ms/pbidesktopstore</a> to install Power BI Desktop).</p>
-<p><img src="../images/workflowpowerbidesktop.png" alt="powerbi report"></p>
-<p>When using the report from Power BI Desktop there are some things to understand:</p>
-<ul>
-<li>The report is built using multiple pages, use the bottom tabs to switch to different report pages. The Overview page will give you a quick overview while the Details page allows you to further drill in</li>
-<li>When the report is opened from the generated Power BI pbit file it's not saved, meaning if you close Power BI Desktop it will ask you to save the file. You can also save the opened report yourselves using the <strong>save</strong> icon top left, when saving as a Power BI pbix file the data and report are combined into a single file, making it easier for your to move around and share the report</li>
-<li>If you want to update the visualizations used you can use the toolbar and visualizations and fields sections at the right</li>
-</ul>
-<p>You can use the left navigation to learn more about each report page.</p>
+<p>This page lists the InfoPath Forms Services assessment specific requirements and options.</p>
+<h2 id="permission-requirements">Permission requirements</h2>
+<p>When using the InfoPath Forms Services module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application (<a href="../using-the-assessment-tool/setupauth.html">learn more here</a>). The Microsoft 365 Assessment tool aims to be able to perform the InfoPath Forms Services assessment using minimal permissions, as listed below.</p>
+<table>
+<thead>
+<tr>
+<th>Authentication</th>
+<th>Minimal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Application</td>
+<td><strong>Graph:</strong> Sites.Read.All <br> <strong>SharePoint:</strong> Sites.Read.All</td>
+</tr>
+<tr>
+<td>Delegated</td>
+<td><strong>Graph:</strong> Sites.Read.All, User.Read <br> <strong>SharePoint:</strong> AllSites.Read</td>
+</tr>
+</tbody>
+</table>
+<h2 id="command-line-arguments-for-starting-an-assessment">Command line arguments for starting an assessment</h2>
+<p>There are no specific command line arguments when starting the InfoPath Forms Services assessment.</p>
+<div class="NOTE">
+<h5>Note</h5>
+<p>To learn more about starting an assessment checkout the Microsoft 365 Assessment tool <a href="../using-the-assessment-tool/assess-start.html">Start documentation</a>.</p>
+</div>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

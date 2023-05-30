@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>The Power BI report | Microsoft 365 Assessment Tool </title>
+    <title>Overview | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="The Power BI report | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="Overview | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -71,19 +71,59 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
                   <div class="contribution-panel mobile-hide pull-right">
-                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/workflow/report-intro.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/infopath/report-overview.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="the-power-bi-report">The Power BI report</h1>
+                    <h1 id="overview">Overview</h1>
 
-<p>The generated report is a Power BI report and can be opened in Power BI Desktop (see <a href="https://aka.ms/pbidesktopstore">https://aka.ms/pbidesktopstore</a> to install Power BI Desktop).</p>
-<p><img src="../images/workflowpowerbidesktop.png" alt="powerbi report"></p>
-<p>When using the report from Power BI Desktop there are some things to understand:</p>
-<ul>
-<li>The report is built using multiple pages, use the bottom tabs to switch to different report pages. The Overview page will give you a quick overview while the Details page allows you to further drill in</li>
-<li>When the report is opened from the generated Power BI pbit file it's not saved, meaning if you close Power BI Desktop it will ask you to save the file. You can also save the opened report yourselves using the <strong>save</strong> icon top left, when saving as a Power BI pbix file the data and report are combined into a single file, making it easier for your to move around and share the report</li>
-<li>If you want to update the visualizations used you can use the toolbar and visualizations and fields sections at the right</li>
-</ul>
-<p>You can use the left navigation to learn more about each report page.</p>
+<p>InfoPath forms in SharePoint online have not been updated for a long time and depend on the InfoPath designer client which will go out of support when Office 2016 goes out of support (April 2026). Next to that can InfoPath forms not be shown using modern SharePoint and are the forms not responsive and therefore will not show up nicely on some devices. In the shown table these columns are presented:</p>
+<table>
+<thead>
+<tr>
+<th>Column name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web</td>
+<td>The fully qualified URL of the web hosting the InfoPath usage</td>
+</tr>
+<tr>
+<td>List</td>
+<td>The name of the list or form library hosting the InfoPath usage</td>
+</tr>
+<tr>
+<td>Year</td>
+<td>Year when the last user triggered change for an item in the list/library that uses this InfoPath happened</td>
+</tr>
+<tr>
+<td>Month</td>
+<td>Month when the last user triggered change for an item in the list/library that uses this InfoPath happened</td>
+</tr>
+<tr>
+<td>Day</td>
+<td>Day when the last user triggered change for an item in the list/library that uses this InfoPath happened</td>
+</tr>
+<tr>
+<td>Items</td>
+<td>The amount of items/files in the list or library having InfoPath usage. Lists or form libraries containing zero or a few items are often less important to migrate</td>
+</tr>
+<tr>
+<td>Usage</td>
+<td>Indicates how InfoPath is used: when <code>FormLibrary</code> an InfoPath form is used to collect data which is stored as InfoPath XML in a form library. When <code>CustomForm</code> an InfoPath form is used to customize the list forms and finally when <code>ContentType</code> the InfoPath form is linked to a content type</td>
+</tr>
+<tr>
+<td>Template</td>
+<td>The name of the InfoPath form template (the .xsn file being used)</td>
+</tr>
+<tr>
+<td>Enabled</td>
+<td>Always true in this report</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sample-page">Sample page</h2>
+<p><img src="../images/infopathoverview.png" alt="InfoPath overview"></p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

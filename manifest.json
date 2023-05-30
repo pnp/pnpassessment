@@ -60,6 +60,39 @@
     },
     {
       "type": "Resource",
+      "source_relative_path": "images/infopathoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/infopathoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/infopathpowerbidesktop.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/infopathpowerbidesktop.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/infopathscanoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/infopathscanoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
       "source_relative_path": "images/listargumentshelp.png",
       "output": {
         "resource": {
@@ -350,7 +383,175 @@
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "DseDyJ3VMBxqtpDt00X2jQ=="
+          "hash": "URhnwUxyu3j3A+lja6xyaA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/assess.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/assess.html",
+          "hash": "7ppCkBHVtNyu7csl/1oZfw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/csv-classicinfopath.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/csv-classicinfopath.html",
+          "hash": "Wuz5Qk2EjtGRgR7Bi3kZ2w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/csv-history.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/csv-history.html",
+          "hash": "6m6NDnEmEm4RanUrryiK1A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/csv-properties.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/csv-properties.html",
+          "hash": "51IZuJkjDiRjRlCgpABhXg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/csv-scans.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/csv-scans.html",
+          "hash": "KBVgdyE4oqlaL/SvbP7Mug=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/csv-sitecollections.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/csv-sitecollections.html",
+          "hash": "4Mmz3UB/YdNsjDTylbP3aw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/csv-webs.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/csv-webs.html",
+          "hash": "4Zv/+aRcE9l2Ci90129puw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/migrate-intro.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/migrate-intro.html",
+          "hash": "dVivtV/iGCy07TybdKaRKQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/readme.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/readme.html",
+          "hash": "LEqEkBljJUJNbqsk8+2gXQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/report-assessmentoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/report-assessmentoverview.html",
+          "hash": "F4BiW8WoIyIQ+jcOHVSQNg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/report-intro.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/report-intro.html",
+          "hash": "KA7jabIvuNFB+vIvzikJnA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/report-overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/report-overview.html",
+          "hash": "rc4iu7+pL8jHNyI97sP0RQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "infopath/requirements.md",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/requirements.html",
+          "hash": "RAfdXK6Hqtsu6uPba9CRmA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "infopath/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "infopath/toc.html",
+          "hash": "FA3ujDFMnAuYOuSywPtYtQ=="
         }
       },
       "is_incremental": false,
@@ -674,7 +875,7 @@
       "output": {
         ".html": {
           "relative_path": "toc.html",
-          "hash": "Wt3/tiWBgn6aMQtfg1fYug=="
+          "hash": "uY2hs6gDu3UKOGblLa5osw=="
         }
       },
       "is_incremental": false,
@@ -710,7 +911,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "J/t8hk4fs+pMKq+CGVhZ8A=="
+          "hash": "00KAHbSmgz/M2oTdQaPRTQ=="
         }
       },
       "is_incremental": false,
@@ -938,7 +1139,7 @@
       "output": {
         ".html": {
           "relative_path": "workflow/report-intro.html",
-          "hash": "3xEQUse4UCNVoIvrvUrpQA=="
+          "hash": "8J1ReHPE6zVhVLT6C05mKA=="
         }
       },
       "is_incremental": false,
@@ -995,7 +1196,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 50,
+          "total_file_count": 63,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
