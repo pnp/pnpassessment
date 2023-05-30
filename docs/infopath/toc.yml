@@ -9,8 +9,8 @@
   items:
     - name: Overview
       href: report-overview.md
-    - name: Details
-      href: report-details.md
+    - name: Assessment overview
+      href: report-assessmentoverview.md
 - name: Migrate guidance
   href: migrate-intro.md
 - name: CSV files
