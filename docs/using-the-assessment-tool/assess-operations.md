@@ -124,7 +124,7 @@ Restarting happens per assessment and you specify the assessment to restart via 
 
 When using delegated permissions in combination with either `--authmode` equal to `Interactive` or `Device` then you're seeing a one time prompt for credentials when you use this option for the first time. As part of this operation the authentication library (MSAL) state is cached on disk using machine/user specific encryption. With this cache the Microsoft 365 Assessment tool can automatically request new access tokens whenever that's needed. If you're however switching between tenants or you want to remove this stored cache you can do so via the `cache` action.
 
-### Sample pause command
+### Sample clearing authentication caches command
 
 Task | CLI
 -----|------
