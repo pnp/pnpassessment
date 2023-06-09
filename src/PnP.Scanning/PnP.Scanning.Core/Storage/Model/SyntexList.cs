@@ -31,6 +31,8 @@ namespace PnP.Scanning.Core.Storage
         public int FlowInstanceCount { get; set; }
 
         public int RetentionLabelCount { get; set; }
+
+        public int ViewCount { get; set; }
         #endregion
 
         #region Information to collect list "activeness"

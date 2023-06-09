@@ -26,6 +26,7 @@ namespace PnP.Scanning.Core.Services
         private const string SyntexFieldsCsv = "syntexfields.csv";
         private const string SyntexModelUsageCsv = "syntexmodelusage.csv";
         private const string SyntexFileTypesCsv = "syntexfiletypes.csv";
+        private const string SyntexTermSetsCsv = "syntextermsets.csv";
 
         private const string WorkflowsCsv = "workflows.csv";
 
@@ -241,6 +242,14 @@ namespace PnP.Scanning.Core.Services
                             await csv.WriteRecordsAsync(dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexTermSetsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.SyntexTermSets.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
                 }
 
                 if (scan.CLIMode == Mode.Workflow.ToString())
@@ -319,7 +328,6 @@ namespace PnP.Scanning.Core.Services
                             await csv.WriteRecordsAsync(dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
-
                 }
 
                 if (scan.CLIMode == Mode.InfoPath.ToString())

@@ -817,7 +817,7 @@ namespace PnP.Scanning.Core.Storage
         #region Syntex
         internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, 
                                                                      List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields,
-                                                                     List<SyntexModelUsage> syntexModelUsage, List<SyntexFileType> syntexFileTypes)
+                                                                     List<SyntexModelUsage> syntexModelUsage, List<SyntexFileType> syntexFileTypes, List<SyntexTermSet> syntexTermSets)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -827,6 +827,7 @@ namespace PnP.Scanning.Core.Storage
                 await dbContext.SyntexFields.AddRangeAsync(syntexFields.ToArray());
                 await dbContext.SyntexModelUsage.AddRangeAsync(syntexModelUsage.ToArray());
                 await dbContext.SyntexFileTypes.AddRangeAsync(syntexFileTypes.ToArray());
+                await dbContext.SyntexTermSets.AddRangeAsync(syntexTermSets.ToArray());
 
                 await dbContext.SaveChangesAsync();
                 Log.Information("StoreSyntexInformationAsync succeeded");
@@ -1220,6 +1221,10 @@ namespace PnP.Scanning.Core.Storage
             foreach (var syntexFileType in await dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.SyntexFileTypes.Remove(syntexFileType);
+            }
+            foreach(var syntexTermSet in await dbContext.SyntexTermSets.Where(p => p.ScanId == scanId).ToListAsync())
+            {
+                dbContext.SyntexTermSets.Remove(syntexTermSet);
             }
             Log.Information("Consolidating assessment {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }

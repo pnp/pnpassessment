@@ -16,6 +16,8 @@ namespace PnP.Scanning.Core.Scanners
     {
         private readonly string UsesApplicationPermissons = "UsesApplicationPermissons";
         private readonly string HasSitesFullControlAll = "HasSitesFullControlAll";
+        private readonly string HasSitesReadAll = "HasSitesReadAll";
+        private readonly string HasTermStoreReadAll = "HasTermStoreReadAll";
         private readonly string HasPermissionsToReadWorkflowData = "HasPermissionsToReadWorkflowData";
 
         private class ContentTypeInfo
@@ -75,16 +77,19 @@ namespace PnP.Scanning.Core.Scanners
             // This will not require extra server roundtrips
             PnPContextOptions options = new()
             {
+                // Note: loading IsSiteAssetsLibrary does not work with just sites.read.all permissions
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
                 {
                     w => w.WebTemplateConfiguration,
+                    w => w.Features,
                     w => w.Lists.QueryProperties(r => r.Title, r => r.ItemCount, r => r.ListExperience, r => r.TemplateType, r => r.ContentTypesEnabled, r => r.Hidden, 
-                                                 r => r.Created, r => r.LastItemUserModifiedDate, r => r.IsSiteAssetsLibrary, r => r.IsSystemList,
+                                                 r => r.Created, r => r.LastItemUserModifiedDate, /*r => r.IsSiteAssetsLibrary,*/ r => r.IsSystemList,
                                                  r => r.Fields.QueryProperties(f => f.Id, f => f.Hidden, f => f.TypeAsString, f => f.InternalName, f => f.StaticName, f => f.TermSetId, f => f.Title, f => f.Required),
-                                                 r => r.ContentTypes.QueryProperties(c => c.Id, c => c.StringId, c=> c.Name, c => c.Hidden, c => c.Group, c => c.SchemaXml,
+                                                 r => r.ContentTypes.QueryProperties(c => c.Id, c => c.StringId, c=> c.Name, c => c.Hidden, c => c.Group, c => c.SchemaXml, c => c.DocumentTemplate,
                                                     c => c.Fields.QueryProperties(f => f.Id, f => f.Hidden, f => f.TypeAsString, f => f.InternalName, f => f.StaticName, f => f.TermSetId, f => f.Title, f => f.Required), 
                                                     c => c.FieldLinks.QueryProperties(f => f.Id, f => f.Hidden, f => f.FieldInternalName, f => f.Required)),
-                                                 r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl))
+                                                 r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl),
+                                                 r => r.Views.QueryProperties(v => v.Id, v => v.Title))
                 }
             };
 
@@ -96,7 +101,7 @@ namespace PnP.Scanning.Core.Scanners
                 List<SyntexField> syntexFields = new();
                 List<SyntexModelUsage> syntexModelUsage = new();
                 List<SyntexFileType> syntexFileTypes = new();
-
+                List<SyntexTermSet> syntexTermSets = new();
                 List<ContentTypeInfo> uniqueContentTypesInWeb = new();
 
                 // Loop over the enumerated lists
@@ -109,12 +114,11 @@ namespace PnP.Scanning.Core.Scanners
 
                         // Process list information
                         var syntexList = PrepareSyntexList(list);
-                        var foundSyntexFields = PrepareSyntexFields(list);
+                        var foundSyntexFields = await PrepareSyntexFieldsAsync(list, syntexTermSets);
 
                         syntexList.FieldCount = foundSyntexFields.Count;
 
                         syntexLists.Add(syntexList);
-                        //syntexListInstances.Add(list);
 
                         if (list.ContentTypesEnabled)
                         {
@@ -164,8 +168,9 @@ namespace PnP.Scanning.Core.Scanners
                             ContentTypeId = contentTypeInstance.ContentTypeId,
                             FieldCount = contentTypeInstance.FieldCount,
                             Group = Clean(contentTypeInstance.Group),
-                            Hidden = contentTypeInstance.Hidden,
+                            Hidden = contentTypeInstance.Hidden,                            
                             Name = Clean(contentTypeInstance.Name),
+                            DocumentTemplate = contentTypeInstance.DocumentTemplate,
                             IsSyntexContentType = driveId != null,
                             SyntexModelDriveId = driveId,
                             SyntexModelObjectId = modelId
@@ -175,11 +180,15 @@ namespace PnP.Scanning.Core.Scanners
                     }
                 }
 
-                // Calculate content type file and label counts
-                await CalculateContentTypeCountsAsync(context, syntexContentTypes, syntexLists, syntexFileTypes);
+                // Handle the search queries in a new context as they otherwise clean the in-memory collected data
+                using (var searchContext = await context.CloneAsync())
+                {
+                    // Calculate content type file and label counts
+                    await CalculateContentTypeCountsAsync(searchContext, syntexContentTypes, syntexLists, syntexFileTypes);
 
-                // Calculate label counts for the remaining lists
-                await CalculateCountsForRemainingListsAsync(context, syntexContentTypes, syntexLists, syntexFileTypes);
+                    // Calculate label counts for the remaining lists
+                    await CalculateCountsForRemainingListsAsync(searchContext, syntexContentTypes, syntexLists, syntexFileTypes);
+                }
 
                 // Scan for Workflow 2013 instances on the collected lists
                 await ScanForListWorkflowAsync(context, syntexLists);
@@ -188,13 +197,14 @@ namespace PnP.Scanning.Core.Scanners
                 //await ScanForPowerAutomateFlowsAsync(context, syntexListInstances, syntexLists);
 
                 // Persist the Syntex model usage data in case we're processing a Syntex Content Center
-                if (context.Web.WebTemplateConfiguration == "CONTENTCTR#0")
+                // or in sites that have enabled the ContentCenterEverywhere feature
+                if (HasContentCenterFeatures(context.Web))
                 {
                     await CaptureSyntexModelUsageDataAsync(context, syntexModelUsage);
                 }
 
                 // Persist the gathered data
-                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields, syntexModelUsage, syntexFileTypes);
+                await StorageManager.StoreSyntexInformationAsync(ScanId, syntexLists, syntexContentTypes, syntexContentTypeFields, syntexFields, syntexModelUsage, syntexFileTypes, syntexTermSets);
             }
 
             Logger.Information("Syntex assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
@@ -215,6 +225,13 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     bool hasSitesFullControlAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("Sites.FullControl.All");
                     AddToCache(HasSitesFullControlAll, hasSitesFullControlAll.ToString());
+
+                    bool hasSitesReadControlAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("Sites.Read.All");
+                    AddToCache(HasSitesReadAll, hasSitesReadControlAll.ToString());
+                    
+                    var token = await context.AuthenticationProvider.GetAccessTokenAsync(new Uri($"https://{GetMicrosoftGraphAuthority(context.Environment.Value)}"));
+                    bool hasTermStoreReadAll = context.GetMicrosoft365Admin().AccessTokenHasRole(token, "TermStore.Read.All");
+                    AddToCache(HasTermStoreReadAll, hasTermStoreReadAll.ToString());
 
                     if (!hasSitesFullControlAll)
                     {
@@ -238,12 +255,20 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         AddToCache(HasPermissionsToReadWorkflowData, true.ToString());
                     }
+
+                    bool hasTermStoreReadAll = await context.GetMicrosoft365Admin().AccessTokenHasRoleAsync("TermStore.Read.All");
+                    AddToCache(HasTermStoreReadAll, hasTermStoreReadAll.ToString());
                 }
             }
 
-            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            //if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            //{
+            //    Logger.Information("No DeepScan selected or Application Permissions without Sites.FullControl.All used ==> not using exact content type file counts");
+            //}
+
+            if (!Options.DeepScan)
             {
-                Logger.Information("No DeepScan selected or Application Permissions without Sites.FullControl.All used ==> not using exact content type file counts");
+                Logger.Information("No DeepScan selected");
             }
 
             if (!GetBoolFromCache(HasPermissionsToReadWorkflowData))
@@ -340,7 +365,12 @@ namespace PnP.Scanning.Core.Scanners
 
         private async Task CalculateContentTypeCountsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists, List<SyntexFileType> syntexFileTypes)
         {
-            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            //if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            //{
+            //    return;
+            //}
+
+            if (!Options.DeepScan)
             {
                 return;
             }
@@ -448,7 +478,12 @@ namespace PnP.Scanning.Core.Scanners
 
         private async Task CalculateCountsForRemainingListsAsync(PnPContext context, List<SyntexContentType> contentTypes, List<SyntexList> syntexLists, List<SyntexFileType> syntexFileTypes)
         {
-            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            //if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            //{
+            //    return;
+            //}
+
+            if (!Options.DeepScan)
             {
                 return;
             }
@@ -555,7 +590,7 @@ namespace PnP.Scanning.Core.Scanners
         {
             ContentTypeItemUsage usage = new(0);
 
-            if (!Options.DeepScan || (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll)))
+            if (!Options.DeepScan /*|| (GetBoolFromCache(UsesApplicationPermissons) && !GetBoolFromCache(HasSitesFullControlAll))*/ )
             {
                 // Estimating content type file usage by assuming all files in a list using a content type are from that content type
                 foreach (var contentType in dbContext.SyntexContentTypes.Where(p => p.ScanId == ScanId && p.ContentTypeId == contentTypeId))
@@ -675,6 +710,8 @@ namespace PnP.Scanning.Core.Scanners
 
         private async Task CaptureSyntexModelUsageDataAsync(PnPContext context, List<SyntexModelUsage> syntexModelUsage)
         {
+            // First get the models that are actually used
+
             // Load the model usage list with the needed properties
             var modelUsageList = await context.Web.Lists.GetByServerRelativeUrlAsync($"{context.Uri.PathAndQuery}/ModelUsage", 
                                                                                      p => p.Fields.QueryProperties(p => p.InternalName,
@@ -705,7 +742,7 @@ namespace PnP.Scanning.Core.Scanners
                     // Clear the previous page (if any), no point in keeping all model usage data in memory
                     modelUsageList.Items.Clear();
 
-                    var output = await modelUsageList.LoadListDataAsStreamAsync(new PnP.Core.Model.SharePoint.RenderListDataOptions()
+                    var output = await modelUsageList.LoadListDataAsStreamAsync(new RenderListDataOptions()
                     {
                         ViewXml = viewXml,
                         RenderOptions = RenderListDataOptionsFlags.ListData,
@@ -741,7 +778,8 @@ namespace PnP.Scanning.Core.Scanners
                                     Classifier = Clean(listItem.Values["Title"].ToString()),
                                     TargetSiteId = targetSiteId,
                                     TargetWebId = targetWebId,
-                                    TargetListId = targetListId
+                                    TargetListId = targetListId,
+                                    EnterpriseContentCenter = IsContentCenterSite(context.Web)
                                 };
 
                                 // Store counts 
@@ -771,8 +809,77 @@ namespace PnP.Scanning.Core.Scanners
                             }
                         }
                     }
-                }                
+                }                  
             }
+
+            // Load the model list with the needed properties
+            var modelList = await context.Web.Lists.GetByServerRelativeUrlAsync($"{context.Uri.PathAndQuery}/Model",
+                                                                                   p => p.Fields.QueryProperties(p => p.InternalName,
+                                                                                                                 p => p.FieldTypeKind,
+                                                                                                                 p => p.TypeAsString,
+                                                                                                                 p => p.Title));
+            if (modelList != null)
+            {
+                string viewXml = @"<View>
+                                    <ViewFields>
+                                      <FieldRef Name='Title' />
+                                      <FieldRef Name='FileLeafRef' />
+                                    </ViewFields>
+                                    <OrderBy Override='TRUE'><FieldRef Name= 'ID' Ascending= 'FALSE' /></OrderBy>
+                                   </View>";
+
+                // Load all the needed data using paged requests
+                bool paging = true;
+                string nextPage = null;
+                while (paging)
+                {
+                    // Clear the previous page (if any), no point in keeping all model usage data in memory
+                    modelList.Items.Clear();
+
+                    var output = await modelList.LoadListDataAsStreamAsync(new RenderListDataOptions()
+                    {
+                        ViewXml = viewXml,
+                        RenderOptions = RenderListDataOptionsFlags.ListData,
+                        Paging = nextPage ?? null,
+                    }).ConfigureAwait(false);
+
+                    if (output.ContainsKey("NextHref"))
+                    {
+                        nextPage = output["NextHref"].ToString().Substring(1);
+                    }
+                    else
+                    {
+                        paging = false;
+                    }
+
+                    // Iterate over the retrieved list items within this page
+                    foreach (var listItem in modelList.Items.AsRequested())
+                    {                        
+                        if (listItem.Values["FileLeafRef"] != null && !string.IsNullOrEmpty(listItem.Values["FileLeafRef"].ToString()) && listItem.Values["FileLeafRef"].ToString().EndsWith(".classifier"))
+                        {
+                            // If the classifier was not listed because it was used then let's add it here with an empty target site and usage data
+                            // This will allow us to show "unused" classifiers in the report
+                            if (!syntexModelUsage.Any(p => p.ScanId == ScanId && p.SiteUrl == SiteUrl && p.WebUrl == WebUrl && p.Classifier == $"{listItem.Values["FileLeafRef"]}"))
+                            {
+                                SyntexModelUsage syntexModelUsageRow = new()
+                                {
+                                    ScanId = ScanId,
+                                    SiteUrl = SiteUrl,
+                                    WebUrl = WebUrl,
+                                    Classifier = Clean(listItem.Values["FileLeafRef"].ToString()),
+                                    TargetSiteId = Guid.Empty,
+                                    TargetWebId = Guid.Empty,
+                                    TargetListId = Guid.Empty,
+                                    EnterpriseContentCenter = IsContentCenterSite(context.Web)
+                                };
+
+                                syntexModelUsage.Add(syntexModelUsageRow);
+                            }
+                        }
+                    }
+                }
+            }
+
         }
 
         private string GetWorkflowProperty(WorkflowSubscription subscription, string propertyName)
@@ -801,6 +908,7 @@ namespace PnP.Scanning.Core.Scanners
                 AllowContentTypes = list.ContentTypesEnabled,
                 ContentTypeCount = list.ContentTypesEnabled ? list.ContentTypes.AsRequested().Count() : 0,
                 ListExperienceOptions = list.ListExperience.ToString(),
+                ViewCount = list.Views.AsRequested().Count(),                
 
                 ItemCount = list.ItemCount,
                 Created = list.Created,
@@ -834,6 +942,7 @@ namespace PnP.Scanning.Core.Scanners
                 Group = Clean(contentType.Group),
                 Hidden = contentType.Hidden,
                 Name = Clean(contentType.Name),
+                DocumentTemplate = contentType.DocumentTemplate != null ? Clean(contentType.DocumentTemplate) : "",                
             };
 
             // Process the field refs
@@ -898,7 +1007,7 @@ namespace PnP.Scanning.Core.Scanners
             return (syntexContentType, contentType.SchemaXml, syntexContentTypeFields);
         }
 
-        private List<SyntexField> PrepareSyntexFields(IList list)
+        private async Task<List<SyntexField>> PrepareSyntexFieldsAsync(IList list, List<SyntexTermSet> syntexTermSets)
         {
             List<SyntexField> syntexFields = new();
 
@@ -906,7 +1015,7 @@ namespace PnP.Scanning.Core.Scanners
             {
                 if (!BuiltInFields.Contains(field.Id))
                 {
-                    syntexFields.Add(new SyntexField
+                    var syntexField = new SyntexField
                     {
                         ScanId = ScanId,
                         SiteUrl = SiteUrl,
@@ -918,8 +1027,42 @@ namespace PnP.Scanning.Core.Scanners
                         Name = Clean(field.Title),
                         Required = field.Required,
                         TypeAsString = field.TypeAsString,
-                        TermSetId= field.IsPropertyAvailable(p => p.TermSetId) ? field.TermSetId : Guid.Empty,
-                    });
+                        TermSetId = field.IsPropertyAvailable(p => p.TermSetId) ? field.TermSetId : Guid.Empty,
+                    };
+                    syntexFields.Add(syntexField);
+
+                    // If the field is a taxonomy field then add extra info
+                    if (!syntexField.TermSetId.Equals(Guid.Empty))
+                    {
+                        if (syntexTermSets.FirstOrDefault(p => p.ScanId == ScanId && p.TermSetId == syntexField.TermSetId) == null)
+                        {
+                            // Lookup termset details if the permissions where granted
+                            if (GetBoolFromCache(HasTermStoreReadAll))
+                            {
+                                var termSet = await list.PnPContext.TermStore.GetTermSetByIdAsync(syntexField.TermSetId.ToString(), p => p.LocalizedNames, p => p.Description);
+                                if (termSet != null)
+                                {
+                                    syntexTermSets.Add(new SyntexTermSet
+                                    {
+                                        ScanId = ScanId,
+                                        TermSetId = syntexField.TermSetId,
+                                        Title = termSet.LocalizedNames.FirstOrDefault().Name,
+                                        Description = termSet.Description,
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                syntexTermSets.Add(new SyntexTermSet
+                                {
+                                    ScanId = ScanId,
+                                    TermSetId = syntexField.TermSetId,
+                                    Title = "N/A",
+                                    Description = "Please grant the used Azure AD application TermStore.Read.All permissions to populate taxonomy data",
+                                });
+                            }
+                        }
+                    }
                 }
             }
 
@@ -933,12 +1076,13 @@ namespace PnP.Scanning.Core.Scanners
 
         private static bool IncludeList(IList list)
         {
-            if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.DocumentLibrary ||
-                list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.PictureLibrary ||
-                list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.XMLForm ||
-                list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.MySiteDocumentLibrary)
+            if (list.TemplateType == ListTemplateType.DocumentLibrary ||
+                list.TemplateType == ListTemplateType.PictureLibrary ||
+                list.TemplateType == ListTemplateType.XMLForm ||
+                list.TemplateType == ListTemplateType.MySiteDocumentLibrary)
             {
-                if (!list.IsSiteAssetsLibrary && !list.IsSystemList && !list.Hidden)
+                // SiteAssets is also a system list, we're not loading IsSiteAssetsLibrary anymore as that requires more then sites.read.all
+                if (/*!list.IsSiteAssetsLibrary &&*/ !list.IsSystemList && !list.Hidden)
                 {
                     return true;
                 }
@@ -1016,5 +1160,48 @@ namespace PnP.Scanning.Core.Scanners
             return (driveId, modelId);
         }
 
+        private static bool HasContentCenterFeatures(IWeb web)
+        {
+            if (IsContentCenterSite(web))
+            {
+                // This is content center site
+                return true;
+            }
+
+            // Can't use Features here as that requires more than just sites.read.all permissions
+            if (web.Features.AsRequested().Any(p => p.DefinitionId == new Guid("e10f0eb7-05ae-4c06-a823-e8b362d2440d")))
+            {
+                // This is a regular site with content center features enabled
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsContentCenterSite(IWeb web)
+        {
+            if (web.WebTemplateConfiguration == "CONTENTCTR#0")
+            {
+                // This is content center site
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string GetMicrosoftGraphAuthority(Microsoft365Environment environment)
+        {
+            return environment switch
+            {
+                Microsoft365Environment.Production => "graph.microsoft.com",
+                Microsoft365Environment.PreProduction => "graph.microsoft.com",
+                Microsoft365Environment.USGovernment => "graph.microsoft.com",
+                Microsoft365Environment.USGovernmentHigh => "graph.microsoft.us",
+                Microsoft365Environment.USGovernmentDoD => "dod-graph.microsoft.us",
+                Microsoft365Environment.Germany => "graph.microsoft.de",
+                Microsoft365Environment.China => "microsoftgraph.chinacloudapi.cn",
+                _ => "graph.microsoft.com"
+            };
+        }
     }
 }

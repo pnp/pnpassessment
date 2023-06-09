@@ -13,6 +13,8 @@ namespace PnP.Scanning.Core.Storage
 
         public Guid TargetListId { get; set; }
 
+        public bool EnterpriseContentCenter { get; set; }
+
         public int ClassifiedItemCount { get; set; }
 
         public int NotProcessedItemCount { get; set; }

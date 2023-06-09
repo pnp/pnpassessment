@@ -15,6 +15,8 @@ namespace PnP.Scanning.Core.Storage
 
         public bool Hidden { get; set; }
 
+        public string DocumentTemplate { get; set; }
+
         public int FieldCount { get; set; }
 
         public int ListCount { get; set; }

@@ -38,6 +38,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<SyntexFileType> SyntexFileTypes { get; set; }
 
+        internal DbSet<SyntexTermSet> SyntexTermSets { get; set; }
+
         internal DbSet<Workflow> Workflows { get; set; }
 
         internal DbSet<ClassicInfoPath> ClassicInfoPath { get; set; }
@@ -147,6 +149,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<SyntexFileType>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FileType });
+            });
+
+            modelBuilder.Entity<SyntexTermSet>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.TermSetId });
             });
             #endregion
 
