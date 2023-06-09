@@ -526,6 +526,15 @@
         internal static readonly Guid SharingHintHash = new Guid("89A0FBBC-67B4-40BD-8C9A-386B325AB4CA");
         internal static readonly Guid _IpLabelPromotionCtagVersion = new Guid("D736872B-A0B9-4C9D-8750-CA0572B0B2DA");
 
+        // Built in fields update on June 9th 2023
+        internal static readonly Guid _ColorHex = new Guid("3BDAB9AC-9E5D-44D4-BDE9-13B37E170618");
+        internal static readonly Guid _ColorTag = new Guid("76D13CD2-1BAE-45A5-8B74-545B87B65037");
+        internal static readonly Guid _Emoji = new Guid("D8A77D76-536B-45D2-8B9B-E4E9B00CF3DC");
+        internal static readonly Guid PolicyDisabledUICapabilities = new Guid("321BC046-2178-49BD-893F-7AA4FD61D04E");
+        internal static readonly Guid _IpLabelMetaInfo = new Guid("90B83BB8-3527-4526-8C68-D9DCFE467921");
+        internal static readonly Guid _AdditionalStreamSize = new Guid("5075B983-F1D7-42C6-921A-F331958F0DC2");
+        internal static readonly Guid _HasUserDefinedProtection = new Guid("345B4112-BABF-4642-BA31-C8F9EAF3B57A");
+
         // Hashset to contain the whole list of built in fields
         private static HashSet<Guid> builtInFieldsHashSet;
         private static object builtInFieldsHashSetSyncLock = new object();
@@ -1067,6 +1076,13 @@
                                 TaxKeyword,
                                 SharingHintHash,
                                 _IpLabelPromotionCtagVersion,
+                                _ColorHex,
+                                _ColorTag,
+                                _Emoji,
+                                PolicyDisabledUICapabilities,
+                                _IpLabelMetaInfo,
+                                _AdditionalStreamSize,
+                                _HasUserDefinedProtection
                             });
                     }
                 }
