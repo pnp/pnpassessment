@@ -33,7 +33,16 @@ namespace PnP.Scanning.Core.Services
                 Log.Information("Building list of site collections: using sites list");
                 foreach (var site in LoadSitesFromList(start.SitesList, new char[] { ',' }))
                 {
-                    list.Add(site.TrimEnd('/'));
+                    string siteToAdd = site.ToLowerInvariant().TrimEnd('/');
+
+                    if (!list.Contains(siteToAdd))
+                    {
+                        list.Add(siteToAdd);
+                    }
+                    else
+                    {
+                        Log.Information("Site collection {SiteCollection} was already added", siteToAdd);
+                    }                    
                 }
 
                 feedback.Invoke($"Loaded {list.Count} site collections from the passed siteslist parameter");
@@ -43,9 +52,17 @@ namespace PnP.Scanning.Core.Services
                 Log.Information("Building list of site collections: using sites file");
                 foreach (var row in LoadSitesFromCsv(start.SitesFile, new char[] { ',' }))
                 {
-                    if (!string.IsNullOrEmpty(row[0]))
+                    string siteToAdd = row[0].ToLowerInvariant().TrimEnd('/');
+                    if (!string.IsNullOrEmpty(siteToAdd))
                     {
-                        list.Add(row[0].ToString().TrimEnd('/'));
+                        if (!list.Contains(siteToAdd))
+                        {
+                            list.Add(siteToAdd);
+                        }
+                        else
+                        {
+                            Log.Information("Site collection {SiteCollection} was already added", siteToAdd);
+                        }
                     }
                 }
                 feedback.Invoke($"Loaded {list.Count} site collections from the passed file {start.SitesFile}");
