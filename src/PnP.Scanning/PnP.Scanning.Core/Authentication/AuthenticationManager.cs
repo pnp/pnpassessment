@@ -264,17 +264,38 @@ namespace PnP.Scanning.Core.Authentication
                     case Microsoft365Environment.USGovernmentDoD:
                     case Microsoft365Environment.USGovernmentHigh:
                         {
-                            builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, AadAuthorityAudience.AzureAdMyOrg);
+                            if (string.IsNullOrEmpty(tenantId))
+                            {
+                                builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, AadAuthorityAudience.AzureAdMyOrg);
+                            }
+                            else
+                            {
+                                builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, tenantId);
+                            }
                             break;
                         }
                     case Microsoft365Environment.Germany:
                         {
-                            builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, AadAuthorityAudience.AzureAdMyOrg);
+                            if (string.IsNullOrEmpty(tenantId))
+                            {
+                                builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, AadAuthorityAudience.AzureAdMyOrg);
+                            }
+                            else
+                            {
+                                builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, tenantId);
+                            }
                             break;
                         }
                     case Microsoft365Environment.China:
                         {
-                            builder = builder.WithAuthority(AzureCloudInstance.AzureChina, AadAuthorityAudience.AzureAdMyOrg);
+                            if (string.IsNullOrEmpty(tenantId))
+                            {
+                                builder = builder.WithAuthority(AzureCloudInstance.AzureChina, AadAuthorityAudience.AzureAdMyOrg);
+                            }
+                            else
+                            {
+                                builder = builder.WithAuthority(AzureCloudInstance.AzureChina, tenantId);
+                            }
                             break;
                         }
                 }
