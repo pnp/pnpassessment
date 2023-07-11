@@ -3,7 +3,6 @@ using Microsoft.Identity.Client;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
-using System.Net;
 using System.Security.Cryptography.X509Certificates;
 
 namespace PnP.Scanning.Core.Authentication
