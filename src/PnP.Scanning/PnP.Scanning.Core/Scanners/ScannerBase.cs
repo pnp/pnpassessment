@@ -56,7 +56,7 @@ namespace PnP.Scanning.Core.Scanners
         }
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 
-        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, string webTemplate, OptionsBase options)
+        internal static ScannerBase NewScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory, Guid scanId, string siteCollectionUrl, string webUrl, string webTemplate, OptionsBase options, string adminCenterUrl, string mySiteHostUrl)
         {
             // PER SCAN COMPONENT: instantiate the scan component here
             if (options is SyntexOptions syntexOptions)
@@ -74,6 +74,10 @@ namespace PnP.Scanning.Core.Scanners
             else if (options is InfoPathOptions infoPathOptions)
             {
                 return new InfoPathScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, infoPathOptions);
+            }
+            else if (options is AddInACSOptions addInACSOptions)
+            {
+                return new AddInACSScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, addInACSOptions, adminCenterUrl, mySiteHostUrl);
             }
 #if DEBUG
             else if (options is TestOptions testOptions)

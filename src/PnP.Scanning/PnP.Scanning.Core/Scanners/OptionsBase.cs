@@ -107,6 +107,13 @@ namespace PnP.Scanning.Core.Scanners
                     Mode = mode,
                 };
             }
+            else if (mode.Equals(Services.Mode.AddInsACS.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new AddInACSOptions
+                {
+                    Mode = mode,
+                };
+            }
 #if DEBUG
             else if (mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
             {

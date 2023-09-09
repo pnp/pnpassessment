@@ -6,7 +6,6 @@ using PnP.Core.Services;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using Serilog;
-using stdole;
 
 namespace PnP.Scanning.Core.Storage
 {
@@ -550,6 +549,7 @@ namespace PnP.Scanning.Core.Storage
             await DropWorkflowIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropClassicIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropInfoPathIncompleteWebScanDataAsync(scanId, dbContext, site, web);
+            await DropAddInIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #if DEBUG
             await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
@@ -1195,6 +1195,139 @@ namespace PnP.Scanning.Core.Storage
         #endregion
 
 
+        #region Azure ACS and SharePoint Add-Ins
+
+        internal async Task StoreAzureACSInformationAsync(Guid scanId, List<TempClassicACSPrincipalValidUntil> classicACSPrincipalValidUntils, List<TempClassicACSPrincipal> classicACSPrincipals, List<ClassicACSPrincipalSiteScopedPermissions> siteScopedPermissions, List<ClassicACSPrincipalTenantScopedPermissions> tenantScopedPermissions)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.TempClassicACSPrincipals.AddRangeAsync(classicACSPrincipals.ToArray());
+                
+                if (classicACSPrincipalValidUntils != null)
+                {
+                    await dbContext.TempClassicACSPrincipalValidUntils.AddRangeAsync(classicACSPrincipalValidUntils.ToArray());
+                }
+                
+                await dbContext.ClassicACSPrincipalSiteScopedPermissions.AddRangeAsync(siteScopedPermissions.ToArray());
+                
+                // Tenant scoped permissions can be retrieved multiple times, ensure we're not trying to create duplicates
+                foreach(var tenantScopedPermission in tenantScopedPermissions) 
+                { 
+                    if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == tenantScopedPermission.ScanId &&
+                                                                                                            p.AppIdentifier == tenantScopedPermission.AppIdentifier &&
+                                                                                                            p.ProductFeature == tenantScopedPermission.ProductFeature &&
+                                                                                                            p.Scope == tenantScopedPermission.Scope &&
+                                                                                                            p.Right == tenantScopedPermission.Right &&
+                                                                                                            p.ResourceId == tenantScopedPermission.ResourceId) == null)
+                    {
+                        await dbContext.ClassicACSPrincipalTenantScopedPermissions.AddAsync(tenantScopedPermission);
+                    }
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreAzureACSInformationAsync succeeded");
+            }
+        }
+
+        internal async Task StoreSharePointAddInInformationAsync(Guid scanId, List<ClassicAddIn> classicAddIns)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.ClassicAddIns.AddRangeAsync(classicAddIns.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreSharePointAddInInformationAsync succeeded");
+            }
+        }
+
+        internal async Task UpdateACSPrincipalInformationAsync(Guid scanId)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                // Copy over data from TempClassicACSPrincipals into ClassicACSPrincipals and ClassicACSPrincipalSites
+                foreach (var tempACSPrincipal in await dbContext.TempClassicACSPrincipals.Where(p => p.ScanId == scanId).ToListAsync())
+                {
+                    if (await dbContext.ClassicACSPrincipals.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == tempACSPrincipal.AppIdentifier) == null)
+                    {
+                        await dbContext.ClassicACSPrincipals.AddAsync(new ClassicACSPrincipal
+                        {
+                            ScanId = tempACSPrincipal.ScanId,
+                            AppIdentifier = tempACSPrincipal.AppIdentifier,
+                            AllowAppOnly = tempACSPrincipal.AllowAppOnly,
+                            AppDomains = tempACSPrincipal.AppDomains,
+                            AppId = tempACSPrincipal.AppId,
+                            RedirectUri = tempACSPrincipal.RedirectUri,
+                            Title = tempACSPrincipal.Title,
+                            ValidUntil = tempACSPrincipal.ValidUntil,
+                            RemediationCode = tempACSPrincipal.RemediationCode,
+                            // Will be updated later on
+                            HasExpired = false,
+                            HasSiteCollectionScopedPermissions = false,
+                            HasTenantScopedPermissions = false,
+                        });
+                    }
+
+                    // Add the site if needed
+                    if (await dbContext.ClassicACSPrincipalSites.FirstOrDefaultAsync(p => p.ScanId == scanId && 
+                                                                                          p.AppIdentifier == tempACSPrincipal.AppIdentifier && 
+                                                                                          p.ServerRelativeUrl == tempACSPrincipal.ServerRelativeUrl) == null)
+                    {
+                        await dbContext.ClassicACSPrincipalSites.AddAsync(new ClassicACSPrincipalSite
+                        {
+                            ScanId = tempACSPrincipal.ScanId,
+                            AppIdentifier = tempACSPrincipal.AppIdentifier,
+                            ServerRelativeUrl = tempACSPrincipal.ServerRelativeUrl,
+                        });
+                    }
+
+                    await dbContext.SaveChangesAsync();
+                }
+
+
+                // Copy over principal validity information from TempClassicACSPrincipalValidUntils into ClassicACSPrincipals
+                foreach (var classicACSPrincipalValidUntil in await dbContext.TempClassicACSPrincipalValidUntils.Where(p => p.ScanId == scanId).OrderByDescending(p => p.ValidUntil).ToListAsync())
+                {
+                    foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipalValidUntil.AppIdentifier).ToListAsync())
+                    {
+                        if (classicACSPrincipal.ValidUntil == DateTime.MinValue && classicACSPrincipalValidUntil.ValidUntil != DateTime.MinValue)
+                        {
+                            classicACSPrincipal.ValidUntil = classicACSPrincipalValidUntil.ValidUntil;
+                        }
+                    }
+                }
+
+                // Set the calculated fields
+                foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId).ToListAsync())
+                {
+                    classicACSPrincipal.HasExpired = classicACSPrincipal.ValidUntil < DateTime.Now;
+
+                    if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
+                    {
+                        classicACSPrincipal.HasTenantScopedPermissions = true;
+                    }
+
+                    if (await dbContext.ClassicACSPrincipalSiteScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
+                    {
+                        classicACSPrincipal.HasSiteCollectionScopedPermissions = true;
+                    }
+                }
+
+                foreach(var classicAddIn in await dbContext.ClassicAddIns.Where(p => p.ScanId == scanId).ToListAsync())
+                {
+                    var usedACSPrincipal = await dbContext.ClassicACSPrincipals.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicAddIn.AppIdentifier);
+                    if (usedACSPrincipal  != null && usedACSPrincipal.HasExpired) 
+                    { 
+                        classicAddIn.HasExpired = usedACSPrincipal.HasExpired;
+                    }
+                }
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("UpdateACSPrincipalValidUntilInformationAsync succeeded");
+            }
+        }
+
+        #endregion
+
         // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
         private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {
@@ -1290,6 +1423,15 @@ namespace PnP.Scanning.Core.Storage
             }
 
             Log.Information("Consolidating assessment {ScanId}: dropping Classic results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+        }
+
+        private async Task DropAddInIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        {
+            foreach (var addIns in await dbContext.ClassicAddIns.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicAddIns.Remove(addIns);
+            }
+            Log.Information("Consolidating assessment {ScanId}: dropping Add-In results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
 #if DEBUG

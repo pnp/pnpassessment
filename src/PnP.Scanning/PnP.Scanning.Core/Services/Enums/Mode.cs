@@ -8,8 +8,7 @@
         Syntex,
         Workflow,
         InfoPath,
-        //AddIns,
-        //AzureACS,
-        Classic
+        Classic,
+        AddInsACS
     }
 }

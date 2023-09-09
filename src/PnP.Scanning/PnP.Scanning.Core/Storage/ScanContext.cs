@@ -56,6 +56,20 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<ClassicWebSummary> ClassicWebSummaries { get; set; }      
 
+        internal DbSet<ClassicAddIn> ClassicAddIns { get; set; }
+
+        internal DbSet<ClassicACSPrincipal> ClassicACSPrincipals { get; set; }
+
+        internal DbSet<ClassicACSPrincipalSite> ClassicACSPrincipalSites { get; set; }
+
+        internal DbSet<ClassicACSPrincipalSiteScopedPermissions> ClassicACSPrincipalSiteScopedPermissions { get; set; }
+
+        internal DbSet<ClassicACSPrincipalTenantScopedPermissions> ClassicACSPrincipalTenantScopedPermissions { get; set; }
+
+        internal DbSet<TempClassicACSPrincipal> TempClassicACSPrincipals { get; set; }
+
+        internal DbSet<TempClassicACSPrincipalValidUntil> TempClassicACSPrincipalValidUntils { get; set; }
+
 #if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
@@ -200,6 +214,38 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<ClassicWebSummary>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
+            });
+            #endregion
+
+            #region AddIn and ACS scanner
+
+            modelBuilder.Entity<ClassicAddIn>(entity => 
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.AppInstanceId });
+            });
+
+            modelBuilder.Entity<TempClassicACSPrincipal>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ServerRelativeUrl });
+            });
+
+            modelBuilder.Entity<ClassicACSPrincipal>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.AppIdentifier });
+            });
+
+            modelBuilder.Entity<ClassicACSPrincipalSite>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ServerRelativeUrl });
+            });
+
+            modelBuilder.Entity<ClassicACSPrincipalSiteScopedPermissions>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ServerRelativeUrl, e.SiteId, e.WebId, e.ListId, e.Right });
+            });
+
+            modelBuilder.Entity<ClassicACSPrincipalTenantScopedPermissions>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ProductFeature, e.Scope, e.Right, e.ResourceId });
+            });
+
+            modelBuilder.Entity<TempClassicACSPrincipalValidUntil>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.AppIdentifier });
             });
             #endregion
 

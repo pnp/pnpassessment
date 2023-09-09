@@ -38,6 +38,12 @@ namespace PnP.Scanning.Core.Services
         private const string ClassicWebSummariesCsv = "classicwebsummaries.csv";
         private const string ClassicSiteSummariesCsv = "classicsitesummaries.csv";
 
+        private const string ClassicAddInsCsv = "classicaddins.csv";
+        private const string ClassicACSPrincipalsCsv = "classicacsprincipals.csv";
+        private const string ClassicACSPrincipalSitesCsv = "classicacsprincipalsites.csv";
+        private const string ClassicACSPrincipalSiteScopedPermissionsCsv = "classicacsprincipalsitescopedpermissions.csv";
+        private const string ClassicACSPrincipalTenantScopedPermissionsCsv = "classicacsprincipaltenantcopedpermissions.csv";
+
 #if DEBUG
         private const string TestDelaysCsv = "testdelays.csv";
 #endif
@@ -99,6 +105,17 @@ namespace PnP.Scanning.Core.Services
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
                     RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\InfoPath\\\\", ",");
+                }
+                else if (scan.CLIMode == Mode.AddInsACS.ToString())
+                {
+                    reportFile = "AddInsACSAssessmentReport.pbit";
+                    // Put the report file in the report folder
+                    string pbitFile = Path.Combine(exportPath, reportFile);
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.AddInsACS.AddInsACSAssessmentReport.pbit", pbitFile);
+
+                    // Update the report file to pick up the exported CSV files in the report folder
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\AddInsACS\\\\", ",");
                 }
 #if DEBUG
                 else if (scan.CLIMode == Mode.Test.ToString())
@@ -337,6 +354,49 @@ namespace PnP.Scanning.Core.Services
                         using (var csv = new CsvWriter(writer, config))
                         {
                             await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+                }
+
+                if (scan.CLIMode == Mode.AddInsACS.ToString())
+                {
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicAddInsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicAddIns.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicACSPrincipalsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicACSPrincipalSitesCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipalSites.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicACSPrincipalSiteScopedPermissionsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipalSiteScopedPermissions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicACSPrincipalTenantScopedPermissionsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipalTenantScopedPermissions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
                 }

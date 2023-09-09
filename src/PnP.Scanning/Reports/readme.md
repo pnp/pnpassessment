@@ -15,4 +15,4 @@
 - Click on "Apply Changes" 
 - Check the report and if all looks good save the PBIX again
 - Save the report as PBIT overwriting the current PBIT file
-- Copy the created PBIT file to the respective code location (e.g. D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Scanners\<assessment module>)
+- Copy the created PBIT file to the respective code location (e.g. `D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Scanners\<assessment module>`)

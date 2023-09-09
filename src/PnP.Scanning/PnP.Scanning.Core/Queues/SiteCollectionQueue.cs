@@ -10,7 +10,7 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<SiteCollectionQueueItem> siteCollectionsToScan;
 
-        public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken) : base(storageManager, cancellationToken)
+        public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken, string adminCenterUrl, string mySiteHostUrl) : base(storageManager, cancellationToken, adminCenterUrl, mySiteHostUrl)
         {
             ScanManager = scanManager;
             ScanId = scanId;
@@ -103,7 +103,7 @@ namespace PnP.Scanning.Core.Queues
                     await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
 
                     // Start parallel execution per web in this site collection
-                    var webQueue = new WebQueue(ScanManager, StorageManager, ScanId, CancellationToken);
+                    var webQueue = new WebQueue(ScanManager, StorageManager, ScanId, CancellationToken, AdminCenterUrl, MySiteHostUrl);
 
                     // Use parallel threads per running site collection task for processing the webs
                     webQueue.ConfigureQueue(ParallelWebProcessingThreads);

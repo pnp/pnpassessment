@@ -9,15 +9,17 @@ namespace PnP.Scanning.Process.Commands
     internal sealed class RestartCommandHandler
     {
         private readonly ScannerManager processManager;
+        private readonly ConfigurationOptions configurationOptions;
 
         private Command cmd;
 
         private Option<Guid> scanIdOption;
         private Option<int> threadsOption;
 
-        internal RestartCommandHandler(ScannerManager processManagerInstance)
+        internal RestartCommandHandler(ScannerManager processManagerInstance, ConfigurationOptions configurationOptionsInstance)
         {
             processManager = processManagerInstance;
+            configurationOptions = configurationOptionsInstance;
 
             cmd = new Command("restart", "Restarts a paused or terminated Microsoft 365 Assessment");
 
@@ -61,7 +63,9 @@ namespace PnP.Scanning.Process.Commands
                 var call = client.Restart(new Core.Services.RestartRequest
                 {
                     Id = scanId.ToString(),
-                    Threads = threads
+                    Threads = threads,
+                    AdminCenterUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.AdminCenterUrl)) ? configurationOptions.AdminCenterUrl : "",
+                    MySiteHostUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.MySiteHostUrl)) ? configurationOptions.MySiteHostUrl : "",
                 });
 
                 await foreach (var message in call.ResponseStream.ReadAllAsync())

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
@@ -8,6 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <None Remove="Scanners\AddInsACS\AddInsACSAssessmentReport.pbit" />
 	  <None Remove="Scanners\Classic\ClassicAssessmentReport.pbit" />
 	  <None Remove="Scanners\InfoPath\InfoPathAssessmentReport.pbit" />
 	  <None Remove="Scanners\Syntex\SyntexAssessmentReport.pbit" />
@@ -18,6 +19,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <EmbeddedResource Include="Scanners\AddInsACS\AddInsACSAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Classic\ClassicAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\InfoPath\InfoPathAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Syntex\SyntexAssessmentReport.pbit" />

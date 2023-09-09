@@ -97,7 +97,7 @@ namespace PnP.Scanning.Core.Services
             CancellationTokenSource cancellationTokenSource = new();
 
             // Launch a queue to handle this scan
-            var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token);
+            var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token, start.AdminCenterUrl, start.MySiteHostUrl);
 
             // Configure threading for the site collection and web queues
             siteCollectionQueue.ConfigureParallelProcessing(start.Threads);
@@ -122,7 +122,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", null, options);
+            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", null, options, start.AdminCenterUrl, start.MySiteHostUrl);
             if (scanner != null)
             {
                 try
@@ -236,7 +236,7 @@ namespace PnP.Scanning.Core.Services
                 CancellationTokenSource cancellationTokenSource = new();
 
                 // Launch a queue to handle this scan
-                var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token);
+                var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token, request.AdminCenterUrl, request.MySiteHostUrl);
 
                 // Configure threading for the site collection and web queues
                 int threadsToUse = start.Threads;
@@ -653,7 +653,7 @@ namespace PnP.Scanning.Core.Services
                 foreach(var scanId in scansToMarkAsDone)
                 {
                     // Run post scanning step
-                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", null, scans[scanId].Options);
+                    var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, scans[scanId].FirstSiteCollection, "/", null, scans[scanId].Options, null, null);
                     if (scanner != null)
                     {
                         try

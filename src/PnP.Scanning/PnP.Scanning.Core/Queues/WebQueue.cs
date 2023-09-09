@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<WebQueueItem> websToScan;
 
-        public WebQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken) : base(storageManager, cancellationToken)
+        public WebQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken, string adminCenterUrl, string mySiteHostUrl) : base(storageManager, cancellationToken, adminCenterUrl, mySiteHostUrl)
         {
             ScanId = scanId;
             ScanManager = scanManager;
@@ -60,7 +60,7 @@ namespace PnP.Scanning.Core.Queues
                 await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
 
                 // Get an instance for the actual scanner to use
-                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, web.PnPContextFactory, ScanId, web.SiteCollectionUrl, web.WebUrl, web.WebTemplate, web.OptionsBase);
+                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, web.PnPContextFactory, ScanId, web.SiteCollectionUrl, web.WebUrl, web.WebTemplate, web.OptionsBase, AdminCenterUrl, MySiteHostUrl);
 
                 if (scanner == null)
                 {

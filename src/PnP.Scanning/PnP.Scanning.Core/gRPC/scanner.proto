@@ -119,6 +119,8 @@ message PauseStatus {
 message RestartRequest {
 	string Id = 1;
 	int32 Threads = 2;
+	string AdminCenterUrl = 3;
+	string MySiteHostUrl = 4;	
 }
 
 message RestartStatus {
