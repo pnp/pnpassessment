@@ -8,6 +8,11 @@ using System.Linq.Expressions;
 
 namespace PnP.Scanning.Core.Scanners
 {
+    /// <summary>
+    /// Minimal permission scopes needed:
+    /// Application permissions: Graph => Sites.Read.All, Application.Read.All SharePoint => Sites.Read.All
+    /// Delegated permissions: Graph => Sites.Read.All, User.Read, Application.Read.All SharePoint => AllSites.Read
+    /// </summary>
     internal class AddInACSScanner : ScannerBase
     {
         public AddInACSScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,

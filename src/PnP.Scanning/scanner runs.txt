@@ -43,6 +43,9 @@ start --mode addinsacs --authmode application --tenant bertonline.sharepoint.com
 
 start --mode addinsacs --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84"
 
+//Minimal permission app
+start --mode addinsacs --authmode application --tenant bertonline.sharepoint.com --applicationid 25b84372-582f-451a-9089-37d5f1bae067 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --siteslist "https://bertonline.sharepoint.com/sites/prov-1"
+
 Start: Interactive
 ==================
 
@@ -57,6 +60,7 @@ start --mode Workflow --authmode interactive --tenant bertonline.sharepoint.com 
 
 //Minimal permission app
 start --mode Workflow --authmode interactive --tenant bertonline.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478
+start --mode addinsacs --authmode interactive --tenant bertonline.sharepoint.com --applicationid 25b84372-582f-451a-9089-37d5f1bae067 --siteslist "https://bertonline.sharepoint.com/sites/prov-1"
 
 :: Vanity URL tenant test ::
 start --mode Workflow --authmode interactive --tenant team.spodvnext.com --siteslist "https://team.spodvnext.com/sites/bjansen2" --threads 1 --applicationid 16095cd9-1df2-44b2-ae3c-76204429cf9e
