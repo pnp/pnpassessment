@@ -1,7 +1,12 @@
-ScanId,ContentTypeId,Name,Group,Hidden,FieldCount,ListCount,ItemCount,ItemCountMean,ItemCountStandardDeviation,ItemCountMin,ItemCountMax,ItemCountMedian,ItemCountLowerQuartile,ItemCountUpperQuartile,IsSyntexContentType,SyntexModelDriveId,SyntexModelObjectId
-d78ccbb9-e9c9-4549-a710-fa4fc44ef672,0x0100B609FEFDEFAA484299C6DE254182E666,ContosoHR,Custom Content Types,False,2,1,0,0,-1,0,0,0,0,0,False,,
-d78ccbb9-e9c9-4549-a710-fa4fc44ef672,0x0101,Document,Document Content Types,False,2,8,775,96.875,263.51440052815764,0,749,4,1.2500000000000009,7.583333333333333,False,,
-d78ccbb9-e9c9-4549-a710-fa4fc44ef672,0x0101003FBD592BF084AB41B710EACD4773BD6C,Invoice,Intelligent Document Content Types,False,3,1,9,9,-1,9,9,9,9,9,True,b!Ta_2KWpDzEqx8_2czSMA1FUxELdBlwJNlRFl2Abv2pMys5h0UYXxSKs8-JI8U3AW,01ULTO54WNBOU2QQ7EC5FYY4BBCZ4CABHK
-d78ccbb9-e9c9-4549-a710-fa4fc44ef672,0x01010094E6B95E79D7D942AD68D3AB285F3AC1,inv,Intelligent Document Content Types,False,4,1,4,4,-1,4,4,4,4,4,True,b!Ta_2KWpDzEqx8_2czSMA1FUxELdBlwJNlRFl2Abv2pMys5h0UYXxSKs8-JI8U3AW,01ULTO54SACMQFG66EMREYA2NIGL4QKP2Z
-d78ccbb9-e9c9-4549-a710-fa4fc44ef672,0x010100F590A527EA62604E882D5B3D0BE7CC2E,Contoso RFP,Intelligent Document Content Types,False,5,0,0,0,-1,-1,-1,-1,-1,-1,False,,
-d78ccbb9-e9c9-4549-a710-fa4fc44ef672,0x0120,Folder,Folder Content Types,False,0,8,221,27.625,78.13529932111351,0,221,0,0,0,False,,
+ScanId,ContentTypeId,Name,Group,Hidden,DocumentTemplate,FieldCount,ListCount,ItemCount,ItemCountMean,ItemCountStandardDeviation,ItemCountMin,ItemCountMax,ItemCountMedian,ItemCountLowerQuartile,ItemCountUpperQuartile,IsSyntexContentType,SyntexModelDriveId,SyntexModelObjectId
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0101,Document,Document Content Types,False,/sites/temp2/s1/wftest/Forms/template.dotx,0,7,7,1,1.9148542155126762,0,5,0,0,1.666666666666666,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0101000452B1090CD00D4CB2733F754532D75B,WFDocument,Custom Content Types,False,template.dotx,1,1,0,0,-1,0,0,0,0,0,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0101000452B1090CD00D4CB2733F754532D75B01,WFDocumentChild,Custom Content Types,False,template.dotx,2,1,0,0,-1,0,0,0,0,0,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0101000452B1090CD00D4CB2733F754532D75B02,WfDocumentChildAtWebLevel,BertOnline Content Types,False,template.dotx,1,1,0,0,-1,0,0,0,0,0,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0101001FEF58651BEAF6448021C8EA7C210A2901,BertLevel2,Custom Content Types,False,template.dotx,3,1,1,1,-1,1,1,1,1,1,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x01010070CD0CBB847F9048B1B290B42162C975,Contract Notice,Intelligent Document Content Types,False,template.dotx,5,1,0,0,-1,0,0,0,0,0,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x010100B703FF916A3EFC459CE64BC4FA561CCA,SyntexDocBert,Custom Content Types,False,template.dotx,1,1,2,2,-1,2,2,2,2,2,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x010100E853EDE6CA932E48B286E032501D3BCD,Demo1,BertOnline Content Types,False,template.dotx,0,1,0,0,-1,0,0,0,0,0,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x01010B,Dublin Core Columns,Document Content Types,False,template.dotx,0,1,1,1,-1,1,1,1,1,1,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0120,Folder,Folder Content Types,False,,0,7,4,0.5714285714285714,1.1338934190276817,0,3,0,0,0.833333333333333,False,,
+8f6e8ec0-d693-41bb-9985-5d2b9f7ab322,0x0120D520,Document Set,Document Set Content Types,False,,1,2,2,1,0,1,1,1,1,1,False,,

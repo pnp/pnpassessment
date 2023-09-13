@@ -1,5 +1,1 @@
-Classifier,TargetSiteId,TargetWebId,TargetListId,ClassifiedItemCount,NotProcessedItemCount,AverageConfidenceScore,ScanId,SiteUrl,WebUrl
-Invoice.classifier,36df1088-0cc7-4a40-a83c-af73939accfb,867ac3d1-d41b-4fb8-ad61-23f0f7239edd,7b89b488-63f2-4aa5-bf2f-05ec17ca2612,9,0,1,d78ccbb9-e9c9-4549-a710-fa4fc44ef672,https://m365x94377144.sharepoint.com/sites/CC,/
-inv.classifier,d37da45d-1eba-488d-8b1a-be20d6cf2757,868e8f45-cd3d-4dbc-b593-b95414976ebd,abe5380a-eef4-45f9-ba20-24418ddcf9fd,0,0,0,d78ccbb9-e9c9-4549-a710-fa4fc44ef672,https://m365x94377144.sharepoint.com/sites/CC,/
-Invoice_sites_CC.classifier,36df1088-0cc7-4a40-a83c-af73939accfb,867ac3d1-d41b-4fb8-ad61-23f0f7239edd,7b89b488-63f2-4aa5-bf2f-05ec17ca2612,9,0,1,d78ccbb9-e9c9-4549-a710-fa4fc44ef672,https://m365x94377144.sharepoint.com/sites/ContosoContentCenter,/
-inv_sites_CC.classifier,d37da45d-1eba-488d-8b1a-be20d6cf2757,868e8f45-cd3d-4dbc-b593-b95414976ebd,abe5380a-eef4-45f9-ba20-24418ddcf9fd,0,0,0,d78ccbb9-e9c9-4549-a710-fa4fc44ef672,https://m365x94377144.sharepoint.com/sites/ContosoContentCenter,/
+Classifier,TargetSiteId,TargetWebId,TargetListId,EnterpriseContentCenter,ClassifiedItemCount,NotProcessedItemCount,AverageConfidenceScore,ScanId,SiteUrl,WebUrl
