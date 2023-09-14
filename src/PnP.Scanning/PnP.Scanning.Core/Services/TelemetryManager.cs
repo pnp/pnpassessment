@@ -1,6 +1,7 @@
 ﻿using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.EntityFrameworkCore;
+using PnP.Core.Admin.Model.SharePoint;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
@@ -43,7 +44,7 @@ namespace PnP.Scanning.Core.Services
                 telemetryClient.Context.Cloud.RoleInstance = "PnPMicrosoft365Scanner";
                 telemetryClient.Context.Device.OperatingSystem = Environment.OSVersion.ToString();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Log.Warning(ex, "Could not initialize telemetry client");
                 telemetryClient = null;
@@ -78,7 +79,7 @@ namespace PnP.Scanning.Core.Services
                 // Send the event
                 telemetryClient.TrackEvent($"{Scan.CLIMode}{TelemetryEvent.Skip}", properties);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Log.Warning(ex, "Could not send telemetry event");
             }
@@ -187,6 +188,10 @@ namespace PnP.Scanning.Core.Services
                 {
                     await PopulateInfoPathMetricsAsync(scanId, metrics);
                 }
+                else if (Scan.CLIMode.Equals(Mode.AddInsACS.ToString()))
+                {
+                    await PopulateAddInsACSMetricsAsync(scanId, metrics);
+                }
 
                 // Send the event
                 telemetryClient.TrackEvent($"{Scan.CLIMode}{TelemetryEvent.Done}", properties, metrics);
@@ -224,6 +229,273 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("FailedSiteCollectionCount", failedSiteCollectionCount);
                 metric.Add("FailedWebCount", failedWebCount);
                 metric.Add("ScanDurationInMinutes", scanDurationInMinutes);
+            }
+        }
+
+        private async Task PopulateAddInsACSMetricsAsync(Guid scanId, Dictionary<string, double> metric)
+        {
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            {
+                int addInCount = 0;
+                int sharePointHostedAddins = 0;
+                int providerHostedAddins = 0;
+
+                int sourceCorporateCatalog = 0;
+                int sourceMarketplace = 0;
+                int sourceDeveloperSite = 0;
+                int sourceObjectModel = 0;
+                int sourceRemoteObjectModel = 0;
+                int sourceSiteCollectionCorporateCatalog = 0;
+                int sourceInvalidSource = 0;
+
+                int statusInstalled = 0;
+                int statusInstalling = 0;
+                int statusUninstalling = 0;
+                int statusUpgrading = 0;
+                int statusRecycling = 0;
+                int statusInvalidStatus = 0;
+                int statusCanceling = 0;
+                int statusInitialized = 0;
+                int statusUpgradeCanceling = 0;
+                int statusDisabling = 0;
+                int statusDisabled = 0;
+                int statusSecretRolling = 0;
+                int statusRestoring = 0;
+                int statusRestoreCanceling = 0;
+
+                int expiredTrue = 0;
+                int expiredFalse = 0;
+
+                foreach (var addIn in dbContext.ClassicAddIns)
+                {
+                    addInCount++;
+
+                    // Add-In type
+                    if (addIn.Type.Equals("SharePoint hosted", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        sharePointHostedAddins++;
+                    }
+                    else if (addIn.Type.Equals("Provider hosted", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        providerHostedAddins++;
+                    }
+
+                    //Add-In source
+                    if (addIn.AppSource == SharePointAddInSource.CorporateCatalog.ToString())
+                    {
+                        sourceCorporateCatalog++;
+                    }
+                    else if (addIn.AppSource == SharePointAddInSource.Marketplace.ToString())
+                    {
+                        sourceMarketplace++;
+                    }
+                    else if (addIn.AppSource == SharePointAddInSource.DeveloperSite.ToString())
+                    {
+                        sourceDeveloperSite++;
+                    }
+                    else if (addIn.AppSource == SharePointAddInSource.ObjectModel.ToString())
+                    {
+                        sourceObjectModel++;
+                    }
+                    else if (addIn.AppSource == SharePointAddInSource.RemoteObjectModel.ToString())
+                    {
+                        sourceRemoteObjectModel++;
+                    }
+                    else if (addIn.AppSource == SharePointAddInSource.SiteCollectionCorporateCatalog.ToString())
+                    {
+                        sourceSiteCollectionCorporateCatalog++;
+                    }
+                    else if (addIn.AppSource == SharePointAddInSource.InvalidSource.ToString())
+                    {
+                        sourceInvalidSource++;
+                    }
+
+                    //Add-In status
+                    if (addIn.Status == SharePointAddInStatus.Installed.ToString())
+                    {
+                        statusInstalled++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Installing.ToString())
+                    {
+                        statusInstalling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Uninstalling.ToString())
+                    {
+                        statusUninstalling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Upgrading.ToString())
+                    {
+                        statusUpgrading++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Recycling.ToString())
+                    {
+                        statusRecycling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.InvalidStatus.ToString())
+                    {
+                        statusInvalidStatus++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Canceling.ToString())
+                    {
+                        statusCanceling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Initialized.ToString())
+                    {
+                        statusInitialized++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.UpgradeCanceling.ToString())
+                    {
+                        statusUpgradeCanceling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Disabling.ToString())
+                    {
+                        statusDisabling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Disabled.ToString())
+                    {
+                        statusDisabled++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.SecretRolling.ToString())
+                    {
+                        statusSecretRolling++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.Restoring.ToString())
+                    {
+                        statusRestoring++;
+                    }
+                    else if (addIn.Status == SharePointAddInStatus.RestoreCanceling.ToString())
+                    {
+                        statusRestoreCanceling++;
+                    }
+
+                    if (addIn.HasExpired)
+                    {
+                        expiredTrue++;
+                    }
+                    else
+                    {
+                        expiredFalse++;
+                    }
+
+                }
+
+                metric.Add("AddInACSAddInCount", addInCount);
+                metric.Add("AddInACSSharePointHostedAddInsCount", sharePointHostedAddins);
+                metric.Add("AddInACSProviderHostedAddInsCount", providerHostedAddins);
+
+                metric.Add("AddInACSSourceCorporateCatalogCount", sourceCorporateCatalog);
+                metric.Add("AddInACSSourceMarketplaceCount", sourceMarketplace);
+                metric.Add("AddInACSSourceDeveloperSiteCount", sourceDeveloperSite);
+                metric.Add("AddInACSSourceObjectModelCount", sourceObjectModel);
+                metric.Add("AddInACSSourceRemoteObjectModelCount", sourceRemoteObjectModel);
+                metric.Add("AddInACSSourceSiteCollectionCorporateCatalogCount", sourceSiteCollectionCorporateCatalog);
+                metric.Add("AddInACSSourceInvalidSourceCount", sourceInvalidSource);
+
+                metric.Add("AddInACSStatusInstalledCount", statusInstalled);
+                metric.Add("AddInACSStatusInstallingCount", statusInstalling);
+                metric.Add("AddInACSStatusUninstallingCount", statusUninstalling);
+                metric.Add("AddInACSStatusUpgradingCount", statusUpgrading);
+                metric.Add("AddInACSStatusRecyclingCount", statusRecycling);
+                metric.Add("AddInACSStatusInvalidStatusCount", statusInvalidStatus);
+                metric.Add("AddInACSStatusCancelingCount", statusCanceling);
+                metric.Add("AddInACSStatusInitializedCount", statusInitialized);
+                metric.Add("AddInACSStatusUpgradeCancelingCount", statusUpgradeCanceling);
+                metric.Add("AddInACSStatusDisablingCount", statusDisabling);
+                metric.Add("AddInACSStatusDisabledCount", statusDisabled);
+                metric.Add("AddInACSStatusSecretRollingCount", statusSecretRolling);
+                metric.Add("AddInACSStatusRestoringCount", statusRestoring);
+                metric.Add("AddInACSStatusRestoreCancelingCount", statusRestoreCanceling);
+
+                metric.Add("AddInACSAddInExpiredTrueCount", expiredTrue);
+                metric.Add("AddInACSAddInExpiredFalseCount", expiredFalse);
+
+
+                int principalCount = 0;
+                int canUseAppOnly = 0;
+                int hasExpired = 0;
+                int hasTenantPermissions = 0;
+                int hasSitePermissions = 0;
+                Dictionary<string, int> permissionScopeCounts = new();
+
+                foreach (var acsPrincipal in dbContext.ClassicACSPrincipals)
+                {
+                    principalCount++;
+
+                    if (acsPrincipal.AllowAppOnly)
+                    {
+                        canUseAppOnly++;
+                    }
+
+                    if (acsPrincipal.HasExpired)
+                    {
+                        hasExpired++;
+                    }
+
+                    if (acsPrincipal.HasTenantScopedPermissions)
+                    {
+                        hasTenantPermissions++;
+                    }
+
+                    if (acsPrincipal.HasSiteCollectionScopedPermissions)
+                    {
+                        hasSitePermissions++;
+                    }
+
+                    foreach (var acsPrincipalPermission in dbContext.ClassicACSPrincipalSiteScopedPermissions.Where(p => p.ScanId == acsPrincipal.ScanId &&
+                                                                                                                        p.AppIdentifier == acsPrincipal.AppIdentifier))
+                    {
+                        string permissionScopeString = "";
+
+                        if (acsPrincipalPermission.ListId != Guid.Empty)
+                        {
+                            permissionScopeString = $"content/list-{acsPrincipalPermission.Right}";
+                        }
+                        else if (acsPrincipalPermission.WebId != Guid.Empty)
+                        {
+                            permissionScopeString = $"content/web-{acsPrincipalPermission.Right}";
+                        }
+                        else
+                        {
+                            permissionScopeString = $"content/site-{acsPrincipalPermission.Right}";
+                        }
+
+                        if (permissionScopeCounts.ContainsKey(permissionScopeString))
+                        {
+                            permissionScopeCounts[permissionScopeString]++;
+                        }
+                        else
+                        {
+                            permissionScopeCounts.Add(permissionScopeString, 1);
+                        }
+                    }
+
+                    foreach (var acsPrincipalPermission in dbContext.ClassicACSPrincipalTenantScopedPermissions.Where(p => p.ScanId == acsPrincipal.ScanId &&
+                                                                                                                           p.AppIdentifier == acsPrincipal.AppIdentifier))
+                    {
+                        string permissionScopeString = $"{acsPrincipalPermission.Scope}-{acsPrincipalPermission.Right}";
+
+                        if (permissionScopeCounts.ContainsKey(permissionScopeString))
+                        {
+                            permissionScopeCounts[permissionScopeString]++;
+                        }
+                        else
+                        {
+                            permissionScopeCounts.Add(permissionScopeString, 1);
+                        }
+                    }
+                }
+
+                metric.Add("AddInACSPrincipalCount", principalCount);
+                metric.Add("AddInACSCanUseAppOnlyCount", canUseAppOnly);
+                metric.Add("AddInACSPrincipalHasExpiredCount", hasExpired);
+                metric.Add("AddInACSPrincipalHasTenantPermissionsCount", hasTenantPermissions);
+                metric.Add("AddInACSPrincipalHasSitePermissionsCount", hasSitePermissions);
+
+                foreach (var permissionScope in permissionScopeCounts)
+                {
+                    metric.Add($"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "-" )}", permissionScope.Value);
+                }
+
             }
         }
 
