@@ -491,9 +491,55 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("AddInACSPrincipalHasTenantPermissionsCount", hasTenantPermissions);
                 metric.Add("AddInACSPrincipalHasSitePermissionsCount", hasSitePermissions);
 
+                /* Possible permission scope values:
+                     
+                AddInACSPrincipalPermissioncontentlistguest
+                AddInACSPrincipalPermissioncontentlistread
+                AddInACSPrincipalPermissioncontentlistwrite
+                AddInACSPrincipalPermissioncontentlistmanage
+                AddInACSPrincipalPermissioncontentlistfullcontrol
+                AddInACSPrincipalPermissioncontentwebguest
+                AddInACSPrincipalPermissioncontentwebread
+                AddInACSPrincipalPermissioncontentwebwrite
+                AddInACSPrincipalPermissioncontentwebmanage
+                AddInACSPrincipalPermissioncontentwebfullcontrol
+                AddInACSPrincipalPermissioncontentsiteguest
+                AddInACSPrincipalPermissioncontentsiteread
+                AddInACSPrincipalPermissioncontentsitewrite
+                AddInACSPrincipalPermissioncontentsitemanage
+                AddInACSPrincipalPermissioncontentsitefullcontrol
+                AddInACSPrincipalPermissioncontenttenantguest
+                AddInACSPrincipalPermissioncontenttenantread
+                AddInACSPrincipalPermissioncontenttenantwrite
+                AddInACSPrincipalPermissioncontenttenantmanage
+                AddInACSPrincipalPermissioncontenttenantfullcontrol
+                AddInACSPrincipalPermissionsearchqueryasuserignoreappprincipal
+                AddInACSPrincipalPermissiontaxonomyread
+                AddInACSPrincipalPermissiontaxonomywrite
+                AddInACSPrincipalPermissionsocialtenantread
+                AddInACSPrincipalPermissionsocialtenantwrite
+                AddInACSPrincipalPermissionsocialtenantmanage
+                AddInACSPrincipalPermissionsocialtenantfullcontrol
+                AddInACSPrincipalPermissionsocialtrimmingread
+                AddInACSPrincipalPermissionsocialtrimmingwrite
+                AddInACSPrincipalPermissionsocialtrimmingmanage
+                AddInACSPrincipalPermissionsocialtrimmingfullcontrol
+                AddInACSPrincipalPermissionprojectservermanage
+                AddInACSPrincipalPermissionprojectserverprojectsread
+                AddInACSPrincipalPermissionprojectserverprojectswrite
+                AddInACSPrincipalPermissionprojectserverprojectsprojectread
+                AddInACSPrincipalPermissionprojectserverprojectsprojectwrite
+                AddInACSPrincipalPermissionprojectserverenterpriseresourcesread
+                AddInACSPrincipalPermissionprojectserverenterpriseresourceswrite
+                AddInACSPrincipalPermissionprojectserverstatusingsubmitstatus
+                AddInACSPrincipalPermissionprojectserverreportingread
+                AddInACSPrincipalPermissionprojectserverworkflowelevate
+
+                 */
+
                 foreach (var permissionScope in permissionScopeCounts)
                 {
-                    metric.Add($"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "-" )}", permissionScope.Value);
+                    metric.Add($"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "" ).ToLowerInvariant()}", permissionScope.Value);
                 }
 
             }
