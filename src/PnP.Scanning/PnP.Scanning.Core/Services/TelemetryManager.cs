@@ -448,15 +448,15 @@ namespace PnP.Scanning.Core.Services
 
                         if (acsPrincipalPermission.ListId != Guid.Empty)
                         {
-                            permissionScopeString = $"content/list-{acsPrincipalPermission.Right}";
+                            permissionScopeString = $"content/list{acsPrincipalPermission.Right}";
                         }
                         else if (acsPrincipalPermission.WebId != Guid.Empty)
                         {
-                            permissionScopeString = $"content/web-{acsPrincipalPermission.Right}";
+                            permissionScopeString = $"content/web{acsPrincipalPermission.Right}";
                         }
                         else
                         {
-                            permissionScopeString = $"content/site-{acsPrincipalPermission.Right}";
+                            permissionScopeString = $"content/site{acsPrincipalPermission.Right}";
                         }
 
                         if (permissionScopeCounts.ContainsKey(permissionScopeString))
@@ -472,7 +472,7 @@ namespace PnP.Scanning.Core.Services
                     foreach (var acsPrincipalPermission in dbContext.ClassicACSPrincipalTenantScopedPermissions.Where(p => p.ScanId == acsPrincipal.ScanId &&
                                                                                                                            p.AppIdentifier == acsPrincipal.AppIdentifier))
                     {
-                        string permissionScopeString = $"{acsPrincipalPermission.Scope}-{acsPrincipalPermission.Right}";
+                        string permissionScopeString = $"{acsPrincipalPermission.Scope}{acsPrincipalPermission.Right}";
 
                         if (permissionScopeCounts.ContainsKey(permissionScopeString))
                         {
