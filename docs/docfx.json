@@ -11,6 +11,8 @@
           "workflow/toc.yml",
           "infopath/**.md",
           "infopath/toc.yml",
+          "addinsacs/**.md",
+          "addinsacs/toc.yml",
           "contributing/**.md",
           "contributing/toc.yml",
           "toc.yml",
