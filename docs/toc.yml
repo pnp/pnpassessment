@@ -2,11 +2,13 @@
   href: index.md
 - name: Getting started
   href: using-the-assessment-tool/
-- name: Microsoft Syntex Assessment
+- name: Microsoft Syntex
   href: sharepoint-syntex/
-- name: Workflow 2013 Assessment
+- name: Workflow 2013
   href: workflow/
-- name: InfoPath Assessment
+- name: InfoPath
   href: infopath/
+- name: Add-Ins and ACS
+  href: addinsacs/
 - name: Contributing
   href: contributing/
