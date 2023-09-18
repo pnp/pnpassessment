@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html lang="en">
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Azure ACS principal details | Microsoft 365 Assessment Tool </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Azure ACS principal details | Microsoft 365 Assessment Tool ">
+    <meta name="generator" content="docfx 2.56.5.0">
+    <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
+    <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> 
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    <meta property="docfx:newtab" content="true">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <!--
+        <a class="navbar-brand" href="../index.html">
+          <img id="logo" class="svg" src="../logo.svg" alt="" >
+        </a>
+        -->
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <label class="glyphicon glyphicon-search" for="search-query"></label>
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+                  <div class="contribution-panel mobile-hide pull-right">
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/addinsacs/report-acsdetails.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                  </div>
+                    <h1 id="azure-acs-principal-details">Azure ACS principal details</h1>
+
+<p>Using this report page you'll be able to see all details of a selected Azure ACS Principal, Azure ACS principals are a legacy auth concept used to grant applications (e.g. Provider Hosted SharePoint Add-Ins) access to SharePoint.</p>
+<div class="IMPORTANT">
+<h5>Important</h5>
+<p>Use the top filters for <code>Title</code>, <code>App Id</code>, <code>Expired</code> and <code>App-Only</code> to filter down to <strong>one</strong> selected Azure ACS Principal. Use the <code>Selected ACS Principals</code> value to confirm the filtering.</p>
+</div>
+<p>Once filtered you'll find three sections with information.</p>
+<h2 id="acs-principal-details">ACS Principal details</h2>
+<p>Provider Hosted SharePoint Add-Ins use an Azure ACS principal (a.k.a application) to enable the Add-In provider code to call back into the needed SharePoint APIs (e.g. the Add-In will add a list item). The details of the used Azure ACS principal are shown in this section, key fields are:</p>
+<ul>
+<li><strong>Expiration date</strong>: By default the Azure ACS principals are generated with a two year valid secret, this field shows the expiration date of the most recent secret. If the secret has expired it means the SharePoint Add-In is not able to read/update data in SharePoint Online and is in a broken state</li>
+<li><strong>Use App-Only</strong>: Can this ACS principal be used in scenarios that require application permissions?</li>
+</ul>
+<p>When a principal was granted access to specific sites you can see the sites in the shown table, if the table lists <code>&lt;tenant&gt;</code> then the Azure ACS principal was also granted a tenant scoped permission.</p>
+<p>More details about the returned field and their possible values can be found in the documentation of the generated <a href="csv-classicacsprincipals.html">Azure ACS principals csv file</a>.</p>
+<h2 id="site-collection-scoped-permissions">Site collection scoped permissions</h2>
+<p>Azure ACS principals are configured with permission scopes detailing what content they can access and what right they have for that content. If an Azure ACS principal is granted access to one or more specific site collections, specific webs or specific lists then you'll be able to see the respective site collection, web and list id's with their associated right in the shown table.</p>
+<p>More details about the returned field and their possible values can be found in the documentation of the generated <a href="csv-classicacsprincipalsitescopedpermissions.html">Azure ACS site collection scoped permissions csv file</a>.</p>
+<h2 id="tenant-scoped-permissions">Tenant scoped permissions</h2>
+<p>Azure ACS principals are configured with permission scopes detailing what content they can access and what right they have for that content. If an Azure ACS principal is granted access to content across the complete tenant then you'll be able to see the content scope and associated right in the shown table.</p>
+<p>More details about the returned field and their possible values can be found in the documentation of the generated <a href="csv-classicacsprincipaltenantcopedpermissions.html">Azure ACS site collection scoped permissions csv file</a>.</p>
+<h2 id="sample-page">Sample page</h2>
+<p><img src="../images/addinsacsacsdetail.png" alt="Azure ACS Principal details"></p>
+</article>
+          </div>
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              </nav>
+            </div>
+          </div>        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            <span>Microsoft 365 Assessment Tool<br>Generated by <strong><a href='https://dotnet.github.io/docfx' alt='Doc FX Website'>DocFX</a></strong> with <strong><a href='https://ovasquez.github.io/docfx-material' alt='DocFx Material Theme'>Material UI</a></strong></span>
+            
+          </div>
+        </div>
+      </footer>    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>  </body>
+</html>

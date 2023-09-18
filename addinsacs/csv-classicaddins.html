@@ -1,0 +1,242 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html lang="en">
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>classicaddins.csv file details | Microsoft 365 Assessment Tool </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="classicaddins.csv file details | Microsoft 365 Assessment Tool ">
+    <meta name="generator" content="docfx 2.56.5.0">
+    <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
+    <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> 
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    <meta property="docfx:newtab" content="true">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <!--
+        <a class="navbar-brand" href="../index.html">
+          <img id="logo" class="svg" src="../logo.svg" alt="" >
+        </a>
+        -->
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <label class="glyphicon glyphicon-search" for="search-query"></label>
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+                  <div class="contribution-panel mobile-hide pull-right">
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/addinsacs/csv-classicaddins.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                  </div>
+                    <h1 id="classicaddinscsv-file-details">classicaddins.csv file details</h1>
+
+<h2 id="summary">Summary</h2>
+<p>This csv file contains information about the SharePoint Add-In usage that has been assessed.</p>
+<h2 id="columns">Columns</h2>
+<p>The following columns are included:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AppInstanceId</td>
+<td>The id of the Add-In installation</td>
+</tr>
+<tr>
+<td>Title</td>
+<td>Title of the Add-In</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>Type of the Add-In, either <code>SharePoint Hosted</code> or <code>Provider Hosted</code></td>
+</tr>
+<tr>
+<td>HasExpired</td>
+<td>When type is <code>Provider Hosted</code> and the Add-In was not acquired from the marketplace this field is true in case the Add-In has no valid Azure ACS principal secret anymore</td>
+</tr>
+<tr>
+<td>AppSource</td>
+<td>Indicates where the Add-In came from, possible values are: <code>Marketplace</code>, <code>CorporateCatalog</code>, <code>DeveloperSite</code>, <code>ObjectModel</code>, <code>RemoteObjectModel</code>, <code>SiteCollectionCorporateCatalog</code> and <code>InvalidSource</code></td>
+</tr>
+<tr>
+<td>AppWebFullUrl</td>
+<td>The full url of the app web. The SharePoint components are generally in a special child web of the host web called the app web. The app web will be created during install the Add-In</td>
+</tr>
+<tr>
+<td>AppWebId</td>
+<td>Id of the app web</td>
+</tr>
+<tr>
+<td>AssetId</td>
+<td>The id of the app in the marketplace, this will be empty for Add-Ins installed from elsewhere</td>
+</tr>
+<tr>
+<td>CreationTime</td>
+<td>Date and time when the Add-In was installed</td>
+</tr>
+<tr>
+<td>InstalledBy</td>
+<td>Name of the user who installed the Add-In</td>
+</tr>
+<tr>
+<td>InstalledSiteId</td>
+<td>Site collection id where the Add-In installed</td>
+</tr>
+<tr>
+<td>InstalledWebId</td>
+<td>Site id where the Add-in installed</td>
+</tr>
+<tr>
+<td>InstalledWebFullUrl</td>
+<td>Site url where the Add-In installed</td>
+</tr>
+<tr>
+<td>InstalledWebName</td>
+<td>Site name where the Add-In installed</td>
+</tr>
+<tr>
+<td>CurrentSiteId</td>
+<td>Site collection id of current site</td>
+</tr>
+<tr>
+<td>CurrentWebId</td>
+<td>Site id of current site</td>
+</tr>
+<tr>
+<td>CurrentWebFullUrl</td>
+<td>Site url of current site</td>
+</tr>
+<tr>
+<td>CurrentWebName</td>
+<td>Site name of current site</td>
+</tr>
+<tr>
+<td>LaunchUrl</td>
+<td>The Add-In's launch page address</td>
+</tr>
+<tr>
+<td>LicensePurchaseTime</td>
+<td>Date and time when the Add-In license was purchased</td>
+</tr>
+<tr>
+<td>PurchaserIdentity</td>
+<td>Identity of the person acquiring the Add-In license</td>
+</tr>
+<tr>
+<td>Locale</td>
+<td>Locale of the site where the Add-In was installed</td>
+</tr>
+<tr>
+<td>ProductId</td>
+<td>The global unique id of the Add-In. It is same for all tenants</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>The status of current Add-In, possible values are: <code>Installed</code>, <code>Installing</code>, <code>Uninstalling</code>, <code>Upgrading</code>, <code>Recycling</code>, <code>InvalidStatus</code>, <code>Canceling</code>, <code>Initialized</code>, <code>UpgradeCanceling</code>, <code>Disabling</code>, <code>Disabled</code>, <code>SecretRolling</code>, <code>Restoring</code> and <code>RestoreCanceling</code></td>
+</tr>
+<tr>
+<td>TenantAppData</td>
+<td>After the Add-In installed in the tenant app catalog site it could be enabled for tenant level usage. This data indicates the conditions how to filter the sites. If this field is not empty, it means this Add-In was installed in the tenant app catalog site, deployed to tenant level, and current site matches the conditions. For more information, see <a href="https://learn.microsoft.com/en-us/sharepoint/dev/sp-add-ins/tenancies-and-deployment-scopes-for-sharepoint-add-ins">Tenancies and deployment scopes for SharePoint Add-ins</a></td>
+</tr>
+<tr>
+<td>TenantAppDataUpdateTime</td>
+<td>The tenant app data update time</td>
+</tr>
+<tr>
+<td>AppIdentifier</td>
+<td>The application principal id that's being used by the Add-In</td>
+</tr>
+<tr>
+<td>RemediationCode</td>
+<td>Link to remediation code</td>
+</tr>
+<tr>
+<td>ScanId</td>
+<td>Id of the assessment</td>
+</tr>
+<tr>
+<td>SiteUrl</td>
+<td>Fully qualified site collection URL</td>
+</tr>
+<tr>
+<td>WebUrl</td>
+<td>Relative URL of this web</td>
+</tr>
+</tbody>
+</table>
+</article>
+          </div>
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              </nav>
+            </div>
+          </div>        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            <span>Microsoft 365 Assessment Tool<br>Generated by <strong><a href='https://dotnet.github.io/docfx' alt='Doc FX Website'>DocFX</a></strong> with <strong><a href='https://ovasquez.github.io/docfx-material' alt='DocFx Material Theme'>Material UI</a></strong></span>
+            
+          </div>
+        </div>
+      </footer>    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>  </body>
+</html>

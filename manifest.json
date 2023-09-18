@@ -14,6 +14,246 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "addinsacs/assess.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/assess.html",
+          "hash": "v919g2skg/HU2pNu/H56SQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-classicacsprincipals.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-classicacsprincipals.html",
+          "hash": "lrMSDP+bm2Kp2uPtvW4Eug=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-classicacsprincipalsites.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-classicacsprincipalsites.html",
+          "hash": "l9NYwqK21fjhs9XiDZvQXg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-classicacsprincipalsitescopedpermissions.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-classicacsprincipalsitescopedpermissions.html",
+          "hash": "lNZ61Ge4Dr+iDgmikU8Rbw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-classicacsprincipaltenantcopedpermissions.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-classicacsprincipaltenantcopedpermissions.html",
+          "hash": "cSAtgiDLDboFQ9vVJLEM2w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-classicaddins.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-classicaddins.html",
+          "hash": "Uofn9b1Qf7Ewo+9Sw1tSiw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-history.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-history.html",
+          "hash": "qINNLpjDFdr7ICIW98rOcg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-properties.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-properties.html",
+          "hash": "gTijeoQLdEjcUrQjeRO3DA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-scans.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-scans.html",
+          "hash": "MWXhfECMs7S19P/Pd+ZRJA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-sitecollections.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-sitecollections.html",
+          "hash": "7HT0V/akqZqXfaZMJUes/w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/csv-webs.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/csv-webs.html",
+          "hash": "olnPW/qeJQS8/xjHKGSQJA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/readme.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/readme.html",
+          "hash": "tg0el8sj7EsYoqMjBHf6AA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/report-acsdetails.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/report-acsdetails.html",
+          "hash": "YewZgy3JJS4RX6exuFNy/w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/report-acsoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/report-acsoverview.html",
+          "hash": "ff44RT2pOYN52th3K+mT6g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/report-addindetails.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/report-addindetails.html",
+          "hash": "m/TxewtFRgk3ht3rFUd7ZA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/report-addinoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/report-addinoverview.html",
+          "hash": "Umzg5HDjqHjF21+qunhiKw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/report-assessmentoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/report-assessmentoverview.html",
+          "hash": "iGt7ehrs4QA8DrMhyO8qiQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/report-intro.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/report-intro.html",
+          "hash": "FdKxC4DDKBqgMAxEKAC6dg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "addinsacs/requirements.md",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/requirements.html",
+          "hash": "gxy0L1O4v4s5sn68a1MbdQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "addinsacs/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "addinsacs/toc.html",
+          "hash": "GDudDNdSjNYxD1C0sUfJpA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "contributing/readme.md",
       "output": {
         ".html": {
@@ -1273,7 +1513,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 63,
+          "total_file_count": 82,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
