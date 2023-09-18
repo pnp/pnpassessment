@@ -38,6 +38,83 @@
     },
     {
       "type": "Resource",
+      "source_relative_path": "images/addinsacsacsdetail.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacsacsdetail.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/addinsacsacsoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacsacsoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/addinsacsaddindetail.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacsaddindetail.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/addinsacsaddinoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacsaddinoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/addinsacspowerbidesktop.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacspowerbidesktop.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/addinsacsscanoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacsscanoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/addinsacsstart.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/addinsacsstart.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
       "source_relative_path": "images/assessmentarguments.gif",
       "output": {
         "resource": {
@@ -383,7 +460,7 @@
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "0WYoVx8vOaw51iERgO6tTQ=="
+          "hash": "ndVhv00XVMTsKJjKg/W+sQ=="
         }
       },
       "is_incremental": false,
@@ -911,7 +988,7 @@
       "output": {
         ".html": {
           "relative_path": "using-the-assessment-tool/assess-start.html",
-          "hash": "00KAHbSmgz/M2oTdQaPRTQ=="
+          "hash": "dHOgNNQrUu2/d8hM0bKWJA=="
         }
       },
       "is_incremental": false,
