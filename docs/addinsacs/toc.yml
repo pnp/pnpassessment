@@ -1,0 +1,41 @@
+- name: Introduction
+  href: readme.md
+- name: Requirements
+  href: requirements.md
+- name: Run an assessment
+  href: assess.md
+- name: Report      
+  href: report-intro.md
+  items:
+    - name: SharePoint Add-In overview
+      href: report-addinoverview.md
+    - name: SharePoint Add-In details
+      href: report-addindetails.md
+    - name: Azure ACS overview
+      href: report-acsoverview.md
+    - name: Azure ACS details
+      href: report-acsdetails.md
+    - name: Assessment overview
+      href: report-assessmentoverview.md
+- name: CSV files
+  items:
+    - name: classicaddins.csv
+      href: csv-classicaddins.md
+    - name: classicacsprincipals.csv
+      href: csv-classicacsprincipals.md
+    - name: classicacsprincipalsites.csv
+      href: csv-classicacsprincipalsites.md
+    - name: classicacsprincipalsitescopedpermissions.csv
+      href: csv-classicacsprincipalsitescopedpermissions.md
+    - name: classicacsprincipaltenantcopedpermissions.csv
+      href: csv-classicacsprincipaltenantcopedpermissions.md
+    - name: sitecollections.csv
+      href: csv-sitecollections.md
+    - name: webs.csv
+      href: csv-webs.md
+    - name: scans.csv
+      href: csv-scans.md
+    - name: properties.csv
+      href: csv-properties.md
+    - name: history.csv
+      href: csv-history.md
