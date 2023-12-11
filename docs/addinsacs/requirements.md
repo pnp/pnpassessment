@@ -11,6 +11,9 @@ Authentication | Minimal
 Application | **Graph:** Sites.Read.Al, Application.Read.All <br> **SharePoint:** Sites.Read.All
 Delegated | **Graph:** Sites.Read.All, Application.Read.All, User.Read <br> **SharePoint:** AllSites.Read
 
+> [!Important]
+> Cross check the minimally required permissions are granted, if not the scan might return inaccurate results.
+
 ## Command line arguments for starting an assessment
 
 There are no specific command line arguments when starting the SharePoint Add-In and Azure ACS assessment.

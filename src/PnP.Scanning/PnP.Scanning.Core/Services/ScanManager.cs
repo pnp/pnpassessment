@@ -140,6 +140,9 @@ namespace PnP.Scanning.Core.Services
                     // The web scan failed, log accordingly
                     Log.Error(ex, "Preassessment for assessment {ScanId} failed. Error: {Error}", scanId, ex.Message);
                     await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Failed);
+                    
+                    // Prescanning has become too important to continue scanning. When it fails then also fail the scan
+                    throw;
                 }
             }
 

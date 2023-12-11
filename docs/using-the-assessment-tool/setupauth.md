@@ -18,6 +18,11 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 
 - [Microsoft Syntex adoption](../sharepoint-syntex/requirements.md)
 - [Workflow 2013 deprecation](../workflow/requirements.md)
+- [InfoPath 2013 deprecation](../infopath/requirements.md)
+- [SharePoint Add-Ins and Azure ACS deprecation](../addinsacs/requirements.md)
+
+> [!Important]
+> Cross check the minimally required permissions are granted, if not the scan might fail or might return inaccurate results.
 
 ### Creating an Azure AD application using PnP PowerShell
 
