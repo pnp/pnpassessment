@@ -91,7 +91,13 @@
 <ul>
 <li><a href="../sharepoint-syntex/requirements.html">Microsoft Syntex adoption</a></li>
 <li><a href="../workflow/requirements.html">Workflow 2013 deprecation</a></li>
+<li><a href="../infopath/requirements.html">InfoPath 2013 deprecation</a></li>
+<li><a href="../addinsacs/requirements.html">SharePoint Add-Ins and Azure ACS deprecation</a></li>
 </ul>
+<div class="IMPORTANT">
+<h5>Important</h5>
+<p>Cross check the minimally required permissions are granted, if not the scan might fail or might return inaccurate results.</p>
+</div>
 <h3 id="creating-an-azure-ad-application-using-pnp-powershell">Creating an Azure AD application using PnP PowerShell</h3>
 <p>Using <a href="https://pnp.github.io/powershell/">PnP PowerShell</a> creating an Azure AD application becomes really simple. The <a href="https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html">Register-PnPAzureADApp</a> cmdlet will create a new Azure AD application, will create a new self-signed certificate inside the <strong>Personal</strong> node (= <strong>My</strong>) of the <strong>CurrentUser</strong> certificate store, and will hookup that cert with the created Azure AD application. Finally the right permissions are configured and you're prompted to consent these permissions.</p>
 <div class="IMPORTANT">
