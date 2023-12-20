@@ -103,7 +103,8 @@ namespace PnP.Scanning.Process
                 string logFolder = Path.GetDirectoryName(Environment.ProcessPath);
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
                 Log.Logger = new LoggerConfiguration()
-                           .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                           // Set to debug log level to diagnose the Kestrel startup issue
+                           .MinimumLevel.Override("Microsoft", LogEventLevel.Debug)
                            .Enrich.FromLogContext()
 #if DEBUG
                            .WriteTo.Console()

@@ -31,46 +31,55 @@ namespace PnP.Scanning.Process.Services
 
         internal async Task<PnPScanner.PnPScannerClient> GetScannerClientAsync()
         {
-            // Check if we previously connected with the scanner process
-            if (CurrentScannerPort == 0)
+            try
             {
-                // Launch the scanner
-                await LaunchScannerAsync();
-                // We can immediately return the client as during launch we ensured the server was up
-                return CreateClient(CurrentScannerPort);
-            }
-            else
+                // Check if we previously connected with the scanner process
+                if (CurrentScannerPort == 0)
+                {
+                    // Launch the scanner
+                    await LaunchScannerAsync();
+                    // We can immediately return the client as during launch we ensured the server was up
+                    return CreateClient(CurrentScannerPort);
+                }
+                else
+                {
+                    // Ensure the process is up and running via a ping
+                    try
+                    {
+                        // We're aware of a previously connected scanner, let's see if we can connect to it
+                        var client = CreateClient(CurrentScannerPort);
+
+                        var response = await PingScannerAsync(client);
+                        if (response != null && response.UpAndRunning)
+                        {
+                            return client;
+                        }
+                        else
+                        {
+                            throw new Exception("No Microsoft 365 Assessment tool found");
+                        }
+
+                    }
+                    catch
+                    {
+                        // We did not find a scanner process, so launch the scanner again
+                        if (await LaunchScannerAsync() > -1)
+                        {
+                            return CreateClient(CurrentScannerPort);
+                        }
+                        else
+                        {
+                            // Seems like we didn't manage to get the server up and running
+                            AnsiConsole.MarkupLine($"[red]Seems like we didn't manage to get the server up and running.[/]");
+                            throw;
+                        }
+                    }
+                }
+            } 
+            catch (Exception ex) 
             {
-                // We're aware of a previously connected scanner, let's see if we can connect to it
-                var client = CreateClient(CurrentScannerPort);
-
-                // Ensure the process is up and running via a ping
-                try
-                {
-                    var response = await PingScannerAsync(client);
-                    if (response != null && response.UpAndRunning)
-                    {
-                        return client;
-                    }
-                    else
-                    {
-                        throw new Exception("No Microsoft 365 Assessment tool found");
-                    }
-
-                }
-                catch
-                {
-                    // We did not find a scanner process, so launch the scanner again
-                    if (await LaunchScannerAsync() > -1)
-                    {
-                        return CreateClient(CurrentScannerPort);
-                    }
-                    else
-                    {
-                        // Seems like we didn't manage to get the server up and running
-                        throw;
-                    }
-                }
+                AnsiConsole.MarkupLine($"[red]Debugging Kestrel start error. CurrentScannerPort = {CurrentScannerPort} Exception = {ex} [/]");
+                throw;
             }
         }
 
@@ -185,11 +194,13 @@ namespace PnP.Scanning.Process.Services
                 {
                 }
             }
-            while (!isGrpcUpAndRunning && retryAttempt <= 20);
+            // Temporary increase the number of retries to 40
+            while (!isGrpcUpAndRunning && retryAttempt <= 40);
 
             if (!isGrpcUpAndRunning)
             {
-                throw new Exception("Microsoft 365 Assessment tool did not start timely");
+                AnsiConsole.MarkupLine($"[red]Microsoft 365 Assessment tool did not start timely[/]");
+                //throw new Exception("Microsoft 365 Assessment tool did not start timely");
             }
         }
 
