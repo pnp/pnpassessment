@@ -2,6 +2,7 @@
 using PnP.Scanning.Core.Services;
 using Spectre.Console;
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.InteropServices;
 
 namespace PnP.Scanning.Process.Services
@@ -11,6 +12,7 @@ namespace PnP.Scanning.Process.Services
     /// </summary>
     internal sealed class ScannerManager
     {
+        private static HttpClient httpClient;
         internal static int StandardScannerPort = 25010;
 
         public ScannerManager(ConfigurationOptions config)
@@ -19,6 +21,13 @@ namespace PnP.Scanning.Process.Services
             {
                 DefaultScannerPort = config.Port;
             }
+
+            // Configure HttpClient we're using to call our localhost GRPC server to not use a proxy
+            var handler = new HttpClientHandler
+            {
+                UseProxy = false
+            };
+            httpClient = new HttpClient(handler);
         }
 
         internal static string DefaultScannerHost { get; } = "http://localhost";
@@ -238,7 +247,7 @@ namespace PnP.Scanning.Process.Services
 
         private static PnPScanner.PnPScannerClient CreateClient(int port)
         {
-            return new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"{DefaultScannerHost}:{port}"));
+            return new PnPScanner.PnPScannerClient(GrpcChannel.ForAddress($"{DefaultScannerHost}:{port}", new GrpcChannelOptions() { HttpClient = httpClient }));
         }
 
         private async static Task<PingReply> PingScannerAsync(PnPScanner.PnPScannerClient client)
