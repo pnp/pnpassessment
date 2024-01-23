@@ -18,10 +18,10 @@ A fully configured file could look like this:
 ```json
 {
   "PnPCore": {
-    "Environment": "USGovernment"
+    "Environment": "Production"
   },
   "CustomSettings": {
-    "Environment": "USGovernment",    
+    "Environment": "Production",    
     "Port": 7887,
     "AdminCenterUrl": "https://spo-admin.contoso.com",
     "MySiteHostUrl": "https://my.contoso.com"
@@ -44,7 +44,7 @@ The assessment tool can be used to run against tenants hosted in other cloud env
 }
 ```
 
-Valid values for environment are: `Production`, `PreProduction` (Microsoft internal only), `USGovernment` (a.k.a GCC), `USGovernmentHigh` (a.k.a GCC High), `USGovernmentDoD` (a.k.a DoD), `China` and `Germany`.
+Valid values for environment are: `Production` (this is default if not set, this also works for GCC), `PreProduction` (Microsoft internal only), `USGovernmentHigh` (a.k.a GCC High), `USGovernmentDoD` (a.k.a DoD), `China` and `Germany`.
 
 ## Vanity URL configuration
 
