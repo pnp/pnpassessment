@@ -86,10 +86,10 @@
 <p>A fully configured file could look like this:</p>
 <pre><code class="lang-json">{
   &quot;PnPCore&quot;: {
-    &quot;Environment&quot;: &quot;USGovernment&quot;
+    &quot;Environment&quot;: &quot;Production&quot;
   },
   &quot;CustomSettings&quot;: {
-    &quot;Environment&quot;: &quot;USGovernment&quot;,    
+    &quot;Environment&quot;: &quot;Production&quot;,    
     &quot;Port&quot;: 7887,
     &quot;AdminCenterUrl&quot;: &quot;https://spo-admin.contoso.com&quot;,
     &quot;MySiteHostUrl&quot;: &quot;https://my.contoso.com&quot;
@@ -107,7 +107,7 @@
   }
 }
 </code></pre>
-<p>Valid values for environment are: <code>Production</code>, <code>PreProduction</code> (Microsoft internal only), <code>USGovernment</code> (a.k.a GCC), <code>USGovernmentHigh</code> (a.k.a GCC High), <code>USGovernmentDoD</code> (a.k.a DoD), <code>China</code> and <code>Germany</code>.</p>
+<p>Valid values for environment are: <code>Production</code> (this is default if not set, this also works for GCC), <code>PreProduction</code> (Microsoft internal only), <code>USGovernmentHigh</code> (a.k.a GCC High), <code>USGovernmentDoD</code> (a.k.a DoD), <code>China</code> and <code>Germany</code>.</p>
 <h2 id="vanity-url-configuration">Vanity URL configuration</h2>
 <p>A handful tenants use custom URLs due to historic reasons (so called vanity URLs) and when you want to use the Microsoft 365 Assessment tool you'll need to let the tool know these custom URLs by specifying them in the settings file:</p>
 <pre><code class="lang-json">{
