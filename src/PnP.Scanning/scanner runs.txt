@@ -43,6 +43,9 @@ start --mode addinsacs --authmode application --tenant bertonline.sharepoint.com
 
 start --mode addinsacs --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84"
 
+GCC tenant on sharepoint.com domain:
+start --mode addinsacs --authmode application --tenant gov914181.sharepoint.com --applicationid 4c39b89e-1fa4-49ea-bd9d-6bb8a80429a9 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --siteslist "https://gov914181.sharepoint.com/sites/Finance"
+
 //Minimal permission app
 start --mode addinsacs --authmode application --tenant bertonline.sharepoint.com --applicationid 25b84372-582f-451a-9089-37d5f1bae067 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --siteslist "https://bertonline.sharepoint.com/sites/prov-1"
 
