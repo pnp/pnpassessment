@@ -36,10 +36,10 @@ The assessment tool can be used to run against tenants hosted in other cloud env
 ```json
 {
   "PnPCore": {
-    "Environment": "USGovernment"
+    "Environment": "USGovernmentHigh"
   },
   "CustomSettings": {
-    "Environment": "USGovernment"    
+    "Environment": "USGovernmentHigh"    
   }
 }
 ```
