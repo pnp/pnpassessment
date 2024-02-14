@@ -11,7 +11,7 @@ Once filtered you'll find four sections with information.
 
 In this section you'll find all the details of the selected SharePoint Add-In, key fields to pay attention to are:
 
-- **Type**: Is this a SharePoint Hosted or Provider Hosted Add-In?
+- **Type**: Is this a SharePoint Hosted, Provider Hosted or Hybrid Add-In? The latter category is when an Add-In is both (having an app web and an ACS principal).
 - **Source** : Is this a SharePoint Add-In coming from the marketplace, local tenant app catalog of elsewhere?
 
 More details about the returned field and their possible values can be found in the documentation of the generated [SharePoint Add-Ins csv file](csv-classicaddins.md).

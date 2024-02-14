@@ -6,7 +6,7 @@ Column name | Description
 ------------|------------
 Web URL | The fully qualified URL of the web where the SharePoint Add-In was installed
 Title | The title of the SharePOint Add-In
-Type | Is this a SharePoint Hosted or Provider Hosted Add-In
+Type | Is this a SharePoint Hosted, Provider Hosted or Hybrid Add-In. The latter category is when an Add-In is both (having an app web and an ACS principal)
 Expired | For SharePoint Hosted Add-Ins this value is always false, for Provider Hosted Add-Ins that are not coming from the marketplace we do know the expiration date of the linked Azure ACS principal and this field can be set to true
 Status | Typically a SharePoint Add-In is status `Installed`, but additional statuses are possible
 Source | From which source was the SharePoint Add-In installed, common sources are `Marketplace`, `CorporateCatalog` (= tenant app catalog) and `RemoteObjectModel` (side-loaded using development tools)

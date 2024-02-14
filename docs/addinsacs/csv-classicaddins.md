@@ -12,7 +12,7 @@ Column|Description
 ------|-----------
 AppInstanceId | The id of the Add-In installation
 Title | Title of the Add-In
-Type | Type of the Add-In, either `SharePoint Hosted` or `Provider Hosted`
+Type | Type of the Add-In, either `SharePoint Hosted`, `Provider Hosted` or `Hybrid`. The latter category is when an Add-In is both (having an app web and an ACS principal)
 HasExpired | When type is `Provider Hosted` and the Add-In was not acquired from the marketplace this field is true in case the Add-In has no valid Azure ACS principal secret anymore
 AppSource | Indicates where the Add-In came from, possible values are: `Marketplace`, `CorporateCatalog`, `DeveloperSite`, `ObjectModel`, `RemoteObjectModel`, `SiteCollectionCorporateCatalog` and `InvalidSource`
 AppWebFullUrl | The full url of the app web. The SharePoint components are generally in a special child web of the host web called the app web. The app web will be created during install the Add-In
