@@ -279,6 +279,11 @@ namespace PnP.Scanning.Core.Services
                     {
                         providerHostedAddins++;
                     }
+                    else if (addIn.Type.Equals("Hybrid", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        sharePointHostedAddins++;
+                        providerHostedAddins++;
+                    }
 
                     //Add-In source
                     if (addIn.AppSource == SharePointAddInSource.CorporateCatalog.ToString())

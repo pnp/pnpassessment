@@ -24,7 +24,7 @@ namespace PnP.Scanning.Core.Scanners
                     WebUrl = scannerBase.WebUrl,
                     AppIdentifier = addIn.AppIdentifier,
                     Title = addIn.Title,
-                    Type = addIn.AppIdentifier.Contains("|ms.sp.ext|", StringComparison.InvariantCultureIgnoreCase) ? "Provider hosted" : "SharePoint hosted",
+                    Type = DetermineType(addIn),
                     AppInstanceId = addIn.AppInstanceId,
                     AppWebFullUrl = addIn.AppWebFullUrl,
                     AppSource = addIn.AppSource.ToString(),
@@ -93,6 +93,33 @@ namespace PnP.Scanning.Core.Scanners
 
             // Save the Azure ACS data in the database
             await scannerBase.StorageManager.StoreAzureACSInformationAsync(scannerBase.ScanId, null, classicACSPrincipals, siteScopedPermissions, tenantScopedPermissions);
+        }
+
+        private static string DetermineType(ISharePointAddIn addIn)
+        {
+            string type = "Unknown";
+
+            if (!string.IsNullOrEmpty(addIn.AppWebFullUrl))
+            {
+                // There's an app web, so there's also a SharePoint hosted component. Check if there's also an ACS principal
+                if (addIn.AppIdentifier.Contains("|ms.sp.ext|", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    type = "Hybrid";
+                }
+                else
+                {
+                    type = "SharePoint hosted";
+                }
+            }
+            else
+            {
+                if (addIn.AppIdentifier.Contains("|ms.sp.ext|", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    type = "Provider hosted";
+                }
+            }
+
+            return type;
         }
 
         internal static async Task ExecutePreScanningAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext, VanityUrlOptions vanityUrlOptions)
