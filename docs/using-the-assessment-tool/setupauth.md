@@ -32,8 +32,11 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 > If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Azure AD admins for help.
 
 ```PowerShell
-# Sample for the Microsoft Syntex adoption module. Remove the application/delegated permissions depending on your needs
-# and update the Tenant and Username properties to match your environment.
+# Sample for the Microsoft Syntex adoption module. 
+# Remove/update the application/delegated permissions depending on your needs
+# as each assessment module requires slightly different permissions.
+#
+# Also update the Tenant and Username properties to match your environment.
 #
 # If you prefer to have a password set to secure the created PFX file then add below parameter
 # -CertificatePassword (ConvertTo-SecureString -String "password" -AsPlainText -Force)
