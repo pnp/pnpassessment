@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(SiteUrl), nameof(WebUrl)], IsUnique = true)]
     internal sealed class TestDelay : BaseScanResult
     {
         public int Delay1 { get; set; }

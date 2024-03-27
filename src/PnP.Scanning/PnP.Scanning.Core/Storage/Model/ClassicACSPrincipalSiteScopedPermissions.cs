@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(AppIdentifier), nameof(ServerRelativeUrl), nameof(SiteId), nameof(WebId), nameof(ListId), nameof(Right) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(AppIdentifier), nameof(ServerRelativeUrl), nameof(SiteId), nameof(WebId), nameof(ListId), nameof(Right)], IsUnique = true)]
     internal class ClassicACSPrincipalSiteScopedPermissions
     {
         public Guid ScanId { get; set; }

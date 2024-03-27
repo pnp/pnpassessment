@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(AppIdentifier), nameof(ProductFeature), nameof(Scope), nameof(Right), nameof(ResourceId) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(AppIdentifier), nameof(ProductFeature), nameof(Scope), nameof(Right), nameof(ResourceId)], IsUnique = true)]
     internal class ClassicACSPrincipalTenantScopedPermissions
     {
         public Guid ScanId { get; set; }

@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl), nameof(Classifier), nameof(TargetSiteId), nameof(TargetWebId), nameof(TargetListId) })]
+    [Index(nameof(ScanId), [nameof(SiteUrl), nameof(WebUrl), nameof(Classifier), nameof(TargetSiteId), nameof(TargetWebId), nameof(TargetListId)])]
     internal sealed class SyntexModelUsage: BaseScanResult
     {
         public string Classifier { get; set; }

@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(Key) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(Key)], IsUnique = true)]
     internal sealed class Cache
     {
         public Guid ScanId { get; set; }

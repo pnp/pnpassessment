@@ -3,7 +3,7 @@ using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl), nameof(PageUrl) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(SiteUrl), nameof(WebUrl), nameof(PageUrl)], IsUnique = true)]
     internal class ClassicPage : BaseScanResult
     {
         public string PageUrl { get; set; }

@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl), nameof(ListId), nameof(ContentTypeId), nameof(FieldId) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(SiteUrl), nameof(WebUrl), nameof(ListId), nameof(ContentTypeId), nameof(FieldId)], IsUnique = true)]
     internal sealed class SyntexContentTypeField: BaseScanResult
     {
         public Guid ListId { get; set; }

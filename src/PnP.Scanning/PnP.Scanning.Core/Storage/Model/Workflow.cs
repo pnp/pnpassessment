@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(SiteUrl), nameof(WebUrl), nameof(DefinitionId), nameof(SubscriptionId) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(SiteUrl), nameof(WebUrl), nameof(DefinitionId), nameof(SubscriptionId)], IsUnique = true)]
     internal class Workflow : BaseScanResult
     {
         public Guid DefinitionId { get; set; }

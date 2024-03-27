@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(TermSetId) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(TermSetId)], IsUnique = true)]
     internal sealed class SyntexTermSet
     {
         public Guid ScanId { get; set; }

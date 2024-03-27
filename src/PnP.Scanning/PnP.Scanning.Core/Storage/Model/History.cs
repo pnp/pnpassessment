@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(Event), nameof(EventDate) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(Event), nameof(EventDate)], IsUnique = true)]
     internal sealed class History
     {
         public Guid ScanId { get; set; }

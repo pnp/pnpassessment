@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Microsoft.EntityFrameworkCore.Index(new string[] { nameof(ScanId), nameof(SiteUrl) }, IsUnique = true)]
+    [Microsoft.EntityFrameworkCore.Index(nameof(ScanId), [nameof(SiteUrl)], IsUnique = true)]
     internal sealed class SiteCollection
     {
         public Guid ScanId { get; set; }

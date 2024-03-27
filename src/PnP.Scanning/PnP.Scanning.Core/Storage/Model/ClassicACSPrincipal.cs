@@ -2,7 +2,7 @@
 
 namespace PnP.Scanning.Core.Storage
 {
-    [Index(new string[] { nameof(ScanId), nameof(AppIdentifier) }, IsUnique = true)]
+    [Index(nameof(ScanId), [nameof(AppIdentifier)], IsUnique = true)]
     internal class ClassicACSPrincipal
     {
         public Guid ScanId { get; set; }

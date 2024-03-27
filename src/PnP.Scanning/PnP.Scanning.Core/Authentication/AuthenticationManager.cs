@@ -248,7 +248,7 @@ namespace PnP.Scanning.Core.Authentication
                 var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
                 if (!string.IsNullOrEmpty(tenantId))
                 {
-                    builder = builder.WithAuthority($"{azureADEndPoint}/organizations", tenantId);
+                    builder = builder.WithTenantId(tenantId).WithAuthority($"{azureADEndPoint}/organizations", tenantId);
                 }
                 else
                 {
