@@ -199,6 +199,8 @@ namespace PnP.Scanning.Process
                               options.PnPContext.GraphFirst = false;
                               // Remove the HTTP timeout to ensure the request does not end before the throttling is over
                               options.HttpRequests.Timeout = -1;
+                              // Disable PnP Core SDK telemetry
+                              options.DisableTelemetry = true;
                           });
                           services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
                           services.AddPnPCoreAuthentication();
