@@ -76,7 +76,7 @@ namespace PnP.Scanning.Core.Scanners
             catch (Exception ex)
             {
                 // Add extra error message to clarify the possibilty of a locked site when debugging future failures
-                Logger.Error(ex, "Code in PreScanningAsync failed. This can happen when the first enumerated site collection is locked");
+                Logger.Error(ex, "Code in PreScanningAsync failed. This can happen when the first enumerated site collection is locked or when the used Entra app was not granted the correct permissions.");
                 throw;
             }
 
