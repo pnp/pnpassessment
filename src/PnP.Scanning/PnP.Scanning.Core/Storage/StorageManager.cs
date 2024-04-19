@@ -1298,8 +1298,26 @@ namespace PnP.Scanning.Core.Storage
 
                 // Set the calculated fields
                 foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId).ToListAsync())
-                {
-                    classicACSPrincipal.HasExpired = classicACSPrincipal.ValidUntil < DateTime.Now;
+                { 
+                    if (string.IsNullOrEmpty(classicACSPrincipal.AppDomains) && string.IsNullOrEmpty(classicACSPrincipal.RedirectUri))
+                    {
+                        // Support the case where the app was created using Entra registration and then later granted permissions using appinv.aspx.
+                        // This only applies to ACS principals scoped to the full tenant created by calling appinv.asxp from tenant admin center.
+                        // In this case the appdomains and redirecturi are empty and we don't have an validUntil date, but we should not mark these
+                        // as expired as they possibly are not yet expired.
+                        if (classicACSPrincipal.ValidUntil != DateTime.MinValue)
+                        {
+                            classicACSPrincipal.HasExpired = classicACSPrincipal.ValidUntil < DateTime.Now;
+                        }
+                        else
+                        {
+                            classicACSPrincipal.HasExpired = false;
+                        }
+                    }
+                    else
+                    {
+                        classicACSPrincipal.HasExpired = classicACSPrincipal.ValidUntil < DateTime.Now;
+                    }
 
                     if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
                     {

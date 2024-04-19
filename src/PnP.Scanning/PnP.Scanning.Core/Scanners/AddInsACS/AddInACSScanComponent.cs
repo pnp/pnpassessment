@@ -125,7 +125,7 @@ namespace PnP.Scanning.Core.Scanners
         internal static async Task ExecutePreScanningAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext, VanityUrlOptions vanityUrlOptions)
         {
             // Load the tenant scoped principals
-            var legacyServicePrincipals = await context.GetSiteCollectionManager().GetLegacyServicePrincipalsAsync(true);
+            var legacyServicePrincipals = await context.GetSiteCollectionManager().GetLegacyServicePrincipalsAsync(true, vanityUrlOptions);
             var principals = await context.GetSiteCollectionManager().GetTenantACSPrincipalsAsync(legacyServicePrincipals, vanityUrlOptions);
 
             List<TempClassicACSPrincipal> classicACSPrincipals = new();
