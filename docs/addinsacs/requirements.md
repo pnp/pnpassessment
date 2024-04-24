@@ -8,7 +8,7 @@ When using the SharePoint Add-In and Azure ACS module of the Microsoft 365 Asses
 
 Authentication | Minimal
 ---------------| -------
-Application | **Graph:** Sites.Read.Al, Application.Read.All <br> **SharePoint:** Sites.Read.All
+Application | **Graph:** Sites.Read.All, Application.Read.All <br> **SharePoint:** Sites.Read.All
 Delegated | **Graph:** Sites.Read.All, Application.Read.All, User.Read <br> **SharePoint:** AllSites.Read
 
 > [!Important]
