@@ -4,7 +4,7 @@ This page lists the Workflow 2013 assessment specific requirements and options.
 
 ## Permission requirements
 
-When using the Workflow 2013 module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application ([learn more here](../using-the-assessment-tool/setupauth.md)). The Microsoft 365 Assessment tool aims to be able to perform the Workflow 2013 assessment using minimal permissions, as listed below.
+When using the Workflow 2013 module of the Microsoft 365 Assessment tool you do need to use a configured Entra application ([learn more here](../using-the-assessment-tool/setupauth.md)). The Microsoft 365 Assessment tool aims to be able to perform the Workflow 2013 assessment using minimal permissions, as listed below.
 
 Authentication | Minimal
 ---------------| -------

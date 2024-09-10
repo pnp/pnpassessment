@@ -24,7 +24,7 @@ CLIEnvironment | Used environment (see [here](../using-the-assessment-tool/confi
 CLISiteList | Was a sites list used to scope the assessment?
 CLISiteFile | Was a sites file used to scope the assessment?
 CLIAuthMode | Authentication mode used for the assessment
-CLIApplicationId | Azure AD application ID used
+CLIApplicationId | Entra application ID used
 CLICertPath | Was a certificate path used?
 CLICertFile | Was a certificate file used?
 CLICertFilePassword | Encrypted PFX file password (see [here](../using-the-assessment-tool/assess-start.md#authentication-configuration) for more details)

@@ -9,7 +9,7 @@ Before diving into all the possible command line arguments let's first show some
 Task | CLI
 -----|------
 Start a new Syntex full assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode syntex --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84" <br> --syntexfull
-Start a new Syntex assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
+Start a new Syntex assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
 Start a new Workflow 2013 assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode workflow --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 
 ## Command line arguments
@@ -67,13 +67,13 @@ The main authentication argument to use the `--authmode` argument that allows yo
 
 Authentication mode | Description
 --------------------|------------
-`Application` | Use this mode if you want to use application permissions. This assumes you've [configured an Azure AD application](setupauth.md) to support application permissions. You'll need to specify the certificate to use for authentication via either the `--certpath` argument or use the `--certfile` and `--certpassword` arguments.
-`Interactive` | Use this mode if you want to use delegated permissions and you're using a Windows or macOS computer. This assumes you've [configured an Azure AD application](setupauth.md) to support delegated permissions. When you use this mode a browser window will be opened asking you to authenticate.
-`Device` | Use this mode if you want to use delegated permissions and you're using a Linux computer. This assumes you've [configured an Azure AD application](setupauth.md) to support delegated permissions. When using this mode you'll see a code on the command line which you'll need to use at https://aka.ms/devicelogin to complete the authentication flow.
+`Application` | Use this mode if you want to use application permissions. This assumes you've [configured an Entra application](setupauth.md) to support application permissions. You'll need to specify the certificate to use for authentication via either the `--certpath` argument or use the `--certfile` and `--certpassword` arguments.
+`Interactive` | Use this mode if you want to use delegated permissions and you're using a Windows or macOS computer. This assumes you've [configured an Entra application](setupauth.md) to support delegated permissions. When you use this mode a browser window will be opened asking you to authenticate.
+`Device` | Use this mode if you want to use delegated permissions and you're using a Linux computer. This assumes you've [configured an Entra application](setupauth.md) to support delegated permissions. When using this mode you'll see a code on the command line which you'll need to use at https://aka.ms/devicelogin to complete the authentication flow.
 
-### Defining the Azure AD application to use via `--applicationid`
+### Defining the Entra application to use via `--applicationid`
 
-As mentioned in the [configure authentication](setupauth.md) page it's recommended to create an Azure AD application. To tell the Microsoft 365 Assessment tool which Azure AD application it should use you need to specify the Azure AD application id via the `--applicationid` argument. A sample: `--applicationid c545f9ce-1c11-440b-812b-0b35217d9e83`. When you do not specify an Azure AD application id the PnP Management Shell application is used (`31359c7f-bd7e-475c-86db-fdb8c937548e`).
+As mentioned in the [configure authentication](setupauth.md) page it's required to create an Entra application. To tell the Microsoft 365 Assessment tool which Entra application it should use you need to specify the Entra application id via the `--applicationid` argument. A sample: `--applicationid c545f9ce-1c11-440b-812b-0b35217d9e83`.
 
 ### Specifying the certificate to use when using application permissions
 
@@ -97,7 +97,7 @@ Depending on the chosen assessment mode (`--mode` argument) you can optionally d
 
 ### Microsoft Syntex adoption assessment
 
-When running this assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the specific [Microsoft Syntex assessment page](../sharepoint-syntex/requirements.md) to learn more.
+When running this assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Entra application is correctly configured to allow this. See the specific [Microsoft Syntex assessment page](../sharepoint-syntex/requirements.md) to learn more.
 
 ### Parallel operations
 

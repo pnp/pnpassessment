@@ -4,7 +4,7 @@ This page lists the SharePoint Add-In and Azure ACS assessment specific requirem
 
 ## Permission requirements
 
-When using the SharePoint Add-In and Azure ACS module of the Microsoft 365 Assessment tool you do need to use a configured Azure AD application ([learn more here](../using-the-assessment-tool/setupauth.md)). The Microsoft 365 Assessment tool aims to be able to perform the SharePoint Add-In and Azure ACS assessment using minimal permissions, as listed below.
+When using the SharePoint Add-In and Azure ACS module of the Microsoft 365 Assessment tool you do need to use a configured Entra application ([learn more here](../using-the-assessment-tool/setupauth.md)). The Microsoft 365 Assessment tool aims to be able to perform the SharePoint Add-In and Azure ACS assessment using minimal permissions, as listed below.
 
 Authentication | Minimal
 ---------------| -------

@@ -8,9 +8,9 @@ Running the SharePoint Add-In and Azure ACS assessment is just like running any 
 
 The Microsoft 365 Assessment tool must first be downloaded from https://github.com/pnp/pnpassessment/releases. More details can be found in the [download](../using-the-assessment-tool/download.md) documentation.
 
-### Ensure you've an Azure AD application setup
+### Ensure you've an Entra application setup
 
-The Microsoft 365 Assessment tool requires an Azure AD application for authenticating to SharePoint. More details in the [authentication](../using-the-assessment-tool/setupauth.md) documentation.
+The Microsoft 365 Assessment tool requires an Entra application for authenticating to SharePoint. More details in the [authentication](../using-the-assessment-tool/setupauth.md) documentation.
 
 ### Start assessment
 

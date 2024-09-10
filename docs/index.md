@@ -9,7 +9,7 @@ The minimal steps to get started are:
 Step | Description
 -----|------------
 [Download the tool](using-the-assessment-tool/download.md) | Download the the Microsoft 365 Assessment tool for the OS you're using. The assessment tool versions can be found in the [releases](https://github.com/pnp/pnpassessment/releases) folder
-[Configure authentication](using-the-assessment-tool/setupauth.md) | Setup an Azure AD application that can be used to authenticate the Microsoft 365 Assessment tool to your tenant
+[Configure authentication](using-the-assessment-tool/setupauth.md) | Setup an Entra application that can be used to authenticate the Microsoft 365 Assessment tool to your tenant
 [Run an assessment](using-the-assessment-tool/assess.md) | Use the Microsoft 365 Assessment tool CLI to run an assessment: `microsoft365-assessment.exe --help` will show the available commands
 
 Once you're ready to run an assessment you can choose any of the available modules, use the top navigation to learn more about the specifics for a given module: you'll find information about to run the assessment for that module and a detailed description of the created report and CSV files. Currently supported assessments are:
