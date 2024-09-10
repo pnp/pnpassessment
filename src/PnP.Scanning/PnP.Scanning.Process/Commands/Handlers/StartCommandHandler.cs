@@ -131,8 +131,9 @@ namespace PnP.Scanning.Process.Commands
             applicationIdOption = new(
                 name: $"--{Constants.StartApplicationId}",
                 // Default application to use is the PnP Management shell application
-                getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
-                description: "Azure AD application id to use for authenticating the Microsoft 365 Assessment")
+                // We stopped using the PnP Management shell application as default as it's not available anymore
+                //getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
+                description: "Entra application id to use for authenticating the Microsoft 365 Assessment")
             {
                 IsRequired = true
             };

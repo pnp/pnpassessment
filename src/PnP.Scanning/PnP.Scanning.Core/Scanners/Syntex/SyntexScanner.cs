@@ -1058,7 +1058,7 @@ namespace PnP.Scanning.Core.Scanners
                                     ScanId = ScanId,
                                     TermSetId = syntexField.TermSetId,
                                     Title = "N/A",
-                                    Description = "Please grant the used Azure AD application TermStore.Read.All permissions to populate taxonomy data",
+                                    Description = "Please grant the used Entra application TermStore.Read.All permissions to populate taxonomy data",
                                 });
                             }
                         }
