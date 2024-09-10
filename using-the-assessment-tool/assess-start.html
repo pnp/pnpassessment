@@ -92,7 +92,7 @@
 </tr>
 <tr>
 <td>Start a new Syntex assessment (delegated permissions) for a set of site collections</td>
-<td>microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com <br> --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales&quot;</td>
+<td>microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales&quot;</td>
 </tr>
 <tr>
 <td>Start a new Workflow 2013 assessment (application permissions) for a complete tenant</td>
@@ -179,20 +179,20 @@ https://bertonline.sharepoint.com/sites/apacsales
 <tbody>
 <tr>
 <td><code>Application</code></td>
-<td>Use this mode if you want to use application permissions. This assumes you've <a href="setupauth.html">configured an Azure AD application</a> to support application permissions. You'll need to specify the certificate to use for authentication via either the <code>--certpath</code> argument or use the <code>--certfile</code> and <code>--certpassword</code> arguments.</td>
+<td>Use this mode if you want to use application permissions. This assumes you've <a href="setupauth.html">configured an Entra application</a> to support application permissions. You'll need to specify the certificate to use for authentication via either the <code>--certpath</code> argument or use the <code>--certfile</code> and <code>--certpassword</code> arguments.</td>
 </tr>
 <tr>
 <td><code>Interactive</code></td>
-<td>Use this mode if you want to use delegated permissions and you're using a Windows or macOS computer. This assumes you've <a href="setupauth.html">configured an Azure AD application</a> to support delegated permissions. When you use this mode a browser window will be opened asking you to authenticate.</td>
+<td>Use this mode if you want to use delegated permissions and you're using a Windows or macOS computer. This assumes you've <a href="setupauth.html">configured an Entra application</a> to support delegated permissions. When you use this mode a browser window will be opened asking you to authenticate.</td>
 </tr>
 <tr>
 <td><code>Device</code></td>
-<td>Use this mode if you want to use delegated permissions and you're using a Linux computer. This assumes you've <a href="setupauth.html">configured an Azure AD application</a> to support delegated permissions. When using this mode you'll see a code on the command line which you'll need to use at <a href="https://aka.ms/devicelogin">https://aka.ms/devicelogin</a> to complete the authentication flow.</td>
+<td>Use this mode if you want to use delegated permissions and you're using a Linux computer. This assumes you've <a href="setupauth.html">configured an Entra application</a> to support delegated permissions. When using this mode you'll see a code on the command line which you'll need to use at <a href="https://aka.ms/devicelogin">https://aka.ms/devicelogin</a> to complete the authentication flow.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="defining-the-azure-ad-application-to-use-via---applicationid">Defining the Azure AD application to use via <code>--applicationid</code></h3>
-<p>As mentioned in the <a href="setupauth.html">configure authentication</a> page it's recommended to create an Azure AD application. To tell the Microsoft 365 Assessment tool which Azure AD application it should use you need to specify the Azure AD application id via the <code>--applicationid</code> argument. A sample: <code>--applicationid c545f9ce-1c11-440b-812b-0b35217d9e83</code>. When you do not specify an Azure AD application id the PnP Management Shell application is used (<code>31359c7f-bd7e-475c-86db-fdb8c937548e</code>).</p>
+<h3 id="defining-the-entra-application-to-use-via---applicationid">Defining the Entra application to use via <code>--applicationid</code></h3>
+<p>As mentioned in the <a href="setupauth.html">configure authentication</a> page it's required to create an Entra application. To tell the Microsoft 365 Assessment tool which Entra application it should use you need to specify the Entra application id via the <code>--applicationid</code> argument. A sample: <code>--applicationid c545f9ce-1c11-440b-812b-0b35217d9e83</code>.</p>
 <h3 id="specifying-the-certificate-to-use-when-using-application-permissions">Specifying the certificate to use when using application permissions</h3>
 <p>When you've chosen to use application permissions you need to tell the Microsoft 365 Assessment tool the certificate it needs to use for authentication. Two modes are supported: you either point to a certificate already stored in a certificate store on your computer (<code>--certpath</code>) or you point to a PFX file containing the certificate (<code>--certfile</code>). When using a PFX file you also need to specify the password to open the file via <code>--certpassword</code>.</p>
 <p>When using <code>--certpath</code> some additional information is needed to understand how the <code>--certpath</code> argument (e.g. <code>My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84</code>) needs to be defined. You typically use the <code>My</code> or <code>Root</code> store names followed by either <code>CurrentUser</code> or <code>LocalMachine</code> to identify the location of the certificate store on your computer. The last part is the thumbprint of the certificate you want to use.</p>
@@ -209,7 +209,7 @@ https://bertonline.sharepoint.com/sites/apacsales
 <h2 id="other-configuration-options">Other configuration options</h2>
 <p>Depending on the chosen assessment mode (<code>--mode</code> argument) you can optionally define extra arguments.</p>
 <h3 id="microsoft-syntex-adoption-assessment">Microsoft Syntex adoption assessment</h3>
-<p>When running this assessment it's recommended to use the <code>--syntexfull</code> argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Azure AD application is correctly configured to allow this. See the specific <a href="../sharepoint-syntex/requirements.html">Microsoft Syntex assessment page</a> to learn more.</p>
+<p>When running this assessment it's recommended to use the <code>--syntexfull</code> argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Entra application is correctly configured to allow this. See the specific <a href="../sharepoint-syntex/requirements.html">Microsoft Syntex assessment page</a> to learn more.</p>
 <h3 id="parallel-operations">Parallel operations</h3>
 <p>By default the Microsoft 365 Assessment tool will use multiple parallel operations to read data from your tenant. By default one operation per logical processor is used with a maximum of 10, but you can change this number via the <code>--threads</code> argument.</p>
 <div class="IMPORTANT">
