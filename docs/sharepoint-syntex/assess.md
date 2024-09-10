@@ -19,7 +19,7 @@ Below are some quick start samples that show how to run an Microsoft Syntex asse
 Task | CLI
 -----|------
 Start a new Syntex full assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode syntex --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84" <br> --syntexfull
-Start a new Syntex assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
+Start a new Syntex assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Syntex --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
 
 ### Live status updates
 
