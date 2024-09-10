@@ -21,7 +21,7 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 > [!Important]
 > Cross check the minimally required permissions are granted, if not the scan might fail or might return inaccurate results.
 
-### Creating an Entrq application using PnP PowerShell
+### Creating an Entra application using PnP PowerShell
 
  Using [PnP PowerShell](https://pnp.github.io/powershell/) creating an Entra application becomes really simple. The [Register-PnPAzureADApp](https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html) cmdlet will create a new Entra application, will create a new self-signed certificate inside the **Personal** node (= **My**) of the **CurrentUser** certificate store, and will hookup that cert with the created Entra application. Finally the right permissions are configured and you're prompted to consent these permissions.
 
