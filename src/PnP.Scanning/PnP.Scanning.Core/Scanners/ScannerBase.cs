@@ -79,6 +79,10 @@ namespace PnP.Scanning.Core.Scanners
             {
                 return new AddInACSScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, addInACSOptions, adminCenterUrl, mySiteHostUrl);
             }
+            else if (options is AlertsOptions alertsOptions)
+            {
+                return new AlertsScanner(scanManager, storageManager, pnpContextFactory, scanId, siteCollectionUrl, webUrl, webTemplate, alertsOptions, adminCenterUrl, mySiteHostUrl);
+            }
 #if DEBUG
             else if (options is TestOptions testOptions)
             {

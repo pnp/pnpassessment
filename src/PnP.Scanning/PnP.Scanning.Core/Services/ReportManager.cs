@@ -44,6 +44,8 @@ namespace PnP.Scanning.Core.Services
         private const string ClassicACSPrincipalSiteScopedPermissionsCsv = "classicacsprincipalsitescopedpermissions.csv";
         private const string ClassicACSPrincipalTenantScopedPermissionsCsv = "classicacsprincipaltenantcopedpermissions.csv";
 
+        private const string AlertsCsv = "alerts.csv";
+
 #if DEBUG
         private const string TestDelaysCsv = "testdelays.csv";
 #endif
@@ -71,7 +73,7 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Syntex\\\\", ",");
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Syntex\\\\", ",");
                 }
                 else if (scan.CLIMode == Mode.Workflow.ToString())
                 {
@@ -82,7 +84,7 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Workflow\\\\", ",");
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Workflow\\\\", ",");
                 }
                 else if (scan.CLIMode == Mode.Classic.ToString())
                 {
@@ -93,7 +95,7 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\", ",");
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\", ",");
                 }
                 else if (scan.CLIMode == Mode.InfoPath.ToString())
                 {
@@ -104,7 +106,7 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\InfoPath\\\\", ",");
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\InfoPath\\\\", ",");
                 }
                 else if (scan.CLIMode == Mode.AddInsACS.ToString())
                 {
@@ -115,7 +117,18 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\AddInsACS\\\\", ",");
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\AddInsACS\\\\", ",");
+                }
+                else if (scan.CLIMode == Mode.Alerts.ToString())
+                {
+                    reportFile = "AlertsAssessmentReport.pbit";
+                    // Put the report file in the report folder
+                    string pbitFile = Path.Combine(exportPath, reportFile);
+                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Alerts.AlertsAssessmentReport.pbit", pbitFile);
+
+                    // Update the report file to pick up the exported CSV files in the report folder
+                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Alerts\\\\", ",");
                 }
 #if DEBUG
                 else if (scan.CLIMode == Mode.Test.ToString())
@@ -127,7 +140,7 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "D:\\\\github\\\\pnpscanning\\\\src\\\\PnP.Scanning\\\\Reports\\\\Test\\\\", ";");
+                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Test\\\\", ";");
                 }
 #endif               
 
@@ -401,6 +414,17 @@ namespace PnP.Scanning.Core.Services
                     }
                 }
 
+                if (scan.CLIMode == Mode.Alerts.ToString())
+                {
+                    using (var writer = new StreamWriter(Path.Join(exportPath, AlertsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.Alerts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+                }
+
 #if DEBUG
                 if (scan.CLIMode == Mode.Test.ToString())
                 {
@@ -511,7 +535,7 @@ namespace PnP.Scanning.Core.Services
 
                     while ((line = sr.ReadLine()) != null)
                     {
-                        newLine = line.Replace(oldLocation, newLocation);
+                        newLine = line.Replace(oldLocation, newLocation, StringComparison.InvariantCultureIgnoreCase);
 
                         if (newDelimiter != null && newDelimiter != oldDelimiter)
                         {

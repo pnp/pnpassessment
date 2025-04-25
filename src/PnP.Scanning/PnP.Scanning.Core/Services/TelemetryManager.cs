@@ -2,6 +2,7 @@
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core.Admin.Model.SharePoint;
+using PnP.Core.Model.SharePoint;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
@@ -34,9 +35,9 @@ namespace PnP.Scanning.Core.Services
             try
             {
 #if DEBUG
-                telemetryConfiguration.InstrumentationKey = "e9f3c71a-c861-44b1-8e35-b513e101f743";
+                telemetryConfiguration.ConnectionString = "InstrumentationKey=e9f3c71a-c861-44b1-8e35-b513e101f743;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=367148dd-e9be-4dd5-a93c-4343906f39fa";
 #else
-                telemetryConfiguration.InstrumentationKey = "2563091f-0bef-4ac7-8bb7-532268d52601";
+                telemetryConfiguration.ConnectionString = "InstrumentationKey=2563091f-0bef-4ac7-8bb7-532268d52601;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=27abf4b2-b1e0-4788-a027-3c77fe94b63b";                
 #endif
                 telemetryClient = new TelemetryClient(telemetryConfiguration);
 
@@ -191,6 +192,10 @@ namespace PnP.Scanning.Core.Services
                 else if (Scan.CLIMode.Equals(Mode.AddInsACS.ToString()))
                 {
                     await PopulateAddInsACSMetricsAsync(scanId, metrics);
+                }
+                else if (Scan.CLIMode.Equals(Mode.Alerts.ToString()))
+                {
+                    await PopulateAlertsMetricsAsync(scanId, metrics);
                 }
 
                 // Send the event
@@ -547,6 +552,70 @@ namespace PnP.Scanning.Core.Services
                     metric.Add($"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "" ).ToLowerInvariant()}", permissionScope.Value);
                 }
 
+            }
+        }
+
+        private async Task PopulateAlertsMetricsAsync(Guid scanId, Dictionary<string, double> metric)
+        {
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            {
+                int alertCount = 0;
+
+                // Alert frequency breakdown
+                int immediateAlerts = 0;
+                int dailyAlerts = 0;
+                int weeklyAlerts = 0;
+
+                // Alert type breakdown
+                int listAlerts = 0;
+                int listItemAlerts = 0;  
+
+                foreach (var alert in dbContext.Alerts)
+                {
+                    alertCount++;
+
+                    // Categorize alerts based on their frequency
+                    if (Enum.TryParse(alert.AlertFrequency, out AlertFrequency frequency))
+                    {
+                        switch (frequency)
+                        {
+                            case AlertFrequency.Immediately:
+                                immediateAlerts++;
+                                break;
+                            case AlertFrequency.Daily:
+                                dailyAlerts++;
+                                break;
+                            case AlertFrequency.Weekly:
+                                weeklyAlerts++;
+                                break;
+                        }
+                    }
+
+                    if (Enum.TryParse(alert.AlertType, out AlertType type))
+                    {
+                        switch (type)
+                        {
+                            case AlertType.List:
+                                listAlerts++;
+                                break;
+                            case AlertType.ListItem:
+                                listItemAlerts++;
+                                break;
+                        }
+                    }
+                }
+
+                // Add metrics to the dictionary
+                metric.Add("AlertsCount", alertCount);
+
+                // Add frequency breakdown to the dictionary
+                metric.Add("AlertsImmediate", immediateAlerts);
+                metric.Add("AlertsDaily", dailyAlerts);
+                metric.Add("AlertsWeekly", weeklyAlerts);
+
+                // Add type breakdown to the dictionary
+                metric.Add("AlertsList", listAlerts);
+                metric.Add("AlertsListItem", listItemAlerts);
             }
         }
 

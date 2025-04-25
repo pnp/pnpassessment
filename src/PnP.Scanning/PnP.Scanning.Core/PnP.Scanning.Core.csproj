@@ -4,11 +4,12 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>disable</Nullable>
-		<Version>1.10.0</Version>
+		<Version>1.11.0</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
 	  <None Remove="Scanners\AddInsACS\AddInsACSAssessmentReport.pbit" />
+	  <None Remove="Scanners\Alerts\AlertsAssessmentReport.pbit" />
 	  <None Remove="Scanners\Classic\ClassicAssessmentReport.pbit" />
 	  <None Remove="Scanners\InfoPath\InfoPathAssessmentReport.pbit" />
 	  <None Remove="Scanners\Syntex\SyntexAssessmentReport.pbit" />
@@ -20,6 +21,7 @@
 
 	<ItemGroup>
 	  <EmbeddedResource Include="Scanners\AddInsACS\AddInsACSAssessmentReport.pbit" />
+	  <EmbeddedResource Include="Scanners\Alerts\AlertsAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Classic\ClassicAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\InfoPath\InfoPathAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Syntex\SyntexAssessmentReport.pbit" />
@@ -32,7 +34,7 @@
 	<ItemGroup>
 		<PackageReference Include="CsvHelper" Version="31.0.2" />
 		<PackageReference Include="EFCore.BulkExtensions" Version="8.0.2" />
-		<PackageReference Include="envdte" Version="17.9.37000" />
+		<PackageReference Include="envdte" Version="17.13.40008" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />
 		<PackageReference Include="Grpc.Net.Client" Version="2.61.0" />
 		<PackageReference Include="MathNet.Numerics" Version="5.0.0" />

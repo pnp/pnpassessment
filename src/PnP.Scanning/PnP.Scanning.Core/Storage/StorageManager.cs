@@ -550,6 +550,7 @@ namespace PnP.Scanning.Core.Storage
             await DropClassicIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropInfoPathIncompleteWebScanDataAsync(scanId, dbContext, site, web);
             await DropAddInIncompleteWebScanDataAsync(scanId, dbContext, site, web);
+            await DropAlertsIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #if DEBUG
             await DropTestIncompleteWebScanDataAsync(scanId, dbContext, site, web);
 #endif
@@ -1194,7 +1195,6 @@ namespace PnP.Scanning.Core.Storage
 
         #endregion
 
-
         #region Azure ACS and SharePoint Add-Ins
 
         internal async Task StoreAzureACSInformationAsync(Guid scanId, List<TempClassicACSPrincipalValidUntil> classicACSPrincipalValidUntils, List<TempClassicACSPrincipal> classicACSPrincipals, List<ClassicACSPrincipalSiteScopedPermissions> siteScopedPermissions, List<ClassicACSPrincipalTenantScopedPermissions> tenantScopedPermissions)
@@ -1346,6 +1346,19 @@ namespace PnP.Scanning.Core.Storage
 
         #endregion
 
+        #region Alerts
+        internal async Task StoreAlertsInformationAsync(Guid scanId, List<Alerts> alertsList)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.Alerts.AddRangeAsync(alertsList.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreAlertsInformationAsync succeeded");
+            }
+        }
+        #endregion
+
         // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
         private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
         {
@@ -1450,6 +1463,15 @@ namespace PnP.Scanning.Core.Storage
                 dbContext.ClassicAddIns.Remove(addIns);
             }
             Log.Information("Consolidating assessment {ScanId}: dropping Add-In results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+        }
+
+        private async Task DropAlertsIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        {
+            foreach (var alert in await dbContext.Alerts.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.Alerts.Remove(alert);
+            }
+            Log.Information("Consolidating assessment {ScanId}: dropping Alerts results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
         }
 
 #if DEBUG

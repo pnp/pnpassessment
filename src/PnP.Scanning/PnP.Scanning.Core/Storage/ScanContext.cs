@@ -70,6 +70,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<TempClassicACSPrincipalValidUntil> TempClassicACSPrincipalValidUntils { get; set; }
 
+        internal DbSet<Alerts> Alerts { get; set; }
+
 #if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
 #endif
@@ -246,6 +248,12 @@ namespace PnP.Scanning.Core.Storage
 
             modelBuilder.Entity<TempClassicACSPrincipalValidUntil>(entity => {
                 entity.HasKey(e => new { e.ScanId, e.AppIdentifier });
+            });
+            #endregion
+
+            #region Alerts scanner
+            modelBuilder.Entity<Alerts>(entity => {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.AlertId });
             });
             #endregion
 

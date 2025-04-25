@@ -2,7 +2,7 @@
 
 Here are the instuctions for creating and updating the Power BI reports which are included in the assessment tool.
 
-**Important:** All report files must live in a subfolder under folder D:\github\pnpscanning\src\PnP.Scanning\Reports ==> this path is hardcoded used in the code at the moment. If you change this path then please do this for all reports.
+**Important:** All report files must live in a subfolder under folder Q:\github\pnpassessment\src\PnP.Scanning\Reports ==> this path is hardcoded used in the code at the moment. If you change this path then please do this for all reports.
 
 
 ## Start developing a report for a new assessment module
@@ -12,7 +12,7 @@ Basic instructions to get started. Use the existing Power BI reports for inspira
 1. Build the data export functionality in ReportManager.ExportReportDataAsync
 2. Run the new assessment with as complete as possible scope 
 3. Export the data to CSV, keep the default comma delimiter
-4. Copy the export CSV data to a module folder under D:\github\pnpscanning\src\PnP.Scanning\Reports
+4. Copy the export CSV data to a module folder under Q:\github\pnpassessment\src\PnP.Scanning\Reports
 5. Create a new Power BI report in the module folder named "{modulename}AssessmentReport.pbix"
 6. Import the export CSV files in the report, built the data model and design the report
 7. Save as "{modulename}AssessmentReport.pbix"
@@ -36,7 +36,7 @@ Since MSFT enforces a sensitivity setting on each created Power BI report we nee
 7. Close notepad with custom.xml, click on Save to persist the changes in the pbit zip file
 8. Click OK on the "do you want to update in archive" question
 9. Close 7-zip
-10. Copy the pbit file into the respective scanner folder (e.g. D:\github\pnpscanning\src\PnP.Scanning\PnP.Scanning.Core\Scanners\Classic)
+10. Copy the pbit file into the respective scanner folder (e.g. Q:\github\pnpassessment\src\PnP.Scanning\PnP.Scanning.Core\Scanners\Classic)
 11. In Visual Studio set the Build Action the copied pbit file to "Embedded resource", copy to output directory is set to "Do not copy"
 12. Update the code in ReportManager.CreatePowerBiReportAsync to use the added pbit file
 
@@ -47,3 +47,10 @@ To ensure datetime values are handled correctly they should be imported as Text 
 2. For the imported tables verify that type is set to Text, e.g. `{"StartDate", type text}` and click on "Apply and close"
 3. Go to the "Model view" (3rd icon left side)
 4. Select the fields which represent dates (they're now listed as regular text field) and change "Data type" to "*14/03/2001 13:30:55 (General Date)"
+
+## IMPORTANT: Adding a WebURLAbsolute caculated field to the core data table
+
+The core data table (e.g. Alerts) needs to be linked to the webs table. This is best done by adding a new calculated column using formula [SiteUrl] & [WebUrl] and then name the column WebURLAbsolute
+Also add ScanDurationInMinutes = DATEDIFF(scans[StartDate],scans[EndDate],MINUTE) as new columns to the scans table
+
+Related, ensure you copy the data model from one of the other reports when you create a new one

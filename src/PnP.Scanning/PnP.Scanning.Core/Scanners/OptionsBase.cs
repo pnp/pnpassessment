@@ -114,6 +114,13 @@ namespace PnP.Scanning.Core.Scanners
                     Mode = mode,
                 };
             }
+            else if (mode.Equals(Services.Mode.Alerts.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new AlertsOptions
+                {
+                    Mode = mode,
+                };
+            }
 #if DEBUG
             else if (mode.Equals(Services.Mode.Test.ToString(), StringComparison.OrdinalIgnoreCase))
             {

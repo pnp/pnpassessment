@@ -23,3 +23,7 @@ Before releasing you're making additional database changes. To get them included
 - Run again: Add-Migration -Name v1.6.1 -Project PnP.Scanning.Core -OutputDir Storage\DatabaseMigration -StartupProject PnP.Scanning.Process
 
 Given you're previously created databases might already have been updated it can be needed to drop these
+
+
+IMPORTANT!!
+Always check for drops or renames in the generated migration code!

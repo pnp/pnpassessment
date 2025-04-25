@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PnP.Scanning.Core.Storage
 {
+    [Table("classicACSPrincipalSites")]
     [Index(nameof(ScanId), [nameof(AppIdentifier), nameof(ServerRelativeUrl)], IsUnique = true)]
     internal class ClassicACSPrincipalSite
     {

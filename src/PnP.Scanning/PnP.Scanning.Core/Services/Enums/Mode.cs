@@ -9,6 +9,7 @@
         Workflow,
         InfoPath,
         Classic,
-        AddInsACS
+        AddInsACS,
+        Alerts
     }
 }
