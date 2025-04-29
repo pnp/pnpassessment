@@ -254,6 +254,174 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "alerts/assess.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/assess.html",
+          "hash": "C8hgaz8Ky/z8+sqIyPWvaQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/csv-alerts.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/csv-alerts.html",
+          "hash": "O0YA7Tki5Url1yPF9Rd/nw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/csv-history.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/csv-history.html",
+          "hash": "R7Mph1EKqxhzwXxCW+wyeQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/csv-properties.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/csv-properties.html",
+          "hash": "qXRU0X1nNJwzOE7l/hMVzg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/csv-scans.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/csv-scans.html",
+          "hash": "9PBcY/8x6oxIV3yijJwTXA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/csv-sitecollections.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/csv-sitecollections.html",
+          "hash": "9o2mFDmbjsTmR7kspr5dig=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/csv-webs.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/csv-webs.html",
+          "hash": "WW8BekttvV/vAekCy3In6A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/readme.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/readme.html",
+          "hash": "TBAaBfXNNQG0fFcJaYIFZg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/report-assessmentoverview.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/report-assessmentoverview.html",
+          "hash": "P+/qMyZo35q/U6NMJCEMPg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/report-details.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/report-details.html",
+          "hash": "564NRIUI3UmSdy2b9vSCNg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/report-intro.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/report-intro.html",
+          "hash": "TVMV33E0OOuOAN0phnUQ6Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/report-overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/report-overview.html",
+          "hash": "aQ4d7BkltQCIFGLAzUkvCQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "alerts/requirements.md",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/requirements.html",
+          "hash": "Rc4MmcmMTs6JQotcJvo8XA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "alerts/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "alerts/toc.html",
+          "hash": "UE2ez6I0NntTY5WF+3ckpg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "contributing/readme.md",
       "output": {
         ".html": {
@@ -744,7 +912,7 @@
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "jtstH0zH7SU5X7wgSyWj0g=="
+          "hash": "HzhvhEvmZcSbkNmjEmalLA=="
         }
       },
       "is_incremental": false,
@@ -1557,7 +1725,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 82,
+          "total_file_count": 95,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
