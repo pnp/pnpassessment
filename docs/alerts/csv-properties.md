@@ -1,0 +1,1 @@
+[!INCLUDE [CSV Properties](./../fragments/csv-properties.md)]
