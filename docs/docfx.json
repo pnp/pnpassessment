@@ -13,6 +13,8 @@
           "infopath/toc.yml",
           "addinsacs/**.md",
           "addinsacs/toc.yml",
+          "alerts/**.md",
+          "alerts/toc.yml",
           "contributing/**.md",
           "contributing/toc.yml",
           "toc.yml",
