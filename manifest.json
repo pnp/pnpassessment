@@ -355,6 +355,50 @@
     },
     {
       "type": "Resource",
+      "source_relative_path": "images/alertsdetails.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/alertsdetails.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/alertsoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/alertsoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/alertspowerbidesktop.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/alertspowerbidesktop.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "images/alertsscanoverview.png",
+      "output": {
+        "resource": {
+          "relative_path": "images/alertsscanoverview.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
       "source_relative_path": "images/assessmentarguments.gif",
       "output": {
         "resource": {
