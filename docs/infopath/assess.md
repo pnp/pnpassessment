@@ -33,6 +33,8 @@ Realtime status update of the running assessments | microsoft365-assessment.exe 
 
 When an assessment has finished you can continue with the next step and that's generating the Power BI report by using the `Report` action. Below is a quick start, more details can be found in the [Microsoft 365 Assessment tool Report documentation](../using-the-assessment-tool/assess-report.md).
 
+[!INCLUDE [Clarify the --id parameter](./../fragments/clarify-id-parameter.md)]
+
 Task | CLI
 -----|------
 Generate Power BI report (includes CSV export) in the default location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3

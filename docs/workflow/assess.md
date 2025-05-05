@@ -38,4 +38,6 @@ Task | CLI
 Generate Power BI report (includes CSV export) in the default location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3
 Export the gathered data as CSV files in a custom location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --mode CsvOnly --path "c:\reports"
 
+[!INCLUDE [Clarify the --id parameter](./../fragments/clarify-id-parameter.md)]
+
 To better understand the generated Power BI report and accompanying CSV files use the nodes in the left navigation.

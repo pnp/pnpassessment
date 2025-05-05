@@ -8,8 +8,8 @@ When using the SharePoint Alerts module of the Microsoft 365 Assessment tool you
 
 Authentication | Minimal
 ---------------| -------
-Application | **Graph:** Sites.Read.All <br> **SharePoint:** Sites.Read.All
-Delegated | **Graph:** Sites.Read.All, User.Read <br> **SharePoint:** AllSites.Read
+Application | **Graph:** Sites.Read.All <br> **SharePoint:** Sites.FullControl.All
+Delegated | **Graph:** Sites.Read.All, User.Read <br> **SharePoint:** AllSites.FullControl
 
 ## Command line arguments for starting an assessment
 
