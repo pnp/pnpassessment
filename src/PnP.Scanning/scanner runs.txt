@@ -64,6 +64,9 @@ start --mode alerts --authmode application --tenant bertonline.sharepoint.com --
 
 start --mode alerts --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" 
 
+//Minimal permission app (not working with the listed app as alerts require full control))
+start --mode alerts --authmode application --tenant bertonline.sharepoint.com --applicationid 25b84372-582f-451a-9089-37d5f1bae067 --certpath "My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84" --siteslist "https://bertonline.sharepoint.com/sites/alerts"
+
 
 Start: Interactive
 ==================
