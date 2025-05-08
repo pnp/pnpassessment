@@ -118,6 +118,15 @@
 </tr>
 </tbody>
 </table>
+<div class="NOTE">
+<h5>Note</h5>
+<p>The <code>Expired</code>, <code>AppDomain</code> and <code>RedirectUri</code> fields do require some more context for correct interpretation. <code>Expired</code> or <code>HasExpired</code> in the CSV files: this value is set depending on the discovered validity of the key credentials set on the service/app principal. There however are cases when there's no validity found which can happen because of:</p>
+<ul>
+<li>The principal was created using developing Add-Ins with Visual Studio and after deployment the app was not granted permissions or the deployment failed. These show up as <code>Expired</code> = true.</li>
+<li>The principal was a &quot;regular&quot; Entra app that was granted permissions via appinv.aspx. In this case the <code>AppDomain</code> and <code>RedirectUri</code> fields are empty just as is the validity. These show up as <code>Expired</code> = false as there's no service principal in this case</li>
+<li>Using Microsoft Graph PowerShell or Microsoft Graph APIs the keycredentails on the service principal were cleared. These show up as <code>Expired</code> = true.</li>
+</ul>
+</div>
 <h2 id="sample-page">Sample page</h2>
 <p><img src="../images/addinsacsacsoverview.png" alt="Azure ACS Principal overview"></p>
 </article>
