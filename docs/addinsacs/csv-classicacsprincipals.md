@@ -22,3 +22,5 @@ RedirectUri | The configured redirect URI
 AppDomains | The configured application domain
 ValidUntil | If we can find the ACS principal's secrets this shows the most recent validity
 RemediationCode | Link to remediation code
+
+[!INCLUDE [Clarify the expired acs field](./../fragments/clarify-acs-details.md)]

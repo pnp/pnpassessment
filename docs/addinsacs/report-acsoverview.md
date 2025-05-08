@@ -13,6 +13,8 @@ App domain | The configured application domain
 Redirect URI | The configured redirect URI
 App Id | The id of the Azure ACS principal
 
+[!INCLUDE [Clarify the expired acs field](./../fragments/clarify-acs-details.md)]
+
 ## Sample page
 
 ![Azure ACS Principal overview](../images/addinsacsacsoverview.png)

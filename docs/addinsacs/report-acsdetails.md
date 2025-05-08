@@ -18,6 +18,8 @@ When a principal was granted access to specific sites you can see the sites in t
 
 More details about the returned field and their possible values can be found in the documentation of the generated [Azure ACS principals csv file](csv-classicacsprincipals.md).
 
+[!INCLUDE [Clarify the expired acs field](./../fragments/clarify-acs-details.md)]
+
 ## Site collection scoped permissions
 
 Azure ACS principals are configured with permission scopes detailing what content they can access and what right they have for that content. If an Azure ACS principal is granted access to one or more specific site collections, specific webs or specific lists then you'll be able to see the respective site collection, web and list id's with their associated right in the shown table.
