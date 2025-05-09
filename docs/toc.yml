@@ -10,5 +10,7 @@
   href: infopath/
 - name: Add-Ins and ACS
   href: addinsacs/
+- name: Alerts
+  href: alerts/
 - name: Contributing
   href: contributing/
