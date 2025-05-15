@@ -11,6 +11,9 @@ Authentication | Minimal
 Application | **Graph:** Sites.Read.All <br> **SharePoint:** Sites.FullControl.All
 Delegated | **Graph:** Sites.Read.All, User.Read <br> **SharePoint:** AllSites.FullControl
 
+> [!Important]
+> It's essential you grant the `FullControl` SharePoint permission as listed above, without this permission scope the Alerts module will not work.
+
 ## Command line arguments for starting an assessment
 
 There are no specific command line arguments when starting the SharePoint Alerts assessment.

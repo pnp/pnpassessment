@@ -12,6 +12,9 @@ The Microsoft 365 Assessment tool must first be downloaded from https://github.c
 
 The Microsoft 365 Assessment tool requires an Entra application for authenticating to SharePoint. More details in the [authentication](../using-the-assessment-tool/setupauth.md) documentation.
 
+> [!Important]
+> It's essential you grant the needed permission as listed in [permissions](requirements.md), without these correct permission scopes the Alerts module will not work.
+
 ### Start assessment
 
 Below are some quick start samples that show how to run a SharePoint Alerts assessment. More details on the `Start` action can be found in the [Microsoft 365 Assessment tool Start documentation](../using-the-assessment-tool/assess-start.md).
