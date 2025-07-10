@@ -58,5 +58,23 @@
         #region PnPContext properties
         internal const string PnPContextPropertyScanId = "ScanId";
         #endregion
+        
+        #region Cpub templates
+        internal static readonly List<string> CpubTemplates = new List<string>
+        {
+            "BLANKINTERNETCONTAINER#0", // Publishing Portal
+            "CMSPUBLISHING#0", // Publishing Site
+            "BLANKINTERNET#0", // Publishing Site
+            "BLANKINTERNET#1", // Press Releases Site
+            "BLANKINTERNET#2", // Publishing Site with Workflow
+            "ENTERWIKI#0", // Enterprise Wiki
+            "SRCHCEN#0", // Enterprise Search Center
+            "SPSSITES#0", // Site Directory
+            "SPSNHOME#0", // News Home Site
+            "PRODUCTCATALOG#0", // Product Catalog
+            "SPSREPORTCENTER#0", // Report Center
+            "SPSTOPIC#0" // Topic Area Template
+        };
+        #endregion
     }
 }
