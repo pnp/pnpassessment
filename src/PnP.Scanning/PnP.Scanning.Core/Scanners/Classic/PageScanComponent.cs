@@ -150,8 +150,6 @@ namespace PnP.Scanning.Core.Scanners
 
             if (pagesList.Count > 0)
             {
-                await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
-
                 // Extract web parts from each page
                 foreach (var page in pagesList)
                 {
@@ -190,6 +188,8 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     await scannerBase.StorageManager.StoreWebPartInformationAsync(scannerBase.ScanId, webPartsList);
                 }
+                
+                await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
             }
 
             // Loop over the found pages and save the page summary information

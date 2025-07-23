@@ -16,7 +16,6 @@ using PnP.Scanning.Process.Services;
 using Serilog;
 using Serilog.Events;
 using Spectre.Console;
-using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 

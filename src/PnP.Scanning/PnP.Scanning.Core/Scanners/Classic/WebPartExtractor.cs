@@ -353,19 +353,19 @@ namespace PnP.Scanning.Core.Scanners.Classic
         {
             if (string.IsNullOrEmpty(webPartType))
             {
-                return "WP3"; // Unknown web part type
+                return nameof(RemediationCodes.WP3); // Unknown web part type
             }
 
             if (!hasProperMapping)
             {
-                return "WP1"; // Web part without proper mapping
+                return nameof(RemediationCodes.WP1);
             }
 
             // Web parts with mapping but might need attention
             if (webPartType.Contains("Script", StringComparison.OrdinalIgnoreCase) ||
                 webPartType.Contains("ContentEditor", StringComparison.OrdinalIgnoreCase))
             {
-                return "WP2"; // Script-based web parts requiring community script editor
+                return nameof(RemediationCodes.WP2); // Script-based web parts requiring community script editor
             }
 
             return string.Empty; // No remediation needed
