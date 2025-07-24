@@ -15,7 +15,7 @@ namespace PnP.Scanning.Core.Storage
         public string ListUrl { get; set; }
 
         public string ListTitle { get; set; }
-
+        
         public Guid ListId { get; set; }
 
         public DateTime ModifiedAt { get; set; }

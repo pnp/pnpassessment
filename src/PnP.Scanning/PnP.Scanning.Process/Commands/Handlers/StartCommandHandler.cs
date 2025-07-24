@@ -328,12 +328,12 @@ namespace PnP.Scanning.Process.Commands
         private async Task HandleStartAsync(StartOptions arguments)
         {
             // temporary block for classic assessment run as it's not yet done
-            if (arguments.Mode == Mode.Classic)
-            {
-                AnsiConsole.MarkupLine($"[red]Classic mode is not yet implemented[/]");
-                AnsiConsole.MarkupLine("");
-                return;
-            }
+            // if (arguments.Mode == Mode.Classic)
+            // {
+            //     AnsiConsole.MarkupLine($"[red]Classic mode is not yet implemented[/]");
+            //     AnsiConsole.MarkupLine("");
+            //     return;
+            // }
 
             // Auto populate the tenant id when not provided
             if (string.IsNullOrEmpty(arguments.TenantId) && !string.IsNullOrEmpty(arguments.Tenant))

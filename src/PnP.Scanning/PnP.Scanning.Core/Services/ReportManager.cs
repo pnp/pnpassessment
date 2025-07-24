@@ -37,6 +37,7 @@ namespace PnP.Scanning.Core.Services
         private const string ClassicExtensibilitiesCsv = "classicextensibilities.csv";
         private const string ClassicWebSummariesCsv = "classicwebsummaries.csv";
         private const string ClassicSiteSummariesCsv = "classicsitesummaries.csv";
+        private const string ClassicWebPartsCsv = "classicwebparts.csv";
 
         private const string ClassicAddInsCsv = "classicaddins.csv";
         private const string ClassicACSPrincipalsCsv = "classicacsprincipals.csv";
@@ -348,6 +349,14 @@ namespace PnP.Scanning.Core.Services
                         using (var csv = new CsvWriter(writer, config))
                         {
                             await csv.WriteRecordsAsync(dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        }
+                    }
+
+                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebPartsCsv)))
+                    {
+                        using (var csv = new CsvWriter(writer, config))
+                        {
+                            await csv.WriteRecordsAsync(dbContext.ClassicWebParts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
 

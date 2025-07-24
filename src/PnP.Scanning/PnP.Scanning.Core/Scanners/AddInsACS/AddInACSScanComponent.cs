@@ -36,7 +36,7 @@ namespace PnP.Scanning.Core.Scanners
                     CurrentWebId = addIn.CurrentWebId,
                     CurrentWebName = addIn.CurrentWebName,
                     InstalledBy = addIn.InstalledBy,
-                    InstalledSiteId = addIn.InstalledSiteId,
+                    InstalledSiteId = addIn.InstalledSiteId, 
                     InstalledWebFullUrl = addIn.InstalledWebFullUrl,
                     InstalledWebId = addIn.InstalledWebId,
                     InstalledWebName = addIn.InstalledWebName,

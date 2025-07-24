@@ -351,3 +351,5 @@ MigrationBackup/
 
 # mac OS
 .ds_store
+
+.idea/
