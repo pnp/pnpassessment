@@ -8,7 +8,7 @@ Before diving into all the possible command line arguments let's first show some
 
 Task | CLI
 -----|------
-Start a new Add-Insand ACS assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode AddInsACS --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
+Start a new Add-Ins and ACS assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode AddInsACS --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 Start a new Alerts assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Alerts --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
 Start a new Workflow 2013 assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode workflow --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 
@@ -22,7 +22,7 @@ In the next chapters the arguments are described in more details, grouped by cat
 
 ## Assessment mode
 
-The main argument to use is the `--mode` argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to `Syntex`. Overtime more assessment modules will be added. Currently supported assessments are:
+The main argument to use is the `--mode` argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to `Workflow`. Overtime more assessment modules will be added. Currently supported assessments are:
 
 [!INCLUDE [Assessment overview](./../fragments/supportedassessments.md)]
 
@@ -94,10 +94,6 @@ When using delegated permissions in combination with either `--authmode` equal t
 ## Other configuration options
 
 Depending on the chosen assessment mode (`--mode` argument) you can optionally define extra arguments.
-
-### Microsoft Syntex adoption assessment
-
-When running this assessment it's recommended to use the `--syntexfull` argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Entra application is correctly configured to allow this. See the specific [Microsoft Syntex assessment page](../sharepoint-syntex/requirements.md) to learn more.
 
 ### Parallel operations
 

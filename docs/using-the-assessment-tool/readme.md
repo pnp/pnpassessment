@@ -1,6 +1,6 @@
 # Overview
 
-The Microsoft 365 Assessment tool is a downloadable executable that can be used to assess your tenant for an adoption scenario (e.g. how will using Microsoft Syntex provide value to my organization) or for a retirement/deprecation scenario. How you use the Microsoft 365 Assessment tool is similar for all use cases, the generated output however will differ depending on the use case. The basic steps to use the Microsoft 365 Assessment tool are these:
+The Microsoft 365 Assessment tool is a downloadable executable that can be used to assess your tenant for an adoption scenario or for a retirement/deprecation scenario. How you use the Microsoft 365 Assessment tool is similar for all use cases, the generated output however will differ depending on the use case. The basic steps to use the Microsoft 365 Assessment tool are these:
 
 Step | Description
 -----|------------

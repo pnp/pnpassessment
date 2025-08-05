@@ -29,7 +29,7 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 > If you encounter errors during below steps it's likely that you do not have the needed permissions. Please contact your tenant / Entra admins for help.
 
 ```PowerShell
-# Sample for the Microsoft Syntex adoption module. 
+# Sample for the Microsoft Alerts module. 
 # Remove/update the application/delegated permissions depending on your needs
 # as each assessment module requires slightly different permissions.
 #
@@ -40,13 +40,13 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 #
 # See https://pnp.github.io/powershell/cmdlets/Register-PnPAzureADApp.html for more options
 #
-Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForSyntex `
+Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForAlerts `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
                        -GraphApplicationPermissions "Sites.Read.All" `
                        -SharePointApplicationPermissions "Sites.FullControl.All" `
                        -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
-                       -SharePointDelegatePermissions "AllSites.Manage" `
+                       -SharePointDelegatePermissions "AllSites.FullControl" `
                        -Username "joe@contoso.onmicrosoft.com" `
                        -Interactive
 ```

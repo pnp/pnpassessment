@@ -34,7 +34,7 @@ When using the `list` action a table is generated listing all the assessment tha
 Column | Description
 -------|------------
 Id | The assessment id
-Mode | The assessment mode (e.g. Syntex) defines the adoption or deprecation scenario the assessment is targeting
+Mode | The assessment mode (e.g. Workflow) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
 Progress | Shows how many site collections of the total in scope site collections are assessed
 Started at | When was this assessment for the first time started
@@ -61,7 +61,7 @@ When using the `status` action a table is generated listing all the running asse
 Column | Description
 -------|------------
 Id | The assessment id
-Mode | The assessment mode (e.g. Syntex) defines the adoption or deprecation scenario the assessment is targeting
+Mode | The assessment mode (e.g. Workflow) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
 Progress | Shows how many site collections of the total in scope site collections are assessed
 Retries | Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot)
