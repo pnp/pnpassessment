@@ -1,6 +1,6 @@
 # Microsoft 365 Assessment tool
 
-The Microsoft 365 Assessment tool is an [open source community tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various retirement and adoption scenarios. Currently the tool supports a [Microsoft Syntex adoption](https://pnp.github.io/pnpassessment/sharepoint-syntex/readme.html) and [Workflow 2013](https://pnp.github.io/pnpassessment/workflow/readme.html) module but additional modules are under development.
+The Microsoft 365 Assessment tool is an [open source community tool](https://github.com/pnp/pnpassessment) that provides customers with data to help them with various retirement and adoption scenarios.
 
 ## Getting started 🚀
 
@@ -16,7 +16,6 @@ Once you're ready to run an assessment you can choose any of the available modul
 
 Module | Type | Description
 -------|------|------------
-[Microsoft Syntex](https://pnp.github.io/pnpassessment/sharepoint-syntex/readme.html) | Adoption | Helps you assess your tenant to understand where using Microsoft Syntex will bring value to your organization
 [Workflow 2013](https://pnp.github.io/pnpassessment/workflow/readme.html) | Retirement | Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. **Available as of pre-release version 1.0.1**
 [InfoPath Forms Services](https://pnp.github.io/pnpassessment/infopath/readme.md) | Retirement | Helps you assess your tenant to understand where you're using InfoPath Forms Services and how upgradable those to alternative solutions. **Available as of version 1.5.0**
 [InfoPath Forms Services](https://pnp.github.io/pnpassessment/infopath/readme.md) | Retirement | Helps you assess your tenant to understand where you're using InfoPath Forms Services and how upgradable those to alternative solutions. **Available as of version 1.5.0**
