@@ -245,7 +245,7 @@ namespace PnP.Scanning.Process.Commands
             {
                 IsRequired = false
             };
-            cmd.AddOption(syntexFullOption);
+            //cmd.AddOption(syntexFullOption);
 
             workflowAnalyzeOption = new(
                 name: $"--{Constants.StartWorkflowAnalyze}",

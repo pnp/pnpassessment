@@ -13,10 +13,10 @@ A [configured Entra application](https://entra.microsoft.com/#view/Microsoft_AAD
 
 The Microsoft 365 Assessment tool aims to be able to perform the assessment task at hand using minimal read permissions, but for certain assessments not all features work when using minimal permissions. To understand which Microsoft Graph and SharePoint permissions are required please checkout the permission requirements of the respective modules.
 
-- [Microsoft Syntex adoption](../sharepoint-syntex/requirements.md)
 - [Workflow 2013 deprecation](../workflow/requirements.md)
 - [InfoPath 2013 deprecation](../infopath/requirements.md)
 - [SharePoint Add-Ins and Azure ACS deprecation](../addinsacs/requirements.md)
+- [SharePoint Alerts deprecation](../alerts/requirements.md)
 
 > [!Important]
 > Cross check the minimally required permissions are granted, if not the scan might fail or might return inaccurate results.
