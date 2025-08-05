@@ -64,18 +64,19 @@ namespace PnP.Scanning.Core.Services
                 var scan = await dbContext.Scans.Where(p => p.ScanId == scanId).FirstOrDefaultAsync();
 
                 // PER SCAN COMPONENT: Update report data per scan component
-                if (scan.CLIMode == Mode.Syntex.ToString())
-                {
-                    reportFile = "SyntexAssessmentReport.pbit";
-                    // Put the report file in the report folder
-                    string pbitFile = Path.Combine(exportPath, reportFile);
-                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Syntex.SyntexAssessmentReport.pbit", pbitFile);
+                //if (scan.CLIMode == Mode.Syntex.ToString())
+                //{
+                //    reportFile = "SyntexAssessmentReport.pbit";
+                //    // Put the report file in the report folder
+                //    string pbitFile = Path.Combine(exportPath, reportFile);
+                //    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Syntex.SyntexAssessmentReport.pbit", pbitFile);
 
-                    // Update the report file to pick up the exported CSV files in the report folder
-                    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Syntex\\\\", ",");
-                }
-                else if (scan.CLIMode == Mode.Workflow.ToString())
+                //    // Update the report file to pick up the exported CSV files in the report folder
+                //    // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
+                //    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Syntex\\\\", ",");
+                //}
+                //else 
+                if (scan.CLIMode == Mode.Workflow.ToString())
                 {
                     reportFile = "WorkflowReport.pbit";
                     // Put the report file in the report folder
@@ -215,72 +216,72 @@ namespace PnP.Scanning.Core.Services
                 #region Scanner specific export
                 // PER SCAN COMPONENT: define export for the scan specific tables
 
-                if (scan.CLIMode == Mode.Syntex.ToString())
-                {
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexListsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //if (scan.CLIMode == Mode.Syntex.ToString())
+                //{
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexListsCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypesCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexContentTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypesCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexContentTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypeFieldsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexContentTypeFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypeFieldsCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexContentTypeFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypeOverviewCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexContentTypeOverviewCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexContentTypeOverview.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexFieldsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexFieldsCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexFields.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexModelUsageCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexModelUsage.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexModelUsageCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexModelUsage.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexFileTypesCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexFileTypesCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexTermSetsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.SyntexTermSets.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-                }
+                //    using (var writer = new StreamWriter(Path.Join(exportPath, SyntexTermSetsCsv)))
+                //    {
+                //        using (var csv = new CsvWriter(writer, config))
+                //        {
+                //            await csv.WriteRecordsAsync(dbContext.SyntexTermSets.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                //        }
+                //    }
+                //}
 
                 if (scan.CLIMode == Mode.Workflow.ToString())
                 {

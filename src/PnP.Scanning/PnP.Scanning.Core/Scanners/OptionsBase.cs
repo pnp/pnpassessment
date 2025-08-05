@@ -11,17 +11,18 @@ namespace PnP.Scanning.Core.Scanners
             var options = NewOptions(request.Mode);
 
             // PER SCAN COMPONENT: configure scan component option handling here
-            if (request.Mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                foreach (var property in request.Properties)
-                {
-                    if (property.Property == Constants.StartSyntexFull)
-                    {
-                        (options as SyntexOptions).DeepScan = bool.Parse(property.Value);
-                    }
-                }
-            }
-            else if (request.Mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
+            //if (request.Mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
+            //{
+            //    foreach (var property in request.Properties)
+            //    {
+            //        if (property.Property == Constants.StartSyntexFull)
+            //        {
+            //            (options as SyntexOptions).DeepScan = bool.Parse(property.Value);
+            //        }
+            //    }
+            //}
+            //else 
+            if (request.Mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 foreach (var property in request.Properties)
                 {
@@ -79,14 +80,15 @@ namespace PnP.Scanning.Core.Scanners
         private static OptionsBase NewOptions(string mode)
         {
             // PER SCAN COMPONENT: configure scan component option handling here
-            if (mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                return new SyntexOptions
-                {
-                    Mode = mode,
-                };
-            }
-            else if (mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
+            //if (mode.Equals(Services.Mode.Syntex.ToString(), StringComparison.OrdinalIgnoreCase))
+            //{
+            //    return new SyntexOptions
+            //    {
+            //        Mode = mode,
+            //    };
+            //}
+            //else 
+            if (mode.Equals(Services.Mode.Workflow.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 return new WorkflowOptions
                 {

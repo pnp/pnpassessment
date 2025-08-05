@@ -55,7 +55,7 @@ namespace PnP.Scanning.Process.Commands
             // Scanner mode
             modeOption = new(
                 name: $"--{Constants.StartMode}",
-                getDefaultValue: () => Mode.Syntex,
+                getDefaultValue: () => Mode.Workflow,
                 description: "Assessment mode"
                 )
             {
@@ -420,15 +420,15 @@ namespace PnP.Scanning.Process.Commands
                 };
 
                 // PER SCAN COMPONENT: implement scan component specific options
-                if (arguments.Mode == Mode.Syntex)
-                {
-                    start.Properties.Add(new PropertyRequest
-                    {
-                        Property = syntexFullOption.Name.TrimStart('-'),
-                        Type = "bool",
-                        Value = arguments.SyntexDeepScan.ToString(),
-                    });
-                }
+                //if (arguments.Mode == Mode.Syntex)
+                //{
+                //    start.Properties.Add(new PropertyRequest
+                //    {
+                //        Property = syntexFullOption.Name.TrimStart('-'),
+                //        Type = "bool",
+                //        Value = arguments.SyntexDeepScan.ToString(),
+                //    });
+                //}
 
                 if (arguments.Mode == Mode.Workflow)
                 {

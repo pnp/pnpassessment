@@ -62,107 +62,10 @@ namespace PnP.Scanning.Core.Scanners
                 scannerBase.Logger.Error(ex, $"No workflow service present!");
             }
 
-            // We've found SP2013 site scoped workflows
+            // We've found SP2013 workflows
             if (siteDefinitions != null && siteDefinitions.Length > 0)
             {
-                foreach (var siteDefinition in siteDefinitions.Where(p => p.RestrictToType != null && (p.RestrictToType.Equals("site", StringComparison.InvariantCultureIgnoreCase) || p.RestrictToType.Equals("universal", StringComparison.InvariantCultureIgnoreCase))))
-                {
-                    // Check if this workflow is also in use
-                    var siteWorkflowSubscriptions = siteSubscriptions.Where(p => p.DefinitionId.Equals(siteDefinition.Id));
-
-                    // Perform workflow analysis
-                    WorkflowActionAnalysis workFlowAnalysisResult = null;
-                    WorkflowTriggerAnalysis workFlowTriggerAnalysisResult = null;
-                    if (workflowOptions.Analyze)
-                    {
-                        workFlowAnalysisResult = WorkflowManager.Instance.ParseWorkflowDefinition(siteDefinition.Xaml);
-                        workFlowTriggerAnalysisResult = WorkflowManager.ParseWorkflowTriggers(GetWorkflowPropertyBool(siteDefinition.Properties, "SPDConfig.StartOnCreate"),
-                                                                                              GetWorkflowPropertyBool(siteDefinition.Properties, "SPDConfig.StartOnChange"),
-                                                                                              GetWorkflowPropertyBool(siteDefinition.Properties, "SPDConfig.StartManually"));
-                    }
-
-                    if (siteWorkflowSubscriptions.Any())
-                    {
-                        foreach (var siteWorkflowSubscription in siteWorkflowSubscriptions)
-                        {
-                            // Count the workflow instances for this subscription
-                            var instanceCounts = await GetInstanceCountsAsync(web.Context, instanceService, siteWorkflowSubscription);
-
-                            workflowLists.Add(new Workflow
-                            {
-                                ScanId = scannerBase.ScanId,
-                                SiteUrl = scannerBase.SiteUrl,
-                                WebUrl = scannerBase.WebUrl,
-                                ListTitle = "",
-                                ListUrl = "",
-                                ListId = Guid.Empty,
-                                ContentTypeId = "",
-                                ContentTypeName = "",
-                                Scope = "Site",
-                                RestrictToType = siteDefinition.RestrictToType,
-                                DefinitionName = ScannerBase.Clean(siteDefinition.DisplayName),
-                                DefinitionDescription = ScannerBase.Clean(siteDefinition.Description),
-                                SubscriptionName = ScannerBase.Clean(siteWorkflowSubscription.Name),
-                                HasSubscriptions = true,
-                                Enabled = siteWorkflowSubscription.Enabled,
-                                DefinitionId = siteDefinition.Id,
-                                IsOOBWorkflow = false,
-                                SubscriptionId = siteWorkflowSubscription.Id,
-                                UsedActions = string.Join(",", workFlowAnalysisResult?.WorkflowActions),
-                                ActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.ActionCount : 0,
-                                UsedTriggers = string.Join(",", workFlowTriggerAnalysisResult?.WorkflowTriggers),
-                                UnsupportedActionsInFlow = string.Join(",", workFlowAnalysisResult?.UnsupportedActions),
-                                UnsupportedActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.UnsupportedAccountCount : 0,
-                                LastDefinitionEdit = GetWorkflowPropertyDateTime(siteDefinition.Properties, "Definition.ModifiedDateUTC"),
-                                LastSubscriptionEdit = GetWorkflowPropertyDateTime(siteWorkflowSubscription.PropertyDefinitions, "SharePointWorkflowContext.Subscription.ModifiedDateUTC"),
-                                TotalInstances = instanceCounts.Total,
-                                CancelledInstances = instanceCounts.Cancelled,
-                                CancellingInstances = instanceCounts.Cancelling,
-                                TerminatedInstances = instanceCounts.Terminated,
-                                StartedInstances = instanceCounts.Started,
-                                NotStartedInstances = instanceCounts.NotStarted,
-                                CompletedInstances = instanceCounts.Completed,
-                                SuspendedInstances = instanceCounts.Suspended,
-                            });
-                        }
-                    }
-                    else
-                    {
-                        workflowLists.Add(new Workflow
-                        {
-                            ScanId = scannerBase.ScanId,
-                            SiteUrl = scannerBase.SiteUrl,
-                            WebUrl = scannerBase.WebUrl,
-                            ListTitle = "",
-                            ListUrl = "",
-                            ListId = Guid.Empty,
-                            ContentTypeId = "",
-                            ContentTypeName = "",
-                            Scope = "Site",
-                            RestrictToType = siteDefinition.RestrictToType,
-                            DefinitionName = ScannerBase.Clean(siteDefinition.DisplayName),
-                            DefinitionDescription = ScannerBase.Clean(siteDefinition.Description),
-                            SubscriptionName = "",
-                            HasSubscriptions = false,
-                            Enabled = false,
-                            DefinitionId = siteDefinition.Id,
-                            IsOOBWorkflow = false,
-                            SubscriptionId = Guid.Empty,
-                            UsedActions = string.Join(",", workFlowAnalysisResult?.WorkflowActions),
-                            ActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.ActionCount : 0,
-                            UnsupportedActionsInFlow = string.Join(",", workFlowAnalysisResult?.UnsupportedActions),
-                            UnsupportedActionCount = workFlowAnalysisResult != null ? workFlowAnalysisResult.UnsupportedAccountCount : 0,
-                            UsedTriggers = string.Join(",", workFlowTriggerAnalysisResult?.WorkflowTriggers),
-                            LastDefinitionEdit = GetWorkflowPropertyDateTime(siteDefinition.Properties, "Definition.ModifiedDateUTC"),
-                        });
-                    }
-                }
-            }
-
-            // We've found SP2013 list scoped workflows
-            if (siteDefinitions != null && siteDefinitions.Length > 0)
-            {
-                foreach (var listDefinition in siteDefinitions.Where(p => p.RestrictToType != null && (p.RestrictToType.Equals("list", StringComparison.InvariantCultureIgnoreCase) || p.RestrictToType.Equals("universal", StringComparison.InvariantCultureIgnoreCase))))
+                foreach (var listDefinition in siteDefinitions)
                 {
                     // Check if this workflow is also in use
                     var listWorkflowSubscriptions = siteSubscriptions.Where(p => p.DefinitionId.Equals(listDefinition.Id));
@@ -176,6 +79,21 @@ namespace PnP.Scanning.Core.Scanners
                         workFlowTriggerAnalysisResult = WorkflowManager.ParseWorkflowTriggers(GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartOnCreate"),
                                                                                               GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartOnChange"),
                                                                                               GetWorkflowPropertyBool(listDefinition.Properties, "SPDConfig.StartManually"));
+                    }
+
+                    string workflowScope = "";
+
+                    if (listDefinition.RestrictToType != null && listDefinition.RestrictToType.Equals("list", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        workflowScope = "List";
+                    }
+                    else if (listDefinition.RestrictToType != null && listDefinition.RestrictToType.Equals("site", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        workflowScope = "Site";
+                    }
+                    else
+                    {
+                        workflowScope = "Universal";
                     }
 
                     if (listWorkflowSubscriptions.Any())
@@ -212,7 +130,7 @@ namespace PnP.Scanning.Core.Scanners
                             }
 
                             // Count the workflow instances for this subscription
-                            var instanceCounts = await GetInstanceCountsAsync(web.Context, instanceService, listWorkflowSubscription);
+                            var instanceCounts = await GetInstanceCountsAsync(web.Context, instanceService, listWorkflowSubscription);                            
 
                             workflowLists.Add(new Workflow
                             {
@@ -224,8 +142,8 @@ namespace PnP.Scanning.Core.Scanners
                                 ListId = associatedListId,
                                 ContentTypeId = associatedContentTypeId,
                                 ContentTypeName = ScannerBase.Clean(associatedContentTypeName),
-                                Scope = "List",
-                                RestrictToType = listDefinition.RestrictToType,
+                                Scope = workflowScope,
+                                RestrictToType = workflowScope,
                                 DefinitionName = ScannerBase.Clean(listDefinition.DisplayName),
                                 DefinitionDescription = ScannerBase.Clean(listDefinition.Description),
                                 SubscriptionName = ScannerBase.Clean(listWorkflowSubscription.Name),
@@ -264,8 +182,8 @@ namespace PnP.Scanning.Core.Scanners
                             ListId = Guid.Empty,
                             ContentTypeId = "",
                             ContentTypeName = "",
-                            Scope = "List",
-                            RestrictToType = listDefinition.RestrictToType,
+                            Scope = workflowScope,
+                            RestrictToType = workflowScope,
                             DefinitionName = ScannerBase.Clean(listDefinition.DisplayName),
                             DefinitionDescription = ScannerBase.Clean(listDefinition.Description),
                             SubscriptionName = "",

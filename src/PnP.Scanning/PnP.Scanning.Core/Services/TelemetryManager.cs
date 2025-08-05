@@ -177,11 +177,12 @@ namespace PnP.Scanning.Core.Services
                 // PER SCAN COMPONENT: Update telemetry data per scan component
 
                 // Populate event specific metrics
-                if (Scan.CLIMode.Equals(Mode.Syntex.ToString()))
-                {
-                    await PopulateSyntexMetricsAsync(scanId, metrics);
-                }
-                else if (Scan.CLIMode.Equals(Mode.Workflow.ToString()))
+                //if (Scan.CLIMode.Equals(Mode.Syntex.ToString()))
+                //{
+                //    await PopulateSyntexMetricsAsync(scanId, metrics);
+                //}
+                //else 
+                if (Scan.CLIMode.Equals(Mode.Workflow.ToString()))
                 {
                     await PopulateWorkflowMetricsAsync(scanId, metrics);
                 }

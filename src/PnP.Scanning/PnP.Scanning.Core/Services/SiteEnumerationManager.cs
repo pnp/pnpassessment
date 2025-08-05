@@ -229,7 +229,8 @@ namespace PnP.Scanning.Core.Services
                 string webUrl;
                 if (context.Uri.PathAndQuery != "/")
                 {
-                    webUrl = enumeratedWeb.ServerRelativeUrl.Replace(context.Uri.PathAndQuery, "");
+                    // Ensure the serverRelativeUrl uses %20 for spaces to ensure the site collection path is replaced correctly
+                    webUrl = enumeratedWeb.ServerRelativeUrl.Replace(" ", "%20").Replace(context.Uri.PathAndQuery, "");
                 }
                 else
                 {

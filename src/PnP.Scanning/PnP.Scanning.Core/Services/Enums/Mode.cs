@@ -5,7 +5,7 @@
 #if DEBUG
         Test,
 #endif
-        Syntex,
+        //Syntex,
         Workflow,
         InfoPath,
         Classic,
