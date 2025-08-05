@@ -87,7 +87,7 @@
 </thead>
 <tbody>
 <tr>
-<td>Start a new Add-Insand ACS assessment (application permissions) for a complete tenant</td>
+<td>Start a new Add-Ins and ACS assessment (application permissions) for a complete tenant</td>
 <td>microsoft365-assessment.exe start --mode AddInsACS --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot;</td>
 </tr>
 <tr>
@@ -105,7 +105,7 @@
 <p><img src="../images/startargumentshelp.png" alt="start argument overview"></p>
 <p>In the next chapters the arguments are described in more details, grouped by category</p>
 <h2 id="assessment-mode">Assessment mode</h2>
-<p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Syntex</code>. Overtime more assessment modules will be added. Currently supported assessments are:</p>
+<p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Workflow</code>. Overtime more assessment modules will be added. Currently supported assessments are:</p>
 <table>
 <thead>
 <tr>
@@ -213,8 +213,6 @@ https://bertonline.sharepoint.com/sites/apacsales
 </div>
 <h2 id="other-configuration-options">Other configuration options</h2>
 <p>Depending on the chosen assessment mode (<code>--mode</code> argument) you can optionally define extra arguments.</p>
-<h3 id="microsoft-syntex-adoption-assessment">Microsoft Syntex adoption assessment</h3>
-<p>When running this assessment it's recommended to use the <code>--syntexfull</code> argument, adding this argument will make the assessment use search to gather exact file counts per content type and retention label counts. This however also requires that your Entra application is correctly configured to allow this. See the specific <a href="../sharepoint-syntex/requirements.html">Microsoft Syntex assessment page</a> to learn more.</p>
 <h3 id="parallel-operations">Parallel operations</h3>
 <p>By default the Microsoft 365 Assessment tool will use multiple parallel operations to read data from your tenant. By default one operation per logical processor is used with a maximum of 10, but you can change this number via the <code>--threads</code> argument.</p>
 <div class="IMPORTANT">
