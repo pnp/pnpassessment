@@ -18,7 +18,6 @@ Module | Type | Description
 -------|------|------------
 [Workflow 2013](https://pnp.github.io/pnpassessment/workflow/readme.html) | Retirement | Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. **Available as of pre-release version 1.0.1**
 [InfoPath Forms Services](https://pnp.github.io/pnpassessment/infopath/readme.md) | Retirement | Helps you assess your tenant to understand where you're using InfoPath Forms Services and how upgradable those to alternative solutions. **Available as of version 1.5.0**
-[InfoPath Forms Services](https://pnp.github.io/pnpassessment/infopath/readme.md) | Retirement | Helps you assess your tenant to understand where you're using InfoPath Forms Services and how upgradable those to alternative solutions. **Available as of version 1.5.0**
 [SharePoint Add-Ins and Azure ACS principals](https://pnp.github.io/pnpassessment/addinsacs/readme.html) | Retirement | Helps you assess your tenant to understand where you're using SharePoint Add-Ins and Azure ACS principals. **Available as of version 1.6.0**
 [SharePoint Alerts](https://pnp.github.io/pnpassessment/alerts/readme.html) | Retirement | Helps you assess your tenant to understand where you're using SharePoint Alerts. **Available as of version 1.11.0**
 
