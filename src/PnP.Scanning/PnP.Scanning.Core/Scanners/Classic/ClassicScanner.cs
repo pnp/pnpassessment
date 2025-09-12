@@ -307,8 +307,24 @@ namespace PnP.Scanning.Core.Scanners
                 "CMSPUBLISHING#0" => SiteType.Publishing,
                 // Publishing site
                 "BLANKINTERNET#0" => SiteType.Publishing,
+                // Press Releases Site
+                "BLANKINTERNET#1" => SiteType.Publishing,
                 // Publishing site with workflow
                 "BLANKINTERNET#2" => SiteType.Publishing,
+                // Enterprise Wiki
+                "ENTERWIKI#0" => SiteType.Publishing,
+                // Enterprise Search Center
+                "SRCHCEN#0" => SiteType.Publishing,
+                // Site Directory
+                "SPSSITES#0" => SiteType.Publishing,
+                // News Home Site
+                "SPSNHOME#0" => SiteType.Publishing,
+                // Product Catalog
+                "PRODUCTCATALOG#0" => SiteType.Publishing,
+                // Report Center
+                "SPSREPORTCENTER#0" => SiteType.Publishing,
+                // Topic Area Template
+                "SPSTOPIC#0" => SiteType.Publishing,
                 // Blog
                 "BLOG#0" => SiteType.Blog,
                 // Everything else
