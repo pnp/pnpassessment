@@ -678,6 +678,73 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("ClassicUserCustomActions");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebPart", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("HasProperMapping")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RemediationCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartAssembly")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartClass")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartProperties")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WebPartZone")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("WebPartZoneIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl", "WebPartId");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl", "WebPartId")
+                        .IsUnique();
+
+                    b.ToTable("ClassicWebParts");
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebSummary", b =>
                 {
                     b.Property<Guid>("ScanId")

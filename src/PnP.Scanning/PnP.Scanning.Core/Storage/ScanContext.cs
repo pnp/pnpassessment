@@ -46,6 +46,8 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<ClassicPage> ClassicPages { get; set; }
 
+        internal DbSet<ClassicWebPart> ClassicWebParts { get; set; }
+
         internal DbSet<ClassicList> ClassicLists { get; set; }
 
         internal DbSet<ClassicUserCustomAction> ClassicUserCustomActions { get; set; }
@@ -191,6 +193,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<ClassicPage>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });
+            });
+
+            modelBuilder.Entity<ClassicWebPart>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl, e.WebPartId });
             });
 
             modelBuilder.Entity<ClassicList>(entity =>

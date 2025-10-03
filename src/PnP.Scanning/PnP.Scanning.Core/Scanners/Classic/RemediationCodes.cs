@@ -107,6 +107,17 @@
         /// Other ribbon/UI extensions via User Custom Actions
         /// </summary>
         CE9,
+        
 
+        WP1,
+        
+        /// <summary>
+        /// Web part without proper mapping
+        /// </summary>
+        WP2,
+        /// <summary>
+        ///  Unknown web part type
+        /// </summary>
+        WP3,
     }
 }
