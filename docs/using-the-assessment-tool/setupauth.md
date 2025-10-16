@@ -43,9 +43,9 @@ The Microsoft 365 Assessment tool aims to be able to perform the assessment task
 Register-PnPAzureADApp -ApplicationName Microsoft365AssessmentToolForAlerts `
                        -Tenant contoso.onmicrosoft.com `
                        -Store CurrentUser `
-                       -GraphApplicationPermissions "Sites.Read.All" `
+                       -GraphApplicationPermissions "Sites.Read.All", "Application.Read.All" `
                        -SharePointApplicationPermissions "Sites.FullControl.All" `
-                       -GraphDelegatePermissions "Sites.Read.All", "User.Read" `
+                       -GraphDelegatePermissions "Sites.Read.All", "User.Read", "Application.Read.All" `
                        -SharePointDelegatePermissions "AllSites.FullControl" `
                        -Username "joe@contoso.onmicrosoft.com" `
                        -Interactive
