@@ -4,7 +4,7 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>disable</Nullable>
-		<Version>1.12.0</Version>
+		<Version>1.13.0</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -34,7 +34,7 @@
 	<ItemGroup>
 		<PackageReference Include="CsvHelper" Version="31.0.2" />
 		<PackageReference Include="EFCore.BulkExtensions" Version="8.0.2" />
-		<PackageReference Include="envdte" Version="17.13.40008" />
+		<PackageReference Include="envdte" Version="17.14.40260" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />
 		<PackageReference Include="Grpc.Net.Client" Version="2.61.0" />
 		<PackageReference Include="MathNet.Numerics" Version="5.0.0" />
