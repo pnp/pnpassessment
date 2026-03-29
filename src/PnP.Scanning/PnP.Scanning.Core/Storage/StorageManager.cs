@@ -906,6 +906,17 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        internal async Task StoreWebPartInformationAsync(Guid scanId, List<ClassicWebPart> webParts)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await dbContext.ClassicWebParts.AddRangeAsync(webParts.ToArray());
+
+                await dbContext.SaveChangesAsync();
+                Log.Information("StoreWebPartInformationAsync succeeded");
+            }
+        }
+
         internal async Task StoreClassicListInformationAsync(Guid scanId, List<ClassicList> classicLists)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -1426,6 +1437,11 @@ namespace PnP.Scanning.Core.Storage
             foreach (var page in await dbContext.ClassicPages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.ClassicPages.Remove(page);
+            }
+
+            foreach (var webPart in await dbContext.ClassicWebParts.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicWebParts.Remove(webPart);
             }
 
             foreach (var list in await dbContext.ClassicLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())

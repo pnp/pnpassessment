@@ -2,7 +2,9 @@
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
+using PnP.Scanning.Core.Scanners.Classic;
 using PnP.Scanning.Core.Storage;
+using Serilog;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -37,6 +39,7 @@ namespace PnP.Scanning.Core.Scanners
         {
             
             List<ClassicPage> pagesList = new();
+            List<ClassicWebPart> webPartsList = new();
             int modernPageCounter = 0;
             HashSet<string> remediationCodes = new();
 
@@ -147,6 +150,45 @@ namespace PnP.Scanning.Core.Scanners
 
             if (pagesList.Count > 0)
             {
+                // Extract web parts from each page
+                foreach (var page in pagesList)
+                {
+                    try
+                    {
+                        var webParts = await WebPartExtractor.ExtractWebPartsFromPageAsync(
+                            scannerBase.ScanId,
+                            scannerBase.SiteUrl,
+                            scannerBase.WebUrl,
+                            page.PageUrl,
+                            page.PageName,
+                            page.ListId,
+                            page.ModifiedAt,
+                            csomContext);
+
+                        webPartsList.AddRange(webParts);
+
+                        // Add web part remediation codes to the overall set
+                        foreach (var webPart in webParts)
+                        {
+                            if (!string.IsNullOrEmpty(webPart.RemediationCode))
+                            {
+                                remediationCodes.Add(webPart.RemediationCode);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error but continue processing other pages
+                        Log.Warning("Failed to extract web parts from page {PageUrl}: {Error}", page.PageUrl, ex.Message);
+                    }
+                }
+
+                // Store web parts if any were found
+                if (webPartsList.Count > 0)
+                {
+                    await scannerBase.StorageManager.StoreWebPartInformationAsync(scannerBase.ScanId, webPartsList);
+                }
+                
                 await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
             }
 
