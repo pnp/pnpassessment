@@ -351,3 +351,6 @@ MigrationBackup/
 
 # mac OS
 .ds_store
+
+# rider
+.idea/

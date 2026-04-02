@@ -76,8 +76,7 @@ namespace PnP.Scanning.Core.Scanners
                     }).ConfigureAwait(false);
                 }
             }
-            else if ((scannerBase.WebTemplate == "BLANKINTERNET#0" || scannerBase.WebTemplate == "ENTERWIKI#0" || 
-                      scannerBase.WebTemplate == "SRCHCEN#0" || scannerBase.WebTemplate == "CMSPUBLISHING#0") &&
+            else if (Constants.CpubTemplates.Contains(scannerBase.WebTemplate) &&
                      sitePublishingEnabled && webPublishingEnabled)
             {
                 await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes).ConfigureAwait(false);
