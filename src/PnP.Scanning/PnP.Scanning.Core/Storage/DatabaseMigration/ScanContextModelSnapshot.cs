@@ -503,6 +503,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("PageUrl")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("HomePage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Layout")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ListId")
                         .HasColumnType("TEXT");
 
@@ -512,7 +518,13 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ListUrl")
                         .HasColumnType("TEXT");
 
+                    b.Property<double>("MappingPercentage")
+                        .HasColumnType("REAL");
+
                     b.Property<DateTime>("ModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModifiedBy")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PageName")
@@ -524,12 +536,91 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("RemediationCode")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("UncustomizedHomePage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UnmappedWebParts")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ViewsLifeTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsLifeTimeUniqueUsers")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsRecent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsRecentUniqueUsers")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("WebPartCount")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl");
 
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl")
                         .IsUnique();
 
                     b.ToTable("ClassicPages");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPageWebPart", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WebPartIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Column")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsMappable")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Row")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("WebPartProperties")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartTypeShort")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ZoneId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl", "WebPartIndex");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl", "WebPartIndex")
+                        .IsUnique();
+
+                    b.ToTable("ClassicPageWebParts");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicSiteSummary", b =>
@@ -542,6 +633,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("AggregatedRemediationCodes")
                         .HasColumnType("TEXT");
+
+                    b.Property<double>("AvgMappingPercentage")
+                        .HasColumnType("REAL");
 
                     b.Property<int>("AzureACSPrincipals")
                         .HasColumnType("INTEGER");
@@ -579,10 +673,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<DateTime>("LastItemUserModifiedDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("MappableWebPartPages")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ModernLists")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ModernPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PagesWithWebParts")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("RootWebTemplate")
@@ -599,6 +699,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("SubWebTemplates")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UncustomizedHomePages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UnmappedWebPartPages")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ScanId", "SiteUrl");
 
@@ -678,6 +784,28 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("ClassicUserCustomActions");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebPartUnique", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebPartType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("InMappingFile")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PageCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("ScanId", "WebPartType");
+
+                    b.HasIndex("ScanId", "WebPartType")
+                        .IsUnique();
+
+                    b.ToTable("ClassicWebPartUniques");
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebSummary", b =>
                 {
                     b.Property<Guid>("ScanId")
@@ -691,6 +819,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("AggregatedRemediationCodes")
                         .HasColumnType("TEXT");
+
+                    b.Property<double>("AvgMappingPercentage")
+                        .HasColumnType("REAL");
 
                     b.Property<int>("AzureACSPrincipals")
                         .HasColumnType("INTEGER");
@@ -752,10 +883,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<DateTime>("LastItemUserModifiedDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("MappableWebPartPages")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ModernLists")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ModernPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PagesWithWebParts")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("RemediationCode")
@@ -766,6 +903,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("Template")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UncustomizedHomePages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UnmappedWebPartPages")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ScanId", "SiteUrl", "WebUrl");
 
