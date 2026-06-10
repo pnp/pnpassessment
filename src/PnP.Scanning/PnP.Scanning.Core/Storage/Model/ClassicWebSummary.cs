@@ -27,17 +27,10 @@ namespace PnP.Scanning.Core.Storage
 
         public int ModernPages { get; set; }
 
-        // Page transformation readiness rollups
-        public int PagesWithWebParts { get; set; }
-
-        public int MappableWebPartPages { get; set; }
-
-        public int UnmappedWebPartPages { get; set; }
-
-        public double AvgMappingPercentage { get; set; }
-
-        public int UncustomizedHomePages { get; set; }
-
+        // Page transformation readiness rollups (PagesWithWebParts, MappableWebPartPages,
+        // UnmappedWebPartPages, AvgMappingPercentage, UncustomizedHomePages) are intentionally NOT
+        // stored. Like the old Modernization Scanner, they are derived at report time by aggregating
+        // the ClassicPage / ClassicPageWebPart rows.
         public bool IsModernSite { get; set; }
 
         public bool IsClassicPublishingSite { get; set; }
