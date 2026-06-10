@@ -34,6 +34,14 @@ namespace PnP.Scanning.Process.Commands
 
         public List<ClassicComponent> ClassicInclude { get; set; }
 
+        public bool ExportWebPartProperties { get; set; }
+
+        public bool SkipUsageInformation { get; set; }
+
+        public bool SkipUserInformation { get; set; }
+
+        public bool HomePageOnly { get; set; }
+
 #if DEBUG
         public int TestNumberOfSites { get; set; }
 #endif

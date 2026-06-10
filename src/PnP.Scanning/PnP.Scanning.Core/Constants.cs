@@ -19,6 +19,10 @@
         internal const string StartSyntexFull = "syntexfull";
         internal const string StartWorkflowAnalyze = "workflowanalyze";
         internal const string StartClassicInclude = "classicinclude";
+        internal const string StartClassicExportWebPartProperties = "exportwebpartproperties";
+        internal const string StartClassicSkipUsageInformation = "skipusageinformation";
+        internal const string StartClassicSkipUserInformation = "skipuserinformation";
+        internal const string StartClassicHomePageOnly = "homepageonly";
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
         internal const string ListRunning = "running";
