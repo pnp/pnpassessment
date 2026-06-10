@@ -20,6 +20,23 @@ namespace PnP.Scanning.Core.Storage
 
         public DateTime ModifiedAt { get; set; }
 
+        // Page transformation readiness enrichment (ported from the Modernization Scanner)
+        public string Layout { get; set; }
+
+        public bool HomePage { get; set; }
+
+        public bool UncustomizedHomePage { get; set; }
+
+        public string ModifiedBy { get; set; }
+
+        public int ViewsRecent { get; set; }
+
+        public int ViewsRecentUniqueUsers { get; set; }
+
+        public int ViewsLifeTime { get; set; }
+
+        public int ViewsLifeTimeUniqueUsers { get; set; }
+
         public string RemediationCode { get; set; }
 
         public bool AddToDatabase()
