@@ -64,6 +64,22 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         (options as ClassicOptions).Extensibility = bool.Parse(property.Value);
                     }
+                    else if (property.Property == Constants.StartClassicExportWebPartProperties)
+                    {
+                        (options as ClassicOptions).ExportWebPartProperties = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == Constants.StartClassicSkipUsageInformation)
+                    {
+                        (options as ClassicOptions).SkipUsageInformation = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == Constants.StartClassicSkipUserInformation)
+                    {
+                        (options as ClassicOptions).SkipUserInformation = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == Constants.StartClassicHomePageOnly)
+                    {
+                        (options as ClassicOptions).HomePageOnly = bool.Parse(property.Value);
+                    }
                 }
             }
 #if DEBUG

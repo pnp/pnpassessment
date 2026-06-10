@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.DataProtection;
 using PnP.Core.Services;
 using PnP.Scanning.Core;
 using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
 using Spectre.Console;
@@ -34,6 +35,10 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> syntexFullOption;
         private Option<bool> workflowAnalyzeOption;
         private Option<List<ClassicComponent>> classicIncludeOption;
+        private Option<bool> classicExportWebPartPropertiesOption;
+        private Option<bool> classicSkipUsageInformationOption;
+        private Option<bool> classicSkipUserInformationOption;
+        private Option<bool> classicHomePageOnlyOption;
 
 #if DEBUG
         // Specific options for the test handler
@@ -258,13 +263,36 @@ namespace PnP.Scanning.Process.Commands
 
             classicIncludeOption = new(name: $"--{Constants.StartClassicInclude}",
                 //getDefaultValue: () => null,
-                description: "Included classic scan components")                
+                description: "Included classic scan components")
             {
                 IsRequired = false,
                 AllowMultipleArgumentsPerToken = true,
                 Arity = ArgumentArity.ZeroOrMore
             };
             cmd.AddOption(classicIncludeOption);
+
+            // These page-scan flags only make sense for a Classic assessment, so they are rejected
+            // for any other --mode (mirrors the --testnumberofsites mode guard). They are also only
+            // consumed when --mode classic (see HandleStartAsync).
+            classicExportWebPartPropertiesOption = CreateClassicFlagOption(
+                Constants.StartClassicExportWebPartProperties,
+                "Export classic web part properties (JSON) during classic page assessment");
+            cmd.AddOption(classicExportWebPartPropertiesOption);
+
+            classicSkipUsageInformationOption = CreateClassicFlagOption(
+                Constants.StartClassicSkipUsageInformation,
+                "Skip collecting classic page usage information (recent/lifetime views)");
+            cmd.AddOption(classicSkipUsageInformationOption);
+
+            classicSkipUserInformationOption = CreateClassicFlagOption(
+                Constants.StartClassicSkipUserInformation,
+                "Skip collecting classic page user information (e.g. ModifiedBy)");
+            cmd.AddOption(classicSkipUserInformationOption);
+
+            classicHomePageOnlyOption = CreateClassicFlagOption(
+                Constants.StartClassicHomePageOnly,
+                "Only assess the home page of each web during classic page assessment");
+            cmd.AddOption(classicHomePageOnlyOption);
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -300,6 +328,47 @@ namespace PnP.Scanning.Process.Commands
         }
 
         /// <summary>
+        /// Creates a boolean page-scan option that is only valid for a Classic assessment. When the
+        /// flag is supplied together with any other --mode the parse fails with a clear error,
+        /// mirroring the --testnumberofsites mode guard. Supports both switch usage (--flag) and an
+        /// explicit --flag true/false value.
+        /// </summary>
+        private Option<bool> CreateClassicFlagOption(string name, string description)
+        {
+            var option = new Option<bool>(
+                name: $"--{name}",
+                parseArgument: (result) =>
+                {
+                    var mode = result.FindResultFor(modeOption);
+                    if (mode != null && mode.GetValueOrDefault<Mode>() != Mode.Classic)
+                    {
+                        result.ErrorMessage = $"--{name} can only be used with --{Constants.StartMode} classic";
+                        return false;
+                    }
+
+                    if (result.Tokens.Count == 0)
+                    {
+                        // Switch style: "--flag" with no value means true.
+                        return true;
+                    }
+
+                    if (!bool.TryParse(result.Tokens[0].Value, out var value))
+                    {
+                        result.ErrorMessage = $"--{name} requires a true or false value";
+                        return false;
+                    }
+
+                    return value;
+                },
+                description: description)
+            {
+                IsRequired = false
+            };
+            option.SetDefaultValue(false);
+            return option;
+        }
+
+        /// <summary>
         /// https://github.com/dotnet/command-line-api/blob/main/docs/model-binding.md#more-complex-types
         /// </summary>
         /// <returns></returns>
@@ -312,6 +381,10 @@ namespace PnP.Scanning.Process.Commands
                                               , syntexFullOption
                                               , workflowAnalyzeOption
                                               , classicIncludeOption
+                                              , classicExportWebPartPropertiesOption
+                                              , classicSkipUsageInformationOption
+                                              , classicSkipUserInformationOption
+                                              , classicHomePageOnlyOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -454,15 +527,13 @@ namespace PnP.Scanning.Process.Commands
                         classicComponents = Enum.GetValues(typeof(ClassicComponent)).Cast<ClassicComponent>().ToList();
                     }
 
-                    foreach (var classicComponent in classicComponents)
-                    {
-                        start.Properties.Add(new PropertyRequest
-                        {
-                            Property = $"{classicComponent}",
-                            Type = "bool",
-                            Value = true.ToString(),
-                        });
-                    }
+                    ClassicStartRequestBuilder.AddClassicProperties(
+                        start,
+                        classicComponents,
+                        arguments.ExportWebPartProperties,
+                        arguments.SkipUsageInformation,
+                        arguments.SkipUserInformation,
+                        arguments.HomePageOnly);
                 }
 
 #if DEBUG

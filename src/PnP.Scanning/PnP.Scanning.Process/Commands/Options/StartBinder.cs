@@ -23,6 +23,10 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<bool> syntexDeepScan;
         private readonly Option<bool> workflowAnalyze;
         private readonly Option<List<ClassicComponent>> classicIncludeOption;
+        private readonly Option<bool> classicExportWebPartProperties;
+        private readonly Option<bool> classicSkipUsageInformation;
+        private readonly Option<bool> classicSkipUserInformation;
+        private readonly Option<bool> classicHomePageOnly;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
@@ -33,6 +37,10 @@ namespace PnP.Scanning.Process.Commands
                            , Option<bool> syntexDeepScanInput
                            , Option<bool> workflowAnalyzeInput
                            , Option<List<ClassicComponent>> classicIncludeOptionInput
+                           , Option<bool> classicExportWebPartPropertiesInput
+                           , Option<bool> classicSkipUsageInformationInput
+                           , Option<bool> classicSkipUserInformationInput
+                           , Option<bool> classicHomePageOnlyInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
@@ -54,6 +62,10 @@ namespace PnP.Scanning.Process.Commands
             syntexDeepScan = syntexDeepScanInput;
             workflowAnalyze = workflowAnalyzeInput;
             classicIncludeOption = classicIncludeOptionInput;
+            classicExportWebPartProperties = classicExportWebPartPropertiesInput;
+            classicSkipUsageInformation = classicSkipUsageInformationInput;
+            classicSkipUserInformation = classicSkipUserInformationInput;
+            classicHomePageOnly = classicHomePageOnlyInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -77,6 +89,10 @@ namespace PnP.Scanning.Process.Commands
                 SyntexDeepScan = bindingContext.ParseResult.GetValueForOption(syntexDeepScan),
                 WorkflowAnalyze = bindingContext.ParseResult.GetValueForOption(workflowAnalyze),
                 ClassicInclude = bindingContext.ParseResult.GetValueForOption(classicIncludeOption),
+                ExportWebPartProperties = bindingContext.ParseResult.GetValueForOption(classicExportWebPartProperties),
+                SkipUsageInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUsageInformation),
+                SkipUserInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUserInformation),
+                HomePageOnly = bindingContext.ParseResult.GetValueForOption(classicHomePageOnly),
 
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),
