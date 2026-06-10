@@ -46,9 +46,6 @@ namespace PnP.Scanning.Core.Tests.Storage
                     ViewsRecentUniqueUsers = 4,
                     ViewsLifeTime = 100,
                     ViewsLifeTimeUniqueUsers = 25,
-                    WebPartCount = 2,
-                    MappingPercentage = 50.0,
-                    UnmappedWebParts = "CustomWebPart",
                 });
 
                 context.ClassicPageWebParts.Add(new ClassicPageWebPart
@@ -96,9 +93,6 @@ namespace PnP.Scanning.Core.Tests.Storage
                 page.ViewsRecentUniqueUsers.Should().Be(4);
                 page.ViewsLifeTime.Should().Be(100);
                 page.ViewsLifeTimeUniqueUsers.Should().Be(25);
-                page.WebPartCount.Should().Be(2);
-                page.MappingPercentage.Should().Be(50.0);
-                page.UnmappedWebParts.Should().Be("CustomWebPart");
 
                 var webPart = context.ClassicPageWebParts.Single(wp =>
                     wp.ScanId == scanId && wp.PageUrl == pageUrl && wp.WebPartIndex == 0);

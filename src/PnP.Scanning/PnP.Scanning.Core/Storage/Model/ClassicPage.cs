@@ -37,12 +37,6 @@ namespace PnP.Scanning.Core.Storage
 
         public int ViewsLifeTimeUniqueUsers { get; set; }
 
-        public int WebPartCount { get; set; }
-
-        public double MappingPercentage { get; set; }
-
-        public string UnmappedWebParts { get; set; }
-
         public string RemediationCode { get; set; }
 
         public bool AddToDatabase()

@@ -521,9 +521,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ListUrl")
                         .HasColumnType("TEXT");
 
-                    b.Property<double>("MappingPercentage")
-                        .HasColumnType("REAL");
-
                     b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("TEXT");
 
@@ -542,9 +539,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<bool>("UncustomizedHomePage")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("UnmappedWebParts")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("ViewsLifeTime")
                         .HasColumnType("INTEGER");
 
@@ -555,9 +549,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ViewsRecentUniqueUsers")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("WebPartCount")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("ScanId", "SiteUrl", "WebUrl", "PageUrl");

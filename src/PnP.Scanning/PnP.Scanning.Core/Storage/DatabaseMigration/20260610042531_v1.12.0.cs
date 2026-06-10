@@ -94,13 +94,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 type: "TEXT",
                 nullable: true);
 
-            migrationBuilder.AddColumn<double>(
-                name: "MappingPercentage",
-                table: "ClassicPages",
-                type: "REAL",
-                nullable: false,
-                defaultValue: 0.0);
-
             migrationBuilder.AddColumn<string>(
                 name: "ModifiedBy",
                 table: "ClassicPages",
@@ -113,12 +106,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 type: "INTEGER",
                 nullable: false,
                 defaultValue: false);
-
-            migrationBuilder.AddColumn<string>(
-                name: "UnmappedWebParts",
-                table: "ClassicPages",
-                type: "TEXT",
-                nullable: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "ViewsLifeTime",
@@ -143,13 +130,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
             migrationBuilder.AddColumn<int>(
                 name: "ViewsRecentUniqueUsers",
-                table: "ClassicPages",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: 0);
-
-            migrationBuilder.AddColumn<int>(
-                name: "WebPartCount",
                 table: "ClassicPages",
                 type: "INTEGER",
                 nullable: false,
@@ -266,19 +246,11 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 table: "ClassicPages");
 
             migrationBuilder.DropColumn(
-                name: "MappingPercentage",
-                table: "ClassicPages");
-
-            migrationBuilder.DropColumn(
                 name: "ModifiedBy",
                 table: "ClassicPages");
 
             migrationBuilder.DropColumn(
                 name: "UncustomizedHomePage",
-                table: "ClassicPages");
-
-            migrationBuilder.DropColumn(
-                name: "UnmappedWebParts",
                 table: "ClassicPages");
 
             migrationBuilder.DropColumn(
@@ -295,10 +267,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
             migrationBuilder.DropColumn(
                 name: "ViewsRecentUniqueUsers",
-                table: "ClassicPages");
-
-            migrationBuilder.DropColumn(
-                name: "WebPartCount",
                 table: "ClassicPages");
         }
     }
