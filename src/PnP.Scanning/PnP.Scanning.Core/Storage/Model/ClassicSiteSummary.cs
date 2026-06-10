@@ -35,10 +35,6 @@
 
         public int ModernPages { get; set; }
 
-        // Page transformation readiness rollups (PagesWithWebParts, MappableWebPartPages,
-        // UnmappedWebPartPages, AvgMappingPercentage, UncustomizedHomePages) are intentionally NOT
-        // stored. Like the old Modernization Scanner, they are derived at report time by aggregating
-        // the ClassicPage / ClassicPageWebPart rows.
         public int ClassicWorkflows { get; set; }
 
         public int ClassicInfoPathForms { get; set; }
