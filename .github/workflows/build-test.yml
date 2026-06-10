@@ -1,0 +1,66 @@
+name: Build and test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      # PnP.Scanning references the PnP Core SDK projects via relative paths that expect
+      # the pnpcore repo to sit as a SIBLING of pnpassessment (..\..\..\..\pnpcore\...).
+      # Both repos are therefore checked out side by side under the workspace root.
+      - name: Checkout pnpassessment
+        uses: actions/checkout@v4
+        with:
+          path: pnpassessment
+
+      # Always build against the latest published pnpcore release for reproducibility.
+      # If no release can be resolved, fall back to pnpcore's main branch (named "master").
+      - name: Resolve latest pnpcore release tag
+        id: pnpcore_ref
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = ""
+          try { $tag = gh release view --repo pnp/pnpcore --json tagName -q .tagName } catch { $tag = "" }
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            Write-Host "No pnpcore release found - falling back to master branch"
+            $tag = "master"
+          } else {
+            Write-Host "Using pnpcore release tag: $tag"
+          }
+          "ref=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Checkout pnpcore (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: pnp/pnpcore
+          ref: ${{ steps.pnpcore_ref.outputs.ref }}
+          path: pnpcore
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore pnpassessment/src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj
+
+      - name: Test
+        run: dotnet test pnpassessment/src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=test-results.trx"
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: pnpassessment/**/TestResults/*.trx
+          if-no-files-found: ignore

@@ -85,6 +85,15 @@ namespace PnP.Scanning.Core.Storage
         {
         }
 
+        /// <summary>
+        /// Constructor accepting externally supplied options. Used by unit tests to run the
+        /// context against an in-memory SQLite connection. When options are supplied here they
+        /// already configure the provider, so <see cref="OnConfiguring"/> leaves them untouched.
+        /// </summary>
+        internal ScanContext(DbContextOptions<ScanContext> options) : base(options)
+        {
+        }
+
         internal ScanContext(Guid scanId)
         {
             var path = StorageManager.GetScanDataFolder(scanId);
@@ -97,11 +106,16 @@ namespace PnP.Scanning.Core.Storage
 
         // The following configures EF to create a Sqlite database file
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        { 
-            optionsBuilder.UseSqlite($"Data Source={DbPath}", options =>
+        {
+            // When options were supplied through the constructor (e.g. an in-memory SQLite
+            // connection in unit tests) the provider is already configured - don't override it.
+            if (!optionsBuilder.IsConfigured)
             {
-                options.MigrationsAssembly(Assembly.GetExecutingAssembly().FullName);
-            });
+                optionsBuilder.UseSqlite($"Data Source={DbPath}", options =>
+                {
+                    options.MigrationsAssembly(Assembly.GetExecutingAssembly().FullName);
+                });
+            }
 
             base.OnConfiguring(optionsBuilder);
         }
