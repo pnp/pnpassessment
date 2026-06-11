@@ -214,6 +214,80 @@ namespace PnP.Scanning.Core.Scanners
             return ToRows(page, ordered, exportWebPartProperties);
         }
 
+        /// <summary>
+        /// Extracts the web part inventory for a publishing page using its <c>LimitedWebPartManager</c>.
+        /// Ported from the legacy <c>PublishingPage.GetWebPartsForScanner</c> (the scanner-oriented variant,
+        /// not the transform-oriented <c>Analyze</c>): it inventories every web part placed in the page's
+        /// web part zones. Unlike <see cref="ExtractFromWebPartPageAsync"/> there is no page-layout / row /
+        /// column mapping (the legacy scanner leaves the layout at <c>PublishingPage_AutoDetect</c> and does
+        /// not position the parts) and no TitleBar exclusion — every web part the manager returns is recorded.
+        /// </summary>
+        /// <remarks>
+        /// SPO-only, matching T5: the on-premises web-services fallback
+        /// (<c>LoadPublishingPageFromWebServices</c> / <c>ExtractWebPartDocumentViaWebServicesFromPage</c>) is
+        /// intentionally not ported. Web parts placed outside a web part zone (e.g. directly in a field control
+        /// via SharePoint Designer) are not surfaced by the web part manager and are therefore not captured,
+        /// matching the legacy scanner behaviour.
+        /// </remarks>
+        /// <param name="csomContext">CSOM context for the web (already throttle-aware).</param>
+        /// <param name="page">The discovered classic page the rows belong to.</param>
+        /// <param name="exportWebPartProperties">When set, the web part properties are serialized to JSON.</param>
+        internal static async Task<List<ClassicPageWebPart>> ExtractFromPublishingPageAsync(ClientContext csomContext, ClassicPage page,
+                                                                                            bool exportWebPartProperties)
+        {
+            var publishingPage = csomContext.Web.GetFileByServerRelativeUrl(page.PageUrl);
+
+            var limitedWPManager = publishingPage.GetLimitedWebPartManager(PersonalizationScope.Shared);
+            csomContext.Load(limitedWPManager);
+
+            var webParts = csomContext.LoadQuery(limitedWPManager.WebParts.IncludeWithDefaultProperties(
+                wp => wp.Id, wp => wp.ZoneId, wp => wp.WebPart.ExportMode, wp => wp.WebPart.Title,
+                wp => wp.WebPart.ZoneIndex, wp => wp.WebPart.IsClosed, wp => wp.WebPart.Hidden, wp => wp.WebPart.Properties));
+            await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+
+            // Export the web part XML for the parts that allow it (gives the most reliable type).
+            var exportedXml = new Dictionary<Guid, ClientResult<string>>();
+            bool isDirty = false;
+            foreach (var foundWebPart in webParts)
+            {
+                if (foundWebPart.WebPart.ExportMode == WebPartExportMode.All)
+                {
+                    exportedXml[foundWebPart.Id] = limitedWPManager.ExportWebPart(foundWebPart.Id);
+                    isDirty = true;
+                }
+            }
+            if (isDirty)
+            {
+                await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+            }
+
+            var entities = new List<WebPartEntity>();
+            // Process in zone-index order, as the legacy scanner does, so the resulting row order is stable.
+            foreach (var foundWebPart in webParts.OrderBy(wp => wp.WebPart.ZoneIndex))
+            {
+                exportedXml.TryGetValue(foundWebPart.Id, out var xml);
+                string webPartType = xml != null ? GetTypeFromXml(xml.Value) : GetTypeFromProperties(foundWebPart.WebPart.Properties.FieldValues);
+
+                entities.Add(new WebPartEntity
+                {
+                    Title = foundWebPart.WebPart.Title,
+                    Type = webPartType,
+                    Id = foundWebPart.Id,
+                    ServerControlId = foundWebPart.Id.ToString(),
+                    // The legacy scanner does not map publishing zones to a row/column grid (that is layout
+                    // detection, deferred to T7); only the zone index is meaningful here.
+                    Order = foundWebPart.WebPart.ZoneIndex,
+                    ZoneId = foundWebPart.ZoneId,
+                    ZoneIndex = (uint)foundWebPart.WebPart.ZoneIndex,
+                    IsClosed = foundWebPart.WebPart.IsClosed,
+                    Hidden = foundWebPart.WebPart.Hidden,
+                    Properties = ToStringProperties(foundWebPart.WebPart.Properties.FieldValues),
+                });
+            }
+
+            return ToRows(page, entities, exportWebPartProperties);
+        }
+
         private static List<ClassicPageWebPart> ToRows(ClassicPage page, List<WebPartEntity> entities, bool exportWebPartProperties)
         {
             var rows = new List<ClassicPageWebPart>();
@@ -272,7 +346,8 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // Determines the web part type from its exported XML. Ported from BasePage.GetType.
-        private static string GetTypeFromXml(string webPartXml)
+        // Internal (not private) so the publishing/web-part type detection has its own unit tests.
+        internal static string GetTypeFromXml(string webPartXml)
         {
             string type = "Unknown";
 
@@ -295,7 +370,8 @@ namespace PnP.Scanning.Core.Scanners
 
         // Determines the web part type by detecting it from the available properties. Ported from
         // BasePage.GetTypeFromProperties (online code path; the on-premises legacy branch is not ported).
-        private static string GetTypeFromProperties(IDictionary<string, object> properties)
+        // Internal (not private) so the publishing/web-part type detection has its own unit tests.
+        internal static string GetTypeFromProperties(IDictionary<string, object> properties)
         {
             if (HasAll(properties, "ListUrl", "ListId", "Xsl", "JSLink", "ShowTimelineIfAvailable")) return XsltListViewType;
             if (HasAll(properties, "ListViewXml", "ListName", "ListId", "ViewContentTypeId", "PageType")) return ListViewType;
