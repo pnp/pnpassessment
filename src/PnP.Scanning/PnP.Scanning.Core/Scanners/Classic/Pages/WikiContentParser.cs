@@ -11,7 +11,10 @@ namespace PnP.Scanning.Core.Scanners
     /// Pure (no CSOM) parser of a classic wiki page's <c>WikiField</c> HTML. It walks the wiki layout
     /// table and extracts:
     /// <list type="bullet">
-    /// <item><description>the inline <c>WikiText</c> blocks as fully resolved <see cref="WebPartEntity"/> records, and</description></item>
+    /// <item><description>the inline <c>WikiText</c> blocks as fully resolved <see cref="WebPartEntity"/> records,</description></item>
+    /// <item><description>the embedded media (images and iframes) as fully resolved <c>WikiImagePart</c> /
+    /// <c>WikiVideoPart</c> <see cref="WebPartEntity"/> records — these come straight from the HTML (no
+    /// CSOM round-trip), and</description></item>
     /// <item><description>placeholders (<see cref="WikiWebPartPlaceholder"/>) for the real web parts embedded in the wiki —
     /// these carry the control id + position only; the actual web part type/title/properties must be
     /// resolved against the live page via CSOM (<c>LimitedWebPartManager</c>), which is deferred to the
@@ -20,16 +23,32 @@ namespace PnP.Scanning.Core.Scanners
     /// Ported from the legacy SharePoint Modernization Scanner
     /// (<c>SharePointPnP.Modernization.Framework\Pages\BasePage.AnalyzeWikiContentBlock</c> +
     /// <c>WikiPage.Analyze</c>), with the CSOM and page-layout detection (a separate task) stripped out so
-    /// the HTML parsing is unit-testable on its own.
+    /// the HTML parsing is unit-testable on its own. The embedded-media split follows the newer
+    /// PnP.Framework 1.0.2111.0 wiki analyzer (<c>WikiHtmlTransformator.TransformPlusSplit</c>): an
+    /// <c>&lt;img&gt;</c> becomes a <c>WikiImagePart</c> and an <c>&lt;iframe&gt;</c> becomes a
+    /// <c>WikiVideoPart</c> instead of being swallowed into the surrounding text block (the gap the legacy
+    /// 1.0.1911.0 walk left, which under-counted these as mappable parts). That analyzer only emits those
+    /// two media types from wiki content; <c>WikiEmbedPart</c> (a DocumentEmbed) is never produced by the
+    /// wiki walk, so it is intentionally not emitted here.
     /// </summary>
     internal static class WikiContentParser
     {
         // Marker inserted where a web part div used to be, so surrounding text can be split around it.
         private const string WebPartMarkerString = "[[WebPartMarker]]";
 
+        // CSS class of the throw-away span we drop in place of an embedded image/iframe so the
+        // surrounding wiki text can be recovered as separate text parts around the media. Matches the
+        // marker used by the PnP.Framework wiki analyzer.
+        private const string SplitMarkerClass = "split";
+
         // The fake "type" used for the wiki text blocks; matches the legacy WebParts.WikiText constant so
         // the mapping lookup (which knows this type as a ClientSideText mapping) treats it as mappable.
         internal const string WikiTextPartType = "SharePointPnP.Modernization.WikiTextPart";
+
+        // The fake "types" used for media embedded in wiki text; match the WebParts.WikiImage /
+        // WebParts.WikiVideo constants so the mapping lookup credits them as mappable (Image / ContentEmbed).
+        internal const string WikiImagePartType = "SharePointPnP.Modernization.WikiImagePart";
+        internal const string WikiVideoPartType = "SharePointPnP.Modernization.WikiVideoPart";
 
         // Pulls the server side control id out of a web part box (e.g. id="div_8c4f...-...." ).
         private static readonly Regex RegexClientIds = new(@"id=\""div_(?<ControlId>(\w|\-)+)", RegexOptions.Compiled);
@@ -79,10 +98,11 @@ namespace PnP.Scanning.Core.Scanners
             // Somehow the wiki was not standard formatted (no layout table we could walk): wrap the whole
             // content in a single text block so the page still records something. Matches the legacy
             // fallback, evaluated here only against the text/placeholders we could extract (the CSOM web
-            // part resolution happens later, so we key off "nothing found at all").
-            if (result.Placeholders.Count == 0 && result.TextParts.Count == 0)
+            // part resolution happens later, so we key off "nothing found at all"). Routed through the
+            // media-aware flush so an embedded image/iframe on a non-standard page is still split out.
+            if (result.Placeholders.Count == 0 && result.TextParts.Count == 0 && result.MediaParts.Count == 0)
             {
-                result.TextParts.Add(CreateWikiTextPart(wikiFieldHtml, 1, 1, 1));
+                FlushTextBlock(result, parser, wikiFieldHtml, 1, 1, 0);
             }
 
             return result;
@@ -127,11 +147,10 @@ namespace PnP.Scanning.Core.Scanners
                         textContent.AppendLine(extraTextBeforeWebPart);
                     }
 
-                    // first insert text part (if it was available)
+                    // first insert text part (if it was available), splitting out any embedded media
                     if (!string.IsNullOrEmpty(textContent.ToString()))
                     {
-                        order++;
-                        result.TextParts.Add(CreateWikiTextPart(textContent.ToString(), rowCount, colCount, order));
+                        order = FlushTextBlock(result, parser, textContent.ToString(), rowCount, colCount, order);
                         textContent.Clear();
                     }
 
@@ -201,10 +220,183 @@ namespace PnP.Scanning.Core.Scanners
             // there was only one text part
             if (!string.IsNullOrEmpty(textContent.ToString()))
             {
-                // insert text part to the web part collection
-                order++;
-                result.TextParts.Add(CreateWikiTextPart(textContent.ToString(), rowCount, colCount, order));
+                // insert text part to the web part collection, splitting out any embedded media
+                order = FlushTextBlock(result, parser, textContent.ToString(), rowCount, colCount, order);
             }
+        }
+
+        /// <summary>
+        /// Emits the accumulated wiki text as one or more <c>WikiText</c> parts, pulling any embedded
+        /// images / iframes out into their own fully-resolved media parts (<c>WikiImagePart</c> /
+        /// <c>WikiVideoPart</c>) so they are credited as mappable web parts rather than swallowed into the
+        /// text. Text and media are emitted in document order; <paramref name="order"/> is advanced for
+        /// each part and the final value is returned. With no embedded media the behaviour is identical to
+        /// the original single-text-block flush.
+        /// </summary>
+        private static int FlushTextBlock(WikiContentParseResult result, HtmlParser parser, string html,
+                                          int row, int col, int order)
+        {
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return order;
+            }
+
+            using var document = parser.ParseDocument(html);
+
+            // Embedded media nodes in document order — the same set the PnP.Framework wiki analyzer treats
+            // as standalone image/video parts.
+            var mediaElements = document.All
+                .Where(e => e is IHtmlImageElement || e is IHtmlInlineFrameElement)
+                .ToList();
+
+            if (mediaElements.Count == 0)
+            {
+                // No embedded media: a single text block, exactly like the legacy flush.
+                order++;
+                result.TextParts.Add(CreateWikiTextPart(html, row, col, order));
+                return order;
+            }
+
+            // Build a media part for each embedded node and replace it (or its wrapping anchor) with a
+            // split marker so the surrounding wiki text can be recovered as separate text parts around it.
+            var mediaParts = new List<WebPartEntity>(mediaElements.Count);
+            foreach (var element in mediaElements)
+            {
+                mediaParts.Add(CreateMediaPart(element));
+
+                var splitter = document.CreateElement("span");
+                splitter.ClassName = SplitMarkerClass;
+
+                var nodeToReplace = element;
+                if (element is IHtmlImageElement && element.ParentElement != null &&
+                    element.ParentElement.TagName.Equals("A", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    nodeToReplace = element.ParentElement;
+                }
+                nodeToReplace.ParentElement?.ReplaceChild(splitter, nodeToReplace);
+            }
+
+            // Split the leftover html into the text segments that sat between the media nodes, then
+            // interleave text + media in document order: text before media[i], then media[i], ... trailing text.
+            string leftover = document.Body?.InnerHtml ?? string.Empty;
+            var segments = leftover.Split(new[] { $"<span class=\"{SplitMarkerClass}\"></span>" }, StringSplitOptions.None);
+
+            for (int i = 0; i < mediaParts.Count; i++)
+            {
+                if (i < segments.Length)
+                {
+                    order = AddTextSegment(result, parser, segments[i], row, col, order);
+                }
+
+                order++;
+                var media = mediaParts[i];
+                media.Row = row;
+                media.Column = col;
+                media.Order = order;
+                result.MediaParts.Add(media);
+            }
+
+            if (segments.Length > mediaParts.Count)
+            {
+                order = AddTextSegment(result, parser, segments[mediaParts.Count], row, col, order);
+            }
+
+            return order;
+        }
+
+        // Emits a single WikiText part for a leftover html segment, after re-parsing it to repair the
+        // tag boundaries broken by the marker split and to drop segments that hold no visible text.
+        private static int AddTextSegment(WikiContentParseResult result, HtmlParser parser, string segmentHtml,
+                                          int row, int col, int order)
+        {
+            if (string.IsNullOrWhiteSpace(segmentHtml))
+            {
+                return order;
+            }
+
+            using var document = parser.ParseDocument(segmentHtml);
+            var body = document.Body;
+            if (body == null || string.IsNullOrWhiteSpace(body.TextContent))
+            {
+                return order;
+            }
+
+            order++;
+            result.TextParts.Add(CreateWikiTextPart(body.InnerHtml, row, col, order));
+            return order;
+        }
+
+        // Builds a fully-resolved media WebPartEntity from an embedded image or iframe node, mirroring the
+        // property projection of the PnP.Framework wiki analyzer (img -> WikiImagePart, iframe -> WikiVideoPart).
+        // Row/Column/Order are filled in by the caller. No CSOM is involved — everything comes from the HTML.
+        private static WebPartEntity CreateMediaPart(IElement element)
+        {
+            if (element is IHtmlImageElement image)
+            {
+                var properties = new Dictionary<string, string>();
+                if (image.Source != null)
+                {
+                    properties["ImageUrl"] = image.Source.Replace("about://", "");
+                }
+
+                var alt = element.GetAttribute("alt");
+                if (!string.IsNullOrEmpty(alt))
+                {
+                    properties["AlternativeText"] = alt;
+                }
+
+                // An image wrapped in an anchor carries the link as the modern image web part's anchor.
+                if (element.ParentElement != null &&
+                    element.ParentElement.TagName.Equals("A", StringComparison.InvariantCultureIgnoreCase) &&
+                    element.ParentElement.HasAttribute("href"))
+                {
+                    properties["Anchor"] = element.ParentElement.GetAttribute("href");
+                }
+
+                return new WebPartEntity
+                {
+                    Title = "Image in wiki text",
+                    Type = WikiImagePartType,
+                    Id = Guid.Empty,
+                    Properties = properties,
+                };
+            }
+
+            var iframe = (IHtmlInlineFrameElement)element;
+            var videoProperties = new Dictionary<string, string>
+            {
+                { "IFrameEmbed", element.OuterHtml },
+            };
+            if (iframe.Source != null)
+            {
+                videoProperties["Source"] = iframe.Source;
+            }
+
+            var allowFullScreen = element.GetAttribute("allowfullscreen");
+            if (allowFullScreen != null && bool.TryParse(allowFullScreen, out bool allowFullScreenValue))
+            {
+                videoProperties["AllowFullScreen"] = allowFullScreenValue.ToString();
+            }
+
+            var width = element.GetAttribute("width");
+            if (width != null)
+            {
+                videoProperties["Width"] = width;
+            }
+
+            var height = element.GetAttribute("height");
+            if (height != null)
+            {
+                videoProperties["Height"] = height;
+            }
+
+            return new WebPartEntity
+            {
+                Title = "Video in wiki text",
+                Type = WikiVideoPartType,
+                Id = Guid.Empty,
+                Properties = videoProperties,
+            };
         }
 
         /// <summary>
@@ -366,6 +558,13 @@ namespace PnP.Scanning.Core.Scanners
         /// The inline wiki text blocks, already fully resolved as <see cref="WebPartEntity"/> records.
         /// </summary>
         public List<WebPartEntity> TextParts { get; } = new();
+
+        /// <summary>
+        /// The media (images / iframes) embedded directly in the wiki content, already fully resolved as
+        /// <c>WikiImagePart</c> / <c>WikiVideoPart</c> <see cref="WebPartEntity"/> records. Like the text
+        /// blocks these need no CSOM round-trip — they are read straight from the HTML.
+        /// </summary>
+        public List<WebPartEntity> MediaParts { get; } = new();
     }
 
     /// <summary>

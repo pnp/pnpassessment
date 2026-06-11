@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Scanners.WebPartMapping;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Scanners.Pages
@@ -162,6 +163,148 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             result.TextParts[0].Row.Should().Be(1);
             result.TextParts[0].Column.Should().Be(1);
             result.TextParts[0].Order.Should().Be(1);
+        }
+
+        // --- T5a: embedded media (images / iframes) split out as their own mappable parts ----------------
+
+        // A one-row, one-column layout with text, an embedded image, then more text.
+        private const string ImageInWikiHtml = @"
+            <div class=""ExternalClassABC"">
+              <table id=""layoutsTable"">
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class=""ms-rte-layoutszone-outer"">
+                        <div class=""ms-rte-layoutszone-inner"">
+                          <p>Before the picture</p>
+                          <img src=""https://contoso.example/sites/team/SiteAssets/diagram.png"" alt=""Architecture diagram"" />
+                          <p>After the picture</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>";
+
+        // A one-row, one-column layout with text followed by an embedded iframe (e.g. a YouTube embed).
+        private const string VideoInWikiHtml = @"
+            <div class=""ExternalClassABC"">
+              <table id=""layoutsTable"">
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class=""ms-rte-layoutszone-outer"">
+                        <div class=""ms-rte-layoutszone-inner"">
+                          <p>Watch this:</p>
+                          <iframe src=""https://www.youtube.com/embed/dQw4w9WgXcQ"" width=""640"" height=""360"" allowfullscreen=""true""></iframe>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>";
+
+        // An image wrapped in an anchor — the modern image web part carries the link as its anchor.
+        private const string AnchorWrappedImageHtml = @"
+            <div class=""ExternalClassABC"">
+              <table id=""layoutsTable"">
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class=""ms-rte-layoutszone-outer"">
+                        <div class=""ms-rte-layoutszone-inner"">
+                          <a href=""https://contoso.example/landing""><img src=""https://contoso.example/sites/team/SiteAssets/banner.png"" alt=""Banner"" /></a>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>";
+
+        [Fact]
+        public void WikiHtml_EmbeddedImage_EmitsWikiImagePart()
+        {
+            var result = WikiContentParser.Parse(ImageInWikiHtml);
+
+            // The image is emitted as its own fully-resolved media part (no CSOM placeholder needed).
+            result.Placeholders.Should().BeEmpty();
+            result.MediaParts.Should().ContainSingle();
+
+            var image = result.MediaParts[0];
+            image.Type.Should().Be(WikiContentParser.WikiImagePartType);
+            image.Row.Should().Be(1);
+            image.Column.Should().Be(1);
+            // Interleaved order: text (1), image (2), text (3).
+            image.Order.Should().Be(2);
+            image.Properties.Should().ContainKey("ImageUrl");
+            image.Properties["ImageUrl"].Should().Contain("diagram.png");
+            image.Properties["AlternativeText"].Should().Be("Architecture diagram");
+
+            // The image is no longer swallowed into the surrounding wiki text...
+            result.TextParts.Should().HaveCount(2);
+            result.TextParts.Should().OnlyContain(t =>
+                !t.Properties["Text"].Contains("diagram.png") && !t.Properties["Text"].Contains("<img"));
+
+            // ...and the text on either side of it still survives as its own block(s).
+            string.Join(" ", result.TextParts.Select(t => t.Properties["Text"]))
+                .Should().Contain("Before the picture").And.Contain("After the picture");
+        }
+
+        [Fact]
+        public void WikiHtml_EmbeddedIframe_EmitsWikiVideoPart()
+        {
+            // The PnP.Framework wiki analyzer treats an embedded iframe as a "video in wiki text" part
+            // (mapped to a modern ContentEmbed); it never emits a WikiEmbedPart from the wiki walk.
+            var result = WikiContentParser.Parse(VideoInWikiHtml);
+
+            result.Placeholders.Should().BeEmpty();
+            result.MediaParts.Should().ContainSingle();
+
+            var video = result.MediaParts[0];
+            video.Type.Should().Be(WikiContentParser.WikiVideoPartType);
+            video.Row.Should().Be(1);
+            video.Column.Should().Be(1);
+            video.Properties["Source"].Should().Contain("youtube.com/embed");
+            video.Properties.Should().ContainKey("IFrameEmbed");
+            video.Properties["IFrameEmbed"].Should().Contain("<iframe");
+            video.Properties["AllowFullScreen"].Should().Be("True");
+            video.Properties["Width"].Should().Be("640");
+            video.Properties["Height"].Should().Be("360");
+
+            // The iframe markup is not retained inside any wiki text block.
+            result.TextParts.Should().OnlyContain(t => !t.Properties["Text"].Contains("<iframe"));
+        }
+
+        [Fact]
+        public void WikiHtml_AnchorWrappedImage_EmitsImagePartWithAnchor()
+        {
+            var result = WikiContentParser.Parse(AnchorWrappedImageHtml);
+
+            result.MediaParts.Should().ContainSingle();
+            var image = result.MediaParts[0];
+            image.Type.Should().Be(WikiContentParser.WikiImagePartType);
+            image.Properties["ImageUrl"].Should().Contain("banner.png");
+            image.Properties["Anchor"].Should().Be("https://contoso.example/landing");
+
+            // The anchor + image is fully removed from the text; no text part holds the markup (the
+            // image was the only content, so there may be no surviving text part at all).
+            result.TextParts
+                .Where(t => t.Properties["Text"].Contains("<img") || t.Properties["Text"].Contains("banner.png"))
+                .Should().BeEmpty();
+        }
+
+        [Fact]
+        public void WikiHtml_EmbeddedMediaTypes_AreMappable()
+        {
+            // Regression tie-back to T4: the media types the parser emits must be recognized as mappable
+            // by the embedded webpartmapping.xml, otherwise they would not be credited in the mapping %.
+            var manager = new WebPartMappingManager();
+
+            manager.IsMappable(WikiContentParser.WikiImagePartType).Should().BeTrue();
+            manager.IsMappable(WikiContentParser.WikiVideoPartType).Should().BeTrue();
         }
     }
 }

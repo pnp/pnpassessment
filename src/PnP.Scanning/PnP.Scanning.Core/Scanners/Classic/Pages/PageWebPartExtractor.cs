@@ -131,10 +131,11 @@ namespace PnP.Scanning.Core.Scanners
         internal static async Task<List<ClassicPageWebPart>> ExtractFromWikiPageAsync(ClientContext csomContext, ClassicPage page,
                                                                                       string wikiFieldHtml, bool exportWebPartProperties)
         {
-            // Pure HTML parsing: text blocks + placeholders for the embedded web parts.
+            // Pure HTML parsing: text blocks + embedded media parts + placeholders for the embedded web parts.
             var parsed = WikiContentParser.Parse(wikiFieldHtml);
 
             var entities = new List<WebPartEntity>(parsed.TextParts);
+            entities.AddRange(parsed.MediaParts);
 
             if (parsed.Placeholders.Count > 0)
             {
