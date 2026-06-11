@@ -20,6 +20,7 @@ namespace PnP.Scanning.Core.Scanners
         private const string ContentTypeIdField = "ContentTypeId";
         private const string WikiField = "WikiField";
         private const string ModifiedField = "Modified";
+        private const string ModifiedByField = "Editor";
         private const string CreatedField = "Created";
         private const string ClientSideApplicationIdField = "ClientSideApplicationId";
         private const string TitleField = "Title";
@@ -32,6 +33,10 @@ namespace PnP.Scanning.Core.Scanners
         internal const string ASPXPage = "ASPXPage";
         internal const string PublishingPage = "PublishingPage";
         internal const string BlogPage = "BlogPage";
+        internal const string DelveBlogPage = "DelveBlogPage";
+
+        // File type value identifying a Delve blog page (point publishing)
+        private const string DelveBlogFileType = "pointpub";
 
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext)
         {
@@ -39,6 +44,9 @@ namespace PnP.Scanning.Core.Scanners
             List<ClassicPage> pagesList = new();
             int modernPageCounter = 0;
             HashSet<string> remediationCodes = new();
+
+            // Page ModifiedBy is a user lookup; skip it when user information is not wanted.
+            bool skipUserInformation = ((ClassicScanner)scannerBase).Options.SkipUserInformation;
 
             var lists = ScannerBase.CleanLoadedLists(context);
 
@@ -67,6 +75,7 @@ namespace PnP.Scanning.Core.Scanners
                                 ListTitle = blogList.Title,
                                 ListId = blogList.Id,
                                 ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
+                                ModifiedBy = GetModifiedBy(listItem.Values, skipUserInformation),
                                 PageType = BlogPage,
                                 RemediationCode = RemediationCodes.CP4.ToString(),
                             });
@@ -80,14 +89,14 @@ namespace PnP.Scanning.Core.Scanners
                       scannerBase.WebTemplate == "SRCHCEN#0" || scannerBase.WebTemplate == "CMSPUBLISHING#0") &&
                      sitePublishingEnabled && webPublishingEnabled)
             {
-                await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes).ConfigureAwait(false);
+                await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes, skipUserInformation).ConfigureAwait(false);
             }
             else
             {
                 // A team site can also have the publishing features enabled
                 if (sitePublishingEnabled && webPublishingEnabled)
                 {
-                    await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes).ConfigureAwait(false);
+                    await QueryPublishingPagesAsync(scannerBase, pagesList, lists, remediationCodes, skipUserInformation).ConfigureAwait(false);
                 }
 
                 // Check for the regular pages library
@@ -112,6 +121,7 @@ namespace PnP.Scanning.Core.Scanners
                                     ListTitle = sitePagesLibrary.Title,
                                     ListId = sitePagesLibrary.Id,
                                     ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
+                                    ModifiedBy = GetModifiedBy(listItem.Values, skipUserInformation),
                                     PageType = GetPageType(listItem)
                                 };
 
@@ -183,7 +193,7 @@ namespace PnP.Scanning.Core.Scanners
                                                                    modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
         }
 
-        private static async Task QueryPublishingPagesAsync(ScannerBase scannerBase, List<ClassicPage> pagesList, List<IList> lists, HashSet<string> remediationCodes)
+        private static async Task QueryPublishingPagesAsync(ScannerBase scannerBase, List<ClassicPage> pagesList, List<IList> lists, HashSet<string> remediationCodes, bool skipUserInformation)
         {
             var pagesLibrary = lists.FirstOrDefault(l => l.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.PublishingPagesLibrary);
             if (pagesLibrary != null)
@@ -204,6 +214,7 @@ namespace PnP.Scanning.Core.Scanners
                             ListTitle = pagesLibrary.Title,
                             ListId = pagesLibrary.Id,
                             ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
+                            ModifiedBy = GetModifiedBy(listItem.Values, skipUserInformation),
                             PageType = PublishingPage,
                             RemediationCode = RemediationCodes.CP3.ToString(),
                         });
@@ -278,6 +289,7 @@ namespace PnP.Scanning.Core.Scanners
                     <FieldRef Name='{FileLeafRefField}' />
                     <FieldRef Name='{FileTypeField}' />
                     <FieldRef Name='{ModifiedField}' />
+                    <FieldRef Name='{ModifiedByField}' />
                     <FieldRef Name='{CreatedField}' />
                     <FieldRef Name='{TitleField}' />
                     <FieldRef Name='{BSNField}' />
@@ -296,9 +308,14 @@ namespace PnP.Scanning.Core.Scanners
 
         private static T GetFieldValue<T>(IListItem listItem, string fieldName, T defaultValue = default)
         {
-            if (listItem.Values.ContainsKey(fieldName) && listItem.Values[fieldName] != null)
+            return GetFieldValue(listItem.Values, fieldName, defaultValue);
+        }
+
+        private static T GetFieldValue<T>(IDictionary<string, object> fieldValues, string fieldName, T defaultValue = default)
+        {
+            if (fieldValues.ContainsKey(fieldName) && fieldValues[fieldName] != null)
             {
-                return (T)listItem.Values[fieldName];
+                return (T)fieldValues[fieldName];
             }
 
             return defaultValue;
@@ -306,22 +323,33 @@ namespace PnP.Scanning.Core.Scanners
 
         private static string GetPageType(IListItem listItem)
         {
-            if (GetFieldValue(listItem, HtmlFileTypeField, string.Empty) == "SharePoint.WebPartPage.Document")
+            return GetPageType(listItem.Values);
+        }
+
+        // Pure classification over the raw field values (no CSOM) so it is unit-testable.
+        internal static string GetPageType(IDictionary<string, object> fieldValues)
+        {
+            if (GetFieldValue(fieldValues, HtmlFileTypeField, string.Empty) == "SharePoint.WebPartPage.Document")
             {
                 return WebPartPage;
             }
 
-            if (GetFieldValue(listItem, ClientSideApplicationIdField, string.Empty).Equals($"{{{FeatureId_Web_ModernPage}}}", StringComparison.InvariantCultureIgnoreCase))
+            if (GetFieldValue(fieldValues, ClientSideApplicationIdField, string.Empty).Equals($"{{{FeatureId_Web_ModernPage}}}", StringComparison.InvariantCultureIgnoreCase))
             {
                 return ModernPage;
             }
 
-            if (GetFieldValue<string>(listItem, WikiField) != null)
+            if (GetFieldValue<string>(fieldValues, WikiField) != null)
             {
                 return WikiPage;
             }
 
-            if (GetFieldValue<string>(listItem, BSNField) != "")
+            if (GetFieldValue(fieldValues, FileTypeField, string.Empty).Equals(DelveBlogFileType, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return DelveBlogPage;
+            }
+
+            if (GetFieldValue<string>(fieldValues, BSNField) != "")
             {
                 return ASPXPage;
             }
@@ -329,6 +357,24 @@ namespace PnP.Scanning.Core.Scanners
             {
                 return WikiPage;
             }
+        }
+
+        // Pure extraction of the page "Modified By" (no CSOM) so it is unit-testable.
+        // Parity with the legacy scanner's ListItemExtensions.LastModifiedBy: prefer the account
+        // email, falling back to the lookup display value when no email is present.
+        internal static string GetModifiedBy(IDictionary<string, object> fieldValues, bool skipUserInformation)
+        {
+            if (skipUserInformation)
+            {
+                return null;
+            }
+
+            if (fieldValues.TryGetValue(ModifiedByField, out object value) && value is IFieldUserValue user)
+            {
+                return !string.IsNullOrEmpty(user.Email) ? user.Email : user.LookupValue;
+            }
+
+            return null;
         }
     }
 }
