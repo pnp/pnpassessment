@@ -72,22 +72,23 @@ namespace PnP.Scanning.Core.Tests.Scanners
         }
 
         [Fact]
-        public void ModifiedBy_EditorField_ParsesDisplayName()
+        public void ModifiedBy_EditorField_ReturnsEmail()
         {
+            // Parity with legacy LastModifiedBy: the account email wins when present.
             var fields = new Dictionary<string, object>
             {
-                { ModifiedByField, new FakeUserValue(lookupValue: "Jane Doe") },
+                { ModifiedByField, new FakeUserValue(email: "jane.doe@contoso.com", lookupValue: "Jane Doe") },
             };
 
-            PageScanComponent.GetModifiedBy(fields, skipUserInformation: false).Should().Be("Jane Doe");
+            PageScanComponent.GetModifiedBy(fields, skipUserInformation: false).Should().Be("jane.doe@contoso.com");
         }
 
         [Fact]
-        public void ModifiedBy_EditorField_FallsBackToTitle_WhenLookupValueEmpty()
+        public void ModifiedBy_EditorField_FallsBackToLookupValue_WhenEmailEmpty()
         {
             var fields = new Dictionary<string, object>
             {
-                { ModifiedByField, new FakeUserValue(lookupValue: "", title: "John Smith") },
+                { ModifiedByField, new FakeUserValue(email: "", lookupValue: "John Smith") },
             };
 
             PageScanComponent.GetModifiedBy(fields, skipUserInformation: false).Should().Be("John Smith");
@@ -98,7 +99,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         {
             var fields = new Dictionary<string, object>
             {
-                { ModifiedByField, new FakeUserValue(lookupValue: "Jane Doe") },
+                { ModifiedByField, new FakeUserValue(email: "jane.doe@contoso.com", lookupValue: "Jane Doe") },
             };
 
             PageScanComponent.GetModifiedBy(fields, skipUserInformation: true).Should().BeNull();
@@ -116,8 +117,9 @@ namespace PnP.Scanning.Core.Tests.Scanners
         /// </summary>
         private sealed class FakeUserValue : IFieldUserValue
         {
-            public FakeUserValue(string lookupValue, string title = null)
+            public FakeUserValue(string email = null, string lookupValue = null, string title = null)
             {
+                Email = email;
                 LookupValue = lookupValue;
                 Title = title;
             }
@@ -134,7 +136,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
 
             public ISharePointPrincipal Principal { get; set; }
 
-            public string Email => null;
+            public string Email { get; }
 
             public string Sip => null;
 

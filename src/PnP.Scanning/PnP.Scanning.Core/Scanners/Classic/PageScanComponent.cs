@@ -359,7 +359,9 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        // Pure extraction of the page "Modified By" display name (no CSOM) so it is unit-testable.
+        // Pure extraction of the page "Modified By" (no CSOM) so it is unit-testable.
+        // Parity with the legacy scanner's ListItemExtensions.LastModifiedBy: prefer the account
+        // email, falling back to the lookup display value when no email is present.
         internal static string GetModifiedBy(IDictionary<string, object> fieldValues, bool skipUserInformation)
         {
             if (skipUserInformation)
@@ -369,8 +371,7 @@ namespace PnP.Scanning.Core.Scanners
 
             if (fieldValues.TryGetValue(ModifiedByField, out object value) && value is IFieldUserValue user)
             {
-                // For user fields loaded via list data stream the display name lands in LookupValue (and Title).
-                return !string.IsNullOrEmpty(user.LookupValue) ? user.LookupValue : user.Title;
+                return !string.IsNullOrEmpty(user.Email) ? user.Email : user.LookupValue;
             }
 
             return null;
