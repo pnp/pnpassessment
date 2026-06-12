@@ -43,6 +43,10 @@ namespace PnP.Scanning.Core.Scanners
 
         private const string UnsupportedWebPartType = "Unsupported Web Part Type";
 
+        // The publishing page list item field that holds the page layout reference (a URL field whose
+        // Description is the layout's friendly name). Ported from the legacy Constants.PublishingPageLayoutField.
+        private const string PublishingPageLayoutField = "PublishingPageLayout";
+
         /// <summary>
         /// Extracts the web part inventory for a web part page using its <c>LimitedWebPartManager</c>.
         /// </summary>
@@ -67,6 +71,7 @@ namespace PnP.Scanning.Core.Scanners
             await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
             var layout = GetWebPartPageLayout(pageProperties);
+            page.Layout = PageLayoutDetector.ToLayoutString(layout);
 
             // Export the web part XML for the parts that allow it (gives the most reliable type).
             var exportedXml = new Dictionary<Guid, ClientResult<string>>();
@@ -133,6 +138,9 @@ namespace PnP.Scanning.Core.Scanners
         {
             // Pure HTML parsing: text blocks + embedded media parts + placeholders for the embedded web parts.
             var parsed = WikiContentParser.Parse(wikiFieldHtml);
+
+            // The wiki layout is derived from the same HTML (no CSOM needed).
+            page.Layout = PageLayoutDetector.ToLayoutString(PageLayoutDetector.DetectWikiLayout(wikiFieldHtml));
 
             var entities = new List<WebPartEntity>(parsed.TextParts);
             entities.AddRange(parsed.MediaParts);
@@ -218,9 +226,11 @@ namespace PnP.Scanning.Core.Scanners
         /// Extracts the web part inventory for a publishing page using its <c>LimitedWebPartManager</c>.
         /// Ported from the legacy <c>PublishingPage.GetWebPartsForScanner</c> (the scanner-oriented variant,
         /// not the transform-oriented <c>Analyze</c>): it inventories every web part placed in the page's
-        /// web part zones. Unlike <see cref="ExtractFromWebPartPageAsync"/> there is no page-layout / row /
-        /// column mapping (the legacy scanner leaves the layout at <c>PublishingPage_AutoDetect</c> and does
-        /// not position the parts) and no TitleBar exclusion — every web part the manager returns is recorded.
+        /// web part zones. Unlike <see cref="ExtractFromWebPartPageAsync"/> the web parts are not assigned a
+        /// row / column (the legacy scanner does not position publishing-page parts) and there is no TitleBar
+        /// exclusion — every web part the manager returns is recorded. The page's <c>Layout</c> is set to the
+        /// actual page layout name (e.g. <c>ArticleLeft</c>) read from the <c>PublishingPageLayout</c> field,
+        /// matching the legacy <c>PublishingAnalyzer</c> (see <see cref="GetPublishingPageLayoutName"/>).
         /// </summary>
         /// <remarks>
         /// SPO-only, matching T5: the on-premises web-services fallback
@@ -237,6 +247,10 @@ namespace PnP.Scanning.Core.Scanners
         {
             var publishingPage = csomContext.Web.GetFileByServerRelativeUrl(page.PageUrl);
 
+            // The publishing page's list item carries the page layout reference we report as the layout.
+            var listItem = publishingPage.ListItemAllFields;
+            csomContext.Load(listItem);
+
             var limitedWPManager = publishingPage.GetLimitedWebPartManager(PersonalizationScope.Shared);
             csomContext.Load(limitedWPManager);
 
@@ -244,6 +258,11 @@ namespace PnP.Scanning.Core.Scanners
                 wp => wp.Id, wp => wp.ZoneId, wp => wp.WebPart.ExportMode, wp => wp.WebPart.Title,
                 wp => wp.WebPart.ZoneIndex, wp => wp.WebPart.IsClosed, wp => wp.WebPart.Hidden, wp => wp.WebPart.Properties));
             await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+
+            // Parity with the legacy PublishingAnalyzer: the recorded layout is the actual page layout name
+            // (e.g. "ArticleLeft") read from the PublishingPageLayout field — not the transform engine's
+            // PublishingPage_AutoDetect placeholder (which the legacy scanner discards for publishing pages).
+            page.Layout = GetPublishingPageLayoutName(listItem.FieldValues);
 
             // Export the web part XML for the parts that allow it (gives the most reliable type).
             var exportedXml = new Dictionary<Guid, ClientResult<string>>();
@@ -387,6 +406,25 @@ namespace PnP.Scanning.Core.Scanners
             return UnsupportedWebPartType;
         }
 
+        // Reads the publishing page layout name from the page list item's PublishingPageLayout field.
+        // Ported verbatim from the legacy ListItemExtensions.PageLayout: the field is a URL field whose
+        // Description is the friendly layout name (e.g. "ArticleLeft"); an absent/empty field yields "".
+        // Internal (not private) so the field-value parsing has its own unit tests; the CSOM list item load
+        // is integration-only.
+        internal static string GetPublishingPageLayoutName(IDictionary<string, object> fieldValues)
+        {
+            if (fieldValues != null &&
+                fieldValues.TryGetValue(PublishingPageLayoutField, out var value) &&
+                value != null &&
+                !string.IsNullOrEmpty(value.ToString()))
+            {
+                var description = (value as FieldUrlValue)?.Description;
+                return string.IsNullOrEmpty(description) ? "" : description;
+            }
+
+            return "";
+        }
+
         private static bool HasAll(IDictionary<string, object> properties, params string[] keys)
         {
             foreach (var key in keys)
@@ -400,28 +438,16 @@ namespace PnP.Scanning.Core.Scanners
             return true;
         }
 
-        // Determines the web part page layout from the page file properties. Ported from
-        // WebPartPage.GetLayout.
+        // Determines the web part page layout from the page file properties. Reads the vti_setuppath
+        // property (CSOM) and delegates the actual string→layout mapping to the pure PageLayoutDetector
+        // (ported from WebPartPage.GetLayout) so that logic is unit-testable on its own.
         private static PageLayout GetWebPartPageLayout(PropertyValues pageProperties)
         {
-            if (pageProperties.FieldValues.ContainsKey("vti_setuppath"))
-            {
-                var setupPath = pageProperties["vti_setuppath"]?.ToString();
-                if (!string.IsNullOrEmpty(setupPath))
-                {
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd1.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_FullPageVertical;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd2.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_HeaderFooterThreeColumns;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd3.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_HeaderLeftColumnBody;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd4.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_HeaderRightColumnBody;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd5.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_HeaderFooter2Columns4Rows;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd6.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_HeaderFooter4ColumnsTopRow;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd7.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_LeftColumnHeaderFooterTopRow3Columns;
-                    if (setupPath.IndexOf(@"\STS\doctemp\smartpgs\spstd8.aspx", StringComparison.InvariantCultureIgnoreCase) > -1) return PageLayout.WebPart_RightColumnHeaderFooterTopRow3Columns;
-                    if (setupPath.Equals(@"SiteTemplates\STS\default.aspx", StringComparison.InvariantCultureIgnoreCase)) return PageLayout.WebPart_2010_TwoColumnsLeft;
-                }
-            }
+            var setupPath = pageProperties.FieldValues.ContainsKey("vti_setuppath")
+                ? pageProperties["vti_setuppath"]?.ToString()
+                : null;
 
-            return PageLayout.WebPart_Custom;
+            return PageLayoutDetector.DetectWebPartPageLayout(setupPath);
         }
 
         // Translates the given zone value and page layout to a column number. Ported from WebPartPage.GetColumn.
