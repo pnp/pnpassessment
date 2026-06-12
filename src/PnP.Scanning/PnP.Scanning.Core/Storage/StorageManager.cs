@@ -899,11 +899,44 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                await dbContext.ClassicPages.AddRangeAsync(pagesLists.ToArray());
-
-                await dbContext.SaveChangesAsync();
-                Log.Information("StorePageInformationAsync succeeded");
+                await StorePageInformationAsync(dbContext, pagesLists);
             }
+        }
+
+        // Testable core (in-memory SQLite friendly): bulk insert the (enriched) page rows on the
+        // supplied context. Split out from the scanId overload so the persistence of the page-scan
+        // enrichment columns can be unit-tested against the shared in-memory ScanContext fixture.
+        internal static async Task StorePageInformationAsync(ScanContext dbContext, List<ClassicPage> pagesLists)
+        {
+            await dbContext.ClassicPages.AddRangeAsync(pagesLists.ToArray());
+
+            await dbContext.SaveChangesAsync();
+            Log.Information("StorePageInformationAsync succeeded");
+        }
+
+        internal async Task StorePageWebPartsAsync(Guid scanId, List<ClassicPageWebPart> pageWebPartsList)
+        {
+            using (var dbContext = new ScanContext(scanId))
+            {
+                await StorePageWebPartsAsync(dbContext, pageWebPartsList);
+            }
+        }
+
+        // Testable core (in-memory SQLite friendly): bulk insert the per-page web part inventory rows
+        // on the supplied context, following the StorePageInformationAsync pattern. A null/empty list
+        // is a no-op (no database round-trip), so a page with no web parts does not trigger an empty
+        // SaveChanges.
+        internal static async Task StorePageWebPartsAsync(ScanContext dbContext, List<ClassicPageWebPart> pageWebPartsList)
+        {
+            if (pageWebPartsList == null || pageWebPartsList.Count == 0)
+            {
+                return;
+            }
+
+            await dbContext.ClassicPageWebParts.AddRangeAsync(pageWebPartsList.ToArray());
+
+            await dbContext.SaveChangesAsync();
+            Log.Information("StorePageWebPartsAsync succeeded");
         }
 
         internal async Task StoreClassicListInformationAsync(Guid scanId, List<ClassicList> classicLists)
@@ -1426,6 +1459,11 @@ namespace PnP.Scanning.Core.Storage
             foreach (var page in await dbContext.ClassicPages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
             {
                 dbContext.ClassicPages.Remove(page);
+            }
+
+            foreach (var pageWebPart in await dbContext.ClassicPageWebParts.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            {
+                dbContext.ClassicPageWebParts.Remove(pageWebPart);
             }
 
             foreach (var list in await dbContext.ClassicLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
