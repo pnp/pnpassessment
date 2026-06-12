@@ -634,6 +634,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("AggregatedRemediationCodes")
                         .HasColumnType("TEXT");
 
+                    b.Property<double>("AvgMappingPercentage")
+                        .HasColumnType("REAL");
+
                     b.Property<int>("AzureACSPrincipals")
                         .HasColumnType("INTEGER");
 
@@ -670,10 +673,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<DateTime>("LastItemUserModifiedDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("MappableWebPartPages")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ModernLists")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ModernPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PagesWithWebParts")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("RootWebTemplate")
@@ -690,6 +699,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("SubWebTemplates")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UncustomizedHomePages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UnmappedWebPartPages")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ScanId", "SiteUrl");
 
@@ -805,6 +820,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("AggregatedRemediationCodes")
                         .HasColumnType("TEXT");
 
+                    b.Property<double>("AvgMappingPercentage")
+                        .HasColumnType("REAL");
+
                     b.Property<int>("AzureACSPrincipals")
                         .HasColumnType("INTEGER");
 
@@ -865,10 +883,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<DateTime>("LastItemUserModifiedDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("MappableWebPartPages")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ModernLists")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ModernPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PagesWithWebParts")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("RemediationCode")
@@ -879,6 +903,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("Template")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UncustomizedHomePages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UnmappedWebPartPages")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ScanId", "SiteUrl", "WebUrl");
 

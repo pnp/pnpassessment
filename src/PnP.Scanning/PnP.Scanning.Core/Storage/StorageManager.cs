@@ -939,6 +939,111 @@ namespace PnP.Scanning.Core.Storage
             Log.Information("StorePageWebPartsAsync succeeded");
         }
 
+        // T9: roll each web's per-page transformation readiness (computed + persisted earlier by
+        // T6/T8) up into its ClassicWebSummary row. Runs once per scan in PostScanningAsync.
+        //   PagesWithWebParts     = classic pages on the web carrying at least one web part (WebPartCount > 0).
+        //   MappableWebPartPages  = those pages that are fully mappable (MappingPercentage == 100).
+        //   UnmappedWebPartPages  = those pages with at least one unmapped web part.
+        //     (Mappable + Unmapped == PagesWithWebParts — they partition the pages-with-web-parts set.)
+        //   AvgMappingPercentage  = mean MappingPercentage over the pages-with-web-parts (0 when there are
+        //     none). Stored UNROUNDED so the site-level weighted mean (web avg x web count, accumulated in
+        //     ClassicScanner.PostScanningAsync) reconstructs the exact page-percentage sum.
+        //   UncustomizedHomePages = classic pages flagged as an uncustomized home page (T10).
+        // Pages with no web parts (WebPartCount == 0) are deliberately excluded from the mapping metrics:
+        // they are 100% by the T6 empty-page convention and including them would mask the real readiness
+        // of the pages that actually carry web parts.
+        internal static async Task ComputeAndStoreWebPageRollupsAsync(ScanContext dbContext, Guid scanId)
+        {
+            // Load the page readiness facts once and group per web (avoids an N+1 query per web summary).
+            var pagesByWeb = (await dbContext.ClassicPages
+                    .Where(p => p.ScanId == scanId)
+                    .Select(p => new { p.SiteUrl, p.WebUrl, p.WebPartCount, p.MappingPercentage, p.UncustomizedHomePage })
+                    .ToListAsync())
+                .GroupBy(p => (p.SiteUrl, p.WebUrl))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var webSummaries = await dbContext.ClassicWebSummaries
+                .Where(w => w.ScanId == scanId)
+                .ToListAsync();
+
+            foreach (var web in webSummaries)
+            {
+                int pagesWithWebParts = 0;
+                int mappable = 0;
+                int unmapped = 0;
+                int uncustomizedHome = 0;
+                double mappingSum = 0;
+
+                if (pagesByWeb.TryGetValue((web.SiteUrl, web.WebUrl), out var pages))
+                {
+                    foreach (var page in pages)
+                    {
+                        if (page.UncustomizedHomePage)
+                        {
+                            uncustomizedHome++;
+                        }
+
+                        if (page.WebPartCount > 0)
+                        {
+                            pagesWithWebParts++;
+                            mappingSum += page.MappingPercentage;
+
+                            if (page.MappingPercentage >= 100)
+                            {
+                                mappable++;
+                            }
+                            else
+                            {
+                                unmapped++;
+                            }
+                        }
+                    }
+                }
+
+                web.PagesWithWebParts = pagesWithWebParts;
+                web.MappableWebPartPages = mappable;
+                web.UnmappedWebPartPages = unmapped;
+                web.UncustomizedHomePages = uncustomizedHome;
+                web.AvgMappingPercentage = pagesWithWebParts > 0 ? mappingSum / pagesWithWebParts : 0;
+            }
+
+            await dbContext.SaveChangesAsync();
+            Log.Information("ComputeAndStoreWebPageRollupsAsync succeeded");
+        }
+
+        // T9: build the scan-wide unique web part inventory (mirrors the old scanner's UniqueWebParts.csv,
+        // plus a page count). One ClassicWebPartUnique row per distinct WebPartType seen anywhere in the scan.
+        //   InMappingFile = the type exists in webpartmapping.xml — taken from the IsMappable flag T6 stamped
+        //                   on every ClassicPageWebPart row (all rows of a given type share the same value).
+        //   PageCount     = number of distinct classic pages that reference the type at least once.
+        internal static async Task PopulateWebPartUniqueAsync(ScanContext dbContext, Guid scanId)
+        {
+            var rows = await dbContext.ClassicPageWebParts
+                .Where(wp => wp.ScanId == scanId)
+                .Select(wp => new { wp.WebPartType, wp.IsMappable, wp.SiteUrl, wp.WebUrl, wp.PageUrl })
+                .ToListAsync();
+
+            var uniques = rows
+                .GroupBy(wp => wp.WebPartType)
+                .Select(g => new ClassicWebPartUnique
+                {
+                    ScanId = scanId,
+                    WebPartType = g.Key,
+                    InMappingFile = g.Any(wp => wp.IsMappable),
+                    PageCount = g.Select(wp => (wp.SiteUrl, wp.WebUrl, wp.PageUrl)).Distinct().Count(),
+                })
+                .ToList();
+
+            if (uniques.Count == 0)
+            {
+                return;
+            }
+
+            await dbContext.ClassicWebPartUniques.AddRangeAsync(uniques);
+            await dbContext.SaveChangesAsync();
+            Log.Information("PopulateWebPartUniqueAsync succeeded");
+        }
+
         internal async Task StoreClassicListInformationAsync(Guid scanId, List<ClassicList> classicLists)
         {
             using (var dbContext = new ScanContext(scanId))

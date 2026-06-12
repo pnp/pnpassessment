@@ -180,6 +180,12 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Post assessment work is starting");
             using (var dbContext = new ScanContext(ScanId))
             {
+                // T9: before aggregating webs into site collections, roll each web's per-page
+                // transformation readiness up into its ClassicWebSummary and build the scan-wide unique
+                // web part inventory. The site loop below then reads the now-populated web columns.
+                await StorageManager.ComputeAndStoreWebPageRollupsAsync(dbContext, ScanId);
+                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId);
+
                 // Iterate over the sites to populate the classic site collection overview table
                 string lastSiteUrl = null;
                 HashSet<string> webTemplates = null;
@@ -245,6 +251,17 @@ namespace PnP.Scanning.Core.Scanners
                     classicSiteCollection.ClassicWebPartPages += web.ClassicWebPartPages;
                     classicSiteCollection.ClassicPublishingPages += web.ClassicPublishingPages;
 
+                    // T9: page transformation readiness rollups. The count columns sum directly; the
+                    // AvgMappingPercentage field is used here as a running SUM of page percentages
+                    // (web.AvgMappingPercentage x web.PagesWithWebParts reconstructs each web's exact
+                    // page-percentage sum because the web average is stored unrounded) and is normalized
+                    // to the site-wide weighted mean in AddClassicSiteCollection.
+                    classicSiteCollection.PagesWithWebParts += web.PagesWithWebParts;
+                    classicSiteCollection.MappableWebPartPages += web.MappableWebPartPages;
+                    classicSiteCollection.UnmappedWebPartPages += web.UnmappedWebPartPages;
+                    classicSiteCollection.UncustomizedHomePages += web.UncustomizedHomePages;
+                    classicSiteCollection.AvgMappingPercentage += web.AvgMappingPercentage * web.PagesWithWebParts;
+
                     classicSiteCollection.ClassicWorkflows += web.ClassicWorkflows;
 
                     classicSiteCollection.ClassicInfoPathForms += web.ClassicInfoPathForms;
@@ -277,6 +294,12 @@ namespace PnP.Scanning.Core.Scanners
             if (remediationCodes.Count > 0)
             {
                 classicSiteCollection.AggregatedRemediationCodes = string.Join(",", remediationCodes);
+            }
+
+            // T9: normalize the accumulated page-percentage sum into the site-wide weighted mean.
+            if (classicSiteCollection.PagesWithWebParts > 0)
+            {
+                classicSiteCollection.AvgMappingPercentage /= classicSiteCollection.PagesWithWebParts;
             }
 
             // Persist the previously collected site collection data

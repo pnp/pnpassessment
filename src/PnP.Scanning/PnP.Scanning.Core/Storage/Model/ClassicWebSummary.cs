@@ -27,6 +27,17 @@ namespace PnP.Scanning.Core.Storage
 
         public int ModernPages { get; set; }
 
+        // Page transformation readiness rollups (T9 — aggregated from the web's ClassicPages).
+        public int PagesWithWebParts { get; set; }
+
+        public int MappableWebPartPages { get; set; }
+
+        public int UnmappedWebPartPages { get; set; }
+
+        public double AvgMappingPercentage { get; set; }
+
+        public int UncustomizedHomePages { get; set; }
+
         public bool IsModernSite { get; set; }
 
         public bool IsClassicPublishingSite { get; set; }
