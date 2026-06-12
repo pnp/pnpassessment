@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using FluentAssertions;
+using Microsoft.SharePoint.Client;
 using PnP.Scanning.Core.Scanners;
 using Xunit;
 
@@ -88,6 +89,61 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         public void GetTypeFromXml_EmptyXml_ReturnsUnknown(string xml)
         {
             PageWebPartExtractor.GetTypeFromXml(xml).Should().Be("Unknown");
+        }
+
+        // --- T7: publishing page layout name (parity with the legacy PublishingAnalyzer) -----------------
+
+        [Fact]
+        public void GetPublishingPageLayoutName_UrlFieldDescription_ReturnsLayoutName()
+        {
+            // The PublishingPageLayout field is a URL field whose Description holds the friendly layout
+            // name; that name (e.g. "ArticleLeft") is what the legacy scanner records as the page layout.
+            var fieldValues = new Dictionary<string, object>
+            {
+                { "PublishingPageLayout", new FieldUrlValue { Url = "/_catalogs/masterpage/ArticleLeft.aspx", Description = "ArticleLeft" } },
+            };
+
+            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().Be("ArticleLeft");
+        }
+
+        [Fact]
+        public void GetPublishingPageLayoutName_FieldMissing_ReturnsEmpty()
+        {
+            var fieldValues = new Dictionary<string, object>
+            {
+                { "SomeOtherField", "value" },
+            };
+
+            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+        }
+
+        [Fact]
+        public void GetPublishingPageLayoutName_NullFieldValue_ReturnsEmpty()
+        {
+            var fieldValues = new Dictionary<string, object>
+            {
+                { "PublishingPageLayout", null },
+            };
+
+            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+        }
+
+        [Fact]
+        public void GetPublishingPageLayoutName_EmptyDescription_ReturnsEmpty()
+        {
+            // A URL field that carries a Url but no Description yields no usable layout name.
+            var fieldValues = new Dictionary<string, object>
+            {
+                { "PublishingPageLayout", new FieldUrlValue { Url = "/_catalogs/masterpage/ArticleLeft.aspx", Description = "" } },
+            };
+
+            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+        }
+
+        [Fact]
+        public void GetPublishingPageLayoutName_NullFieldValues_ReturnsEmpty()
+        {
+            PageWebPartExtractor.GetPublishingPageLayoutName(null).Should().BeEmpty();
         }
     }
 }
