@@ -37,6 +37,13 @@ namespace PnP.Scanning.Core.Storage
 
         public int ViewsLifeTimeUniqueUsers { get; set; }
 
+        // Page transformation readiness rollup (computed from the page's web part inventory)
+        public int WebPartCount { get; set; }
+
+        public double MappingPercentage { get; set; }
+
+        public string UnmappedWebParts { get; set; }
+
         public string RemediationCode { get; set; }
 
         public bool AddToDatabase()
