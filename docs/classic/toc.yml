@@ -1,0 +1,20 @@
+- name: Introduction
+  href: readme.md
+- name: Requirements
+  href: requirements.md
+- name: Run an assessment
+  href: assess.md
+- name: Report
+  href: report-intro.md
+- name: CSV files
+  items:
+    - name: classicpages.csv
+      href: csv-classicpages.md
+    - name: classicpagewebparts.csv
+      href: csv-classicpagewebparts.md
+    - name: classicwebpartunique.csv
+      href: csv-classicwebpartunique.md
+    - name: classicwebsummaries.csv
+      href: csv-classicwebsummaries.md
+    - name: classicsitesummaries.csv
+      href: csv-classicsitesummaries.md

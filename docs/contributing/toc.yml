@@ -1,2 +1,4 @@
 - name: Getting started
   href: readme.md
+- name: Running the tests
+  href: running-tests.md
