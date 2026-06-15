@@ -198,6 +198,10 @@ namespace PnP.Scanning.Core.Services
                 {
                     await PopulateAlertsMetricsAsync(scanId, metrics);
                 }
+                else if (Scan.CLIMode.Equals(Mode.Classic.ToString()))
+                {
+                    await PopulateClassicMetricsAsync(scanId, metrics);
+                }
 
                 // Send the event
                 telemetryClient.TrackEvent($"{Scan.CLIMode}{TelemetryEvent.Done}", properties, metrics);
@@ -236,6 +240,126 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("FailedWebCount", failedWebCount);
                 metric.Add("ScanDurationInMinutes", scanDurationInMinutes);
             }
+        }
+
+        private async Task PopulateClassicMetricsAsync(Guid scanId, Dictionary<string, double> metric)
+        {
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            {
+                BuildClassicMetrics(dbContext, metric);
+            }
+        }
+
+        /// <summary>
+        /// T14 — builds the classic page-scan telemetry payload (page type distribution + page
+        /// transformation readiness) from the scan's stored page inventory. Pure over the
+        /// <see cref="ScanContext"/> (no network, no scan-status gating) so it can be unit-tested
+        /// against the in-memory SQLite fixture — same testability split as the storage/export cores.
+        /// </summary>
+        internal static void BuildClassicMetrics(ScanContext dbContext, Dictionary<string, double> metric)
+        {
+            // Page type distribution (the DB only holds classic pages — modern pages are not persisted).
+            int pageCount = 0;
+            int wikiPageCount = 0;
+            int webPartPageCount = 0;
+            int aspxPageCount = 0;
+            int publishingPageCount = 0;
+            int blogPageCount = 0;
+            int delveBlogPageCount = 0;
+
+            int homePageCount = 0;
+            int uncustomizedHomePageCount = 0;
+
+            // Page transformation readiness — only pages that actually carry web parts contribute to
+            // the mapping metrics (empty pages are 100% by the T6 convention and would mask real readiness).
+            int pagesWithWebParts = 0;
+            int mappableWebPartPages = 0;   // fully mappable (MappingPercentage >= 100)
+            int unmappedWebPartPages = 0;   // partially/not mappable (< 100)
+            double mappingPercentageSum = 0;
+
+            foreach (var page in dbContext.ClassicPages)
+            {
+                pageCount++;
+
+                switch (page.PageType)
+                {
+                    case PageScanComponent.WikiPage: wikiPageCount++; break;
+                    case PageScanComponent.WebPartPage: webPartPageCount++; break;
+                    case PageScanComponent.ASPXPage: aspxPageCount++; break;
+                    case PageScanComponent.PublishingPage: publishingPageCount++; break;
+                    case PageScanComponent.BlogPage: blogPageCount++; break;
+                    case PageScanComponent.DelveBlogPage: delveBlogPageCount++; break;
+                }
+
+                if (page.HomePage)
+                {
+                    homePageCount++;
+                }
+
+                if (page.UncustomizedHomePage)
+                {
+                    uncustomizedHomePageCount++;
+                }
+
+                if (page.WebPartCount > 0)
+                {
+                    pagesWithWebParts++;
+                    mappingPercentageSum += page.MappingPercentage;
+
+                    if (page.MappingPercentage >= 100)
+                    {
+                        mappableWebPartPages++;
+                    }
+                    else
+                    {
+                        unmappedWebPartPages++;
+                    }
+                }
+            }
+
+            int webPartCount = 0;
+            foreach (var webPart in dbContext.ClassicPageWebParts)
+            {
+                webPartCount++;
+            }
+
+            // Scan-wide unique web part inventory (one row per distinct type, see T9).
+            int uniqueWebPartTypeCount = 0;
+            int mappableWebPartTypeCount = 0;
+            int unmappedWebPartTypeCount = 0;
+            foreach (var unique in dbContext.ClassicWebPartUniques)
+            {
+                uniqueWebPartTypeCount++;
+                if (unique.InMappingFile)
+                {
+                    mappableWebPartTypeCount++;
+                }
+                else
+                {
+                    unmappedWebPartTypeCount++;
+                }
+            }
+
+            metric.Add("ClassicPageCount", pageCount);
+            metric.Add("ClassicPageWikiCount", wikiPageCount);
+            metric.Add("ClassicPageWebPartPageCount", webPartPageCount);
+            metric.Add("ClassicPageASPXCount", aspxPageCount);
+            metric.Add("ClassicPagePublishingCount", publishingPageCount);
+            metric.Add("ClassicPageBlogCount", blogPageCount);
+            metric.Add("ClassicPageDelveBlogCount", delveBlogPageCount);
+
+            metric.Add("ClassicPageHomePageCount", homePageCount);
+            metric.Add("ClassicPageUncustomizedHomePageCount", uncustomizedHomePageCount);
+
+            metric.Add("ClassicPagePagesWithWebPartsCount", pagesWithWebParts);
+            metric.Add("ClassicPageMappableWebPartPagesCount", mappableWebPartPages);
+            metric.Add("ClassicPageUnmappedWebPartPagesCount", unmappedWebPartPages);
+            metric.Add("ClassicPageAvgMappingPercentage", pagesWithWebParts > 0 ? mappingPercentageSum / pagesWithWebParts : 0);
+
+            metric.Add("ClassicPageWebPartCount", webPartCount);
+            metric.Add("ClassicPageUniqueWebPartTypeCount", uniqueWebPartTypeCount);
+            metric.Add("ClassicPageMappableWebPartTypeCount", mappableWebPartTypeCount);
+            metric.Add("ClassicPageUnmappedWebPartTypeCount", unmappedWebPartTypeCount);
         }
 
         private async Task PopulateAddInsACSMetricsAsync(Guid scanId, Dictionary<string, double> metric)
