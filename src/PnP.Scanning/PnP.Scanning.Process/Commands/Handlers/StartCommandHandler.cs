@@ -400,14 +400,6 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(StartOptions arguments)
         {
-            // temporary block for classic assessment run as it's not yet done
-            if (arguments.Mode == Mode.Classic)
-            {
-                AnsiConsole.MarkupLine($"[red]Classic mode is not yet implemented[/]");
-                AnsiConsole.MarkupLine("");
-                return;
-            }
-
             // Auto populate the tenant id when not provided
             if (string.IsNullOrEmpty(arguments.TenantId) && !string.IsNullOrEmpty(arguments.Tenant))
             {
@@ -515,16 +507,35 @@ namespace PnP.Scanning.Process.Commands
 
                 if (arguments.Mode == Mode.Classic)
                 {
-                    List<ClassicComponent> classicComponents = new();
+                    List<ClassicComponent> classicComponents;
                     if (arguments.ClassicInclude.Count > 0)
                     {
                         // Only add the requested classic scan components
-                        classicComponents = arguments.ClassicInclude;
+                        classicComponents = new List<ClassicComponent>(arguments.ClassicInclude);
                     }
                     else
                     {
                         // Add all possible classic scan components
                         classicComponents = Enum.GetValues(typeof(ClassicComponent)).Cast<ClassicComponent>().ToList();
+                    }
+
+                    // The Azure ACS and SharePoint Add-Ins components are not (yet) implemented as part of a
+                    // Classic assessment; they are covered by the dedicated --mode AddInsACS assessment. Drop
+                    // them so a Classic assessment never silently produces empty data for them, warning when a
+                    // user explicitly requested them via --classicinclude.
+                    foreach (var component in new[] { ClassicComponent.AzureACS, ClassicComponent.SharePointAddIns })
+                    {
+                        if (classicComponents.Remove(component) && arguments.ClassicInclude.Count > 0)
+                        {
+                            AnsiConsole.MarkupLine($"[yellow]The '{component}' component is not available in a Classic assessment; use --mode AddInsACS instead. Skipping it.[/]");
+                        }
+                    }
+
+                    if (classicComponents.Count == 0)
+                    {
+                        AnsiConsole.MarkupLine($"[red]No supported classic scan components were selected. Supported components: Workflow, InfoPath, Pages, Lists, Extensibility.[/]");
+                        AnsiConsole.MarkupLine("");
+                        return;
                     }
 
                     ClassicStartRequestBuilder.AddClassicProperties(
