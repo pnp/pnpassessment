@@ -505,7 +505,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        private static void RewriteDataLocationsInPbit(string pbitFile, string newDelimiter, string oldLocation, string oldDelimiter)
+        internal static void RewriteDataLocationsInPbit(string pbitFile, string newDelimiter, string oldLocation, string oldDelimiter)
         {
             string destinationPath = "";
             string copiedFile = "";
