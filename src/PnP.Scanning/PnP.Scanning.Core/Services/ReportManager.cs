@@ -32,6 +32,8 @@ namespace PnP.Scanning.Core.Services
 
         private const string ClassicInfoPathCsv = "classicinfopath.csv";
         private const string ClassicPagesCsv = "classicpages.csv";
+        private const string ClassicPageWebPartsCsv = "classicpagewebparts.csv";
+        private const string ClassicWebPartUniqueCsv = "classicwebpartunique.csv";
         private const string ClassicListsCsv = "classiclists.csv";
         private const string ClassicUserCustomActionsCsv = "classicusercustomactions.csv";
         private const string ClassicExtensibilitiesCsv = "classicextensibilities.csv";
@@ -296,69 +298,7 @@ namespace PnP.Scanning.Core.Services
 
                 if (scan.CLIMode == Mode.Classic.ToString())
                 {
-                    using (var writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicExtensibilitiesCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicInfoPathCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicListsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPagesCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicPages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicUserCustomActionsCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicSiteSummariesCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
-
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebSummariesCsv)))
-                    {
-                        using (var csv = new CsvWriter(writer, config))
-                        {
-                            await csv.WriteRecordsAsync(dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                        }
-                    }
+                    await ExportClassicReportDataAsync(dbContext, scanId, exportPath, config);
                 }
 
                 if (scan.CLIMode == Mode.InfoPath.ToString())
@@ -443,6 +383,96 @@ namespace PnP.Scanning.Core.Services
             }
 
             return exportPath;
+        }
+
+        /// <summary>
+        /// Exports the Classic scan-mode tables to CSV. Split out from <see cref="ExportReportDataAsync"/>
+        /// as a testable static core (same pattern as the StorageManager rollup cores) so the page-scan
+        /// exports — including the T11 <c>classicpagewebparts.csv</c> / <c>classicwebpartunique.csv</c> and
+        /// the enriched <c>classicpages.csv</c> — can be exercised against a seeded in-memory SQLite
+        /// <see cref="ScanContext"/> without opening an on-disk scan database.
+        /// </summary>
+        internal static async Task ExportClassicReportDataAsync(ScanContext dbContext, Guid scanId, string exportPath, CsvConfiguration config)
+        {
+            using (var writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicExtensibilitiesCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicInfoPathCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicListsCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPagesCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicPages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPageWebPartsCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicPageWebParts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebPartUniqueCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicWebPartUniques.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicUserCustomActionsCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicSiteSummariesCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
+
+            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebSummariesCsv)))
+            {
+                using (var csv = new CsvWriter(writer, config))
+                {
+                    await csv.WriteRecordsAsync(dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                }
+            }
         }
 
         private static string EnsureReportPath(Guid scanId, string exportPath)
