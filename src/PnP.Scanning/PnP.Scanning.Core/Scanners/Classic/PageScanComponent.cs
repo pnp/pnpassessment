@@ -22,8 +22,9 @@ namespace PnP.Scanning.Core.Scanners
 
         // The web part mapping model (embedded webpartmapping.xml) is read-only after construction, so a
         // single shared instance is reused across webs/threads instead of re-parsing the ~1370-line file
-        // for every web.
-        private static readonly WebPartMappingManager MappingManager = new();
+        // for every web. Also reused by the post-scan unique-web-part rollup (StorageManager.
+        // PopulateWebPartUniqueAsync) so it shares the same parsed mapping file.
+        internal static readonly WebPartMappingManager MappingManager = new();
 
         // Fields
         private const string FileRefField = "FileRef";

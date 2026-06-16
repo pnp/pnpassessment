@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using PnP.Scanning.Core.Scanners.WebPartMapping;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -74,6 +75,12 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
+        // Assembly-qualified web part types — InMappingFile is resolved against the real embedded
+        // webpartmapping.xml, so these must be the actual keys the mapping file uses.
+        private const string ContentEditorType = "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+        private const string ScriptEditorType = "Microsoft.SharePoint.WebPartPages.ScriptEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+        private const string CustomType = "Contoso.Custom.WebParts.MyCustomWebPart, Contoso.Custom, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0000000000000000";
+
         [Fact]
         public async Task Rollup_WebPartUnique_AggregatesPageCounts()
         {
@@ -82,12 +89,17 @@ namespace PnP.Scanning.Core.Tests.Storage
 
             // ContentEditor appears twice on page A (counts the page once) and once on page B -> 2 pages.
             // A custom (non-mapped) web part appears once on page A -> 1 page.
+            // ScriptEditor is the regression guard for the InMappingFile defect: it is present in
+            // webpartmapping.xml (InMappingFile=true) but has no <Mappings> (IsMappable=false). The unique
+            // row's InMappingFile must reflect *presence in the file*, not the row's IsMappable flag — so
+            // even though the seeded row carries IsMappable=false, InMappingFile must come out true.
             var webParts = new List<ClassicPageWebPart>
             {
-                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 0, type: "ContentEditorWebPart", isMappable: true),
-                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 1, type: "ContentEditorWebPart", isMappable: true),
-                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 2, type: "Contoso.Custom.WebPart", isMappable: false),
-                NewWebPart(scanId, siteUrl, "/", "/Pages/b.aspx", index: 0, type: "ContentEditorWebPart", isMappable: true),
+                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 0, type: ContentEditorType, isMappable: true),
+                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 1, type: ContentEditorType, isMappable: true),
+                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 2, type: CustomType, isMappable: false),
+                NewWebPart(scanId, siteUrl, "/", "/Pages/a.aspx", index: 3, type: ScriptEditorType, isMappable: false),
+                NewWebPart(scanId, siteUrl, "/", "/Pages/b.aspx", index: 0, type: ContentEditorType, isMappable: true),
             };
 
             using (var context = fixture.CreateContext())
@@ -95,7 +107,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                 await context.ClassicPageWebParts.AddRangeAsync(webParts);
                 await context.SaveChangesAsync();
 
-                await StorageManager.PopulateWebPartUniqueAsync(context, scanId);
+                await StorageManager.PopulateWebPartUniqueAsync(context, scanId, new WebPartMappingManager());
             }
 
             using (var context = fixture.CreateContext())
@@ -104,15 +116,20 @@ namespace PnP.Scanning.Core.Tests.Storage
                     .Where(u => u.ScanId == scanId)
                     .ToList();
 
-                uniques.Should().HaveCount(2);
+                uniques.Should().HaveCount(3);
 
-                var contentEditor = uniques.Single(u => u.WebPartType == "ContentEditorWebPart");
+                var contentEditor = uniques.Single(u => u.WebPartType == ContentEditorType);
                 contentEditor.InMappingFile.Should().BeTrue();
                 contentEditor.PageCount.Should().Be(2);
 
-                var custom = uniques.Single(u => u.WebPartType == "Contoso.Custom.WebPart");
+                var custom = uniques.Single(u => u.WebPartType == CustomType);
                 custom.InMappingFile.Should().BeFalse();
                 custom.PageCount.Should().Be(1);
+
+                // Listed-but-unmapped: present in the file -> InMappingFile true, despite IsMappable=false.
+                var scriptEditor = uniques.Single(u => u.WebPartType == ScriptEditorType);
+                scriptEditor.InMappingFile.Should().BeTrue();
+                scriptEditor.PageCount.Should().Be(1);
             }
         }
 
