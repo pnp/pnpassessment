@@ -18,3 +18,5 @@
       href: csv-classicwebsummaries.md
     - name: classicsitesummaries.csv
       href: csv-classicsitesummaries.md
+    - name: classicpublishingsitesummaries.csv
+      href: csv-classicpublishingsitesummaries.md

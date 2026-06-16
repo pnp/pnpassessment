@@ -1044,6 +1044,107 @@ namespace PnP.Scanning.Core.Storage
             Log.Information("PopulateWebPartUniqueAsync succeeded");
         }
 
+        // Build the per-site-collection publishing-portal rollup (mirrors the legacy Modernization Scanner's
+        // ModernizationPublishingSiteScanResults.csv — one row per publishing portal). A "publishing web" is a
+        // web flagged as a classic publishing site (publishing template) or one that carries at least one
+        // publishing page (publishing feature enabled on a non-publishing template, the way the legacy
+        // PublishingAnalyzer scanned them). Only site collections with at least one publishing web get a row,
+        // mirroring the legacy analyzer bailing out when there are no publishing web results.
+        //   NumberOfWebs          = publishing webs in the portal.
+        //   NumberOfPages         = sum of the webs' publishing-page counts.
+        //   UsedSiteMasterPages   = distinct custom (site) master pages used across the portal's publishing webs.
+        //   UsedSystemMasterPages = distinct system master pages used across the portal's publishing webs.
+        //   UsedPageLayouts       = distinct layouts used by the portal's publishing pages.
+        //   LastPageUpdateDate    = most recent publishing-page modification (null when no pages were scanned).
+        internal static async Task PopulatePublishingSiteSummaryAsync(ScanContext dbContext, Guid scanId)
+        {
+            var publishingWebs = await dbContext.ClassicWebSummaries
+                .Where(w => w.ScanId == scanId && (w.IsClassicPublishingSite || w.ClassicPublishingPages > 0))
+                .Select(w => new { w.SiteUrl, w.WebUrl, w.ClassicPublishingPages })
+                .ToListAsync();
+
+            if (publishingWebs.Count == 0)
+            {
+                Log.Information("PopulatePublishingSiteSummaryAsync: no publishing webs, nothing to do");
+                return;
+            }
+
+            // The (SiteUrl, WebUrl) set of publishing webs — used to scope master-page data to publishing webs.
+            var publishingWebKeys = publishingWebs.Select(w => (w.SiteUrl, w.WebUrl)).ToHashSet();
+
+            // Master page data is per web and only present when the Extensibility component ran. MasterPage =
+            // the web's MasterUrl (system master), CustomMasterPage = CustomMasterUrl (custom/site master).
+            var extensibilities = await dbContext.ClassicExtensibilities
+                .Where(e => e.ScanId == scanId)
+                .Select(e => new { e.SiteUrl, e.WebUrl, e.MasterPage, e.CustomMasterPage })
+                .ToListAsync();
+
+            var publishingPages = await dbContext.ClassicPages
+                .Where(p => p.ScanId == scanId && p.PageType == PageScanComponent.PublishingPage)
+                .Select(p => new { p.SiteUrl, p.Layout, p.ModifiedAt })
+                .ToListAsync();
+
+            var rows = new List<ClassicPublishingSiteSummary>();
+
+            foreach (var siteGroup in publishingWebs.GroupBy(w => w.SiteUrl))
+            {
+                var siteUrl = siteGroup.Key;
+
+                var siteMasters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                var systemMasters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var e in extensibilities)
+                {
+                    if (!publishingWebKeys.Contains((e.SiteUrl, e.WebUrl)))
+                    {
+                        continue;
+                    }
+                    if (!string.IsNullOrEmpty(e.CustomMasterPage))
+                    {
+                        siteMasters.Add(e.CustomMasterPage);
+                    }
+                    if (!string.IsNullOrEmpty(e.MasterPage))
+                    {
+                        systemMasters.Add(e.MasterPage);
+                    }
+                }
+
+                var layouts = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                DateTime? lastUpdate = null;
+                foreach (var page in publishingPages)
+                {
+                    if (page.SiteUrl != siteUrl)
+                    {
+                        continue;
+                    }
+                    if (!string.IsNullOrEmpty(page.Layout))
+                    {
+                        layouts.Add(page.Layout);
+                    }
+                    if (page.ModifiedAt != DateTime.MinValue && page.ModifiedAt != DateTime.MaxValue &&
+                        (lastUpdate == null || page.ModifiedAt > lastUpdate))
+                    {
+                        lastUpdate = page.ModifiedAt;
+                    }
+                }
+
+                rows.Add(new ClassicPublishingSiteSummary
+                {
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    NumberOfWebs = siteGroup.Count(),
+                    NumberOfPages = siteGroup.Sum(w => w.ClassicPublishingPages),
+                    UsedSiteMasterPages = siteMasters.Count > 0 ? string.Join(",", siteMasters) : null,
+                    UsedSystemMasterPages = systemMasters.Count > 0 ? string.Join(",", systemMasters) : null,
+                    UsedPageLayouts = layouts.Count > 0 ? string.Join(",", layouts) : null,
+                    LastPageUpdateDate = lastUpdate,
+                });
+            }
+
+            await dbContext.ClassicPublishingSiteSummaries.AddRangeAsync(rows);
+            await dbContext.SaveChangesAsync();
+            Log.Information("PopulatePublishingSiteSummaryAsync succeeded");
+        }
+
         internal async Task StoreClassicListInformationAsync(Guid scanId, List<ClassicList> classicLists)
         {
             using (var dbContext = new ScanContext(scanId))
