@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PnP.Core;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Scanners.WebPartMapping;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
@@ -1013,14 +1014,17 @@ namespace PnP.Scanning.Core.Storage
 
         // T9: build the scan-wide unique web part inventory (mirrors the old scanner's UniqueWebParts.csv,
         // plus a page count). One ClassicWebPartUnique row per distinct WebPartType seen anywhere in the scan.
-        //   InMappingFile = the type exists in webpartmapping.xml — taken from the IsMappable flag T6 stamped
-        //                   on every ClassicPageWebPart row (all rows of a given type share the same value).
+        //   InMappingFile = the type is present in webpartmapping.xml at all (presence check), matching the
+        //                   legacy UniqueWebParts.csv column. This is deliberately NOT the IsMappable flag:
+        //                   IsMappable is present AND has a <Mappings> element, so a listed-but-unmapped type
+        //                   (e.g. ScriptEditor/SimpleForm) is InMappingFile=true but IsMappable=false. Resolved
+        //                   via the same shared WebPartMappingManager the page scan uses.
         //   PageCount     = number of distinct classic pages that reference the type at least once.
-        internal static async Task PopulateWebPartUniqueAsync(ScanContext dbContext, Guid scanId)
+        internal static async Task PopulateWebPartUniqueAsync(ScanContext dbContext, Guid scanId, WebPartMappingManager mappingManager)
         {
             var rows = await dbContext.ClassicPageWebParts
                 .Where(wp => wp.ScanId == scanId)
-                .Select(wp => new { wp.WebPartType, wp.IsMappable, wp.SiteUrl, wp.WebUrl, wp.PageUrl })
+                .Select(wp => new { wp.WebPartType, wp.SiteUrl, wp.WebUrl, wp.PageUrl })
                 .ToListAsync();
 
             var uniques = rows
@@ -1029,7 +1033,7 @@ namespace PnP.Scanning.Core.Storage
                 {
                     ScanId = scanId,
                     WebPartType = g.Key,
-                    InMappingFile = g.Any(wp => wp.IsMappable),
+                    InMappingFile = mappingManager.InMappingFile(g.Key),
                     PageCount = g.Select(wp => (wp.SiteUrl, wp.WebUrl, wp.PageUrl)).Distinct().Count(),
                 })
                 .ToList();

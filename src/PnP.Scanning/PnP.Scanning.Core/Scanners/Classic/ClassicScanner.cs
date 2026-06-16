@@ -184,7 +184,7 @@ namespace PnP.Scanning.Core.Scanners
                 // transformation readiness up into its ClassicWebSummary and build the scan-wide unique
                 // web part inventory. The site loop below then reads the now-populated web columns.
                 await StorageManager.ComputeAndStoreWebPageRollupsAsync(dbContext, ScanId);
-                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId);
+                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, PageScanComponent.MappingManager);
 
                 // Roll the publishing webs + pages up into one per-site-collection publishing-portal line
                 // (parity with the legacy ModernizationPublishingSiteScanResults.csv). Reads the web summaries
