@@ -186,6 +186,11 @@ namespace PnP.Scanning.Core.Scanners
                 await StorageManager.ComputeAndStoreWebPageRollupsAsync(dbContext, ScanId);
                 await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId);
 
+                // Roll the publishing webs + pages up into one per-site-collection publishing-portal line
+                // (parity with the legacy ModernizationPublishingSiteScanResults.csv). Reads the web summaries
+                // populated during the scan, so it runs after the web-level rollups above.
+                await StorageManager.PopulatePublishingSiteSummaryAsync(dbContext, ScanId);
+
                 // Iterate over the sites to populate the classic site collection overview table
                 string lastSiteUrl = null;
                 HashSet<string> webTemplates = null;

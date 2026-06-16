@@ -58,7 +58,9 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<ClassicSiteSummary> ClassicSiteSummaries { get; set; }
 
-        internal DbSet<ClassicWebSummary> ClassicWebSummaries { get; set; }      
+        internal DbSet<ClassicWebSummary> ClassicWebSummaries { get; set; }
+
+        internal DbSet<ClassicPublishingSiteSummary> ClassicPublishingSiteSummaries { get; set; }
 
         internal DbSet<ClassicAddIn> ClassicAddIns { get; set; }
 
@@ -244,6 +246,11 @@ namespace PnP.Scanning.Core.Storage
             modelBuilder.Entity<ClassicWebSummary>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
+            });
+
+            modelBuilder.Entity<ClassicPublishingSiteSummary>(entity =>
+            {
+                entity.HasKey(e => new { e.ScanId, e.SiteUrl });
             });
             #endregion
 

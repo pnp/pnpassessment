@@ -623,6 +623,40 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("ClassicPageWebParts");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPublishingSiteSummary", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastPageUpdateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("NumberOfPages")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("NumberOfWebs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UsedPageLayouts")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsedSiteMasterPages")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsedSystemMasterPages")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "SiteUrl");
+
+                    b.HasIndex("ScanId", "SiteUrl")
+                        .IsUnique();
+
+                    b.ToTable("ClassicPublishingSiteSummaries");
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicSiteSummary", b =>
                 {
                     b.Property<Guid>("ScanId")

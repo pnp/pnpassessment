@@ -15,3 +15,4 @@ The report is driven by the exported CSV files. Even if you do not use Power BI,
 - [classicwebpartunique.csv](csv-classicwebpartunique.md) — one row per unique web part type encountered across the assessment.
 - [classicwebsummaries.csv](csv-classicwebsummaries.md) — per-web readiness roll-up.
 - [classicsitesummaries.csv](csv-classicsitesummaries.md) — per-site-collection readiness roll-up.
+- [classicpublishingsitesummaries.csv](csv-classicpublishingsitesummaries.md) — per-publishing-portal roll-up of master pages and page layouts.
