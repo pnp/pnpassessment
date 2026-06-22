@@ -95,8 +95,8 @@
 <td>microsoft365-assessment.exe start --mode Alerts --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist &quot;https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales&quot;</td>
 </tr>
 <tr>
-<td>Start a new Workflow 2013 assessment (application permissions) for a complete tenant</td>
-<td>microsoft365-assessment.exe start --mode workflow --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot;</td>
+<td>Start a new Classic page assessment (application permissions) for a complete tenant</td>
+<td>microsoft365-assessment.exe start --mode Classic --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath &quot;My|CurrentUser|b133d1cb4d19ce539986c7ac67de005481084c84&quot;</td>
 </tr>
 </tbody>
 </table>
@@ -105,7 +105,7 @@
 <p><img src="../images/startargumentshelp.png" alt="start argument overview"></p>
 <p>In the next chapters the arguments are described in more details, grouped by category</p>
 <h2 id="assessment-mode">Assessment mode</h2>
-<p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Workflow</code>. Overtime more assessment modules will be added. Currently supported assessments are:</p>
+<p>The main argument to use is the <code>--mode</code> argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to <code>Classic</code>. Overtime more assessment modules will be added. Currently supported assessments are:</p>
 <table>
 <thead>
 <tr>
@@ -116,12 +116,6 @@
 </tr>
 </thead>
 <tbody>
-<tr>
-<td><a href="../workflow/readme.html">Workflow 2013</a></td>
-<td>Retirement</td>
-<td>Workflow</td>
-<td>Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. <strong>Available as of pre-release version 1.0.1</strong></td>
-</tr>
 <tr>
 <td><a href="../infopath/readme.html">InfoPath Forms Services</a></td>
 <td>Retirement</td>
@@ -228,7 +222,7 @@ https://bertonline.sharepoint.com/sites/apacsales
 <h2 id="running-multiple-parallel-assessments">Running multiple parallel assessments</h2>
 <p>The Microsoft 365 Assessment tool supports running up to 3 parallel assessments, but do note that just like with bumping up the amount of parallel operations this will increase the likelihood of getting throttled.</p>
 <h2 id="assessing-a-multi-geo-tenant">Assessing a Multi-Geo tenant</h2>
-<p>When you want to assess all sites in a Multi-Geo tenant you do have to run an assessment per geo location. For the main geo location you follow the standard flow like described above, for the other geo locations you need to specify the site collections to start via using either the <code>--sitesfile</code> or <code>--siteslist</code> arguments. Below table shows an example for a SharePoint Workflow 2013 assessment:</p>
+<p>When you want to assess all sites in a Multi-Geo tenant you do have to run an assessment per geo location. For the main geo location you follow the standard flow like described above, for the other geo locations you need to specify the site collections to start via using either the <code>--sitesfile</code> or <code>--siteslist</code> arguments. Below table shows an example for a Classic page assessment:</p>
 <table>
 <thead>
 <tr>
@@ -243,19 +237,19 @@ https://bertonline.sharepoint.com/sites/apacsales
 <td>contoso.sharepoint.com</td>
 <td>EUR</td>
 <td>Yes</td>
-<td>start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot;</td>
+<td>start --mode classic --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot;</td>
 </tr>
 <tr>
 <td>contosonam.sharepoint.com</td>
 <td>NAM</td>
 <td>No</td>
-<td>start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot; <strong>--sitesfile &quot;c:\assessment\namsites.txt&quot;</strong></td>
+<td>start --mode classic --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot; <strong>--sitesfile &quot;c:\assessment\namsites.txt&quot;</strong></td>
 </tr>
 <tr>
 <td>contosoapc.sharepoint.com</td>
 <td>APC</td>
 <td>No</td>
-<td>start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot; <strong>--sitesfile &quot;c:\assessment\apcsites.txt&quot;</strong></td>
+<td>start --mode classic --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath &quot;My|CurrentUser|A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD&quot; <strong>--sitesfile &quot;c:\assessment\apcsites.txt&quot;</strong></td>
 </tr>
 </tbody>
 </table>
