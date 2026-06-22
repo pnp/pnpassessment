@@ -16,6 +16,7 @@ Once you're ready to run an assessment you can choose any of the available modul
 
 Module | Type | Description
 -------|------|------------
+[Classic page](https://pnp.github.io/pnpassessment/classic/readme.html) | Modernization | Helps you assess your tenant to understand where you're using classic pages (Web Part, Wiki, Blog and Publishing pages) and how ready they are for modernization. For each page it inventories the web parts, computes a modernization readiness percentage and the list of unmapped web parts, detects the page layout, flags home pages and uncustomized home pages, and captures usage statistics — rolling the results up into per-web and per-site-collection summaries. **Available as of version 1.15.0**
 [Workflow 2013](https://pnp.github.io/pnpassessment/workflow/readme.html) | Retirement | Helps you assess your tenant to understand where you're using Workflow 2013 and how upgradable those workflows are to Power Automate. **Available as of pre-release version 1.0.1**
 [InfoPath Forms Services](https://pnp.github.io/pnpassessment/infopath/readme.md) | Retirement | Helps you assess your tenant to understand where you're using InfoPath Forms Services and how upgradable those to alternative solutions. **Available as of version 1.5.0**
 [SharePoint Add-Ins and Azure ACS principals](https://pnp.github.io/pnpassessment/addinsacs/readme.html) | Retirement | Helps you assess your tenant to understand where you're using SharePoint Add-Ins and Azure ACS principals. **Available as of version 1.6.0**
@@ -31,7 +32,7 @@ The Microsoft 365 Assessment tool in an open-source tool maintained by Microsoft
 
 ## Relationship with the "Modernization Scanner" ❓
 
-Over time the Microsoft 365 Assessment tool replaces the relevant [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) modules. As of version 1.15.0 the classic page scanning / page transformation readiness capability — previously only available in the [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) — has been carried over into the Microsoft 365 Assessment tool, so the Modernization Scanner is no longer needed for that scenario. The [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) should only be used if a needed module is not yet available as part of the Microsoft 365 Assessment tool.
+As of version 1.15.0 the Microsoft 365 Assessment tool supports the **full classic page scan functionality** of the [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) — classic page discovery and typing (Web Part, Wiki, Blog and Publishing pages), live web-part extraction, modernization readiness scoring, page-layout detection, usage statistics, and the per-web / per-site-collection summaries. The ported capability has been validated field-for-field against the legacy scanner on a live tenant across all four classic page types, with **significantly better performance and scale**. The [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) should only be used if a needed module is not yet available as part of the Microsoft 365 Assessment tool.
 
 ## Community rocks, sharing is caring 💖
 
