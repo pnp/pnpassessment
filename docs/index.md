@@ -26,7 +26,7 @@ The Microsoft 365 Assessment tool in an open-source tool maintained by Microsoft
 
 ## Relationship with the "Modernization Scanner" ❓
 
-Overtime the Microsoft 365 Assessment tool will replace the relevant [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) modules, for the time being the [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) should be used if the needed module is not available as part of the the Microsoft 365 Assessment tool.
+Over time the Microsoft 365 Assessment tool replaces the relevant [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) modules. As of version 1.15.0 the classic page scanning / page transformation readiness capability — previously only available in the [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) — has been carried over into the Microsoft 365 Assessment tool, so the Modernization Scanner is no longer needed for that scenario. The [Modernization Scanner](https://aka.ms/sharepoint/modernization/scanner) should only be used if a needed module is not yet available as part of the Microsoft 365 Assessment tool.
 
 ## Community rocks, sharing is caring 💖
 
