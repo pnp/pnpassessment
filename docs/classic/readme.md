@@ -12,6 +12,6 @@ The assessment provides you with:
 - Web- and site-level [readiness roll-ups](csv-classicwebsummaries.md) and a [Power BI report](report-intro.md) to visualize the results.
 
 > [!NOTE]
-> The classic pages assessment is available as of **version 1.15.0** of the Microsoft 365 Assessment tool — [download the latest release](https://github.com/pnp/pnpassessment/releases) to get started. Within a Classic assessment only the classic components run (Pages, Lists, Workflow, InfoPath, Extensibility); the Azure ACS and SharePoint Add-Ins assessments are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module.
+> The classic pages assessment is available as of **version 1.15.0** of the Microsoft 365 Assessment tool — [download the latest release](https://github.com/pnp/pnpassessment/releases) to get started. Within a Classic assessment only the classic components run (Pages, Lists, InfoPath, Extensibility); the Azure ACS and SharePoint Add-Ins assessments are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module.
 
 Use the left navigation to learn how to [run the assessment](assess.md), the [requirements](requirements.md), and the details of the generated report and CSV files.
