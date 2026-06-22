@@ -11,7 +11,7 @@ The assessment provides you with:
 - A tenant-wide inventory of the unique web part types encountered and whether each is known to the modern mapping model — see [classicwebpartunique.csv](csv-classicwebpartunique.md).
 - Web- and site-level [readiness roll-ups](csv-classicwebsummaries.md) and a [Power BI report](report-intro.md) to visualize the results.
 
-> [!IMPORTANT]
-> The classic pages assessment is **pre-release**: it is implemented, tested and runnable from a development build via `start --mode Classic --classicinclude Pages`, but is not yet part of a shipped release. Within a Classic assessment only the implemented components run (Pages, Lists, Workflow, InfoPath, Extensibility) — the Azure ACS and SharePoint Add-Ins assessments are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module. Track availability via the [releases](https://github.com/pnp/pnpassessment/releases) page.
+> [!NOTE]
+> The classic pages assessment is available as of **version 1.15.0** of the Microsoft 365 Assessment tool — [download the latest release](https://github.com/pnp/pnpassessment/releases) to get started. Within a Classic assessment only the classic components run (Pages, Lists, Workflow, InfoPath, Extensibility); the Azure ACS and SharePoint Add-Ins assessments are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module.
 
 Use the left navigation to learn how to [run the assessment](assess.md), the [requirements](requirements.md), and the details of the generated report and CSV files.

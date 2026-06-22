@@ -2,8 +2,8 @@
 
 Running the classic pages assessment is just like running any other module of the Microsoft 365 Assessment tool: you use the CLI with the `Start` action to launch an assessment. By specifying the `--mode` to be `Classic` (and including the `Pages` component) the Microsoft 365 Assessment tool will run the classic pages assessment for you. This page provides you with a quick start and links to the relevant Microsoft 365 Assessment tool documentation for more details.
 
-> [!IMPORTANT]
-> The classic pages assessment is **pre-release** — runnable from a development build but not yet part of a shipped release. The samples below show the intended usage. Within a Classic assessment the Azure ACS and SharePoint Add-Ins components are skipped (they are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module).
+> [!NOTE]
+> The classic pages assessment is available as of **version 1.15.0** of the Microsoft 365 Assessment tool. Within a Classic assessment the Azure ACS and SharePoint Add-Ins components are skipped (they are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module).
 
 ## Quick start
 
