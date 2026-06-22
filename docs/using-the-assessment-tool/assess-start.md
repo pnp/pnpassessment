@@ -10,7 +10,7 @@ Task | CLI
 -----|------
 Start a new Add-Ins and ACS assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode AddInsACS --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 Start a new Alerts assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Alerts --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
-Start a new Workflow 2013 assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode workflow --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
+Start a new Classic page assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode Classic --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 
 ## Command line arguments
 
@@ -22,7 +22,7 @@ In the next chapters the arguments are described in more details, grouped by cat
 
 ## Assessment mode
 
-The main argument to use is the `--mode` argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to `Workflow`. Overtime more assessment modules will be added. Currently supported assessments are:
+The main argument to use is the `--mode` argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to `Classic`. Overtime more assessment modules will be added. Currently supported assessments are:
 
 [!INCLUDE [Assessment overview](./../fragments/supportedassessments.md)]
 
@@ -108,13 +108,13 @@ The Microsoft 365 Assessment tool supports running up to 3 parallel assessments,
 
 ## Assessing a Multi-Geo tenant
 
-When you want to assess all sites in a Multi-Geo tenant you do have to run an assessment per geo location. For the main geo location you follow the standard flow like described above, for the other geo locations you need to specify the site collections to start via using either the `--sitesfile` or `--siteslist` arguments. Below table shows an example for a SharePoint Workflow 2013 assessment:
+When you want to assess all sites in a Multi-Geo tenant you do have to run an assessment per geo location. For the main geo location you follow the standard flow like described above, for the other geo locations you need to specify the site collections to start via using either the `--sitesfile` or `--siteslist` arguments. Below table shows an example for a Classic page assessment:
 
 Url | Geo location | Main | Assessment start arguments
 ----|-------------|------|---------------------------
-contoso.sharepoint.com | EUR | Yes | start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD"
-contosonam.sharepoint.com | NAM | No |  start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" **--sitesfile "c:\assessment\namsites.txt"**
-contosoapc.sharepoint.com | APC | No |  start --mode workflow --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" **--sitesfile "c:\assessment\apcsites.txt"**
+contoso.sharepoint.com | EUR | Yes | start --mode classic --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD"
+contosonam.sharepoint.com | NAM | No |  start --mode classic --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" **--sitesfile "c:\assessment\namsites.txt"**
+contosoapc.sharepoint.com | APC | No |  start --mode classic --authmode application --tenant contoso.sharepoint.com --applicationid 26ff597b-03bf-401a-9f4f-bb3ee8b82478 --certpath "My&#124;CurrentUser&#124;A1FCF8AFC6E7421CCB2FA2877743E74C6CE80ABD" **--sitesfile "c:\assessment\apcsites.txt"**
 
 > [!Note]
 > The `--tenant` parameter is the same for each assessment, no matter which geo location is being assessed.

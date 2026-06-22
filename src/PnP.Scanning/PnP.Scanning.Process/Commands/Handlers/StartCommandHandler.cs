@@ -60,7 +60,9 @@ namespace PnP.Scanning.Process.Commands
             // Scanner mode
             modeOption = new(
                 name: $"--{Constants.StartMode}",
-                getDefaultValue: () => Mode.Workflow,
+                // Workflow was retired (see AssessmentAvailability) and can no longer be the default;
+                // Classic is the current flagship assessment.
+                getDefaultValue: () => Mode.Classic,
                 description: "Assessment mode"
                 )
             {
@@ -400,6 +402,15 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(StartOptions arguments)
         {
+            // Reject retired assessment modes before doing any work. The Workflow 2013 engine code is
+            // retained (so pre-existing Workflow scan databases can still be reported on) but the
+            // assessment itself can no longer be started. Mirrors the classic-component filtering below.
+            if (AssessmentAvailability.IsRetired(arguments.Mode))
+            {
+                AnsiConsole.MarkupLine($"[red]{AssessmentAvailability.WorkflowRetiredMessage}[/]");
+                return;
+            }
+
             // Auto populate the tenant id when not provided
             if (string.IsNullOrEmpty(arguments.TenantId) && !string.IsNullOrEmpty(arguments.Tenant))
             {
@@ -515,8 +526,20 @@ namespace PnP.Scanning.Process.Commands
                     }
                     else
                     {
-                        // Add all possible classic scan components
-                        classicComponents = Enum.GetValues(typeof(ClassicComponent)).Cast<ClassicComponent>().ToList();
+                        // Add all possible classic scan components, excluding any that have been retired
+                        // (e.g. Workflow) so a default Classic run no longer pays for them.
+                        classicComponents = Enum.GetValues(typeof(ClassicComponent)).Cast<ClassicComponent>()
+                            .Where(c => !AssessmentAvailability.IsRetired(c))
+                            .ToList();
+                    }
+
+                    // The Workflow 2013 component has been retired. Drop it from the effective set,
+                    // warning only when a user explicitly requested it via --classicinclude (the default
+                    // "all components" set above already excluded it). Engine code is retained so existing
+                    // Workflow scan databases can still be reported on.
+                    if (classicComponents.Remove(ClassicComponent.Workflow) && arguments.ClassicInclude.Count > 0)
+                    {
+                        AnsiConsole.MarkupLine($"[yellow]{AssessmentAvailability.WorkflowRetiredMessage} Skipping it.[/]");
                     }
 
                     // The Azure ACS and SharePoint Add-Ins components are not (yet) implemented as part of a
@@ -533,7 +556,7 @@ namespace PnP.Scanning.Process.Commands
 
                     if (classicComponents.Count == 0)
                     {
-                        AnsiConsole.MarkupLine($"[red]No supported classic scan components were selected. Supported components: Workflow, InfoPath, Pages, Lists, Extensibility.[/]");
+                        AnsiConsole.MarkupLine($"[red]No supported classic scan components were selected. Supported components: InfoPath, Pages, Lists, Extensibility.[/]");
                         AnsiConsole.MarkupLine("");
                         return;
                     }
