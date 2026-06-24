@@ -67,46 +67,52 @@ namespace PnP.Scanning.Core.Scanners
                 }
                 else if (list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.GenericList)
                 {
-                    try
+                    foreach (var contentType in list.ContentTypes)
                     {
-                        var folder = await context.Web.GetFolderByServerRelativeUrlAsync($"{list.RootFolder.ServerRelativeUrl}/Item", f => f.Properties);
-                        if (folder.Properties.Requested && 
-                            folder.Properties.GetString("_ipfs_infopathenabled", string.Empty) != string.Empty &&
-                            folder.Properties.GetString("_ipfs_solutionName", string.Empty) != string.Empty)
+                        try
                         {
-                            bool infoPathEnabled = true;
-                            if (bool.TryParse(folder.Properties.GetString("_ipfs_infopathenabled", string.Empty), out bool infoPathEnabledParsed))
+                            // Construct folder URL for the content type
+                            var folderUrl = $"{list.RootFolder.ServerRelativeUrl}/{contentType.Name}";
+                            var folder = await context.Web.GetFolderByServerRelativeUrlAsync(folderUrl, f => f.Properties);
+                    
+                            if (folder.Properties.Requested &&
+                                folder.Properties.GetString("_ipfs_infopathenabled", string.Empty) != string.Empty &&
+                                folder.Properties.GetString("_ipfs_solutionName", string.Empty) != string.Empty)
                             {
-                                infoPathEnabled = infoPathEnabledParsed;
+                                bool infoPathEnabled = true;
+                                if (bool.TryParse(folder.Properties.GetString("_ipfs_infopathenabled", string.Empty), out bool infoPathEnabledParsed))
+                                {
+                                    infoPathEnabled = infoPathEnabledParsed;
+                                }
+                    
+                                infoPathLists.Add(new ClassicInfoPath
+                                {
+                                    ScanId = scannerBase.ScanId,
+                                    SiteUrl = scannerBase.SiteUrl,
+                                    WebUrl = scannerBase.WebUrl,
+                                    ListUrl = list.RootFolder.ServerRelativeUrl,
+                                    ListTitle = list.Title,
+                                    ListId = list.Id,
+                                    InfoPathUsage = $"CustomForm ({contentType.Name})",
+                                    InfoPathTemplate = folder.Properties.GetString("_ipfs_solutionName", string.Empty),
+                                    Enabled = infoPathEnabled,
+                                    ItemCount = list.ItemCount,
+                                    LastItemUserModifiedDate = list.LastItemUserModifiedDate,
+                                    RemediationCode = RemediationCodes.IF1.ToString(),
+                                });
+                    
+                                remediationCodes.Add(RemediationCodes.IF1.ToString());
                             }
-                            
-                            infoPathLists.Add(new ClassicInfoPath
-                            {
-                                ScanId = scannerBase.ScanId,
-                                SiteUrl = scannerBase.SiteUrl,
-                                WebUrl = scannerBase.WebUrl,
-                                ListUrl = list.RootFolder.ServerRelativeUrl,
-                                ListTitle = list.Title,
-                                ListId = list.Id,
-                                InfoPathUsage = "CustomForm",
-                                InfoPathTemplate = folder.Properties.GetString("_ipfs_solutionName", string.Empty),
-                                Enabled = infoPathEnabled,
-                                ItemCount = list.ItemCount,
-                                LastItemUserModifiedDate = list.LastItemUserModifiedDate,
-                                RemediationCode = RemediationCodes.IF1.ToString(),
-                            });
-
-                            remediationCodes.Add(RemediationCodes.IF1.ToString());
                         }
-                    }
-                    catch (SharePointRestServiceException ex)
-                    {
-                        var error = ex.Error as SharePointRestError;
-
-                        // If the exception indicated a non existing file/folder then ignore, else throw
-                        if (!ScannerBase.ErrorIndicatesFileFolderDoesNotExists(error))
+                        catch (SharePointRestServiceException ex)
                         {
-                            throw;
+                            var error = ex.Error as SharePointRestError;
+                    
+                            // If the exception indicated a non-existing file/folder then ignore, else throw
+                            if (!ScannerBase.ErrorIndicatesFileFolderDoesNotExists(error))
+                            {
+                                throw;
+                            }
                         }
                     }
                 }
