@@ -22,7 +22,7 @@
         /// <summary>Persist classic web part properties (JSON) when assessing pages.</summary>
         internal bool ExportWebPartProperties { get; set; }
 
-        /// <summary>Skip the search-based page usage statistics (recent/lifetime views).</summary>
+        /// <summary>Skip audit log usage collection (ClassicPageViewed/ClassicPageCreated/ClassicPageEdited). When set, classicpageauditusage.csv is not generated.</summary>
         internal bool SkipUsageInformation { get; set; }
 
         /// <summary>Skip user information lookups (e.g. page ModifiedBy).</summary>
@@ -30,5 +30,8 @@
 
         /// <summary>Only assess the home page of each web.</summary>
         internal bool HomePageOnly { get; set; }
+
+        /// <summary>Number of days back to query the audit log via Graph (1-180, default 14). Max 180 days (Audit Standard) / 1 year (Audit Premium).</summary>
+        internal int AuditLogWindowDays { get; set; } = 14;
     }
 }

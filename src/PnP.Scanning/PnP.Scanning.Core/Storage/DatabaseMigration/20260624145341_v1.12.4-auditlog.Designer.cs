@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PnP.Scanning.Core.Storage;
 
@@ -10,9 +11,11 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    partial class ScanContextModelSnapshot : ModelSnapshot
+    [Migration("20260624145341_v1.12.4-auditlog")]
+    partial class v1124auditlog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.3");
@@ -542,6 +545,18 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("UnmappedWebParts")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ViewsLifeTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsLifeTimeUniqueUsers")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsRecent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsRecentUniqueUsers")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("WebPartCount")
                         .HasColumnType("INTEGER");
 
@@ -563,12 +578,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("PageUrl")
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("AuditCreatesCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("AuditEditsCount")
-                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AuditUniqueUsers")
                         .HasColumnType("INTEGER");

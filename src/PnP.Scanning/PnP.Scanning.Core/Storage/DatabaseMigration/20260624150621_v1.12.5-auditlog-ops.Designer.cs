@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PnP.Scanning.Core.Storage;
 
@@ -10,9 +11,11 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    partial class ScanContextModelSnapshot : ModelSnapshot
+    [Migration("20260624150621_v1.12.5-auditlog-ops")]
+    partial class v1125auditlogops
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.3");
@@ -541,6 +544,18 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("UnmappedWebParts")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("ViewsLifeTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsLifeTimeUniqueUsers")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsRecent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewsRecentUniqueUsers")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("WebPartCount")
                         .HasColumnType("INTEGER");

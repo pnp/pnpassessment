@@ -40,6 +40,7 @@ namespace PnP.Scanning.Core.Services
         private const string ClassicWebSummariesCsv = "classicwebsummaries.csv";
         private const string ClassicSiteSummariesCsv = "classicsitesummaries.csv";
         private const string ClassicPublishingSiteSummariesCsv = "classicpublishingsitesummaries.csv";
+        private const string ClassicPageAuditUsageCsv = "classicpageauditusage.csv";
 
         private const string ClassicAddInsCsv = "classicaddins.csv";
         private const string ClassicACSPrincipalsCsv = "classicacsprincipals.csv";
@@ -482,6 +483,20 @@ namespace PnP.Scanning.Core.Services
                     await csv.WriteRecordsAsync(dbContext.ClassicPublishingSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
+
+            // Only generate the file when audit log collection actually ran (--skipusageinformation
+            // produces zero rows; in that case no file is created).
+            if (dbContext.ClassicPageAuditUsages.Any(p => p.ScanId == scanId))
+            {
+                using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPageAuditUsageCsv)))
+                {
+                    using (var csv = new CsvWriter(writer, config))
+                    {
+                        csv.Context.RegisterClassMap<ClassicPageAuditUsageMap>();
+                        await csv.WriteRecordsAsync(dbContext.ClassicPageAuditUsages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    }
+                }
+            }
         }
 
         private static string EnsureReportPath(Guid scanId, string exportPath)
@@ -599,5 +614,15 @@ namespace PnP.Scanning.Core.Services
             File.Delete(copiedFile);
         }
 
+        // WebUrl is always "/" for audit usage rows (the web is not resolved during post-scan collection)
+        // and adds no information — suppress it from the CSV output.
+        private sealed class ClassicPageAuditUsageMap : ClassMap<ClassicPageAuditUsage>
+        {
+            public ClassicPageAuditUsageMap()
+            {
+                AutoMap(CultureInfo.InvariantCulture);
+                Map(m => m.WebUrl).Ignore();
+            }
+        }
     }
 }
