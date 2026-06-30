@@ -217,6 +217,109 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
+        [Fact]
+        public async Task Csv_ClassicPageAuditUsage_HeaderAndRows()
+        {
+            var scanId = Guid.NewGuid();
+            var siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
+            var windowStart = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            var windowEnd   = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc);
+
+            var rows = new List<ClassicPageAuditUsage>
+            {
+                new()
+                {
+                    ScanId = scanId, SiteUrl = siteUrl, WebUrl = "/",
+                    PageUrl = $"{siteUrl}/SitePages/Home.aspx",
+                    AuditViewsCount = 7, AuditCreatesCount = 1, AuditEditsCount = 2, AuditUniqueUsers = 3,
+                    AuditWindowStart = windowStart, AuditWindowEnd = windowEnd,
+                    QueryStatus = "succeeded", SkipReason = null,
+                },
+                new()
+                {
+                    ScanId = scanId, SiteUrl = siteUrl, WebUrl = "/",
+                    PageUrl = $"{siteUrl}/SitePages/Page1.aspx",
+                    AuditViewsCount = 0, AuditCreatesCount = 0, AuditEditsCount = 0, AuditUniqueUsers = 0,
+                    AuditWindowStart = windowStart, AuditWindowEnd = windowEnd,
+                    QueryStatus = "skipped", SkipReason = "AuditLogDisabled",
+                },
+            };
+
+            using (var context = fixture.CreateContext())
+            {
+                await context.ClassicPageAuditUsages.AddRangeAsync(rows);
+                await context.SaveChangesAsync();
+            }
+
+            var exportDir = NewTempDir();
+            try
+            {
+                await ExportAsync(scanId, exportDir);
+
+                var file = Path.Join(exportDir, "classicpageauditusage.csv");
+                File.Exists(file).Should().BeTrue();
+
+                var header = ReadHeader(file);
+                header.Should().Contain(new[]
+                {
+                    nameof(ClassicPageAuditUsage.ScanId),
+                    nameof(ClassicPageAuditUsage.SiteUrl),
+                    nameof(ClassicPageAuditUsage.PageUrl),
+                    nameof(ClassicPageAuditUsage.AuditViewsCount),
+                    nameof(ClassicPageAuditUsage.AuditCreatesCount),
+                    nameof(ClassicPageAuditUsage.AuditEditsCount),
+                    nameof(ClassicPageAuditUsage.AuditUniqueUsers),
+                    nameof(ClassicPageAuditUsage.AuditWindowStart),
+                    nameof(ClassicPageAuditUsage.AuditWindowEnd),
+                    nameof(ClassicPageAuditUsage.QueryStatus),
+                    nameof(ClassicPageAuditUsage.SkipReason),
+                });
+                header.Should().NotContain(nameof(ClassicPageAuditUsage.WebUrl));
+
+                var exported = ReadRecordsIgnoreMissingFields<ClassicPageAuditUsage>(file)
+                    .Where(r => r.ScanId == scanId)
+                    .OrderBy(r => r.PageUrl)
+                    .ToList();
+
+                exported.Should().HaveCount(2);
+
+                var home = exported.Single(r => r.PageUrl.EndsWith("Home.aspx"));
+                home.AuditViewsCount.Should().Be(7);
+                home.AuditCreatesCount.Should().Be(1);
+                home.AuditEditsCount.Should().Be(2);
+                home.AuditUniqueUsers.Should().Be(3);
+                home.AuditWindowStart.Should().Be(windowStart);
+                home.AuditWindowEnd.Should().Be(windowEnd);
+                home.QueryStatus.Should().Be("succeeded");
+                home.SkipReason.Should().BeNullOrEmpty();
+
+                var skipped = exported.Single(r => r.PageUrl.EndsWith("Page1.aspx"));
+                skipped.QueryStatus.Should().Be("skipped");
+                skipped.SkipReason.Should().Be("AuditLogDisabled");
+            }
+            finally
+            {
+                DeleteTempDir(exportDir);
+            }
+        }
+
+        [Fact]
+        public async Task Csv_ClassicPageAuditUsage_NoRows_FileNotCreated()
+        {
+            // When --skipusageinformation is passed no rows are written; the file must not be created.
+            var scanId = Guid.NewGuid();
+            var exportDir = NewTempDir();
+            try
+            {
+                await ExportAsync(scanId, exportDir);
+                File.Exists(Path.Join(exportDir, "classicpageauditusage.csv")).Should().BeFalse();
+            }
+            finally
+            {
+                DeleteTempDir(exportDir);
+            }
+        }
+
         private async Task ExportAsync(Guid scanId, string exportDir)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = "," };
@@ -237,6 +340,20 @@ namespace PnP.Scanning.Core.Tests.Storage
         private static List<T> ReadRecords<T>(string file)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = "," };
+            using var reader = new StreamReader(file);
+            using var csv = new CsvReader(reader, config);
+            return csv.GetRecords<T>().ToList();
+        }
+
+        // For CSVs that intentionally omit some model properties (e.g. classicpageauditusage.csv drops WebUrl).
+        private static List<T> ReadRecordsIgnoreMissingFields<T>(string file)
+        {
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = ",",
+                HeaderValidated = null,
+                MissingFieldFound = null,
+            };
             using var reader = new StreamReader(file);
             using var csv = new CsvReader(reader, config);
             return csv.GetRecords<T>().ToList();

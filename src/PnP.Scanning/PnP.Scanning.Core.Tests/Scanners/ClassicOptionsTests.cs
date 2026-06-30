@@ -83,6 +83,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             options.SkipUsageInformation.Should().BeTrue();
             options.SkipUserInformation.Should().BeFalse();
             options.HomePageOnly.Should().BeTrue();
+            options.AuditLogWindowDays.Should().Be(14); // default when not explicitly passed
         }
 
         private static StartRequest ClassicRequest(params (string Key, string Value)[] properties)

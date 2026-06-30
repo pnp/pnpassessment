@@ -1149,6 +1149,159 @@ namespace PnP.Scanning.Core.Storage
             Log.Information("PopulatePublishingSiteSummaryAsync succeeded");
         }
 
+        internal async Task CollectAndStoreAuditLogUsageAsync(
+            ScanContext dbContext,
+            Guid scanId,
+            Authentication.AuthenticationManager authManager,
+            string environment,
+            DateTime windowStart,
+            DateTime windowEnd,
+            CancellationToken cancellationToken)
+        {
+            // Sovereign cloud check
+            PnP.Core.Services.Microsoft365Environment m365env = PnP.Core.Services.Microsoft365Environment.Production;
+            Enum.TryParse(environment, out m365env);
+            if (m365env != PnP.Core.Services.Microsoft365Environment.Production && m365env != PnP.Core.Services.Microsoft365Environment.PreProduction)
+            {
+                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).Select(p => p.SiteUrl).ToList();
+                var skipRecords = new List<ClassicPageAuditUsage>();
+                foreach (var siteUrl in sites)
+                    BuildAuditLogRecords(skipRecords, scanId, siteUrl, null, windowStart, windowEnd, "skipped", "SovereignCloud");
+                await dbContext.BulkInsertAsync(skipRecords);
+                return;
+            }
+
+            // Microsoft Graph security/auditLog/queries — supports 90-day retention (vs 7-day blob limit
+            // of Management Activity API). Requires AuditLogsQuery-SharePoint.Read.All app permission.
+            string graphBaseUrl = Authentication.CloudManager.GetMicrosoftGraphAuthority(m365env);
+            string[] auditScopes = new[] { $"https://{graphBaseUrl}/.default" };
+            string bearerToken;
+            try
+            {
+                bearerToken = await authManager.GetAccessTokenAsync(auditScopes);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("Failed to acquire audit log token for scan {ScanId}: {Error}", scanId, ex.Message);
+                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).Select(p => p.SiteUrl).ToList();
+                var skipRecords = new List<ClassicPageAuditUsage>();
+                foreach (var siteUrl in sites)
+                    BuildAuditLogRecords(skipRecords, scanId, siteUrl, null, windowStart, windowEnd, "skipped", $"TokenError: {ex.Message}");
+                await dbContext.BulkInsertAsync(skipRecords);
+                return;
+            }
+
+            // Pass site URLs as objectIdFilters only when --siteslist / --sitesfile was explicitly
+            // used. For full-tenant scans, pass null so the query covers the whole tenant.
+            var scanRecord = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
+            bool hasExplicitSiteList = !string.IsNullOrEmpty(scanRecord?.CLISiteList)
+                                    || !string.IsNullOrEmpty(scanRecord?.CLISiteFile);
+
+            var siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).Select(p => p.SiteUrl).ToList();
+            IReadOnlyList<string> siteUrlsForFilter = hasExplicitSiteList ? siteUrls : null;
+
+            Action<string> auditProgress = msg => Log.Information("[AuditLog] {ScanId} {AuditMsg}", scanId, msg);
+            var (allStats, skipReason) = await Scanners.AuditLogUsageAnalyzer.QueryAllSitesAuditUsageAsync(
+                Authentication.AuthenticationManager.HttpClient, graphBaseUrl, bearerToken,
+                siteUrlsForFilter, windowStart, windowEnd, cancellationToken, auditProgress);
+
+            // allStats != null + skipReason == null  → full success
+            // allStats != null + skipReason != null  → partial success (some chunks failed, data may be incomplete)
+            // allStats == null                       → complete failure or skip
+            string globalStatus = allStats != null
+                ? (skipReason == null ? "succeeded" : "partial")
+                : (skipReason != null && (skipReason.StartsWith("Error") || skipReason.StartsWith("SubmitError")
+                    || skipReason.StartsWith("PollError") || skipReason.StartsWith("RecordsError")
+                    || skipReason.StartsWith("QueryFailed") || skipReason.StartsWith("QueryTimeout"))
+                    ? "failed" : "skipped");
+
+            // Collect all records across all sites into one list, then bulk-insert in one shot.
+            // This avoids EF tracking 100k+ entities individually before SaveChanges.
+            var allRecords = new List<ClassicPageAuditUsage>();
+            foreach (var siteUrl in siteUrls)
+            {
+                IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> siteStats = null;
+                if (allStats != null)
+                {
+                    siteStats = allStats
+                        .Where(kvp => kvp.Key.StartsWith(siteUrl + "/", StringComparison.OrdinalIgnoreCase))
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+                }
+                BuildAuditLogRecords(allRecords, scanId, siteUrl, siteStats, windowStart, windowEnd, globalStatus, skipReason);
+            }
+
+            await dbContext.BulkInsertAsync(allRecords);
+        }
+
+        private static void BuildAuditLogRecords(
+            List<ClassicPageAuditUsage> target,
+            Guid scanId,
+            string siteUrl,
+            IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> stats,
+            DateTime windowStart,
+            DateTime windowEnd,
+            string queryStatus,
+            string skipReason)
+        {
+            if (stats == null || stats.Count == 0)
+            {
+                target.Add(new ClassicPageAuditUsage
+                {
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = "/",
+                    PageUrl = siteUrl,
+                    AuditViewsCount = 0,
+                    AuditCreatesCount = 0,
+                    AuditEditsCount = 0,
+                    AuditUniqueUsers = 0,
+                    AuditWindowStart = windowStart,
+                    AuditWindowEnd = windowEnd,
+                    QueryStatus = queryStatus,
+                    SkipReason = skipReason,
+                });
+            }
+            else
+            {
+                foreach (var kvp in stats)
+                {
+                    var record = new ClassicPageAuditUsage
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = "/",
+                        PageUrl = kvp.Key,
+                        AuditWindowStart = windowStart,
+                        AuditWindowEnd = windowEnd,
+                        // Per-page rows always show "succeeded" — the page's own data came from a
+                        // succeeded chunk. Window-level coverage gaps (partial) are reported on the
+                        // site-level placeholder row only, keeping per-page data rows clean.
+                        QueryStatus = "succeeded",
+                        SkipReason = null,
+                    };
+                    Scanners.AuditLogUsageAnalyzer.ApplyAuditUsage(record, stats);
+                    target.Add(record);
+                }
+
+                // When the overall query was partial, also emit a site-level summary row so the
+                // coverage gap is visible in the CSV without polluting per-page rows.
+                if (queryStatus == "partial" && !string.IsNullOrEmpty(skipReason))
+                {
+                    target.Add(new ClassicPageAuditUsage
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = "/",
+                        PageUrl = siteUrl,
+                        AuditWindowStart = windowStart,
+                        AuditWindowEnd = windowEnd,
+                        QueryStatus = queryStatus,
+                        SkipReason = skipReason,
+                    });
+                }
+            }
+        }
+
         internal async Task StoreClassicListInformationAsync(Guid scanId, List<ClassicList> classicLists)
         {
             using (var dbContext = new ScanContext(scanId))

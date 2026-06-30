@@ -159,26 +159,10 @@ namespace PnP.Scanning.Core.Scanners
                 }
             }
 
-            // Page usage statistics (recent / lifetime views + unique users) via a per-page search lookup,
-            // unless the caller opted out. Applies to every classic page, not only those carrying a web
-            // part inventory. The per-page lookup (RowLimit 1) deliberately avoids the legacy bulk-search
-            // IndexDocId paging risk. Per-page failures are logged and skipped (view counts stay zero).
-            if (!options.SkipUsageInformation)
-            {
-                foreach (var page in pagesList)
-                {
-                    try
-                    {
-                        string searchPath = PageUsageAnalyzer.BuildPageSearchPath(scannerBase.SiteUrl, scannerBase.WebUrl, page.PageUrl, page.HomePage);
-                        var usageRow = await PageUsageAnalyzer.QueryPageUsageAsync(csomContext, searchPath).ConfigureAwait(false);
-                        PageUsageAnalyzer.ApplyUsage(page, usageRow, options.SkipUsageInformation);
-                    }
-                    catch (Exception ex)
-                    {
-                        scannerBase.Logger.Warning(ex, "Failed to retrieve usage statistics for classic page {PageUrl}; leaving view counts at zero", page.PageUrl);
-                    }
-                }
-            }
+            // SharePoint Search usage (ViewsRecent / ViewsLifeTime) is intentionally skipped for Classic
+            // pages: Search Analytics does not reliably populate these managed properties for classic .aspx
+            // pages, producing all-zero results. Audit log usage (ClassicPageViewed / ClassicPageCreated /
+            // ClassicPageEdited) collected in PostScanningAsync is the authoritative source instead.
 
             if (pagesList.Count > 0)
             {

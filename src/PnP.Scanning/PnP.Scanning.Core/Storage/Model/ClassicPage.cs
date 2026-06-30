@@ -29,14 +29,6 @@ namespace PnP.Scanning.Core.Storage
 
         public string ModifiedBy { get; set; }
 
-        public int ViewsRecent { get; set; }
-
-        public int ViewsRecentUniqueUsers { get; set; }
-
-        public int ViewsLifeTime { get; set; }
-
-        public int ViewsLifeTimeUniqueUsers { get; set; }
-
         // Page transformation readiness rollup (computed from the page's web part inventory)
         public int WebPartCount { get; set; }
 

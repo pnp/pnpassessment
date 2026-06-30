@@ -39,6 +39,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> classicSkipUsageInformationOption;
         private Option<bool> classicSkipUserInformationOption;
         private Option<bool> classicHomePageOnlyOption;
+        private Option<int> classicAuditLogWindowDaysOption;
 
 #if DEBUG
         // Specific options for the test handler
@@ -283,7 +284,7 @@ namespace PnP.Scanning.Process.Commands
 
             classicSkipUsageInformationOption = CreateClassicFlagOption(
                 Constants.StartClassicSkipUsageInformation,
-                "Skip collecting classic page usage information (recent/lifetime views)");
+                "Skip collecting classic page usage statistics. When set, classicpageauditusage.csv is not generated.");
             cmd.AddOption(classicSkipUsageInformationOption);
 
             classicSkipUserInformationOption = CreateClassicFlagOption(
@@ -295,6 +296,14 @@ namespace PnP.Scanning.Process.Commands
                 Constants.StartClassicHomePageOnly,
                 "Only assess the home page of each web during classic page assessment");
             cmd.AddOption(classicHomePageOnlyOption);
+
+            classicAuditLogWindowDaysOption = CreateClassicIntOption(
+                Constants.StartClassicAuditLogWindowDays,
+                "Number of days back to query the audit log via Microsoft Graph (1-180, default 14). Requires AuditLogsQuery-SharePoint.Read.All app permission. Retention: 180 days (Audit Standard) / 1 year (Audit Premium/E5).",
+                defaultValue: 14,
+                min: 1,
+                max: 180);
+            cmd.AddOption(classicAuditLogWindowDaysOption);
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -370,6 +379,46 @@ namespace PnP.Scanning.Process.Commands
             return option;
         }
 
+        private Option<int> CreateClassicIntOption(string name, string description, int defaultValue, int min, int max)
+        {
+            var option = new Option<int>(
+                name: $"--{name}",
+                parseArgument: (result) =>
+                {
+                    var mode = result.FindResultFor(modeOption);
+                    if (mode != null && mode.GetValueOrDefault<Mode>() != Mode.Classic)
+                    {
+                        result.ErrorMessage = $"--{name} can only be used with --{Constants.StartMode} classic";
+                        return defaultValue;
+                    }
+
+                    if (result.Tokens.Count == 0)
+                    {
+                        return defaultValue;
+                    }
+
+                    if (!int.TryParse(result.Tokens[0].Value, out var value))
+                    {
+                        result.ErrorMessage = $"--{name} requires an integer value";
+                        return defaultValue;
+                    }
+
+                    if (value < min || value > max)
+                    {
+                        result.ErrorMessage = $"--{name} must be between {min} and {max}";
+                        return defaultValue;
+                    }
+
+                    return value;
+                },
+                description: description)
+            {
+                IsRequired = false
+            };
+            option.SetDefaultValue(defaultValue);
+            return option;
+        }
+
         /// <summary>
         /// https://github.com/dotnet/command-line-api/blob/main/docs/model-binding.md#more-complex-types
         /// </summary>
@@ -387,6 +436,7 @@ namespace PnP.Scanning.Process.Commands
                                               , classicSkipUsageInformationOption
                                               , classicSkipUserInformationOption
                                               , classicHomePageOnlyOption
+                                              , classicAuditLogWindowDaysOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -567,7 +617,8 @@ namespace PnP.Scanning.Process.Commands
                         arguments.ExportWebPartProperties,
                         arguments.SkipUsageInformation,
                         arguments.SkipUserInformation,
-                        arguments.HomePageOnly);
+                        arguments.HomePageOnly,
+                        arguments.AuditLogWindowDays);
                 }
 
 #if DEBUG

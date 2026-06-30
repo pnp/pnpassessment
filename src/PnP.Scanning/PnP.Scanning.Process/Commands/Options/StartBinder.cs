@@ -27,6 +27,7 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<bool> classicSkipUsageInformation;
         private readonly Option<bool> classicSkipUserInformation;
         private readonly Option<bool> classicHomePageOnly;
+        private readonly Option<int> classicAuditLogWindowDays;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
@@ -41,6 +42,7 @@ namespace PnP.Scanning.Process.Commands
                            , Option<bool> classicSkipUsageInformationInput
                            , Option<bool> classicSkipUserInformationInput
                            , Option<bool> classicHomePageOnlyInput
+                           , Option<int> classicAuditLogWindowDaysInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
@@ -66,6 +68,7 @@ namespace PnP.Scanning.Process.Commands
             classicSkipUsageInformation = classicSkipUsageInformationInput;
             classicSkipUserInformation = classicSkipUserInformationInput;
             classicHomePageOnly = classicHomePageOnlyInput;
+            classicAuditLogWindowDays = classicAuditLogWindowDaysInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -93,6 +96,7 @@ namespace PnP.Scanning.Process.Commands
                 SkipUsageInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUsageInformation),
                 SkipUserInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUserInformation),
                 HomePageOnly = bindingContext.ParseResult.GetValueForOption(classicHomePageOnly),
+                AuditLogWindowDays = bindingContext.ParseResult.GetValueForOption(classicAuditLogWindowDays),
 
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),

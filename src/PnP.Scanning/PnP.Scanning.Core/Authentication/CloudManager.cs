@@ -39,6 +39,25 @@ namespace PnP.Scanning.Core.Authentication
         }
 
         /// <summary>
+        /// Returns the Office 365 Management Activity API authority (manage.office.com).
+        /// Used for audit log queries — synchronous, no polling required.
+        /// </summary>
+        internal static string GetManagementApiAuthority(Microsoft365Environment environment)
+        {
+            return environment switch
+            {
+                Microsoft365Environment.Production => "manage.office.com",
+                Microsoft365Environment.PreProduction => "manage.office.com",
+                Microsoft365Environment.USGovernment => "manage-gcc.office.com",
+                Microsoft365Environment.USGovernmentHigh => "manage.office365.us",
+                Microsoft365Environment.USGovernmentDoD => "manage.protection.apps.mil",
+                Microsoft365Environment.Germany => "manage.office.de",
+                Microsoft365Environment.China => "manage.office365.cn",
+                _ => "manage.office.com"
+            };
+        }
+
+        /// <summary>
         /// Returns the Azure AD login authority. See https://docs.microsoft.com/en-us/graph/deployments for details
         /// </summary>
         /// <param name="environment"></param>

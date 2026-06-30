@@ -19,7 +19,8 @@ namespace PnP.Scanning.Core.Scanners
             bool exportWebPartProperties,
             bool skipUsageInformation,
             bool skipUserInformation,
-            bool homePageOnly)
+            bool homePageOnly,
+            int auditLogWindowDays = 14)
         {
             // Each requested scan component is keyed by its enum name and is always "on" (true);
             // FromScannerInput reads these as the set of enabled ClassicComponents.
@@ -37,6 +38,12 @@ namespace PnP.Scanning.Core.Scanners
             AddBool(request, Constants.StartClassicSkipUsageInformation, skipUsageInformation);
             AddBool(request, Constants.StartClassicSkipUserInformation, skipUserInformation);
             AddBool(request, Constants.StartClassicHomePageOnly, homePageOnly);
+            request.Properties.Add(new PropertyRequest
+            {
+                Property = Constants.StartClassicAuditLogWindowDays,
+                Type = "int",
+                Value = auditLogWindowDays.ToString(),
+            });
         }
 
         private static void AddBool(StartRequest request, string property, bool value)

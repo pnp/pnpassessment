@@ -1,4 +1,5 @@
-﻿using PnP.Core.Model;
+﻿using EFCore.BulkExtensions;
+using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
@@ -280,9 +281,67 @@ namespace PnP.Scanning.Core.Scanners
 
                 // Store the last site collection
                 AddClassicSiteCollection(dbContext, webTemplates, remediationCodes, classicSiteCollection);
-                
+
                 // Persist the changes
                 await dbContext.SaveChangesAsync();
+
+                // Audit log usage collection — replaces the legacy SharePoint Search page-usage pipeline.
+                // Skipped when --skipusageinformation is passed, matching the semantics of the old flag.
+                if (!Options.SkipUsageInformation)
+                {
+                    var authManager = ScanManager.GetScanAuthenticationManager(ScanId);
+                    var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == ScanId);
+                    string environment = scan?.CLIEnvironment ?? PnP.Core.Services.Microsoft365Environment.Production.ToString();
+                    int windowDays = Options.AuditLogWindowDays;
+                    DateTime windowEnd = DateTime.UtcNow;
+                    DateTime windowStart = windowEnd.AddDays(-windowDays);
+                    // Use the scan's live cancellation token so pause/abort is honoured during the
+                    // potentially long audit log query (up to 45 min per chunk).
+                    var ct = ScanManager.GetCancellationTokenSource(ScanId).Token;
+                    try
+                    {
+                        await StorageManager.CollectAndStoreAuditLogUsageAsync(dbContext, ScanId, authManager, environment, windowStart, windowEnd, ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Logger.Warning("Audit log collection was cancelled for scan {ScanId}", ScanId);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log and continue — a failure here (e.g. BulkInsert / OOM / Graph API error) must not
+                        // fail the entire post-scan phase and discard site summaries already committed.
+                        Logger.Warning(ex, "Audit log collection failed for scan {ScanId}: {Error}", ScanId, ex.Message);
+
+                        // Write a site-level error row per scanned site so classicpageauditusage.csv
+                        // is generated and the customer can see what went wrong instead of finding a missing file.
+                        try
+                        {
+                            // Reuse the outer dbContext — opening a second ScanContext while the outer
+                            // connection is still alive causes "database is locked" in SQLite DELETE mode.
+                            var siteUrls = dbContext.ClassicSiteSummaries
+                                .Where(p => p.ScanId == ScanId)
+                                .Select(p => p.SiteUrl)
+                                .ToList();
+                            var errorRecords = siteUrls.Select(siteUrl => new PnP.Scanning.Core.Storage.ClassicPageAuditUsage
+                            {
+                                ScanId = ScanId,
+                                SiteUrl = siteUrl,
+                                WebUrl = "/",
+                                PageUrl = siteUrl,
+                                AuditWindowStart = windowStart,
+                                AuditWindowEnd = windowEnd,
+                                QueryStatus = "error",
+                                SkipReason = $"{ex.GetType().Name}: {ex.Message[..Math.Min(200, ex.Message.Length)]}",
+                            }).ToList();
+                            if (errorRecords.Count > 0)
+                                await dbContext.BulkInsertAsync(errorRecords);
+                        }
+                        catch (Exception writeEx)
+                        {
+                            Logger.Warning(writeEx, "Could not write error rows for scan {ScanId}", ScanId);
+                        }
+                    }
+                }
             }
 
             Logger.Information("Post assessment work done");

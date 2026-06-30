@@ -42,10 +42,6 @@ namespace PnP.Scanning.Core.Tests.Storage
                     HomePage = true,
                     UncustomizedHomePage = true,
                     ModifiedBy = "Jane Doe",
-                    ViewsRecent = 10,
-                    ViewsRecentUniqueUsers = 4,
-                    ViewsLifeTime = 100,
-                    ViewsLifeTimeUniqueUsers = 25,
                 });
 
                 context.ClassicPageWebParts.Add(new ClassicPageWebPart
@@ -89,10 +85,6 @@ namespace PnP.Scanning.Core.Tests.Storage
                 page.HomePage.Should().BeTrue();
                 page.UncustomizedHomePage.Should().BeTrue();
                 page.ModifiedBy.Should().Be("Jane Doe");
-                page.ViewsRecent.Should().Be(10);
-                page.ViewsRecentUniqueUsers.Should().Be(4);
-                page.ViewsLifeTime.Should().Be(100);
-                page.ViewsLifeTimeUniqueUsers.Should().Be(25);
 
                 var webPart = context.ClassicPageWebParts.Single(wp =>
                     wp.ScanId == scanId && wp.PageUrl == pageUrl && wp.WebPartIndex == 0);
@@ -162,6 +154,69 @@ namespace PnP.Scanning.Core.Tests.Storage
             {
                 context.ClassicWebPartUniques.Add(Row());
                 // Same (ScanId, WebPartType) → PK violation.
+                Assert.ThrowsAny<DbUpdateException>(() => context.SaveChanges());
+            }
+        }
+
+        [Fact]
+        public void Schema_ClassicPageAuditUsage_CanPersistAndRetrieve()
+        {
+            var scanId  = Guid.NewGuid();
+            var siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
+            var pageUrl = $"{siteUrl}/SitePages/Home.aspx";
+            var windowStart = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            var windowEnd   = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc);
+
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPageAuditUsages.Add(new ClassicPageAuditUsage
+                {
+                    ScanId = scanId, SiteUrl = siteUrl, WebUrl = "/",
+                    PageUrl = pageUrl,
+                    AuditViewsCount = 5, AuditCreatesCount = 1, AuditEditsCount = 2, AuditUniqueUsers = 3,
+                    AuditWindowStart = windowStart, AuditWindowEnd = windowEnd,
+                    QueryStatus = "succeeded", SkipReason = null,
+                });
+                context.SaveChanges();
+            }
+
+            using (var context = fixture.CreateContext())
+            {
+                var row = context.ClassicPageAuditUsages.Single(r => r.ScanId == scanId && r.PageUrl == pageUrl);
+                row.AuditViewsCount.Should().Be(5);
+                row.AuditCreatesCount.Should().Be(1);
+                row.AuditEditsCount.Should().Be(2);
+                row.AuditUniqueUsers.Should().Be(3);
+                row.AuditWindowStart.Should().Be(windowStart);
+                row.AuditWindowEnd.Should().Be(windowEnd);
+                row.QueryStatus.Should().Be("succeeded");
+                row.SkipReason.Should().BeNull();
+            }
+        }
+
+        [Fact]
+        public void Schema_ClassicPageAuditUsage_DuplicateCompositeKey_Throws()
+        {
+            var scanId  = Guid.NewGuid();
+            var siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
+
+            ClassicPageAuditUsage Row() => new()
+            {
+                ScanId = scanId, SiteUrl = siteUrl, WebUrl = "/",
+                PageUrl = $"{siteUrl}/SitePages/Home.aspx",
+                AuditWindowStart = DateTime.UtcNow, AuditWindowEnd = DateTime.UtcNow,
+                QueryStatus = "succeeded",
+            };
+
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPageAuditUsages.Add(Row());
+                context.SaveChanges();
+            }
+
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPageAuditUsages.Add(Row());
                 Assert.ThrowsAny<DbUpdateException>(() => context.SaveChanges());
             }
         }
