@@ -256,8 +256,13 @@ namespace PnP.Scanning.Core.Scanners
                 }
 
                 var pollBody = await pollResponse.Content.ReadAsStringAsync(cancellationToken);
-                using var pollDoc = JsonDocument.Parse(pollBody);
-                var status = pollDoc.RootElement.GetProperty("status").GetString();
+                string status;
+                try
+                {
+                    using var pollDoc = JsonDocument.Parse(pollBody);
+                    status = pollDoc.RootElement.GetProperty("status").GetString() ?? string.Empty;
+                }
+                catch (Exception ex) { return (null, $"ParseError polling query {queryId}: {ex.Message}"); }
 
                 if (status == "failed")
                     return (null, $"QueryFailed: query {queryId} reported failed status");
@@ -294,9 +299,16 @@ namespace PnP.Scanning.Core.Scanners
                 }
 
                 var recordsBody = await recordsResponse.Content.ReadAsStringAsync(cancellationToken);
-                using var recordsDoc = JsonDocument.Parse(recordsBody);
+                JsonDocument recordsDoc;
+                try { recordsDoc = JsonDocument.Parse(recordsBody); }
+                catch (JsonException ex) { return (null, $"ParseError fetching records for query {queryId}: {ex.Message}"); }
 
-                foreach (var record in recordsDoc.RootElement.GetProperty("value").EnumerateArray())
+                using (recordsDoc)
+                {
+                if (!recordsDoc.RootElement.TryGetProperty("value", out var valueElement))
+                    return (null, $"ParseError: records response for query {queryId} missing 'value' array");
+
+                foreach (var record in valueElement.EnumerateArray())
                 {
                     if (!record.TryGetProperty("operation", out var opProp)) continue;
                     string operation = opProp.GetString() ?? string.Empty;
@@ -324,6 +336,7 @@ namespace PnP.Scanning.Core.Scanners
 
                 nextLink = recordsDoc.RootElement.TryGetProperty("@odata.nextLink", out var nextLinkProp)
                     ? nextLinkProp.GetString() : null;
+                } // end using (recordsDoc)
             }
 
             var output = new Dictionary<string, AuditPageStats>(StringComparer.OrdinalIgnoreCase);

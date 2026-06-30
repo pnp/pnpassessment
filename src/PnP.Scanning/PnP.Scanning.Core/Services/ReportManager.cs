@@ -486,7 +486,7 @@ namespace PnP.Scanning.Core.Services
 
             // Only generate the file when audit log collection actually ran (--skipusageinformation
             // produces zero rows; in that case no file is created).
-            if (dbContext.ClassicPageAuditUsages.Any(p => p.ScanId == scanId))
+            if (await dbContext.ClassicPageAuditUsages.AnyAsync(p => p.ScanId == scanId))
             {
                 using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPageAuditUsageCsv)))
                 {

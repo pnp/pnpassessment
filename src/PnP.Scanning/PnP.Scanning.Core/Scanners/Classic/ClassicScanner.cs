@@ -316,8 +316,9 @@ namespace PnP.Scanning.Core.Scanners
                         // is generated and the customer can see what went wrong instead of finding a missing file.
                         try
                         {
-                            using var errorCtx = new PnP.Scanning.Core.Storage.ScanContext(ScanId);
-                            var siteUrls = errorCtx.ClassicSiteSummaries
+                            // Reuse the outer dbContext — opening a second ScanContext while the outer
+                            // connection is still alive causes "database is locked" in SQLite DELETE mode.
+                            var siteUrls = dbContext.ClassicSiteSummaries
                                 .Where(p => p.ScanId == ScanId)
                                 .Select(p => p.SiteUrl)
                                 .ToList();
@@ -333,7 +334,7 @@ namespace PnP.Scanning.Core.Scanners
                                 SkipReason = $"{ex.GetType().Name}: {ex.Message[..Math.Min(200, ex.Message.Length)]}",
                             }).ToList();
                             if (errorRecords.Count > 0)
-                                await errorCtx.BulkInsertAsync(errorRecords);
+                                await dbContext.BulkInsertAsync(errorRecords);
                         }
                         catch (Exception writeEx)
                         {

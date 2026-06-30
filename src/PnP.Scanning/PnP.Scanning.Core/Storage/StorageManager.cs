@@ -1273,11 +1273,31 @@ namespace PnP.Scanning.Core.Storage
                         PageUrl = kvp.Key,
                         AuditWindowStart = windowStart,
                         AuditWindowEnd = windowEnd,
-                        QueryStatus = queryStatus,
-                        SkipReason = skipReason,
+                        // Per-page rows always show "succeeded" — the page's own data came from a
+                        // succeeded chunk. Window-level coverage gaps (partial) are reported on the
+                        // site-level placeholder row only, keeping per-page data rows clean.
+                        QueryStatus = "succeeded",
+                        SkipReason = null,
                     };
                     Scanners.AuditLogUsageAnalyzer.ApplyAuditUsage(record, stats);
                     target.Add(record);
+                }
+
+                // When the overall query was partial, also emit a site-level summary row so the
+                // coverage gap is visible in the CSV without polluting per-page rows.
+                if (queryStatus == "partial" && !string.IsNullOrEmpty(skipReason))
+                {
+                    target.Add(new ClassicPageAuditUsage
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = "/",
+                        PageUrl = siteUrl,
+                        AuditWindowStart = windowStart,
+                        AuditWindowEnd = windowEnd,
+                        QueryStatus = queryStatus,
+                        SkipReason = skipReason,
+                    });
                 }
             }
         }
