@@ -11,8 +11,8 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20260624145341_v1.12.4-auditlog")]
-    partial class v1124auditlog
+    [Migration("20260630080339_v1.12.4-classicpageaudit")]
+    partial class v1124classicpageaudit
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -545,18 +545,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("UnmappedWebParts")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("ViewsLifeTime")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ViewsLifeTimeUniqueUsers")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ViewsRecent")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ViewsRecentUniqueUsers")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("WebPartCount")
                         .HasColumnType("INTEGER");
 
@@ -578,6 +566,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<string>("PageUrl")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("AuditCreatesCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AuditEditsCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("AuditUniqueUsers")
                         .HasColumnType("INTEGER");
@@ -601,9 +595,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("TEXT");
 
                     b.HasKey("ScanId", "SiteUrl", "PageUrl");
-
-                    b.HasIndex("ScanId", "SiteUrl", "PageUrl")
-                        .IsUnique();
 
                     b.ToTable("ClassicPageAuditUsages");
                 });

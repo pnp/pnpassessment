@@ -593,9 +593,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.HasKey("ScanId", "SiteUrl", "PageUrl");
 
-                    b.HasIndex("ScanId", "SiteUrl", "PageUrl")
-                        .IsUnique();
-
                     b.ToTable("ClassicPageAuditUsages");
                 });
 
