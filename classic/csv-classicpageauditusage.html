@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>classicpages.csv file details | Microsoft 365 Assessment Tool </title>
+    <title>classicpageauditusage.csv file details | Microsoft 365 Assessment Tool </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="classicpages.csv file details | Microsoft 365 Assessment Tool ">
+    <meta name="title" content="classicpageauditusage.csv file details | Microsoft 365 Assessment Tool ">
     <meta name="generator" content="docfx 2.56.5.0">
     <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
     <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
@@ -71,14 +71,25 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
                   <div class="contribution-panel mobile-hide pull-right">
-                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/classic/csv-classicpages.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/classic/csv-classicpageauditusage.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
                   </div>
-                    <h1 id="classicpagescsv-file-details">classicpages.csv file details</h1>
+                    <h1 id="classicpageauditusagecsv-file-details">classicpageauditusage.csv file details</h1>
 
 <h2 id="summary">Summary</h2>
-<p>This csv file contains one row for every classic page (wiki, web part, publishing, blog or ASPX page) that was discovered and assessed, including its page-modernization-readiness columns.</p>
+<p>This csv file contains one row per classic page for which audit log activity was collected, plus (when a
+site's audit data could not be fully collected) a site-level summary row that surfaces the coverage gap.
+It reports how often each classic page was <strong>viewed, created and edited</strong> during the queried audit window,
+based on data from the <strong>Microsoft Graph audit log</strong> (<code>security/auditLog/queries</code>).</p>
+<p>The file is only generated when audit log usage collection runs — that is, when <code>--skipusageinformation</code>
+is <strong>not</strong> specified and the Entra app has the <code>AuditLogsQuery-SharePoint.Read.All</code> Microsoft Graph
+application permission (see <a href="requirements.html">requirements</a>).</p>
+<div class="NOTE">
+<h5>Note</h5>
+<p>Audit events are typically available in the log 60–90 minutes after they occur, so very recent activity
+may not yet be reflected. The counts are a de-duplicated activity signal (for example a page view is not
+re-logged for the same user and page within a short window), not a raw hit counter.</p>
+</div>
 <h2 id="columns">Columns</h2>
-<p>The following columns are included:</p>
 <table>
 <thead>
 <tr>
@@ -89,78 +100,57 @@
 <tbody>
 <tr>
 <td>PageUrl</td>
-<td>Server-relative URL of the page</td>
+<td>Server-relative URL of the classic page (e.g. <code>/sites/team/SitePages/Home.aspx</code>). This matches the <code>Url</code> column in <a href="csv-classicpages.html">classicpages.csv</a>, so the two files can be joined on this value. On a site-level summary row (see <code>QueryStatus</code>), this is the server-relative site URL.</td>
 </tr>
 <tr>
-<td>PageName</td>
-<td>Display name of the page</td>
+<td>AuditViewsCount</td>
+<td>Number of <code>ClassicPageViewed</code> events for this page within the audit window.</td>
 </tr>
 <tr>
-<td>PageType</td>
-<td>The detected classic page type: <code>WikiPage</code>, <code>WebPartPage</code>, <code>PublishingPage</code>, <code>BlogPage</code>, <code>ASPXPage</code> or <code>DelveBlogPage</code></td>
+<td>AuditCreatesCount</td>
+<td>Number of <code>ClassicPageCreated</code> events for this page within the audit window.</td>
 </tr>
 <tr>
-<td>ListUrl</td>
-<td>Server-relative URL of the library the page lives in</td>
+<td>AuditEditsCount</td>
+<td>Number of <code>ClassicPageEdited</code> events for this page within the audit window.</td>
 </tr>
 <tr>
-<td>ListTitle</td>
-<td>Title of the library the page lives in</td>
+<td>AuditUniqueUsers</td>
+<td>Approximate number of distinct users across all of the above operations for this page. Capped for very heavily-used pages (the exact count saturates once a page's tracked-user set reaches the internal cap).</td>
 </tr>
 <tr>
-<td>ListId</td>
-<td>Id of the library the page lives in</td>
+<td>AuditWindowStart</td>
+<td>Start of the queried audit window (UTC).</td>
 </tr>
 <tr>
-<td>ModifiedAt</td>
-<td>When the page was last modified</td>
+<td>AuditWindowEnd</td>
+<td>End of the queried audit window (UTC).</td>
 </tr>
 <tr>
-<td>Layout</td>
-<td>The detected page layout (e.g. a wiki <code>TwoColumns</code>, a web part page <code>FullPageVertical</code>, or the publishing page layout name such as <code>ArticleLeft</code>)</td>
+<td>QueryStatus</td>
+<td>Coverage status for this row. <code>succeeded</code> = the audit window was queried in full. <code>partial</code> = one or more sub-windows failed, so this page's counts are a floor (some days may be missing). <code>failed</code> = audit collection failed for this site (for example a missing permission or a query error); counts are 0. <code>skipped</code> = audit collection was intentionally not run for this site (for example an unsupported/sovereign cloud).</td>
 </tr>
 <tr>
-<td>HomePage</td>
-<td>True when this page is the web's home (welcome) page</td>
-</tr>
-<tr>
-<td>UncustomizedHomePage</td>
-<td>True when this home page is still the default, uncustomized home page (only meaningful when <code>HomePage</code> is true)</td>
-</tr>
-<tr>
-<td>ModifiedBy</td>
-<td>Display name of the user who last modified the page (empty when <code>--skipuserinformation</code> was specified)</td>
-</tr>
-<tr>
-<td>WebPartCount</td>
-<td>Number of web parts found on the page</td>
-</tr>
-<tr>
-<td>MappingPercentage</td>
-<td>Percentage (0-100) of the page's web parts that have a known modern mapping. A page with no web parts is reported as 100%</td>
-</tr>
-<tr>
-<td>UnmappedWebParts</td>
-<td>Comma-separated list of the (short) web part type names on the page that do not have a known modern mapping</td>
-</tr>
-<tr>
-<td>RemediationCode</td>
-<td>The remediation code for this page type (<code>CP1</code>-<code>CP5</code>)</td>
+<td>SkipReason</td>
+<td>Populated when <code>QueryStatus</code> is not <code>succeeded</code>. A human-readable reason, e.g. <code>NoPermission: The Entra app is missing the 'AuditLogsQuery-SharePoint.Read.All' application permission...</code>, <code>PartialData: 2/7 chunk(s) failed — ...</code>, or a query/timeout error. Empty on successful rows.</td>
 </tr>
 <tr>
 <td>ScanId</td>
-<td>Id of the assessment</td>
+<td>Id of the assessment.</td>
 </tr>
 <tr>
 <td>SiteUrl</td>
-<td>Fully qualified site collection URL</td>
-</tr>
-<tr>
-<td>WebUrl</td>
-<td>Relative URL of this web</td>
+<td>Fully qualified site collection URL that owns this page.</td>
 </tr>
 </tbody>
 </table>
+<div class="NOTE">
+<h5>Note</h5>
+<p>If the audit query for a site fails or returns partially, that site's affected rows carry
+<code>QueryStatus=failed</code>/<code>partial</code> with the reason in <code>SkipReason</code>. In particular, a missing
+<code>AuditLogsQuery-SharePoint.Read.All</code> permission produces <code>QueryStatus=failed</code> with
+<code>SkipReason=NoPermission: ...</code> — check this column if audit counts are unexpectedly 0.</p>
+</div>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
