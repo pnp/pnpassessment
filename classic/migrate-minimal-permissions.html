@@ -1,0 +1,235 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html lang="en">
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Migrate classic SharePoint pages to modern &#8212; with the least permission possible | Microsoft 365 Assessment Tool </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Migrate classic SharePoint pages to modern &#8212; with the least permission possible | Microsoft 365 Assessment Tool ">
+    <meta name="generator" content="docfx 2.56.5.0">
+    <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
+    <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> 
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    <meta property="docfx:newtab" content="true">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <!--
+        <a class="navbar-brand" href="../index.html">
+          <img id="logo" class="svg" src="../logo.svg" alt="" >
+        </a>
+        -->
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <label class="glyphicon glyphicon-search" for="search-query"></label>
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+                  <div class="contribution-panel mobile-hide pull-right">
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/classic/migrate-minimal-permissions.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                  </div>
+                    <h1 id="migrate-classic-sharepoint-pages-to-modern--with-the-least-permission-possible">Migrate classic SharePoint pages to modern — with the least permission possible</h1>
+
+<p>Once the classic pages assessment has shown you <em>which</em> pages are ready to modernize, the next step is to actually migrate them. This guide shows a <strong>site owner</strong> how to convert classic pages to modern pages using <strong>PnP PowerShell</strong>, requesting the <strong>smallest permission that works</strong>, and escalating only when your tenant forces you to.</p>
+<div class="NOTE">
+<h5>Note</h5>
+<p>Migration is performed by <strong>PnP PowerShell</strong> (the <code>ConvertTo-PnPPage</code> cmdlet), not by the Microsoft 365 Assessment tool. The Assessment tool identifies and inventories classic pages; PnP PowerShell modernizes them. This page complements the assessment by describing the least-privilege way to run that migration.</p>
+</div>
+<h2 id="key-facts-to-understand-first">Key facts to understand first</h2>
+<ul>
+<li><strong>Minimum scope = <code>AllSites.Manage</code>.</strong> This covers everything transformation writes (create/save/publish the modern page, read the classic source, swap the page name, update navigation).</li>
+<li><strong>You sign in as yourself (delegated), not as the app.</strong> Your effective access is <em>the app's scope and your own site rights</em>. You can only migrate pages on sites where <strong>you already have permission</strong>.</li>
+<li><strong><code>AllSites.FullControl</code> is needed for exactly one optional thing:</strong> copying a page's <em>item-level unique (broken-inheritance) permissions</em> onto the new page. Everything else works on <code>AllSites.Manage</code>.</li>
+</ul>
+<h2 id="which-scenario-are-you-in">Which scenario are you in?</h2>
+<pre><code>Register a minimal AllSites.Manage app, then Connect-PnPOnline.
+│
+├─ First sign-in shows an &quot;Accept&quot; consent button
+│     → SCENARIO 1  (self-service, zero admin)
+│
+├─ First sign-in shows &quot;Need admin approval&quot;
+│     → SCENARIO 2  (one-time admin consent, then self-serve forever)
+│
+└─ You must PRESERVE per-page unique permissions
+      → SCENARIO 3  (requires AllSites.FullControl + admin consent)
+</code></pre>
+<h2 id="prerequisites">Prerequisites</h2>
+<pre><code class="lang-powershell"># PnP PowerShell (v2+ / v3+)
+Install-Module PnP.PowerShell -Scope CurrentUser
+</code></pre>
+<p>You'll need: your tenant name (<code>contoso.onmicrosoft.com</code>), the target site URL, and the classic page name.</p>
+<hr>
+<h2 id="scenario-1--try-self-service-first-allsitesmanage-user-consent">Scenario 1 — Try self-service first (<code>AllSites.Manage</code>, user consent)</h2>
+<p>Many tenants let a normal user consent to <code>AllSites.Manage</code> by default. Try this path first — if it works, <strong>no administrator is involved at all.</strong></p>
+<p><strong>Step 1 — Register the minimal app (once per tenant; you can do this yourself).</strong></p>
+<pre><code class="lang-powershell">Register-PnPEntraIDAppForInteractiveLogin `
+  -ApplicationName &quot;Classic Page Migrator&quot; `
+  -Tenant contoso.onmicrosoft.com `
+  -SharePointDelegatePermissions AllSites.Manage `
+  -SignInAudience AzureADMyOrg
+</code></pre>
+<ul>
+<li>This creates a <strong>public-client</strong> app with the single <code>AllSites.Manage</code> delegated permission and prints a line like <code>App Classic Page Migrator with id &lt;client-id&gt; created.</code> — <strong>copy that client id.</strong></li>
+<li>The cmdlet then tries to consent the app in the same run. If you are <strong>not</strong> an admin this last step may end in a red error (<code>AADSTS500027</code>). <strong>That's expected and harmless — the app is already registered.</strong> (Tell: the &quot;App … created&quot; line prints <em>before</em> the error.)</li>
+<li><em>(The cmdlet also generates a self-signed certificate for app-only use. You don't need it here — you sign in interactively as yourself.)</em></li>
+</ul>
+<p><strong>Step 2 — Connect and migrate.</strong></p>
+<pre><code class="lang-powershell">Connect-PnPOnline `
+  -Url https://contoso.sharepoint.com/sites/theirsite `
+  -ClientId &lt;client-id&gt; `
+  -Tenant contoso.onmicrosoft.com `
+  -Interactive
+
+ConvertTo-PnPPage -Identity MyClassicPage.aspx -Overwrite
+</code></pre>
+<ul>
+<li>On first connect a <strong>consent dialog</strong> may appear.
+<ul>
+<li><strong>If it shows an &quot;Accept&quot; button → accept it. You're done — zero admin.</strong> Every future run is prompt-free.</li>
+<li><strong>If it says &quot;Need admin approval&quot; → stop and go to Scenario 2.</strong> (Your app is already registered; you just need it consented once.)</li>
+</ul>
+</li>
+<li><code>-Interactive</code> opens your system browser (MFA-compatible). On a headless/remote box use <code>-DeviceLogin</code> instead.</li>
+</ul>
+<div class="NOTE">
+<h5>Note</h5>
+<p><strong>Run-time note:</strong> you must have <strong>Edit/Full Control on the target site</strong> — a delegated token can't exceed your own rights. If you get <strong>403</strong>, you're not a member of that site, not short on app permission.</p>
+</div>
+<hr>
+<h2 id="scenario-2--consent-is-blocked--one-time-admin-consent-then-self-serve-forever">Scenario 2 — Consent is blocked → one-time admin consent, then self-serve forever</h2>
+<p>If Scenario 1's first sign-in said <strong>&quot;Need admin approval,&quot;</strong> your tenant disables user consent for this scope. You do <strong>not</strong> need to re-register anything — the app from Scenario 1 Step 1 already exists. An administrator just consents it <strong>once, tenant-wide</strong>, and then you (and every other site owner) use it with no prompt.</p>
+<p><strong>Who can consent:</strong> a <strong>Cloud Application Administrator</strong> is sufficient — <strong>Tenant Administrator or Global Administrator are not required.</strong> (<code>AllSites.Manage</code> is a delegated SharePoint scope, not a Graph app-role, so it doesn't force the higher role.)</p>
+<p><strong>Ask your admin to do one of these:</strong></p>
+<p><strong>Option A — Entra portal (simplest).</strong>
+Entra admin center → <strong>Enterprise applications</strong> → <em>Classic Page Migrator</em> → <strong>Permissions</strong> → <strong>Grant admin consent for &lt;tenant&gt;</strong>.</p>
+<p><strong>Option B — Admin-consent URL</strong> (admin opens it in a browser, signs in, clicks <strong>Accept</strong>):</p>
+<pre><code>https://login.microsoftonline.com/contoso.onmicrosoft.com/adminconsent?client_id=&lt;client-id&gt;&amp;redirect_uri=http://localhost
+</code></pre>
+<p>The final redirect to <code>http://localhost</code> may show a harmless <code>AADSTS500027</code> — <strong>the consent is still recorded.</strong></p>
+<p><strong>Option C — Azure CLI:</strong></p>
+<pre><code class="lang-bash">az ad app permission admin-consent --id &lt;client-id&gt;
+</code></pre>
+<p><strong>After consent, you just re-run Scenario 1 Step 2</strong> — this time with <strong>no prompt</strong>:</p>
+<pre><code class="lang-powershell">Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/theirsite -ClientId &lt;client-id&gt; -Tenant contoso.onmicrosoft.com -Interactive
+ConvertTo-PnPPage -Identity MyClassicPage.aspx -Overwrite
+</code></pre>
+<hr>
+<h2 id="scenario-3--you-need-to-preserve-per-page-unique-permissions--allsitesfullcontrol">Scenario 3 — You need to preserve per-page unique permissions → <code>AllSites.FullControl</code></h2>
+<p><code>ConvertTo-PnPPage</code> <strong>copies a page's item-level unique (broken-inheritance) permissions to the new modern page by default.</strong> That copy step needs the <strong>ManagePermissions</strong> right, which is only available through <strong><code>AllSites.FullControl</code></strong>.</p>
+<p><strong>What happens with only <code>AllSites.Manage</code>:</strong> the migration still <strong>succeeds</strong> — the permission-copy step is <strong>skipped and logged</strong> (<code>You don't have the needed permission level (ManagePermissions)…</code>). The modern page simply inherits permissions from its library instead of carrying the source page's unique ACL. For most pages this is fine; you only need FullControl if a specific page relies on unique permissions you must retain. (You can also explicitly opt out of the copy with <code>-SkipItemLevelPermissionCopyToClientSidePage</code>.)</p>
+<p><strong>To actually preserve unique permissions</strong>, register the app with <code>AllSites.FullControl</code> instead:</p>
+<pre><code class="lang-powershell">Register-PnPEntraIDAppForInteractiveLogin `
+  -ApplicationName &quot;Classic Page Migrator (FullControl)&quot; `
+  -Tenant contoso.onmicrosoft.com `
+  -SharePointDelegatePermissions AllSites.FullControl `
+  -SignInAudience AzureADMyOrg
+</code></pre>
+<p><strong><code>AllSites.FullControl</code> always requires an administrator to consent — a site owner can never self-consent it.</strong> Ask a <strong>Cloud Application Administrator</strong> (Global Admin still not required) to consent it, exactly as in <strong>Scenario 2</strong>. After that:</p>
+<pre><code class="lang-powershell">Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/theirsite -ClientId &lt;client-id&gt; -Tenant contoso.onmicrosoft.com -Interactive
+ConvertTo-PnPPage -Identity MyClassicPage.aspx -Overwrite   # item-level permissions now copied
+</code></pre>
+<hr>
+<h2 id="permission-reference">Permission reference</h2>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Delegated permission id</th>
+<th>Consent</th>
+<th>Covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AllSites.Manage</code></td>
+<td><code>b3f70a70-8a4b-4f95-9573-d71c496a53f4</code></td>
+<td><strong>User-consentable on many tenants</strong> (else Cloud App Admin, once)</td>
+<td>Full page migration: create/save/publish, read classic source, name swap, nav</td>
+</tr>
+<tr>
+<td><code>AllSites.FullControl</code></td>
+<td><code>56680e0d-d2a3-4ae1-80d8-3c4f2100e3d0</code></td>
+<td><strong>Always admin</strong> (Cloud App Admin, not Global Admin)</td>
+<td>Everything above <strong>+</strong> copying item-level unique permissions</td>
+</tr>
+</tbody>
+</table>
+<p>SharePoint Online resource app id: <code>00000003-0000-0ff1-ce00-000000000000</code>.</p>
+<h2 id="good-to-know">Good to know</h2>
+<ul>
+<li><strong>Nothing secret is distributed.</strong> Only the non-secret <strong>client id</strong> is shared. Each person signs in as themselves; access is bounded to their own sites.</li>
+<li><strong>One registration serves everyone.</strong> Register (and, if needed, admin-consent) the app <strong>once per tenant</strong>; all site owners reuse the same client id.</li>
+<li><strong><code>-Interactive</code> vs <code>-DeviceLogin</code>:</strong> use <code>-Interactive</code> at a desktop; <code>-DeviceLogin</code> on a headless/remote host. Both support MFA.</li>
+</ul>
+</article>
+          </div>
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              </nav>
+            </div>
+          </div>        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            <span>Microsoft 365 Assessment Tool<br>Generated by <strong><a href='https://dotnet.github.io/docfx' alt='Doc FX Website'>DocFX</a></strong> with <strong><a href='https://ovasquez.github.io/docfx-material' alt='DocFx Material Theme'>Material UI</a></strong></span>
+            
+          </div>
+        </div>
+      </footer>    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>  </body>
+</html>

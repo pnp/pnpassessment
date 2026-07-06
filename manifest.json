@@ -518,6 +518,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "classic/migrate-minimal-permissions.md",
+      "output": {
+        ".html": {
+          "relative_path": "classic/migrate-minimal-permissions.html",
+          "hash": "arFh0kay3MSStW4AJI4t+Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "classic/readme.md",
       "output": {
         ".html": {
@@ -558,7 +570,7 @@
       "output": {
         ".html": {
           "relative_path": "classic/toc.html",
-          "hash": "FbfK3GghQuRG44cIrxFmFw=="
+          "hash": "2eMJNAaZ1PIf9eh8prYS4g=="
         }
       },
       "is_incremental": false,
@@ -1701,7 +1713,7 @@
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
           "incrementalPhase": "build",
-          "total_file_count": 93,
+          "total_file_count": 94,
           "skipped_file_count": 0
         },
         "ResourceDocumentProcessor": {
