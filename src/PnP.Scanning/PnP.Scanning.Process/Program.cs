@@ -24,7 +24,7 @@ namespace PnP.Scanning.Process
 {
     internal class Program
     {
-        internal static async Task Main(string[] args)
+        internal static async Task<int> Main(string[] args)
         {
             bool isCliProcess = true;
 
@@ -37,26 +37,31 @@ namespace PnP.Scanning.Process
             if (isCliProcess)
             {
 
-                await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
+                var isOfflineAspxInventory = args.Length > 0 &&
+                    args[0].Equals("aspx-inventory", StringComparison.OrdinalIgnoreCase);
+                if (!isOfflineAspxInventory)
                 {
-                    var versions = await VersionManager.LatestVersionAsync();
+                    await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
+                    {
+                        var versions = await VersionManager.LatestVersionAsync();
 
-                    // There's a newer version to download                
-                    if (!string.IsNullOrEmpty(versions.Item2))
-                    {
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine($"Version [yellow]{versions.Item2}[/] is available, you are currently using version {versions.Item1}");
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine($"Download the latest version from [yellow]{VersionManager.newVersionDownloadUrl}[/]");
-                        AnsiConsole.WriteLine();
-                    }
-                    else
-                    {
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine($"You are using the latest version {versions.Item1}");
-                        AnsiConsole.WriteLine();
-                    }
-                });
+                        // There's a newer version to download
+                        if (!string.IsNullOrEmpty(versions.Item2))
+                        {
+                            AnsiConsole.WriteLine();
+                            AnsiConsole.MarkupLine($"Version [yellow]{versions.Item2}[/] is available, you are currently using version {versions.Item1}");
+                            AnsiConsole.WriteLine();
+                            AnsiConsole.MarkupLine($"Download the latest version from [yellow]{VersionManager.newVersionDownloadUrl}[/]");
+                            AnsiConsole.WriteLine();
+                        }
+                        else
+                        {
+                            AnsiConsole.WriteLine();
+                            AnsiConsole.MarkupLine($"You are using the latest version {versions.Item1}");
+                            AnsiConsole.WriteLine();
+                        }
+                    });
+                }
 
                 // Configure needed services
                 var host = ConfigureCliHost(args);
@@ -91,10 +96,11 @@ namespace PnP.Scanning.Process
                         AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
                         consoleInput = Console.ReadLine();
                     }
+                    return 0;
                 }
                 else
                 {
-                    await parser.InvokeAsync(args);
+                    return await parser.InvokeAsync(args);
                 }
             }
             else
@@ -145,6 +151,7 @@ namespace PnP.Scanning.Process
                 {
                     Log.CloseAndFlush();
                 }
+                return 0;
             }
         }
 

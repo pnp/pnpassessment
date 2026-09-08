@@ -23,12 +23,13 @@ internal static class DiscoveryGapCodes
     internal const string ChangedDuringScan = "changed_during_scan";
     internal const string PaginationTokenLoopOrLoss = "pagination_token_loop_or_loss";
     internal const string ExpectedChildMissing = "expected_child_missing";
+    internal const string DenominatorDrift = "denominator_drift";
     internal const string BatchReplayConflict = "batch_replay_conflict";
 
     internal static bool ForcesUnknown(string code) => code is
         SourceUnsupported or SupplementSourceUnverified or PermissionVisibilityUnknown or
         FilenameMissing or IdentityMissing or MetadataConflict or LocatorIdentityConflict or
-        ChangedDuringScan or PaginationTokenLoopOrLoss or BatchReplayConflict;
+        ChangedDuringScan or PaginationTokenLoopOrLoss or DenominatorDrift or BatchReplayConflict;
 }
 
 internal sealed record DiscoveryRunManifest(
@@ -47,8 +48,8 @@ internal sealed record DiscoveryRunManifest(
     string FixtureRevision = null,
     string FixtureHash = null)
 {
-    internal const string CurrentContractVersion = "aspx-discovery/v1";
-    internal const string CurrentSchemaVersion = "aspx-discovery-sqlite/v1";
+    internal const string CurrentContractVersion = "aspx-discovery/v2";
+    internal const string CurrentSchemaVersion = "aspx-discovery-sqlite/v2";
 
     internal IReadOnlyList<string> Validate(bool fixtureRun)
     {
@@ -123,6 +124,14 @@ internal sealed record DiscoveryScopeRegistration(
     string ExclusionRuleVersion = null,
     string ExclusionRuleHash = null,
     string ExclusionApprovalRef = null);
+
+internal sealed record DiscoveryChildExpectation(
+    string ScopeKey,
+    DiscoveryScopeKind Kind,
+    DiscoverySourceKind? SourceKind,
+    string Locator,
+    string PermissionContext,
+    bool Required = true);
 
 internal sealed record RawDiscoveryRecord(
     string NativeObjectId,

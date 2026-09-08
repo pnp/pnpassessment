@@ -66,3 +66,22 @@ internal sealed record AspxDiscoveryOutputV1(
             store.ReadObservations(runId), store.ReadCoverage(runId),
             store.ReadGapCodes(runId), store.ReadConflictCount(runId));
 }
+
+internal sealed record AspxDiscoveryOutputV2(
+    string OutputVersion,
+    Guid RunId,
+    DiscoveryExecutionStatus ExecutionStatus,
+    DiscoveryVerdict CoverageVerdict,
+    IReadOnlyList<DiscoveryInventoryRow> Inventory,
+    IReadOnlyList<DiscoveryObservationRow> Observations,
+    IReadOnlyList<DiscoveryCoverageRow> Coverage,
+    IReadOnlyList<DiscoveryDenominatorRow> Denominator,
+    IReadOnlyList<string> UnresolvedGapCodes,
+    int UnresolvedConflictCount)
+{
+    internal const string Version = "aspx-discovery-output/v2";
+    internal static AspxDiscoveryOutputV2 Create(Guid runId, DiscoveryVerdict verdict, DiscoveryStore store) =>
+        new(Version, runId, store.ReadExecutionStatus(runId), verdict, store.ReadInventory(runId),
+            store.ReadObservations(runId), store.ReadCoverage(runId), store.ReadDenominator(runId),
+            store.ReadGapCodes(runId), store.ReadConflictCount(runId));
+}

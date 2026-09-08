@@ -28,6 +28,7 @@ namespace PnP.Scanning.Process.Commands
             rootCommand.AddCommand(new ReportCommandHandler(processManager).Create());
             rootCommand.AddCommand(new RestartCommandHandler(processManager, configurationOptions).Create());
             rootCommand.AddCommand(new StartCommandHandler(processManager, dataProtectionProvider, configurationOptions).Create());
+            rootCommand.AddCommand(new AspxInventoryCommandHandler().Create());
             rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
 

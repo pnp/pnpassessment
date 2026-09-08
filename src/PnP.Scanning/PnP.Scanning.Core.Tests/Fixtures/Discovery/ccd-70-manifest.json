@@ -1,0 +1,16 @@
+{
+  "productRef": "pnp/pnpassessment@e34e862bef99a88b13ad30e11c25c9fc1c778a47",
+  "sdkRef": "1f07296b186698c3cc9ca8580f00af36c0f3f4f5",
+  "contractVersion": "aspx-discovery/v2",
+  "schemaVersion": "aspx-discovery-sqlite/v2",
+  "migrationSetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "inputManifestHash": "3689a344ac6fd09d114001208018a8d1d3ba3c85a5e60595fe3968d1382a7aaf",
+  "scopePolicyHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tenantManifestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "binaryArtifactHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "buildManifestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "dependencyManifestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "environmentManifestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "fixtureRevision": "synthetic-fixtures/ccd-70",
+  "fixtureHash": "3689a344ac6fd09d114001208018a8d1d3ba3c85a5e60595fe3968d1382a7aaf"
+}

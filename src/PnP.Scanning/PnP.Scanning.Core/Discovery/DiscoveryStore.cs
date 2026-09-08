@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Text.Json;
 
 namespace PnP.Scanning.Core.Discovery;
 
@@ -15,6 +16,10 @@ internal sealed record DiscoveryObservationRow(
 internal sealed record DiscoveryCoverageRow(
     string ScopeKey, string ParentScopeKey, string Kind, string SourceKind,
     DiscoveryTerminalOutcome Outcome, int? ExpectedCount, DiscoveryCounts Counts);
+
+internal sealed record DiscoveryDenominatorRow(
+    string ParentScopeKey, string ChildKind, DiscoveryTerminalOutcome Outcome,
+    int ExpectedCount, int ObservedCount, string EnumerationFingerprint, string PermissionContext);
 
 internal sealed record AspxAdmissionResult(bool IsAspx, string LeafName, string GapCode = null, string Detail = null);
 
@@ -64,6 +69,23 @@ internal sealed class DiscoveryStore : IDisposable
             ("$createdUtc", DateTimeOffset.UtcNow.ToString("O")));
     }
 
+    internal bool RunExists(Guid runId) => Scalar<long>(
+        "SELECT COUNT(*) FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D"))) == 1;
+
+    internal DiscoveryRunManifest ReadManifest(Guid runId) => JsonSerializer.Deserialize<DiscoveryRunManifest>(
+        Scalar<string>("SELECT ManifestJson FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D"))),
+        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+    internal string ReadScopeMode(Guid runId) => Scalar<string>(
+        "SELECT ScopeMode FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D")));
+
+    internal bool ReadFixtureRun(Guid runId) => Scalar<long>(
+        "SELECT FixtureRun FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D"))) == 1;
+
+    internal void ResumeExecution(Guid runId) => Execute(
+        "UPDATE DiscoveryRuns SET ExecutionStatus=$status, FinishedUtc=NULL WHERE RunId=$runId",
+        ("$status", DiscoveryExecutionStatus.Running.ToString()), ("$runId", runId.ToString("D")));
+
     internal void RegisterScope(Guid runId, DiscoveryScopeRegistration scope)
     {
         if (!scope.Required && (string.IsNullOrWhiteSpace(scope.ExclusionRuleId) ||
@@ -89,6 +111,67 @@ internal sealed class DiscoveryStore : IDisposable
             ("$ruleId", scope.ExclusionRuleId), ("$ruleVersion", scope.ExclusionRuleVersion),
             ("$ruleHash", scope.ExclusionRuleHash), ("$approval", scope.ExclusionApprovalRef));
     }
+
+    internal void RecordChildEnumeration(Guid runId, string parentScopeKey, DiscoveryScopeKind childKind,
+        IReadOnlyList<DiscoveryChildExpectation> expectedChildren, DiscoveryTerminalOutcome outcome,
+        string permissionContext, string gapCode = null, string gapDetail = null)
+    {
+        expectedChildren ??= Array.Empty<DiscoveryChildExpectation>();
+        if (expectedChildren.Any(child => child.Kind != childKind))
+            throw new InvalidOperationException("Child denominator entries must use the declared child kind.");
+
+        var canonical = string.Join("\n", expectedChildren.OrderBy(child => child.ScopeKey, StringComparer.Ordinal)
+            .Select(child => string.Join("|", child.ScopeKey, child.Kind, child.SourceKind, child.Locator,
+                child.PermissionContext, child.Required)));
+        var fingerprint = DiscoveryHash.Of(parentScopeKey, childKind.ToString(), canonical);
+        using var transaction = connection.BeginTransaction();
+        var previous = Scalar<string>("""
+            SELECT EnumerationFingerprint FROM DiscoveryChildEnumerations
+            WHERE RunId=$runId AND ParentScopeKey=$parent AND ChildKind=$kind
+            """, transaction, ("$runId", runId.ToString("D")), ("$parent", parentScopeKey),
+            ("$kind", childKind.ToString()));
+        if (!string.IsNullOrWhiteSpace(previous) && !string.Equals(previous, fingerprint, StringComparison.Ordinal))
+        {
+            UpsertGap(runId, parentScopeKey, DiscoverySourceKind.TenantManifest,
+                DiscoveryGapCodes.DenominatorDrift,
+                $"Expected {childKind} denominator changed from {previous} to {fingerprint} during resume/replay.",
+                null, transaction);
+        }
+
+        Execute(transaction, """
+            INSERT INTO DiscoveryChildEnumerations
+              (RunId, ParentScopeKey, ChildKind, Outcome, ExpectedCount, EnumerationFingerprint, PermissionContext, UpdatedUtc)
+            VALUES ($runId, $parent, $kind, $outcome, $count, $fingerprint, $permission, $updated)
+            ON CONFLICT(RunId, ParentScopeKey, ChildKind) DO UPDATE SET
+              Outcome=excluded.Outcome, ExpectedCount=excluded.ExpectedCount,
+              EnumerationFingerprint=excluded.EnumerationFingerprint,
+              PermissionContext=excluded.PermissionContext, UpdatedUtc=excluded.UpdatedUtc
+            """, ("$runId", runId.ToString("D")), ("$parent", parentScopeKey),
+            ("$kind", childKind.ToString()), ("$outcome", outcome.ToString()),
+            ("$count", expectedChildren.Count(child => child.Required)), ("$fingerprint", fingerprint),
+            ("$permission", permissionContext), ("$updated", DateTimeOffset.UtcNow.ToString("O")));
+
+        foreach (var child in expectedChildren)
+        {
+            Execute(transaction, """
+                INSERT INTO DiscoveryExpectedChildren
+                  (RunId, ParentScopeKey, ChildScopeKey, ChildKind, SourceKind, Locator, PermissionContext, Required)
+                VALUES ($runId, $parent, $child, $kind, $source, $locator, $permission, $required)
+                ON CONFLICT(RunId, ParentScopeKey, ChildScopeKey) DO UPDATE SET
+                  ChildKind=excluded.ChildKind, SourceKind=excluded.SourceKind, Locator=excluded.Locator,
+                  PermissionContext=excluded.PermissionContext, Required=excluded.Required
+                """, ("$runId", runId.ToString("D")), ("$parent", parentScopeKey),
+                ("$child", child.ScopeKey), ("$kind", child.Kind.ToString()),
+                ("$source", child.SourceKind?.ToString()), ("$locator", child.Locator),
+                ("$permission", child.PermissionContext), ("$required", child.Required ? 1 : 0));
+        }
+        if (!string.IsNullOrWhiteSpace(gapCode))
+            UpsertGap(runId, parentScopeKey, DiscoverySourceKind.TenantManifest, gapCode, gapDetail, null, transaction);
+        transaction.Commit();
+    }
+
+    internal void RecordGap(Guid runId, string scopeKey, string code, string detail) =>
+        UpsertGap(runId, scopeKey, DiscoverySourceKind.TenantManifest, code, detail, null, null);
 
     internal Guid BeginAttempt(Guid runId, string scopeKey, DiscoverySourceKind sourceKind)
     {
@@ -171,15 +254,21 @@ internal sealed class DiscoveryStore : IDisposable
     internal DiscoveryVerdict EvaluateVerdict(Guid runId, bool tenantVisibilityVerified)
     {
         var scopeMode = Scalar<string>("SELECT ScopeMode FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D")));
+        if (string.Equals(scopeMode, "tenant_full", StringComparison.Ordinal)) EnsureTenantFullDenominator(runId);
         var outcomes = Strings("SELECT Outcome FROM DiscoveryScopes WHERE RunId=$runId", ("$runId", runId.ToString("D")))
+            .Select(Enum.Parse<DiscoveryTerminalOutcome>).ToArray();
+        var enumerationOutcomes = Strings("SELECT Outcome FROM DiscoveryChildEnumerations WHERE RunId=$runId", ("$runId", runId.ToString("D")))
             .Select(Enum.Parse<DiscoveryTerminalOutcome>).ToArray();
         var gaps = Strings("SELECT Code FROM DiscoveryGaps WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D"))).ToArray();
         var conflicts = Scalar<long>("SELECT COUNT(*) FROM DiscoveryConflicts WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D")));
         DiscoveryVerdict verdict;
         if (outcomes.Length == 0 || outcomes.Any(outcome => outcome is DiscoveryTerminalOutcome.Pending or DiscoveryTerminalOutcome.Unknown) ||
+            enumerationOutcomes.Any(outcome => outcome is DiscoveryTerminalOutcome.Pending or DiscoveryTerminalOutcome.Unknown) ||
             gaps.Any(DiscoveryGapCodes.ForcesUnknown) || conflicts > 0)
             verdict = DiscoveryVerdict.Unknown;
         else if (outcomes.Any(outcome => outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed or
+                     DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled) ||
+                 enumerationOutcomes.Any(outcome => outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed or
                      DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled) ||
                  gaps.Contains(DiscoveryGapCodes.ExpectedChildMissing, StringComparer.Ordinal))
             verdict = DiscoveryVerdict.Incomplete;
@@ -247,7 +336,30 @@ internal sealed class DiscoveryStore : IDisposable
             reader.IsDBNull(3) ? null : reader.GetString(3), Enum.Parse<DiscoveryTerminalOutcome>(reader.GetString(4))));
         reader.Close();
         return raw.Select(row => new DiscoveryCoverageRow(row.Key, row.Parent, row.Kind, row.Source, row.Outcome,
-            ExpectedCount: null, GetCounts(runId, row.Key))).ToArray();
+            ExpectedCount: Scalar<long>("SELECT COALESCE(SUM(ExpectedCount), -1) FROM DiscoveryChildEnumerations WHERE RunId=$runId AND ParentScopeKey=$parent",
+                ("$runId", runId.ToString("D")), ("$parent", row.Key)) is var expected && expected >= 0 ? (int)expected : null,
+            GetCounts(runId, row.Key))).ToArray();
+    }
+
+    internal IReadOnlyList<DiscoveryDenominatorRow> ReadDenominator(Guid runId)
+    {
+        using var command = Command("""
+            SELECT e.ParentScopeKey, e.ChildKind, e.Outcome, e.ExpectedCount,
+                   (SELECT COUNT(*) FROM DiscoveryExpectedChildren x
+                    JOIN DiscoveryScopes s ON s.RunId=x.RunId AND s.ScopeKey=x.ChildScopeKey
+                    WHERE x.RunId=e.RunId AND x.ParentScopeKey=e.ParentScopeKey
+                      AND x.ChildKind=e.ChildKind AND x.Required=1),
+                   e.EnumerationFingerprint, e.PermissionContext
+            FROM DiscoveryChildEnumerations e
+            WHERE e.RunId=$runId
+            ORDER BY e.ParentScopeKey, e.ChildKind
+            """, null, ("$runId", runId.ToString("D")));
+        using var reader = command.ExecuteReader();
+        var rows = new List<DiscoveryDenominatorRow>();
+        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.GetString(1),
+            Enum.Parse<DiscoveryTerminalOutcome>(reader.GetString(2)), reader.GetInt32(3), reader.GetInt32(4),
+            reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6)));
+        return rows;
     }
 
     internal IReadOnlyList<string> ReadGapCodes(Guid runId) => Strings(
@@ -256,6 +368,87 @@ internal sealed class DiscoveryStore : IDisposable
         "SELECT COUNT(*) FROM DiscoveryConflicts WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D")));
 
     public void Dispose() => connection.Dispose();
+
+    private void EnsureTenantFullDenominator(Guid runId)
+    {
+        Execute("UPDATE DiscoveryGaps SET Resolved=1 WHERE RunId=$runId AND Code=$code",
+            ("$runId", runId.ToString("D")), ("$code", DiscoveryGapCodes.ExpectedChildMissing));
+        var requiredKinds = new[]
+        {
+            DiscoveryScopeKind.Tenant, DiscoveryScopeKind.Geo, DiscoveryScopeKind.SiteCollection,
+            DiscoveryScopeKind.Web, DiscoveryScopeKind.Container, DiscoveryScopeKind.Folder,
+        };
+        foreach (var kind in requiredKinds)
+        {
+            if (Scalar<long>("SELECT COUNT(*) FROM DiscoveryScopes WHERE RunId=$runId AND Required=1 AND Kind=$kind",
+                    ("$runId", runId.ToString("D")), ("$kind", kind.ToString())) == 0)
+            {
+                RecordGap(runId, "run:" + runId.ToString("D"), DiscoveryGapCodes.ExpectedChildMissing,
+                    $"tenant_full requires at least one required {kind} scope.");
+            }
+        }
+
+        using (var missingCommand = Command("""
+            SELECT x.ParentScopeKey, x.ChildScopeKey, x.ChildKind
+            FROM DiscoveryExpectedChildren x
+            LEFT JOIN DiscoveryScopes s ON s.RunId=x.RunId AND s.ScopeKey=x.ChildScopeKey
+            WHERE x.RunId=$runId AND x.Required=1 AND s.ScopeKey IS NULL
+            ORDER BY x.ParentScopeKey, x.ChildScopeKey
+            """, null, ("$runId", runId.ToString("D"))))
+        using (var reader = missingCommand.ExecuteReader())
+        {
+            var missing = new List<(string Parent, string Child, string Kind)>();
+            while (reader.Read()) missing.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            reader.Close();
+            foreach (var item in missing)
+                RecordGap(runId, item.Parent, DiscoveryGapCodes.ExpectedChildMissing,
+                    $"Expected required {item.Kind} child '{item.Child}' was not observed.");
+        }
+
+        var parentChildKinds = new Dictionary<DiscoveryScopeKind, DiscoveryScopeKind>
+        {
+            [DiscoveryScopeKind.Tenant] = DiscoveryScopeKind.Geo,
+            [DiscoveryScopeKind.Geo] = DiscoveryScopeKind.SiteCollection,
+            [DiscoveryScopeKind.SiteCollection] = DiscoveryScopeKind.Web,
+            [DiscoveryScopeKind.Web] = DiscoveryScopeKind.Container,
+            [DiscoveryScopeKind.Container] = DiscoveryScopeKind.Folder,
+            [DiscoveryScopeKind.Folder] = DiscoveryScopeKind.Folder,
+        };
+        using var parentCommand = Command(
+            "SELECT ScopeKey, Kind FROM DiscoveryScopes WHERE RunId=$runId AND Required=1 ORDER BY ScopeKey",
+            null, ("$runId", runId.ToString("D")));
+        using var parentReader = parentCommand.ExecuteReader();
+        var parents = new List<(string Key, DiscoveryScopeKind Kind)>();
+        while (parentReader.Read())
+            parents.Add((parentReader.GetString(0), Enum.Parse<DiscoveryScopeKind>(parentReader.GetString(1))));
+        parentReader.Close();
+        foreach (var parent in parents)
+        {
+            var childKind = parentChildKinds[parent.Kind];
+            var count = Scalar<long>("""
+                SELECT COUNT(*) FROM DiscoveryChildEnumerations
+                WHERE RunId=$runId AND ParentScopeKey=$parent AND ChildKind=$kind
+                """, ("$runId", runId.ToString("D")), ("$parent", parent.Key), ("$kind", childKind.ToString()));
+            if (count == 0)
+            {
+                RecordGap(runId, parent.Key, DiscoveryGapCodes.ExpectedChildMissing,
+                    $"Required {parent.Kind} scope has no {childKind} child enumeration denominator.");
+            }
+        }
+
+        using var singleContainerCommand = Command("""
+            SELECT ParentScopeKey FROM DiscoveryChildEnumerations
+            WHERE RunId=$runId AND ChildKind='Container' AND ExpectedCount=1
+            ORDER BY ParentScopeKey
+            """, null, ("$runId", runId.ToString("D")));
+        using var singleContainerReader = singleContainerCommand.ExecuteReader();
+        var singleContainerParents = new List<string>();
+        while (singleContainerReader.Read()) singleContainerParents.Add(singleContainerReader.GetString(0));
+        singleContainerReader.Close();
+        foreach (var parent in singleContainerParents)
+            RecordGap(runId, parent, DiscoveryGapCodes.ExpectedChildMissing,
+                "tenant_full cannot prove a complete web denominator from a single Container expectation.");
+    }
 
     private void PersistRecord(Guid runId, string scopeKey, DiscoverySourceKind sourceKind, Guid attemptId, Guid batchId,
         RawDiscoveryRecord record, SqliteTransaction transaction)
@@ -364,6 +557,8 @@ internal sealed class DiscoveryStore : IDisposable
         PRAGMA journal_mode=WAL;
         CREATE TABLE IF NOT EXISTS DiscoveryRuns (RunId TEXT PRIMARY KEY, ManifestJson TEXT NOT NULL, ManifestHash TEXT NOT NULL, ScopeMode TEXT NOT NULL, ExecutionStatus TEXT NOT NULL, Verdict TEXT NULL, FixtureRun INTEGER NOT NULL, CreatedUtc TEXT NOT NULL, FinishedUtc TEXT NULL);
         CREATE TABLE IF NOT EXISTS DiscoveryScopes (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, ParentScopeKey TEXT NULL, Kind TEXT NOT NULL, SourceKind TEXT NULL, Locator TEXT NULL, PermissionContext TEXT NULL, Required INTEGER NOT NULL, Outcome TEXT NOT NULL, ExclusionRuleId TEXT NULL, ExclusionRuleVersion TEXT NULL, ExclusionRuleHash TEXT NULL, ExclusionApprovalRef TEXT NULL, PRIMARY KEY (RunId, ScopeKey));
+        CREATE TABLE IF NOT EXISTS DiscoveryChildEnumerations (RunId TEXT NOT NULL, ParentScopeKey TEXT NOT NULL, ChildKind TEXT NOT NULL, Outcome TEXT NOT NULL, ExpectedCount INTEGER NOT NULL, EnumerationFingerprint TEXT NOT NULL, PermissionContext TEXT NULL, UpdatedUtc TEXT NOT NULL, PRIMARY KEY (RunId, ParentScopeKey, ChildKind));
+        CREATE TABLE IF NOT EXISTS DiscoveryExpectedChildren (RunId TEXT NOT NULL, ParentScopeKey TEXT NOT NULL, ChildScopeKey TEXT NOT NULL, ChildKind TEXT NOT NULL, SourceKind TEXT NULL, Locator TEXT NULL, PermissionContext TEXT NULL, Required INTEGER NOT NULL, PRIMARY KEY (RunId, ParentScopeKey, ChildScopeKey));
         CREATE TABLE IF NOT EXISTS DiscoveryAttempts (AttemptId TEXT PRIMARY KEY, RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, SourceKind TEXT NOT NULL, Status TEXT NOT NULL, StartedUtc TEXT NOT NULL, FinishedUtc TEXT NULL);
         CREATE UNIQUE INDEX IF NOT EXISTS UX_DiscoveryAttempts_Active ON DiscoveryAttempts(RunId, ScopeKey, SourceKind) WHERE Status='Running';
         CREATE TABLE IF NOT EXISTS DiscoveryBatches (BatchId TEXT PRIMARY KEY, AttemptId TEXT NOT NULL, BatchOrdinal INTEGER NOT NULL, RequestFingerprint TEXT NOT NULL, ResponseFingerprint TEXT NOT NULL, TerminalFlag INTEGER NOT NULL, NextCheckpoint TEXT NULL, CommittedUtc TEXT NOT NULL, UNIQUE (AttemptId, BatchOrdinal));

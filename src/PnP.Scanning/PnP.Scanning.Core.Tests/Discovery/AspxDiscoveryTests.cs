@@ -28,7 +28,7 @@ public sealed class AspxDiscoveryTests
 
         store.ReadInventory(runId).Select(row => row.FileName)
             .Should().BeEquivalentTo("kept.ASPX", "also-kept.aspx", "failure.aspx");
-        store.EvaluateVerdict(runId, false).Should().Be(DiscoveryVerdict.CompleteAuthorizedSurface);
+        store.EvaluateVerdict(runId, false).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         store.GetCounts(runId, surface.ScopeKey).Should().Be(new DiscoveryCounts(4, 3, 3, 1, 1, 0, 0));
     }
 
@@ -184,7 +184,7 @@ public sealed class AspxDiscoveryTests
 
         output.OutputVersion.Should().Be(AspxDiscoveryOutputV1.Version);
         output.ExecutionStatus.Should().Be(DiscoveryExecutionStatus.Finished);
-        output.CoverageVerdict.Should().Be(DiscoveryVerdict.CompleteTenantVerified);
+        output.CoverageVerdict.Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         output.Coverage.Select(row => row.Kind).Should().Contain(new[] { "Tenant", "Geo", "SiteCollection", "Web", "Container", "Folder" });
         output.Coverage.Should().OnlyContain(row => row.ExpectedCount == null);
         output.Observations.Should().ContainSingle(row => row.PermissionContext == "synthetic-authorized");
@@ -241,7 +241,7 @@ public sealed class AspxDiscoveryTests
                 Record("N01", "/retained/Backup.aspx.bak", "Backup.aspx.bak")
             }, true)));
             store.FinishExecution(runId, DiscoveryExecutionStatus.Finished);
-            store.EvaluateVerdict(runId, false).Should().Be(DiscoveryVerdict.CompleteAuthorizedSurface);
+            store.EvaluateVerdict(runId, false).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         }
         using (var reopened = new DiscoveryStore(path))
         {
@@ -252,7 +252,7 @@ public sealed class AspxDiscoveryTests
     private static Guid CreateRun(DiscoveryStore store)
     {
         var runId = Guid.NewGuid();
-        store.CreateRun(runId, Manifest(), "tenant_full", true);
+        store.CreateRun(runId, Manifest(), "declared_subset", true);
         return runId;
     }
 
