@@ -212,7 +212,7 @@ public sealed class AspxDiscoveryOrchestrationTests
     }
 
     internal static DiscoveryRunManifest Manifest() => new(
-        "pnp/pnpassessment@e34e862bef99a88b13ad30e11c25c9fc1c778a47",
+        "pnp/pnpassessment@34f34e2e3c56909ed5fc98afcb118390b025d7db",
         "1f07296b186698c3cc9ca8580f00af36c0f3f4f5",
         DiscoveryRunManifest.CurrentContractVersion, DiscoveryRunManifest.CurrentSchemaVersion,
         Hash, Hash, Hash, Hash, Hash, Hash, Hash, Hash, "synthetic-fixtures/ccd-70", Hash);
