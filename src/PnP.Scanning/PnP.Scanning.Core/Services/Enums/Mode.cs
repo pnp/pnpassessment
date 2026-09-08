@@ -9,6 +9,7 @@
         Workflow,
         InfoPath,
         Classic,
+        AspxInventory,
         AddInsACS,
         Alerts
     }

@@ -1,0 +1,415 @@
+using Microsoft.Data.Sqlite;
+
+namespace PnP.Scanning.Core.Discovery;
+
+internal enum BatchCommitResult { Committed, ReplayNoOp, ReplayConflict }
+
+internal sealed record DiscoveryInventoryRow(
+    string ScopeKey, string CanonicalInventoryKey, string PhysicalLocator,
+    string FileName, string IdentityQuality, string PermissionContext);
+
+internal sealed record DiscoveryObservationRow(
+    string ScopeKey, string SourceKind, string ObservationKey, string FactHash,
+    string FileName, string PhysicalLocator, string PermissionContext);
+
+internal sealed record DiscoveryCoverageRow(
+    string ScopeKey, string ParentScopeKey, string Kind, string SourceKind,
+    DiscoveryTerminalOutcome Outcome, int? ExpectedCount, DiscoveryCounts Counts);
+
+internal sealed record AspxAdmissionResult(bool IsAspx, string LeafName, string GapCode = null, string Detail = null);
+
+internal static class AspxAdmission
+{
+    internal static AspxAdmissionResult Evaluate(RawDiscoveryRecord record)
+    {
+        var leaf = record.FileName;
+        if (string.IsNullOrWhiteSpace(leaf) && record.LocatorIsGuaranteedPhysicalFilePath &&
+            !string.IsNullOrWhiteSpace(record.PhysicalLocator))
+        {
+            leaf = record.PhysicalLocator.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        }
+        if (string.IsNullOrWhiteSpace(leaf))
+        {
+            return new(false, null, DiscoveryGapCodes.FilenameMissing,
+                "No file leaf name or guaranteed physical-file locator fallback was supplied.");
+        }
+        return new(string.Equals(Path.GetExtension(leaf), ".aspx", StringComparison.OrdinalIgnoreCase), leaf);
+    }
+}
+
+internal sealed class DiscoveryStore : IDisposable
+{
+    private readonly SqliteConnection connection;
+
+    internal DiscoveryStore(string databasePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+        connection = new SqliteConnection($"Data Source={databasePath};Foreign Keys=True;Pooling=False");
+        connection.Open();
+        InitializeSchema();
+    }
+
+    internal void CreateRun(Guid runId, DiscoveryRunManifest manifest, string scopeMode, bool fixtureRun)
+    {
+        var invalid = manifest.Validate(fixtureRun);
+        if (invalid.Count > 0) throw new InvalidOperationException("Invalid immutable discovery manifest: " + string.Join(", ", invalid));
+        Execute("""
+            INSERT INTO DiscoveryRuns
+              (RunId, ManifestJson, ManifestHash, ScopeMode, ExecutionStatus, FixtureRun, CreatedUtc)
+            VALUES ($runId, $manifest, $manifestHash, $scopeMode, $execution, $fixtureRun, $createdUtc)
+            """,
+            ("$runId", runId.ToString("D")), ("$manifest", manifest.CanonicalJson()),
+            ("$manifestHash", DiscoveryHash.Of(manifest.CanonicalJson())), ("$scopeMode", scopeMode),
+            ("$execution", DiscoveryExecutionStatus.Running.ToString()), ("$fixtureRun", fixtureRun ? 1 : 0),
+            ("$createdUtc", DateTimeOffset.UtcNow.ToString("O")));
+    }
+
+    internal void RegisterScope(Guid runId, DiscoveryScopeRegistration scope)
+    {
+        if (!scope.Required && (string.IsNullOrWhiteSpace(scope.ExclusionRuleId) ||
+            string.IsNullOrWhiteSpace(scope.ExclusionRuleVersion) || scope.ExclusionRuleHash?.Length != 64 ||
+            string.IsNullOrWhiteSpace(scope.ExclusionApprovalRef)))
+        {
+            throw new InvalidOperationException("Policy exclusions require rule id/version/hash and approval ref.");
+        }
+        Execute("""
+            INSERT INTO DiscoveryScopes
+              (RunId, ScopeKey, ParentScopeKey, Kind, SourceKind, Locator, PermissionContext, Required, Outcome,
+               ExclusionRuleId, ExclusionRuleVersion, ExclusionRuleHash, ExclusionApprovalRef)
+            VALUES
+              ($runId, $scopeKey, $parent, $kind, $source, $locator, $permission, $required, $outcome,
+               $ruleId, $ruleVersion, $ruleHash, $approval)
+            ON CONFLICT(RunId, ScopeKey) DO UPDATE SET
+              ParentScopeKey=excluded.ParentScopeKey, Locator=excluded.Locator, PermissionContext=excluded.PermissionContext
+            """,
+            ("$runId", runId.ToString("D")), ("$scopeKey", scope.ScopeKey), ("$parent", scope.ParentScopeKey),
+            ("$kind", scope.Kind.ToString()), ("$source", scope.SourceKind?.ToString()), ("$locator", scope.Locator),
+            ("$permission", scope.PermissionContext), ("$required", scope.Required ? 1 : 0),
+            ("$outcome", scope.Required ? DiscoveryTerminalOutcome.Pending.ToString() : DiscoveryTerminalOutcome.PolicyExcluded.ToString()),
+            ("$ruleId", scope.ExclusionRuleId), ("$ruleVersion", scope.ExclusionRuleVersion),
+            ("$ruleHash", scope.ExclusionRuleHash), ("$approval", scope.ExclusionApprovalRef));
+    }
+
+    internal Guid BeginAttempt(Guid runId, string scopeKey, DiscoverySourceKind sourceKind)
+    {
+        Execute("""
+            UPDATE DiscoveryAttempts SET Status=$interrupted, FinishedUtc=$finished
+            WHERE RunId=$runId AND ScopeKey=$scopeKey AND SourceKind=$source AND Status=$running
+            """,
+            ("$interrupted", DiscoveryAttemptStatus.Interrupted.ToString()), ("$finished", DateTimeOffset.UtcNow.ToString("O")),
+            ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey), ("$source", sourceKind.ToString()),
+            ("$running", DiscoveryAttemptStatus.Running.ToString()));
+        var attemptId = Guid.NewGuid();
+        Execute("""
+            INSERT INTO DiscoveryAttempts (AttemptId, RunId, ScopeKey, SourceKind, Status, StartedUtc)
+            VALUES ($attempt, $runId, $scopeKey, $source, $status, $started)
+            """,
+            ("$attempt", attemptId.ToString("D")), ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey),
+            ("$source", sourceKind.ToString()), ("$status", DiscoveryAttemptStatus.Running.ToString()),
+            ("$started", DateTimeOffset.UtcNow.ToString("O")));
+        return attemptId;
+    }
+
+    internal BatchCommitResult CommitBatch(Guid runId, string scopeKey, DiscoverySourceKind sourceKind, Guid attemptId, RawDiscoveryBatch batch)
+    {
+        using var transaction = connection.BeginTransaction();
+        var existing = ExistingBatch(attemptId, batch.BatchOrdinal, transaction);
+        if (existing != null)
+        {
+            if (existing.Value.Request == batch.RequestFingerprint && existing.Value.Response == batch.ResponseFingerprint)
+            {
+                transaction.Rollback();
+                return BatchCommitResult.ReplayNoOp;
+            }
+            UpsertGap(runId, scopeKey, sourceKind, DiscoveryGapCodes.BatchReplayConflict,
+                $"Batch ordinal {batch.BatchOrdinal} changed fingerprints.", null, transaction);
+            SetAttempt(attemptId, DiscoveryAttemptStatus.Failed, transaction);
+            SetOutcome(runId, scopeKey, DiscoveryTerminalOutcome.Unknown, transaction);
+            transaction.Commit();
+            return BatchCommitResult.ReplayConflict;
+        }
+
+        var batchId = Guid.NewGuid();
+        Execute(transaction, """
+            INSERT INTO DiscoveryBatches
+              (BatchId, AttemptId, BatchOrdinal, RequestFingerprint, ResponseFingerprint, TerminalFlag, NextCheckpoint, CommittedUtc)
+            VALUES ($batch, $attempt, $ordinal, $request, $response, $terminal, $checkpoint, $committed)
+            """,
+            ("$batch", batchId.ToString("D")), ("$attempt", attemptId.ToString("D")), ("$ordinal", batch.BatchOrdinal),
+            ("$request", batch.RequestFingerprint), ("$response", batch.ResponseFingerprint),
+            ("$terminal", batch.IsTerminal ? 1 : 0), ("$checkpoint", batch.NextCheckpoint),
+            ("$committed", DateTimeOffset.UtcNow.ToString("O")));
+
+        foreach (var record in batch.Records ?? Array.Empty<RawDiscoveryRecord>())
+            PersistRecord(runId, scopeKey, sourceKind, attemptId, batchId, record, transaction);
+
+        if (!string.IsNullOrWhiteSpace(batch.GapCode))
+            UpsertGap(runId, scopeKey, sourceKind, batch.GapCode, batch.GapDetail, null, transaction);
+
+        if (batch.IsTerminal)
+        {
+            SetAttempt(attemptId,
+                batch.TerminalOutcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty
+                    ? DiscoveryAttemptStatus.Complete : DiscoveryAttemptStatus.Failed, transaction);
+            SetOutcome(runId, scopeKey, batch.TerminalOutcome, transaction);
+        }
+        transaction.Commit();
+        return BatchCommitResult.Committed;
+    }
+
+    internal void FinishExecution(Guid runId, DiscoveryExecutionStatus status) => Execute(
+        "UPDATE DiscoveryRuns SET ExecutionStatus=$status, FinishedUtc=$finished WHERE RunId=$runId",
+        ("$status", status.ToString()), ("$finished", DateTimeOffset.UtcNow.ToString("O")), ("$runId", runId.ToString("D")));
+
+    internal void RecordScopeOutcome(Guid runId, string scopeKey, DiscoveryTerminalOutcome outcome) =>
+        Execute("UPDATE DiscoveryScopes SET Outcome=$outcome WHERE RunId=$runId AND ScopeKey=$scopeKey",
+            ("$outcome", outcome.ToString()), ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey));
+
+    internal DiscoveryExecutionStatus ReadExecutionStatus(Guid runId) => Enum.Parse<DiscoveryExecutionStatus>(
+        Scalar<string>("SELECT ExecutionStatus FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D"))));
+
+    internal DiscoveryVerdict EvaluateVerdict(Guid runId, bool tenantVisibilityVerified)
+    {
+        var scopeMode = Scalar<string>("SELECT ScopeMode FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D")));
+        var outcomes = Strings("SELECT Outcome FROM DiscoveryScopes WHERE RunId=$runId", ("$runId", runId.ToString("D")))
+            .Select(Enum.Parse<DiscoveryTerminalOutcome>).ToArray();
+        var gaps = Strings("SELECT Code FROM DiscoveryGaps WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D"))).ToArray();
+        var conflicts = Scalar<long>("SELECT COUNT(*) FROM DiscoveryConflicts WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D")));
+        DiscoveryVerdict verdict;
+        if (outcomes.Length == 0 || outcomes.Any(outcome => outcome is DiscoveryTerminalOutcome.Pending or DiscoveryTerminalOutcome.Unknown) ||
+            gaps.Any(DiscoveryGapCodes.ForcesUnknown) || conflicts > 0)
+            verdict = DiscoveryVerdict.Unknown;
+        else if (outcomes.Any(outcome => outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed or
+                     DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled) ||
+                 gaps.Contains(DiscoveryGapCodes.ExpectedChildMissing, StringComparer.Ordinal))
+            verdict = DiscoveryVerdict.Incomplete;
+        else if (!string.Equals(scopeMode, "tenant_full", StringComparison.Ordinal) || outcomes.Contains(DiscoveryTerminalOutcome.PolicyExcluded))
+            verdict = DiscoveryVerdict.CompleteDeclaredSubset;
+        else
+            verdict = tenantVisibilityVerified ? DiscoveryVerdict.CompleteTenantVerified : DiscoveryVerdict.CompleteAuthorizedSurface;
+        Execute("UPDATE DiscoveryRuns SET Verdict=$verdict WHERE RunId=$runId", ("$verdict", verdict.ToString()), ("$runId", runId.ToString("D")));
+        return verdict;
+    }
+
+    internal DiscoveryCounts GetCounts(Guid runId, string scopeKey)
+    {
+        var attempt = Scalar<string>("""
+            SELECT AttemptId FROM DiscoveryAttempts WHERE RunId=$runId AND ScopeKey=$scopeKey
+            ORDER BY CASE WHEN Status='Complete' THEN 0 ELSE 1 END, StartedUtc DESC LIMIT 1
+            """, ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey));
+        long AttemptCount(string table, string suffix = "") => string.IsNullOrEmpty(attempt) ? 0 : Scalar<long>(
+            $"SELECT COUNT(*) FROM {table} WHERE AttemptId=$attempt {suffix}", ("$attempt", attempt));
+        return new(
+            (int)AttemptCount("DiscoveryAttemptObservations"),
+            (int)AttemptCount("DiscoveryAttemptObservations", "AND Emitted=1"),
+            (int)Scalar<long>("SELECT COUNT(*) FROM DiscoveryInventory WHERE RunId=$runId AND ScopeKey=$scopeKey", ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey)),
+            (int)AttemptCount("DiscoveryBatches"),
+            (int)Scalar<long>("SELECT COUNT(*) FROM DiscoveryAttempts WHERE RunId=$runId AND ScopeKey=$scopeKey", ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey)),
+            (int)Scalar<long>("SELECT COUNT(*) FROM DiscoveryGaps WHERE RunId=$runId AND ScopeKey=$scopeKey AND Resolved=0", ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey)),
+            (int)Scalar<long>("SELECT COUNT(*) FROM DiscoveryConflicts WHERE RunId=$runId AND ScopeKey=$scopeKey AND Resolved=0", ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey)));
+    }
+
+    internal IReadOnlyList<DiscoveryInventoryRow> ReadInventory(Guid runId)
+    {
+        using var command = Command("""
+            SELECT ScopeKey, CanonicalInventoryKey, PhysicalLocator, FileName, IdentityQuality, PermissionContext
+            FROM DiscoveryInventory WHERE RunId=$runId ORDER BY CanonicalInventoryKey
+            """, null, ("$runId", runId.ToString("D")));
+        using var reader = command.ExecuteReader();
+        var rows = new List<DiscoveryInventoryRow>();
+        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5)));
+        return rows;
+    }
+
+    internal IReadOnlyList<DiscoveryObservationRow> ReadObservations(Guid runId)
+    {
+        using var command = Command("""
+            SELECT ScopeKey, SourceKind, ObservationKey, FactHash, FileName, PhysicalLocator, PermissionContext
+            FROM DiscoveryObservations WHERE RunId=$runId ORDER BY ObservationKey, FactHash
+            """, null, ("$runId", runId.ToString("D")));
+        using var reader = command.ExecuteReader();
+        var rows = new List<DiscoveryObservationRow>();
+        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6)));
+        return rows;
+    }
+
+    internal IReadOnlyList<DiscoveryCoverageRow> ReadCoverage(Guid runId)
+    {
+        using var command = Command("""
+            SELECT ScopeKey, ParentScopeKey, Kind, SourceKind, Outcome
+            FROM DiscoveryScopes WHERE RunId=$runId ORDER BY ScopeKey
+            """, null, ("$runId", runId.ToString("D")));
+        using var reader = command.ExecuteReader();
+        var raw = new List<(string Key, string Parent, string Kind, string Source, DiscoveryTerminalOutcome Outcome)>();
+        while (reader.Read()) raw.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3), Enum.Parse<DiscoveryTerminalOutcome>(reader.GetString(4))));
+        reader.Close();
+        return raw.Select(row => new DiscoveryCoverageRow(row.Key, row.Parent, row.Kind, row.Source, row.Outcome,
+            ExpectedCount: null, GetCounts(runId, row.Key))).ToArray();
+    }
+
+    internal IReadOnlyList<string> ReadGapCodes(Guid runId) => Strings(
+        "SELECT Code FROM DiscoveryGaps WHERE RunId=$runId AND Resolved=0 ORDER BY Code", ("$runId", runId.ToString("D"))).ToArray();
+    internal int ReadConflictCount(Guid runId) => (int)Scalar<long>(
+        "SELECT COUNT(*) FROM DiscoveryConflicts WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D")));
+
+    public void Dispose() => connection.Dispose();
+
+    private void PersistRecord(Guid runId, string scopeKey, DiscoverySourceKind sourceKind, Guid attemptId, Guid batchId,
+        RawDiscoveryRecord record, SqliteTransaction transaction)
+    {
+        var locator = NormalizeLocator(record.PhysicalLocator);
+        var sourceObjectKey = !string.IsNullOrWhiteSpace(record.FileUniqueId) ? "file:" + record.FileUniqueId :
+            !string.IsNullOrWhiteSpace(record.NativeObjectId) ? "native:" + record.NativeObjectId :
+            !string.IsNullOrWhiteSpace(record.ContainerStableId) && !string.IsNullOrWhiteSpace(locator) ? "locator:" + record.ContainerStableId + ":" + locator : null;
+        if (sourceObjectKey == null)
+        {
+            UpsertGap(runId, scopeKey, sourceKind, DiscoveryGapCodes.IdentityMissing, "No stable identity was supplied.", null, transaction);
+            return;
+        }
+
+        var observationKey = DiscoveryHash.Of(DiscoveryRunManifest.CurrentContractVersion, scopeKey, sourceKind.ToString(), sourceObjectKey);
+        var metadata = DiscoveryHash.Metadata(record.Metadata);
+        var factHash = DiscoveryHash.Of(record.FileUniqueId, record.ContainerStableId, record.FileName, locator,
+            record.LocatorIsGuaranteedPhysicalFilePath.ToString(), record.PermissionContext, metadata);
+        var changed = Scalar<long>("SELECT COUNT(*) FROM DiscoveryObservations WHERE RunId=$runId AND ObservationKey=$key AND FactHash<>$fact",
+            transaction, ("$runId", runId.ToString("D")), ("$key", observationKey), ("$fact", factHash)) > 0;
+        Execute(transaction, """
+            INSERT OR IGNORE INTO DiscoveryObservations
+              (ObservationId, RunId, ScopeKey, SourceKind, ObservationKey, FactHash, SourceObjectKey, FileName, PhysicalLocator, PermissionContext, MetadataJson)
+            VALUES ($id, $runId, $scopeKey, $source, $key, $fact, $sourceObject, $fileName, $locator, $permission, $metadata)
+            """,
+            ("$id", Guid.NewGuid().ToString("D")), ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey),
+            ("$source", sourceKind.ToString()), ("$key", observationKey), ("$fact", factHash), ("$sourceObject", sourceObjectKey),
+            ("$fileName", record.FileName), ("$locator", locator), ("$permission", record.PermissionContext), ("$metadata", metadata));
+        var observationId = Scalar<string>("SELECT ObservationId FROM DiscoveryObservations WHERE RunId=$runId AND ObservationKey=$key AND FactHash=$fact",
+            transaction, ("$runId", runId.ToString("D")), ("$key", observationKey), ("$fact", factHash));
+        var admission = AspxAdmission.Evaluate(record);
+        Execute(transaction, """
+            INSERT OR IGNORE INTO DiscoveryAttemptObservations (AttemptId, ObservationId, BatchId, Emitted)
+            VALUES ($attempt, $observation, $batch, $emitted)
+            """, ("$attempt", attemptId.ToString("D")), ("$observation", observationId),
+            ("$batch", batchId.ToString("D")), ("$emitted", admission.IsAspx ? 1 : 0));
+        if (changed) UpsertGap(runId, scopeKey, sourceKind, DiscoveryGapCodes.ChangedDuringScan,
+            "Stable observation identity changed facts during the scan.", observationKey, transaction);
+        if (!admission.IsAspx)
+        {
+            if (admission.GapCode != null) UpsertGap(runId, scopeKey, sourceKind, admission.GapCode, admission.Detail, observationKey, transaction);
+            return;
+        }
+
+        var canonicalKey = !string.IsNullOrWhiteSpace(record.FileUniqueId)
+            ? DiscoveryHash.Of("file", record.FileUniqueId) : DiscoveryHash.Of("locator", record.ContainerStableId, locator);
+        if (!string.IsNullOrWhiteSpace(locator))
+        {
+            using var command = Command("SELECT CanonicalInventoryKey FROM DiscoveryInventory WHERE RunId=$runId AND PhysicalLocator=$locator AND CanonicalInventoryKey<>$key",
+                transaction, ("$runId", runId.ToString("D")), ("$locator", locator), ("$key", canonicalKey));
+            using var reader = command.ExecuteReader();
+            var participants = new List<string>();
+            while (reader.Read()) participants.Add(reader.GetString(0));
+            reader.Close();
+            foreach (var participant in participants)
+            {
+                var sorted = new[] { participant, canonicalKey }.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+                var conflictKey = DiscoveryHash.Of(scopeKey, DiscoveryGapCodes.LocatorIdentityConflict, sorted[0], sorted[1]);
+                Execute(transaction, """
+                    INSERT OR IGNORE INTO DiscoveryConflicts (RunId, ScopeKey, ConflictKey, Code, ParticipantKeys, Resolved)
+                    VALUES ($runId, $scopeKey, $key, $code, $participants, 0)
+                    """, ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey), ("$key", conflictKey),
+                    ("$code", DiscoveryGapCodes.LocatorIdentityConflict), ("$participants", string.Join(',', sorted)));
+            }
+        }
+        Execute(transaction, """
+            INSERT INTO DiscoveryInventory (RunId, ScopeKey, CanonicalInventoryKey, PhysicalLocator, FileName, IdentityQuality, PermissionContext)
+            VALUES ($runId, $scopeKey, $key, $locator, $fileName, $quality, $permission)
+            ON CONFLICT(RunId, CanonicalInventoryKey) DO UPDATE SET
+              PhysicalLocator=excluded.PhysicalLocator, FileName=excluded.FileName, PermissionContext=excluded.PermissionContext
+            """, ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey), ("$key", canonicalKey), ("$locator", locator),
+            ("$fileName", admission.LeafName), ("$quality", string.IsNullOrWhiteSpace(record.FileUniqueId) ? "fallback" : "strong"),
+            ("$permission", record.PermissionContext));
+        Execute(transaction, "INSERT OR IGNORE INTO DiscoveryInventoryObservations (RunId, CanonicalInventoryKey, ObservationId) VALUES ($runId, $key, $observation)",
+            ("$runId", runId.ToString("D")), ("$key", canonicalKey), ("$observation", observationId));
+    }
+
+    private void UpsertGap(Guid runId, string scopeKey, DiscoverySourceKind sourceKind, string code, string detail,
+        string observationKey, SqliteTransaction transaction)
+    {
+        var gapKey = DiscoveryHash.Of(scopeKey, sourceKind.ToString(), code, observationKey ?? DiscoveryHash.Of(detail ?? string.Empty));
+        Execute(transaction, """
+            INSERT INTO DiscoveryGaps (RunId, ScopeKey, GapKey, SourceKind, Code, Detail, Resolved)
+            VALUES ($runId, $scopeKey, $gapKey, $source, $code, $detail, 0)
+            ON CONFLICT(RunId, GapKey) DO UPDATE SET Detail=excluded.Detail, Resolved=0
+            """, ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey), ("$gapKey", gapKey),
+            ("$source", sourceKind.ToString()), ("$code", code), ("$detail", detail));
+    }
+
+    private (string Request, string Response)? ExistingBatch(Guid attemptId, int ordinal, SqliteTransaction transaction)
+    {
+        using var command = Command("SELECT RequestFingerprint, ResponseFingerprint FROM DiscoveryBatches WHERE AttemptId=$attempt AND BatchOrdinal=$ordinal",
+            transaction, ("$attempt", attemptId.ToString("D")), ("$ordinal", ordinal));
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? (reader.GetString(0), reader.GetString(1)) : null;
+    }
+
+    private void SetAttempt(Guid attemptId, DiscoveryAttemptStatus status, SqliteTransaction transaction) => Execute(transaction,
+        "UPDATE DiscoveryAttempts SET Status=$status, FinishedUtc=$finished WHERE AttemptId=$attempt",
+        ("$status", status.ToString()), ("$finished", DateTimeOffset.UtcNow.ToString("O")), ("$attempt", attemptId.ToString("D")));
+    private void SetOutcome(Guid runId, string scopeKey, DiscoveryTerminalOutcome outcome, SqliteTransaction transaction) => Execute(transaction,
+        "UPDATE DiscoveryScopes SET Outcome=$outcome WHERE RunId=$runId AND ScopeKey=$scopeKey",
+        ("$outcome", outcome.ToString()), ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey));
+
+    private void InitializeSchema() => Execute("""
+        PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS DiscoveryRuns (RunId TEXT PRIMARY KEY, ManifestJson TEXT NOT NULL, ManifestHash TEXT NOT NULL, ScopeMode TEXT NOT NULL, ExecutionStatus TEXT NOT NULL, Verdict TEXT NULL, FixtureRun INTEGER NOT NULL, CreatedUtc TEXT NOT NULL, FinishedUtc TEXT NULL);
+        CREATE TABLE IF NOT EXISTS DiscoveryScopes (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, ParentScopeKey TEXT NULL, Kind TEXT NOT NULL, SourceKind TEXT NULL, Locator TEXT NULL, PermissionContext TEXT NULL, Required INTEGER NOT NULL, Outcome TEXT NOT NULL, ExclusionRuleId TEXT NULL, ExclusionRuleVersion TEXT NULL, ExclusionRuleHash TEXT NULL, ExclusionApprovalRef TEXT NULL, PRIMARY KEY (RunId, ScopeKey));
+        CREATE TABLE IF NOT EXISTS DiscoveryAttempts (AttemptId TEXT PRIMARY KEY, RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, SourceKind TEXT NOT NULL, Status TEXT NOT NULL, StartedUtc TEXT NOT NULL, FinishedUtc TEXT NULL);
+        CREATE UNIQUE INDEX IF NOT EXISTS UX_DiscoveryAttempts_Active ON DiscoveryAttempts(RunId, ScopeKey, SourceKind) WHERE Status='Running';
+        CREATE TABLE IF NOT EXISTS DiscoveryBatches (BatchId TEXT PRIMARY KEY, AttemptId TEXT NOT NULL, BatchOrdinal INTEGER NOT NULL, RequestFingerprint TEXT NOT NULL, ResponseFingerprint TEXT NOT NULL, TerminalFlag INTEGER NOT NULL, NextCheckpoint TEXT NULL, CommittedUtc TEXT NOT NULL, UNIQUE (AttemptId, BatchOrdinal));
+        CREATE TABLE IF NOT EXISTS DiscoveryObservations (ObservationId TEXT PRIMARY KEY, RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, SourceKind TEXT NOT NULL, ObservationKey TEXT NOT NULL, FactHash TEXT NOT NULL, SourceObjectKey TEXT NOT NULL, FileName TEXT NULL, PhysicalLocator TEXT NULL, PermissionContext TEXT NULL, MetadataJson TEXT NOT NULL, UNIQUE (RunId, ObservationKey, FactHash));
+        CREATE TABLE IF NOT EXISTS DiscoveryAttemptObservations (AttemptId TEXT NOT NULL, ObservationId TEXT NOT NULL, BatchId TEXT NOT NULL, Emitted INTEGER NOT NULL, PRIMARY KEY (AttemptId, ObservationId));
+        CREATE TABLE IF NOT EXISTS DiscoveryInventory (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, CanonicalInventoryKey TEXT NOT NULL, PhysicalLocator TEXT NULL, FileName TEXT NOT NULL, IdentityQuality TEXT NOT NULL, PermissionContext TEXT NULL, PRIMARY KEY (RunId, CanonicalInventoryKey));
+        CREATE INDEX IF NOT EXISTS IX_DiscoveryInventory_Locator ON DiscoveryInventory(RunId, PhysicalLocator);
+        CREATE TABLE IF NOT EXISTS DiscoveryInventoryObservations (RunId TEXT NOT NULL, CanonicalInventoryKey TEXT NOT NULL, ObservationId TEXT NOT NULL, PRIMARY KEY (RunId, CanonicalInventoryKey, ObservationId));
+        CREATE TABLE IF NOT EXISTS DiscoveryGaps (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, GapKey TEXT NOT NULL, SourceKind TEXT NOT NULL, Code TEXT NOT NULL, Detail TEXT NULL, Resolved INTEGER NOT NULL, PRIMARY KEY (RunId, GapKey));
+        CREATE TABLE IF NOT EXISTS DiscoveryConflicts (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, ConflictKey TEXT NOT NULL, Code TEXT NOT NULL, ParticipantKeys TEXT NOT NULL, Resolved INTEGER NOT NULL, PRIMARY KEY (RunId, ConflictKey));
+        """);
+
+    private static string NormalizeLocator(string locator)
+    {
+        if (string.IsNullOrWhiteSpace(locator)) return null;
+        var normalized = locator.Replace('\\', '/').Trim();
+        while (normalized.Contains("//", StringComparison.Ordinal)) normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
+        return normalized.TrimEnd('/').ToLowerInvariant();
+    }
+
+    private void Execute(string sql, params (string Name, object Value)[] parameters) => Execute(null, sql, parameters);
+    private void Execute(SqliteTransaction transaction, string sql, params (string Name, object Value)[] parameters)
+    {
+        using var command = Command(sql, transaction, parameters);
+        command.ExecuteNonQuery();
+    }
+    private T Scalar<T>(string sql, params (string Name, object Value)[] parameters) => Scalar<T>(sql, null, parameters);
+    private T Scalar<T>(string sql, SqliteTransaction transaction, params (string Name, object Value)[] parameters)
+    {
+        using var command = Command(sql, transaction, parameters);
+        var value = command.ExecuteScalar();
+        if (value == null || value == DBNull.Value) return default;
+        return (T)Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
+    }
+    private IEnumerable<string> Strings(string sql, params (string Name, object Value)[] parameters)
+    {
+        using var command = Command(sql, null, parameters);
+        using var reader = command.ExecuteReader();
+        while (reader.Read()) yield return reader.GetString(0);
+    }
+    private SqliteCommand Command(string sql, SqliteTransaction transaction, params (string Name, object Value)[] parameters)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Transaction = transaction;
+        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        return command;
+    }
+}
