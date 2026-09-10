@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PnP.Core.Services;
 using PnP.Core.Auth.Services.Builder.Configuration;
 using PnP.Core.Services.Builder.Configuration;
 using PnP.Scanning.Core.Authentication;
@@ -37,9 +38,10 @@ namespace PnP.Scanning.Process
             if (isCliProcess)
             {
 
-                var isOfflineAspxInventory = args.Length > 0 &&
-                    args[0].Equals("aspx-inventory", StringComparison.OrdinalIgnoreCase);
-                if (!isOfflineAspxInventory)
+                var isAspxAcquisitionCommand = args.Length > 0 &&
+                    (args[0].Equals("aspx-inventory", StringComparison.OrdinalIgnoreCase) ||
+                     args[0].Equals("aspx-acquisition", StringComparison.OrdinalIgnoreCase));
+                if (!isAspxAcquisitionCommand)
                 {
                     await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
                     {
@@ -70,8 +72,9 @@ namespace PnP.Scanning.Process
                 var processManager = host.Services.GetRequiredService<ScannerManager>();
                 var dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
                 var configurationData = host.Services.GetRequiredService<ConfigurationOptions>();
+                var pnpContextFactory = host.Services.GetRequiredService<IPnPContextFactory>();
 
-                var root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
+                var root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData, pnpContextFactory).Create();
                 var builder = new CommandLineBuilder(root);
                 var parser = builder.UseDefaults().Build();
 
@@ -171,6 +174,16 @@ namespace PnP.Scanning.Process
                            services.AddSingleton(customSettings);
 
                            services.AddDataProtection();
+
+                           services.AddPnPCore(options =>
+                           {
+                               options.PnPContext.GraphFirst = false;
+                               options.HttpRequests.Timeout = -1;
+                               options.DisableTelemetry = true;
+                           });
+                           services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
+                           services.AddPnPCoreAuthentication();
+                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 
                            services.AddSingleton<ScannerManager>();
                            services.AddTransient<AuthenticationManager>();

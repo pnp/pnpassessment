@@ -100,7 +100,8 @@ internal sealed record AspxInventoryRuntimeOptions(
     string ScopeMode,
     bool FixtureRun,
     Guid? ResumeRunId = null,
-    bool TenantVisibilityVerified = false);
+    bool TenantVisibilityVerified = false,
+    Guid? NewRunId = null);
 
 internal sealed class AspxInventoryRuntime
 {
@@ -116,7 +117,9 @@ internal sealed class AspxInventoryRuntime
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath))!);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.OutputPath))!);
 
-        var runId = options.ResumeRunId ?? Guid.NewGuid();
+        if (options.ResumeRunId != null && options.NewRunId != null)
+            throw new ArgumentException("ResumeRunId and NewRunId are mutually exclusive.", nameof(options));
+        var runId = options.ResumeRunId ?? options.NewRunId ?? Guid.NewGuid();
         using var store = new DiscoveryStore(options.DatabasePath);
         if (options.ResumeRunId == null)
         {
