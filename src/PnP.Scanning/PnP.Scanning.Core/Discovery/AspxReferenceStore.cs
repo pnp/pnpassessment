@@ -51,7 +51,7 @@ internal sealed class AspxReferenceCollector
         lock (gate) gaps.Add(gap);
     }
 
-    internal AspxReferenceOutputV1 Build(Guid runId, AspxReferenceRunManifest manifest,
+    internal AspxReferenceOutputV2 Build(Guid runId, AspxReferenceRunManifest manifest,
         AspxDiscoveryOutputV2 physical, AspxPlatformRegistryV1 registry)
     {
         AspxReferenceCandidate[] candidateSnapshot;
@@ -143,7 +143,7 @@ internal sealed class AspxReferenceCollector
             observations.Any(item => item.Disposition == AspxReferenceDispositions.ReferenceUnavailable);
         var verdict = hasUnknown ? AspxAggregateVerdict.Unknown : hasIncomplete
             ? AspxAggregateVerdict.Incomplete : AspxAggregateVerdict.CompleteAuthorizedSurface;
-        return new(AspxReferenceOutputV1.Version, runId, manifest.Hash(), verdict, observations,
+        return new(AspxReferenceOutputV2.Version, runId, manifest.Hash(), verdict, observations,
             denominatorSnapshot.OrderBy(row => row.SurfaceId, StringComparer.Ordinal).ToArray(),
             paginationSnapshot.OrderBy(row => row.CollectionScopeKey, StringComparer.Ordinal)
                 .ThenBy(row => row.PageOrdinal).ToArray(),
@@ -205,7 +205,7 @@ internal sealed class AspxReferenceStore : IDisposable
         Initialize();
     }
 
-    internal void Write(AspxReferenceRunManifest manifest, AspxReferenceOutputV1 output, bool resume)
+    internal void Write(AspxReferenceRunManifest manifest, AspxReferenceOutputV2 output, bool resume)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(output);
@@ -217,8 +217,7 @@ internal sealed class AspxReferenceStore : IDisposable
         if (existing != null)
         {
             if (!resume) throw new InvalidOperationException("Reference run already exists; explicit resume is required.");
-            if (!string.Equals(existing, manifest.Hash(), StringComparison.Ordinal))
-                throw new InvalidOperationException("Immutable reference provenance drift.");
+            ValidateResumeCompatibility(output.AcquisitionRunId, manifest);
             Execute("DELETE FROM ReferenceObservations WHERE RunId=$runId", ("$runId", runId));
             Execute("DELETE FROM ReferenceDenominator WHERE RunId=$runId", ("$runId", runId));
             Execute("DELETE FROM ReferencePaginationReceipts WHERE RunId=$runId", ("$runId", runId));
@@ -256,6 +255,35 @@ internal sealed class AspxReferenceStore : IDisposable
             UPDATE ReferenceRuns SET CoverageVerdict=$verdict, UpdatedUtc=$updated WHERE RunId=$runId
             """, ("$verdict", output.CoverageVerdict.ToString()),
             ("$updated", DateTimeOffset.UtcNow.ToString("O")), ("$runId", runId));
+    }
+
+    internal void ValidateResumeCompatibility(Guid runId, AspxReferenceRunManifest candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        var id = runId.ToString("D");
+        var storedHash = Scalar<string>("SELECT ManifestHash FROM ReferenceRuns WHERE RunId=$runId", ("$runId", id));
+        if (storedHash == null)
+            throw new InvalidOperationException($"Reference resume rejected: run '{id}' does not exist in the reference ledger. Start a new run or supply the matching v2 ledger.");
+        var storedOutputVersion = Scalar<string>("SELECT OutputVersion FROM ReferenceRuns WHERE RunId=$runId", ("$runId", id));
+        if (!string.Equals(storedOutputVersion, AspxReferenceOutputV2.Version, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Reference resume rejected: stored output version '{storedOutputVersion ?? "missing"}' is incompatible with '{AspxReferenceOutputV2.Version}'. Start a new run with new output paths; v1 receipts cannot be resumed as v2.");
+        var storedJson = Scalar<string>("SELECT ManifestJson FROM ReferenceRuns WHERE RunId=$runId", ("$runId", id));
+        AspxReferenceRunManifest stored;
+        try
+        {
+            stored = JsonSerializer.Deserialize<AspxReferenceRunManifest>(storedJson,
+                AspxInventoryRuntime.JsonOptions());
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Reference resume rejected: stored immutable manifest JSON is invalid. Preserve the ledger and start a new v2 run.", ex);
+        }
+        if (stored == null || stored.ContractVersion != AspxAcquisitionVersions.ReferenceProducer ||
+            stored.SchemaVersion != AspxAcquisitionVersions.ReferenceStore ||
+            stored.ProviderVersion != AspxAcquisitionVersions.LiveProvider)
+            throw new InvalidOperationException($"Reference resume rejected: stored contract/schema/provider versions are incompatible with {AspxAcquisitionVersions.ReferenceProducer} + {AspxAcquisitionVersions.ReferenceStore} + {AspxAcquisitionVersions.LiveProvider}. Preserve the ledger and start a new v2 run.");
+        if (!string.Equals(storedHash, candidate.Hash(), StringComparison.Ordinal))
+            throw new InvalidOperationException("Reference resume rejected: immutable v2 provenance drifted (product/sdk/authority/permission/registry/build/snapshot/provider binding). Preserve the prior run and use new output paths.");
     }
 
     public void Dispose() => connection.Dispose();

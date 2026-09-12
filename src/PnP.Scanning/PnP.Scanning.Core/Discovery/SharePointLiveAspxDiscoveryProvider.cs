@@ -2,6 +2,7 @@ using PnP.Core.Model.SharePoint;
 using PnP.Core.Services;
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 
 namespace PnP.Scanning.Core.Discovery;
@@ -11,7 +12,8 @@ internal sealed record SharePointLiveAspxDiscoveryOptions(
     string PermissionContext,
     string VisibilityBoundary,
     string AuthorityRevision,
-    string AuthorityHash);
+    string AuthorityHash,
+    string PlatformBuildRef = null);
 
 internal sealed record SharePointRestPage(
     Uri RequestUri,
@@ -21,7 +23,153 @@ internal sealed record SharePointRestPage(
     string ResponseDigest,
     string SchemaFlavor,
     DiscoveryTerminalOutcome Outcome,
-    string ErrorCode = null);
+    string ErrorCode = null,
+    string SemanticDetectorResult = SharePointSemanticDetectorResults.None,
+    DateTimeOffset ReceivedAtUtc = default,
+    int AttemptCount = 1,
+    int AttemptLimit = 1,
+    string RequestId = null,
+    string CorrelationId = null);
+
+internal static class SharePointSemanticDetectorResults
+{
+    internal const string None = "none";
+    internal const string LoginShell = "login-shell";
+    internal const string AccessDenied = "access-denied";
+    internal const string Unauthorized = "unauthorized";
+    internal const string ErrorEnvelope = "error-envelope";
+
+    internal static bool IsKnown(string value) => value is None or LoginShell or AccessDenied or
+        Unauthorized or ErrorEnvelope;
+}
+
+internal sealed record SharePointSemanticDetection(string Result, bool IsDenied, string ErrorCode);
+
+internal static class SharePointSemanticDenialDetector
+{
+    private const int InspectionLimit = 131072;
+
+    internal static SharePointSemanticDetection Detect(byte[] body, string mediaType = null)
+    {
+        if (body == null || body.Length == 0)
+            return new(SharePointSemanticDetectorResults.None, false, null);
+        var inspected = body.AsSpan(0, Math.Min(body.Length, InspectionLimit));
+        var text = Encoding.UTF8.GetString(inspected);
+        var trimmed = text.TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        var htmlLike = (mediaType?.Contains("html", StringComparison.OrdinalIgnoreCase) ?? false) ||
+            trimmed.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
+        if (htmlLike)
+        {
+            if (ContainsAny(trimmed, "login.microsoftonline.com", "wa=wsignin1.0", "Sign in to your account",
+                    "id=\"loginForm\"", "name=\"loginfmt\""))
+                return new(SharePointSemanticDetectorResults.LoginShell, true, "semantic_login_shell");
+            if (ContainsAny(trimmed, "Access Denied", "AccessDenied.aspx", "Sorry, you don't have access",
+                    "You need permission to access this site"))
+                return new(SharePointSemanticDetectorResults.AccessDenied, true, "semantic_access_denied");
+            if (ContainsAny(trimmed, "401 Unauthorized", ">Unauthorized<"))
+                return new(SharePointSemanticDetectorResults.Unauthorized, true, "semantic_unauthorized");
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (TryErrorEnvelope(document.RootElement, out var errorText, out var serverErrorCode))
+            {
+                if (ContainsAny(errorText, "access denied", "accessdenied", "does not have permissions",
+                        "-2147024891"))
+                    return new(SharePointSemanticDetectorResults.AccessDenied, true,
+                        serverErrorCode ?? "semantic_access_denied");
+                if (ContainsAny(errorText, "unauthorized", "unauthenticated", "401"))
+                    return new(SharePointSemanticDetectorResults.Unauthorized, true,
+                        serverErrorCode ?? "semantic_unauthorized");
+                return new(SharePointSemanticDetectorResults.ErrorEnvelope, false,
+                    serverErrorCode ?? "semantic_error_envelope");
+            }
+        }
+        catch (JsonException)
+        {
+            // Non-JSON success bodies are handled by the normal response parser after semantic shell detection.
+        }
+
+        if (!htmlLike && trimmed.Length < 4096)
+        {
+            if (trimmed.StartsWith("Access denied", StringComparison.OrdinalIgnoreCase))
+                return new(SharePointSemanticDetectorResults.AccessDenied, true, "semantic_access_denied");
+            if (trimmed.StartsWith("Unauthorized", StringComparison.OrdinalIgnoreCase))
+                return new(SharePointSemanticDetectorResults.Unauthorized, true, "semantic_unauthorized");
+        }
+        return new(SharePointSemanticDetectorResults.None, false, null);
+    }
+
+    private static bool TryErrorEnvelope(JsonElement root, out string errorText, out string errorCode)
+    {
+        foreach (var name in new[] { "error", "odata.error" })
+            if (PnPContextSharePointAspxRestClient.TryProperty(root, name, out var error))
+            {
+                errorText = error.GetRawText();
+                errorCode = PnPContextSharePointAspxRestClient.String(error, "code");
+                return true;
+            }
+        if (PnPContextSharePointAspxRestClient.TryProperty(root, "d", out var verbose) &&
+            PnPContextSharePointAspxRestClient.TryProperty(verbose, "error", out var verboseError))
+        {
+            errorText = verboseError.GetRawText();
+            errorCode = PnPContextSharePointAspxRestClient.String(verboseError, "code");
+            return true;
+        }
+        errorText = null;
+        errorCode = null;
+        return false;
+    }
+
+    private static bool ContainsAny(string value, params string[] markers) =>
+        markers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase));
+}
+
+internal static class SharePointRestResponseParser
+{
+    internal static SharePointRestPage Parse(Uri requestUri, HttpStatusCode statusCode, byte[] bytes,
+        string mediaType = null, string requestId = null, string correlationId = null,
+        DateTimeOffset? receivedAtUtc = null, int attemptCount = 1, int attemptLimit = 1)
+    {
+        ArgumentNullException.ThrowIfNull(requestUri);
+        bytes ??= Array.Empty<byte>();
+        var received = receivedAtUtc ?? DateTimeOffset.UtcNow;
+        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+        var semantic = SharePointSemanticDenialDetector.Detect(bytes, mediaType);
+        var transportOutcome = statusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+            ? DiscoveryTerminalOutcome.Denied
+            : (int)statusCode >= 200 && (int)statusCode <= 299
+                ? DiscoveryTerminalOutcome.Complete : DiscoveryTerminalOutcome.Failed;
+        if (transportOutcome != DiscoveryTerminalOutcome.Complete)
+            return new(requestUri, statusCode, Array.Empty<JsonElement>(), null, digest, "http-error",
+                transportOutcome, semantic.ErrorCode ?? "http_" + (int)statusCode, semantic.Result,
+                received, attemptCount, attemptLimit, requestId, correlationId);
+        if (semantic.IsDenied)
+            return new(requestUri, statusCode, Array.Empty<JsonElement>(), null, digest,
+                "semantic-denial-" + semantic.Result, DiscoveryTerminalOutcome.Denied,
+                semantic.ErrorCode, semantic.Result, received, attemptCount, attemptLimit, requestId, correlationId);
+        if (semantic.Result == SharePointSemanticDetectorResults.ErrorEnvelope)
+            return new(requestUri, statusCode, Array.Empty<JsonElement>(), null, digest,
+                "semantic-error-envelope", DiscoveryTerminalOutcome.Failed, semantic.ErrorCode,
+                semantic.Result, received, attemptCount, attemptLimit, requestId, correlationId);
+        try
+        {
+            using var document = JsonDocument.Parse(bytes);
+            var parsed = PnPContextSharePointAspxRestClient.ParseEnvelope(document.RootElement);
+            return new(requestUri, statusCode, parsed.Items, parsed.NextLink, digest,
+                parsed.SchemaFlavor, DiscoveryTerminalOutcome.Complete, null, semantic.Result,
+                received, attemptCount, attemptLimit, requestId, correlationId);
+        }
+        catch (JsonException)
+        {
+            return new(requestUri, statusCode, Array.Empty<JsonElement>(), null, digest,
+                "invalid-json", DiscoveryTerminalOutcome.Failed, "response_json_invalid", semantic.Result,
+                received, attemptCount, attemptLimit, requestId, correlationId);
+        }
+    }
+}
 
 internal sealed record SharePointResolvedFile(
     DiscoveryTerminalOutcome Outcome,
@@ -95,25 +243,10 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         using var response = await context.RestClient.Client.SendAsync(request,
             HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
-        var outcome = response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
-            ? DiscoveryTerminalOutcome.Denied
-            : response.IsSuccessStatusCode ? DiscoveryTerminalOutcome.Complete : DiscoveryTerminalOutcome.Failed;
-        if (!response.IsSuccessStatusCode)
-            return new(requestUri, response.StatusCode, Array.Empty<JsonElement>(), null, digest, "http-error",
-                outcome, "http_" + (int)response.StatusCode);
-        try
-        {
-            using var document = JsonDocument.Parse(bytes);
-            var parsed = ParseEnvelope(document.RootElement);
-            return new(requestUri, response.StatusCode, parsed.Items, parsed.NextLink, digest,
-                parsed.SchemaFlavor, DiscoveryTerminalOutcome.Complete);
-        }
-        catch (JsonException)
-        {
-            return new(requestUri, response.StatusCode, Array.Empty<JsonElement>(), null, digest,
-                "invalid-json", DiscoveryTerminalOutcome.Failed, "response_json_invalid");
-        }
+        return SharePointRestResponseParser.Parse(requestUri, response.StatusCode, bytes,
+            response.Content.Headers.ContentType?.MediaType, Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
+            Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id"),
+            DateTimeOffset.UtcNow, attemptCount: 1, attemptLimit: 1);
     }
 
     public async Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
@@ -146,7 +279,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
 
     public void Dispose() => context.Dispose();
 
-    private static (IReadOnlyList<JsonElement> Items, string NextLink, string SchemaFlavor) ParseEnvelope(
+    internal static (IReadOnlyList<JsonElement> Items, string NextLink, string SchemaFlavor) ParseEnvelope(
         JsonElement root)
     {
         if (TryProperty(root, "value", out var value) && value.ValueKind == JsonValueKind.Array)
@@ -181,6 +314,74 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     internal static string String(JsonElement element, string name) =>
         TryProperty(element, name, out var value) && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
             ? value.ToString() : null;
+
+    private static string Header(HttpResponseMessage response, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (response.Headers.TryGetValues(name, out var values))
+                return BoundedHeader(values.FirstOrDefault());
+            if (response.Content.Headers.TryGetValues(name, out values))
+                return BoundedHeader(values.FirstOrDefault());
+        }
+        return null;
+    }
+
+    private static string BoundedHeader(string value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed[..Math.Min(trimmed.Length, 256)];
+    }
+}
+
+internal sealed record AspxSurfaceDispositionRule(
+    string RuleId,
+    string RuleVersion,
+    string RuleHash,
+    string ReviewRef,
+    string PlatformBinding,
+    int TriggerStatusCode,
+    string TriggerErrorCode,
+    string ReasonCode,
+    string ClassificationEffect,
+    IReadOnlyList<string> EvidenceRefs)
+{
+    internal bool Applies(SharePointRestPage page) => page != null &&
+        (int)page.StatusCode == TriggerStatusCode &&
+        (string.IsNullOrWhiteSpace(TriggerErrorCode) ||
+            string.Equals(page.ErrorCode, TriggerErrorCode, StringComparison.Ordinal));
+}
+
+internal static class AspxSystemListFormsPolicy
+{
+    internal const int UserInformationListTemplate = 112;
+    internal const string RuleId = "sharepoint-user-information-list-forms-http-400";
+    internal const string RuleVersion = "v1";
+    internal const string ReasonCode = "system_list_forms_http_400_reference_unknown";
+
+    internal static AspxSurfaceDispositionRule Create(IReadOnlyDictionary<string, string> metadata,
+        string rootFolder, string platformBuildRef)
+    {
+        if (metadata == null || !metadata.TryGetValue("baseTemplate", out var templateValue) ||
+            !int.TryParse(templateValue, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var template) ||
+            template != UserInformationListTemplate || string.IsNullOrWhiteSpace(rootFolder) ||
+            !rootFolder.TrimEnd('/').EndsWith("/_catalogs/users", StringComparison.OrdinalIgnoreCase))
+            return null;
+        var platform = string.IsNullOrWhiteSpace(platformBuildRef) ? "unbound-build" : platformBuildRef;
+        var material = string.Join('|', RuleId, RuleVersion, UserInformationListTemplate,
+            "/_catalogs/users", 400, "http_400", platform,
+            "SystemOrVirtualOnly", "Failed", "expectedCount=Unknown", "historical/system/virtual applicability explicit");
+        return new(RuleId, RuleVersion, DiscoveryHash.Of(material), "CCD-726+CCD-734@2026-09-12",
+            platform, 400, null, ReasonCode,
+            "system-or-virtual-applicability-explicit;http-400-failed;historical-virtual-unknown",
+            new[]
+            {
+                "sealed-run:62dbcc5b-80fd-4055-b528-745f9451ef2a",
+                "kb:dev.titao@4c91e3a3e0544d871c7faad9f5d029b7ce55e035",
+                $"platform-build:{platform}",
+            });
+    }
 }
 
 /// <summary>
@@ -423,11 +624,27 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var name = isForm ? "Forms" : "Views";
         var endpoint = Endpoint(scope.WebUrl,
             $"_api/web/lists(guid'{scope.ListId:D}')/{name}?$select={select}");
+        var dispositionRule = isForm
+            ? AspxSystemListFormsPolicy.Create(scope.Metadata, scope.FolderUrl, options.PlatformBuildRef)
+            : null;
         var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
             name.ToLowerInvariant() + ":" + scope.ScopeKey, endpoint, select, string.Empty,
             scope.BaseType == (int)ListBaseType.DocumentLibrary
                 ? AspxSurfaceApplicability.Applicable : AspxSurfaceApplicability.SystemOrVirtualOnly,
-            isForm ? "AllListFormsAuthority" : "AllListViewsAuthority", cancellationToken).ConfigureAwait(false);
+            isForm ? "AllListFormsAuthority" : "AllListViewsAuthority", cancellationToken,
+            dispositionRule).ConfigureAwait(false);
+        if (result.AppliedDispositionRule != null)
+        {
+            var evidence = new List<string>(result.AppliedDispositionRule.EvidenceRefs)
+            {
+                EvidenceRef(endpoint, result.Pages.FirstOrDefault()?.Page, select),
+            };
+            ReferenceCollector.AddReference(Candidate(AspxReferenceSourceKinds.ListForm,
+                (scope.ListId?.ToString("D") ?? scope.ScopeKey) + ":forms-authority",
+                "SharePoint REST List.Forms system-list disposition", scope.FolderUrl?.TrimEnd('/') + "/Forms",
+                AspxReferenceDispositions.ReferenceUnavailable, result.AppliedDispositionRule.ReasonCode,
+                null, "system-or-virtual-unknown", evidence.ToArray()));
+        }
         foreach (var page in result.Pages)
         {
             var records = new List<RawDiscoveryRecord>();
@@ -526,6 +743,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var applicability = decision.Applicability;
         var counterexample = decision.RuntimeCounterexampleState;
         var outcome = decision.Outcome;
+        var expectedState = outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty
+            ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown;
         var evidence = new[]
         {
             $"actual-BaseType={list.BaseType?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "missing"}",
@@ -534,7 +753,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         };
         ReferenceCollector.AddSurface(SurfaceRow(web.ScopeKey, web.ScopeKey,
             "list-applicability:" + list.ScopeKey, list.Locator, string.Empty, string.Empty,
-            "ActualListBaseTypeAuthority", applicability, outcome, 1, AspxExpectedCountState.Known,
+            "ActualListBaseTypeAuthority", applicability, outcome,
+            expectedState == AspxExpectedCountState.Known ? 1 : null, expectedState,
             1, DiscoveryHash.Of("list-applicability", list.ScopeKey), 0, evidence,
             applicability == AspxSurfaceApplicability.Applicable ? "raw-files+physical-forms+forms+views"
                 : "forms+views"), Array.Empty<AspxPaginationPageReceipt>(),
@@ -546,7 +766,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private async Task<LiveCollectionResult> ReadCollectionAsync(string scopeKey, string parentScopeKey,
         string surfaceId, Uri initialEndpoint, string select, string filter,
-        AspxSurfaceApplicability applicability, string adapter, CancellationToken cancellationToken)
+        AspxSurfaceApplicability applicability, string adapter, CancellationToken cancellationToken,
+        AspxSurfaceDispositionRule dispositionRule = null)
     {
         var client = await clientFactory.GetAsync(WebUrlFromEndpoint(initialEndpoint), cancellationToken)
             .ConfigureAwait(false);
@@ -572,15 +793,22 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             {
                 page = new SharePointRestPage(next, 0, Array.Empty<JsonElement>(), null,
                     DiscoveryHash.Of(ex.GetType().FullName, ex.Message), "transport-error",
-                    DiscoveryTerminalOutcome.Failed, "transport_failure");
+                    DiscoveryTerminalOutcome.Failed, "transport_failure",
+                    SharePointSemanticDetectorResults.None, DateTimeOffset.UtcNow,
+                    AttemptCount: 1, AttemptLimit: 1);
             }
             var nextLink = page.NextLink;
             var terminal = string.IsNullOrWhiteSpace(nextLink) || page.Outcome != DiscoveryTerminalOutcome.Complete;
             var nextUri = terminal ? null : ResolveNext(initialEndpoint, nextLink);
-            var receipt = new AspxPaginationPageReceipt(surfaceId, options.AuthorityRevision,
+            var receipt = new AspxPaginationPageReceipt(AspxAcquisitionVersions.PaginationReceipt,
+                surfaceId, options.AuthorityRevision,
                 DiscoveryHash.Of(initialEndpoint.GetLeftPart(UriPartial.Path), select, filter ?? string.Empty),
-                ordinal, AspxPaginationContract.TokenHash(requestToken), page.Items.Count,
-                AspxPaginationContract.TokenHash(nextLink), page.ResponseDigest, terminal, DateTimeOffset.UtcNow);
+                "GET", page.RequestUri.AbsoluteUri, select, filter ?? string.Empty, ordinal,
+                AspxPaginationContract.TokenHash(requestToken), page.Items.Count,
+                AspxPaginationContract.TokenHash(nextLink), page.ResponseDigest,
+                page.StatusCode == 0 ? null : (int)page.StatusCode, page.SemanticDetectorResult,
+                page.AttemptCount, page.AttemptLimit, page.RequestId, page.CorrelationId, page.ErrorCode,
+                terminal, page.ReceivedAtUtc == default ? DateTimeOffset.UtcNow : page.ReceivedAtUtc);
             pages.Add(new LivePage(page, receipt));
             items.AddRange(page.Items);
             if (page.Outcome != DiscoveryTerminalOutcome.Complete)
@@ -611,24 +839,28 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         int? expected = expectedState == AspxExpectedCountState.Known ? items.Count : null;
         var outcome = validation.Outcome == DiscoveryTerminalOutcome.Complete && items.Count == 0
             ? DiscoveryTerminalOutcome.Empty : validation.Outcome;
+        var appliedDispositionRule = dispositionRule != null && pages.Any(page => dispositionRule.Applies(page.Page))
+            ? dispositionRule : null;
         var absenceKind = outcome == DiscoveryTerminalOutcome.Empty ? "AuthorityTerminalZero" : null;
         var row = SurfaceRow(scopeKey, parentScopeKey, surfaceId, initialEndpoint.AbsoluteUri, select,
             filter ?? string.Empty, "SharePointRestCollectionAuthority", applicability, outcome,
             expected, expectedState, items.Count, validation.ChainHash, validation.OutstandingTokenCount,
             pages.Select(page => EvidenceRef(initialEndpoint, page.Page, select)).ToArray(), adapter,
-            absenceKind, absenceKind == null ? null : initialEndpoint.AbsoluteUri);
+            absenceKind, absenceKind == null ? null : initialEndpoint.AbsoluteUri, appliedDispositionRule);
         ReferenceCollector.AddSurface(row, pages.Select(page => page.Receipt).ToArray(),
             validation.GapCodes.Select(code => surfaceId + ":" + code).ToArray());
-        return new(items, pages, validation with { Outcome = outcome });
+        return new(items, pages, validation with { Outcome = outcome }, appliedDispositionRule);
     }
 
     private AspxSurfaceDenominatorRow SurfaceRow(string scopeKey, string parentScopeKey, string surfaceId,
         string endpoint, string select, string filter, string authorityKind,
         AspxSurfaceApplicability applicability, DiscoveryTerminalOutcome outcome, int? expected,
         AspxExpectedCountState expectedState, int observed, string chainHash, int outstanding,
-        IReadOnlyList<string> evidenceRefs, string adapter, string absenceKind = null, string absenceRef = null) =>
+        IReadOnlyList<string> evidenceRefs, string adapter, string absenceKind = null, string absenceRef = null,
+        AspxSurfaceDispositionRule dispositionRule = null) =>
         new(AspxAcquisitionVersions.SurfaceContract, Guid.Empty, null, null, scopeKey, parentScopeKey,
-            surfaceId, applicability, null, null, null, null, null, null,
+            surfaceId, applicability, dispositionRule?.RuleId, dispositionRule?.RuleVersion,
+            dispositionRule?.RuleHash, dispositionRule?.ReviewRef, null, dispositionRule?.PlatformBinding,
             applicability == AspxSurfaceApplicability.NotApplicable
                 ? AspxRuntimeCounterexampleState.Observed : AspxRuntimeCounterexampleState.NoneObserved,
             authorityKind, endpoint, options.AuthorityRevision, options.AuthorityHash,
@@ -639,9 +871,11 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                     DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled ? "incomplete" : "unknown",
             outstanding != 0, chainHash, outstanding, absenceKind, absenceRef,
             null, null, null, null, null, null, null, DateTimeOffset.UtcNow,
-            evidenceRefs ?? Array.Empty<string>(), adapter,
-            applicability == AspxSurfaceApplicability.Applicable ? "physical-and-reference"
-                : applicability == AspxSurfaceApplicability.SystemOrVirtualOnly ? "reference-first" : "fail-closed");
+            (evidenceRefs ?? Array.Empty<string>()).Concat(dispositionRule?.EvidenceRefs ?? Array.Empty<string>())
+                .Distinct(StringComparer.Ordinal).ToArray(), adapter,
+            dispositionRule?.ClassificationEffect ??
+                (applicability == AspxSurfaceApplicability.Applicable ? "physical-and-reference"
+                    : applicability == AspxSurfaceApplicability.SystemOrVirtualOnly ? "reference-first" : "fail-closed"));
 
     private static RawDiscoveryBatch ToRawBatch(LivePage page, IReadOnlyList<RawDiscoveryRecord> records,
         DiscoveryTerminalOutcome finalOutcome)
@@ -679,7 +913,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private string EvidenceRef(Uri endpoint, SharePointRestPage page, string select) =>
         page == null ? $"GET {endpoint.AbsoluteUri};$select={select};no-response"
-            : $"GET {endpoint.AbsoluteUri};$select={select};$filter=;status={(int)page.StatusCode};schema={page.SchemaFlavor};digest={page.ResponseDigest}";
+            : $"GET {page.RequestUri.AbsoluteUri};$select={select};$filter=;status={(int)page.StatusCode};semantic={page.SemanticDetectorResult};attempt={page.AttemptCount}/{page.AttemptLimit};receivedUtc={(page.ReceivedAtUtc == default ? DateTimeOffset.UtcNow : page.ReceivedAtUtc).ToUniversalTime():O};requestId={page.RequestId ?? "unavailable"};correlationId={page.CorrelationId ?? "unavailable"};errorCode={page.ErrorCode ?? "none"};schema={page.SchemaFlavor};digest={page.ResponseDigest}";
 
     private static DiscoveryChildEnumerationResult Result(LiveScope parent,
         IReadOnlyList<LiveScope> children, DiscoveryTerminalOutcome outcome, string gapCode = null)
@@ -761,7 +995,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private sealed record LiveCollectionResult(
         IReadOnlyList<JsonElement> Items,
         IReadOnlyList<LivePage> Pages,
-        AspxPaginationValidation Validation);
+        AspxPaginationValidation Validation,
+        AspxSurfaceDispositionRule AppliedDispositionRule);
 }
 
 internal sealed class LiveRawDiscoverySource : IRawDiscoverySource

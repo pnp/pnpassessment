@@ -26,6 +26,7 @@ internal sealed record AspxAcquisitionCliOptions(
     FileInfo ReferenceDatabase,
     FileInfo ReferenceOutput,
     FileInfo AggregateOutput,
+    FileInfo TerminalReceipt,
     string PlatformBuild,
     string SnapshotFence,
     string PermissionContext,
@@ -40,7 +41,7 @@ internal static class AspxAcquisitionCommandDefinition
     {
         ArgumentNullException.ThrowIfNull(executeAsync);
         var command = new Command("aspx-acquisition",
-            "Runs authenticated SharePoint live ASPX acquisition and writes physical v2, reference v1, and aggregate v1 volumes. Use aspx-inventory for explicit offline manifest replay.");
+            "Runs authenticated SharePoint live ASPX acquisition and writes physical v2, reference v2, aggregate v2, and product terminal receipt v1 volumes. Use aspx-inventory for explicit offline manifest replay.");
         var sites = new Option<List<string>>("--site", "Authorized site collection URL. Repeat for multiple site collections.")
         {
             IsRequired = true,
@@ -59,9 +60,10 @@ internal static class AspxAcquisitionCommandDefinition
         var registry = RequiredFile("--registry", "Independent aspx-platform-registry/v1 JSON.");
         var physicalDatabase = RequiredOutput("--physical-database", "aspx-discovery-sqlite/v2 path.");
         var physicalOutput = RequiredOutput("--physical-output", "aspx-discovery-output/v2 path.");
-        var referenceDatabase = RequiredOutput("--reference-database", "aspx-reference-sqlite/v1 path.");
-        var referenceOutput = RequiredOutput("--reference-output", "aspx-reference-output/v1 path.");
-        var aggregateOutput = RequiredOutput("--aggregate-output", "aspx-acquisition-verdict/v1 path.");
+        var referenceDatabase = RequiredOutput("--reference-database", "aspx-reference-sqlite/v2 path.");
+        var referenceOutput = RequiredOutput("--reference-output", "aspx-reference-output/v2 path.");
+        var aggregateOutput = RequiredOutput("--aggregate-output", "aspx-acquisition-verdict/v2 path.");
+        var terminalReceipt = RequiredOutput("--terminal-receipt", "aspx-acquisition-terminal-receipt/v1 path.");
         var platformBuild = RequiredString("--platform-build", "Observed SharePoint platform build bound to the registry.");
         var snapshotFence = RequiredString("--snapshot-fence", "Immutable acquisition snapshot/as-of fence.");
         var permissionContext = RequiredString("--permission-context", "Non-secret effective identity/permission context label.");
@@ -73,7 +75,7 @@ internal static class AspxAcquisitionCommandDefinition
         {
             sites, tenant, authMode, applicationId, tenantId, certPath, certFile, certPassword,
             manifest, registry, physicalDatabase, physicalOutput, referenceDatabase, referenceOutput,
-            aggregateOutput, platformBuild, snapshotFence, permissionContext, visibilityBoundary,
+            aggregateOutput, terminalReceipt, platformBuild, snapshotFence, permissionContext, visibilityBoundary,
             authorityRevision, authorityHash, resume,
         }) command.AddOption(option);
 
@@ -86,6 +88,7 @@ internal static class AspxAcquisitionCommandDefinition
                 result.GetValueForOption(referenceDatabase)?.FullName,
                 result.GetValueForOption(referenceOutput)?.FullName,
                 result.GetValueForOption(aggregateOutput)?.FullName,
+                result.GetValueForOption(terminalReceipt)?.FullName,
             }.Where(value => value != null).ToArray();
             if (outputs.Distinct(StringComparer.OrdinalIgnoreCase).Count() != outputs.Length)
                 result.ErrorMessage = "All physical, reference, and aggregate output paths must be distinct.";
@@ -109,7 +112,8 @@ internal static class AspxAcquisitionCommandDefinition
                 parse.GetValueForOption(manifest), parse.GetValueForOption(registry),
                 parse.GetValueForOption(physicalDatabase), parse.GetValueForOption(physicalOutput),
                 parse.GetValueForOption(referenceDatabase), parse.GetValueForOption(referenceOutput),
-                parse.GetValueForOption(aggregateOutput), parse.GetValueForOption(platformBuild),
+                parse.GetValueForOption(aggregateOutput), parse.GetValueForOption(terminalReceipt),
+                parse.GetValueForOption(platformBuild),
                 parse.GetValueForOption(snapshotFence), parse.GetValueForOption(permissionContext),
                 parse.GetValueForOption(visibilityBoundary), parse.GetValueForOption(authorityRevision),
                 parse.GetValueForOption(authorityHash).ToLowerInvariant(), parse.GetValueForOption(resume));
@@ -151,9 +155,17 @@ internal sealed class AspxAcquisitionCommandHandler
     private async Task<int> ExecuteAsync(AspxAcquisitionCliOptions options,
         CancellationToken cancellationToken)
     {
+        var artifactRunId = options.ResumeRunId ?? Guid.NewGuid();
+        DiscoveryRunManifest manifest = null;
+        AspxAcquisitionVerdictV2 aggregate = null;
+        var exitCode = 1;
+        var completionState = "Failed";
+        string errorCode = null;
+        string errorDigest = null;
+        var terminalPathSafe = true;
         try
         {
-            var manifest = JsonSerializer.Deserialize<DiscoveryRunManifest>(
+            manifest = JsonSerializer.Deserialize<DiscoveryRunManifest>(
                 await File.ReadAllTextAsync(options.Manifest.FullName, cancellationToken),
                 AspxInventoryRuntime.JsonOptions())
                 ?? throw new InvalidOperationException("Manifest JSON did not contain a DiscoveryRunManifest.");
@@ -167,6 +179,28 @@ internal sealed class AspxAcquisitionCommandHandler
             var registryInvalid = registry.Validate(options.PlatformBuild);
             if (registryInvalid.Count > 0)
                 throw new InvalidOperationException("Independent registry cannot close this build: " + string.Join(", ", registryInvalid));
+            if (options.ResumeRunId != null && File.Exists(options.TerminalReceipt.FullName))
+            {
+                AspxTerminalRunReceiptV1 previous;
+                try
+                {
+                    previous = await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(
+                        options.TerminalReceipt.FullName, cancellationToken);
+                }
+                catch
+                {
+                    terminalPathSafe = false;
+                    throw;
+                }
+                if (previous.ArtifactRunId != artifactRunId ||
+                    !string.Equals(previous.ProductRef, manifest.ProductRef, StringComparison.Ordinal) ||
+                    !string.Equals(previous.SnapshotFence, options.SnapshotFence, StringComparison.Ordinal))
+                {
+                    terminalPathSafe = false;
+                    throw new InvalidOperationException(
+                        "Terminal resume rejected: the existing receipt is bound to a different run, product ref, or snapshot fence. Preserve it and use a new terminal receipt path.");
+                }
+            }
 
             var environment = Microsoft365Environment.Production;
             if (!string.IsNullOrWhiteSpace(configuration?.Environment) &&
@@ -185,7 +219,8 @@ internal sealed class AspxAcquisitionCommandHandler
             using var clientFactory = new PnPContextSharePointAspxRestClientFactory(contextFactory, authProvider);
             using var provider = new SharePointLiveAspxDiscoveryProvider(
                 new(options.Sites.Select(site => new Uri(site)).ToArray(), options.PermissionContext,
-                    options.VisibilityBoundary, options.AuthorityRevision, options.AuthorityHash), clientFactory);
+                    options.VisibilityBoundary, options.AuthorityRevision, options.AuthorityHash,
+                    options.PlatformBuild), clientFactory);
             var permissionHash = DiscoveryHash.Of(options.PermissionContext, options.VisibilityBoundary,
                 options.AuthMode.ToString(), options.TenantId ?? string.Empty);
             var result = await new AspxAcquisitionRuntime().RunAsync(provider,
@@ -193,19 +228,60 @@ internal sealed class AspxAcquisitionCommandHandler
                     options.ReferenceDatabase.FullName, options.ReferenceOutput.FullName,
                     options.AggregateOutput.FullName, manifest, "declared_subset", FixtureRun: false,
                     TenantVisibilityVerified: false, permissionHash, options.PlatformBuild,
-                    options.SnapshotFence, registry, options.ResumeRunId), cancellationToken).ConfigureAwait(false);
-            AnsiConsole.MarkupLine($"[green]ASPX live acquisition {result.Aggregate.AcquisitionRunId:D} finished with {result.Aggregate.AggregateVerdict}; physical={Markup.Escape(options.PhysicalOutput.FullName)}; reference={Markup.Escape(options.ReferenceOutput.FullName)}; aggregate={Markup.Escape(options.AggregateOutput.FullName)}[/]");
-            return 0;
+                    options.SnapshotFence, registry, options.ResumeRunId,
+                    options.ResumeRunId == null ? artifactRunId : null), cancellationToken).ConfigureAwait(false);
+            aggregate = result.Aggregate;
+            exitCode = 0;
+            completionState = "Succeeded";
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             AnsiConsole.MarkupLine("[yellow]ASPX live acquisition cancelled.[/]");
-            return 2;
+            exitCode = 2;
+            completionState = "Cancelled";
+            errorCode = "operation_cancelled";
+            errorDigest = DiscoveryHash.Of(ex.GetType().FullName, ex.Message ?? string.Empty);
         }
         catch (Exception ex)
         {
             AnsiConsole.MarkupLine($"[red]ASPX live acquisition failed: {Markup.Escape(ex.Message)}[/]");
-            return 1;
+            exitCode = 1;
+            completionState = "Failed";
+            errorCode = "acquisition_failed";
+            errorDigest = DiscoveryHash.Of(ex.GetType().FullName, ex.Message ?? string.Empty);
         }
+
+        if (!terminalPathSafe) return exitCode;
+        try
+        {
+            var executable = await AspxManagedExecutableBinding.CaptureAsync(CancellationToken.None);
+            await AspxTerminalRunReceiptWriter.WriteAsync(options.TerminalReceipt.FullName, artifactRunId,
+                exitCode, completionState, manifest?.ProductRef, manifest?.SdkRef, options.SnapshotFence,
+                aggregate?.AggregateVerdict.ToString(), executable, OutputSpecs(options), errorCode,
+                errorDigest, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]ASPX live acquisition terminal receipt failed: {Markup.Escape(ex.Message)}[/]");
+            return 3;
+        }
+        if (exitCode == 0)
+            AnsiConsole.MarkupLine($"[green]ASPX live acquisition {artifactRunId:D} finished with {aggregate.AggregateVerdict}; physical={Markup.Escape(options.PhysicalOutput.FullName)}; reference={Markup.Escape(options.ReferenceOutput.FullName)}; aggregate={Markup.Escape(options.AggregateOutput.FullName)}; terminal={Markup.Escape(options.TerminalReceipt.FullName)}[/]");
+        return exitCode;
     }
+
+    private static IReadOnlyList<AspxTerminalOutputSpec> OutputSpecs(AspxAcquisitionCliOptions options) =>
+        new[]
+        {
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.PhysicalDatabase,
+                DiscoveryRunManifest.CurrentSchemaVersion, options.PhysicalDatabase.FullName),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.PhysicalOutput,
+                AspxDiscoveryOutputV2.Version, options.PhysicalOutput.FullName),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.ReferenceDatabase,
+                AspxAcquisitionVersions.ReferenceStore, options.ReferenceDatabase.FullName),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.ReferenceOutput,
+                AspxReferenceOutputV2.Version, options.ReferenceOutput.FullName),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.AggregateOutput,
+                AspxAcquisitionVerdictV2.Version, options.AggregateOutput.FullName),
+        };
 }

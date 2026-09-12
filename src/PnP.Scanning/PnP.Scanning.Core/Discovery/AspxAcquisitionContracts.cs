@@ -6,12 +6,14 @@ namespace PnP.Scanning.Core.Discovery;
 
 internal static class AspxAcquisitionVersions
 {
-    internal const string SurfaceContract = "aspx-surface-applicability-denominator/v3";
-    internal const string ReferenceProducer = "aspx-reference/v1";
-    internal const string ReferenceStore = "aspx-reference-sqlite/v1";
-    internal const string ReferenceOutput = "aspx-reference-output/v1";
-    internal const string AggregateOutput = "aspx-acquisition-verdict/v1";
-    internal const string LiveProvider = "sharepoint-live-aspx-provider/v1";
+    internal const string SurfaceContract = "aspx-surface-applicability-denominator/v4";
+    internal const string PaginationReceipt = "aspx-pagination-page-receipt/v2";
+    internal const string ReferenceProducer = "aspx-reference/v2";
+    internal const string ReferenceStore = "aspx-reference-sqlite/v2";
+    internal const string ReferenceOutput = "aspx-reference-output/v2";
+    internal const string AggregateOutput = "aspx-acquisition-verdict/v2";
+    internal const string TerminalReceipt = "aspx-acquisition-terminal-receipt/v1";
+    internal const string LiveProvider = "sharepoint-live-aspx-provider/v2";
     internal const string Registry = "aspx-platform-registry/v1";
 }
 
@@ -239,14 +241,26 @@ internal static class AspxPlatformRegistryV1BuildRange
 }
 
 internal sealed record AspxPaginationPageReceipt(
+    string ReceiptVersion,
     string CollectionScopeKey,
     string AuthorityRevision,
     string ActualEndpointHash,
+    string ActualMethod,
+    string ActualEndpoint,
+    string ActualSelect,
+    string ActualFilter,
     int PageOrdinal,
     string RequestTokenHash,
     int ResponseItemCount,
     string NextTokenHash,
     string ResponseDigest,
+    int? HttpStatusCode,
+    string SemanticDetectorResult,
+    int AttemptCount,
+    int AttemptLimit,
+    string RequestId,
+    string CorrelationId,
+    string ErrorCode,
     bool TerminalFlag,
     DateTimeOffset ReceivedAtUtc);
 
@@ -270,7 +284,20 @@ internal static class AspxPaginationContract
         for (var index = 0; index < pages.Count; index++)
         {
             var page = pages[index];
+            if (page.ReceiptVersion != AspxAcquisitionVersions.PaginationReceipt)
+                gaps.Add("pagination_receipt_version_incompatible");
             if (page.PageOrdinal != index) gaps.Add("pagination_ordinal_integrity");
+            if (!string.Equals(page.ActualMethod, "GET", StringComparison.Ordinal))
+                gaps.Add("pagination_actual_method_invalid");
+            if (string.IsNullOrWhiteSpace(page.ActualEndpoint)) gaps.Add("pagination_actual_endpoint_missing");
+            if (!SharePointSemanticDetectorResults.IsKnown(page.SemanticDetectorResult))
+                gaps.Add("pagination_semantic_result_invalid");
+            if (page.AttemptLimit < 1 || page.AttemptCount < 1 || page.AttemptCount > page.AttemptLimit)
+                gaps.Add("pagination_attempt_bound_invalid");
+            if (page.ReceivedAtUtc == default) gaps.Add("pagination_received_utc_missing");
+            if (string.IsNullOrWhiteSpace(page.ResponseDigest)) gaps.Add("pagination_response_digest_missing");
+            if (page.HttpStatusCode == null && !string.Equals(page.ErrorCode, "transport_failure", StringComparison.Ordinal))
+                gaps.Add("pagination_http_status_missing_without_transport_error");
             endpoint ??= page.ActualEndpointHash;
             if (!string.Equals(endpoint, page.ActualEndpointHash, StringComparison.Ordinal))
                 gaps.Add("pagination_endpoint_drift");
@@ -291,8 +318,11 @@ internal static class AspxPaginationContract
         if (outstanding.Count > 0) gaps.Add("pagination_outstanding_token");
 
         var canonical = string.Join("\n", pages.Select(page => string.Join('|', page.CollectionScopeKey,
-            page.AuthorityRevision, page.ActualEndpointHash, page.PageOrdinal, page.RequestTokenHash,
-            page.ResponseItemCount, page.NextTokenHash, page.ResponseDigest, page.TerminalFlag)));
+            page.AuthorityRevision, page.ReceiptVersion, page.ActualEndpointHash, page.ActualMethod,
+            page.ActualEndpoint, page.ActualSelect, page.ActualFilter, page.PageOrdinal, page.RequestTokenHash,
+            page.ResponseItemCount, page.NextTokenHash, page.ResponseDigest, page.HttpStatusCode,
+            page.SemanticDetectorResult, page.AttemptCount, page.AttemptLimit, page.RequestId,
+            page.CorrelationId, page.ErrorCode, page.TerminalFlag, page.ReceivedAtUtc.ToUniversalTime().ToString("O"))));
         var outcome = gaps.Count == 0 ? providerOutcome : DiscoveryTerminalOutcome.Unknown;
         return new(outcome, DiscoveryHash.Of(canonical), outstanding.Count,
             gaps.Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray());
@@ -356,6 +386,13 @@ internal sealed record AspxSurfaceDenominatorRow(
             invalid.Add("unknown_expected_count_must_be_null");
         if (ExpectedCountState == AspxExpectedCountState.Known && ExpectedCount == null)
             invalid.Add("known_expected_count_required");
+        if (TerminalOutcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed or
+            DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled or
+            DiscoveryTerminalOutcome.Unknown or DiscoveryTerminalOutcome.Pending)
+        {
+            if (ExpectedCountState != AspxExpectedCountState.Unknown || ExpectedCount != null)
+                invalid.Add("non_success_expected_count_must_be_unknown");
+        }
         if (TerminalOutcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty)
         {
             if (ContinuationRemaining || PaginationOutstandingTokenCount != 0)
@@ -363,8 +400,18 @@ internal sealed record AspxSurfaceDenominatorRow(
         }
         if (Applicability == AspxSurfaceApplicability.NotApplicable &&
             (rule == null || !rule.IsValid(PlatformBuildRef))) invalid.Add("invalid_not_applicable_rule");
+        var hasDispositionRule = !string.IsNullOrWhiteSpace(ApplicabilityRuleId) ||
+            !string.IsNullOrWhiteSpace(ApplicabilityRuleVersion) || !string.IsNullOrWhiteSpace(ApplicabilityRuleHash) ||
+            !string.IsNullOrWhiteSpace(ApplicabilityReviewRef) || !string.IsNullOrWhiteSpace(ApplicabilityPlatformBinding);
+        if (hasDispositionRule && (string.IsNullOrWhiteSpace(ApplicabilityRuleId) ||
+            string.IsNullOrWhiteSpace(ApplicabilityRuleVersion) || !IsHash(ApplicabilityRuleHash) ||
+            string.IsNullOrWhiteSpace(ApplicabilityReviewRef) || string.IsNullOrWhiteSpace(ApplicabilityPlatformBinding)))
+            invalid.Add("incomplete_applicability_disposition_rule");
         return invalid;
     }
+
+    private static bool IsHash(string value) => value?.Length == 64 && value.All(Uri.IsHexDigit) &&
+        string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
 }
 
 internal sealed record AspxReferenceObservation(
@@ -412,7 +459,7 @@ internal sealed record AspxReferenceObservation(
     }
 }
 
-internal sealed record AspxReferenceOutputV1(
+internal sealed record AspxReferenceOutputV2(
     string OutputVersion,
     Guid AcquisitionRunId,
     string ManifestHash,
@@ -434,7 +481,7 @@ internal sealed record AspxVolumeBinding(
     string ScopeAuthorityHash,
     string SnapshotFence);
 
-internal sealed record AspxAcquisitionVerdictV1(
+internal sealed record AspxAcquisitionVerdictV2(
     string OutputVersion,
     Guid AcquisitionRunId,
     AspxAggregateVerdict AggregateVerdict,
@@ -454,7 +501,7 @@ internal sealed record AspxAcquisitionVerdictV1(
 
 internal static class AspxAggregateEvaluator
 {
-    internal static AspxAggregateVerdict Evaluate(AspxDiscoveryOutputV2 physical, AspxReferenceOutputV1 reference,
+    internal static AspxAggregateVerdict Evaluate(AspxDiscoveryOutputV2 physical, AspxReferenceOutputV2 reference,
         AspxReferenceRunManifest manifest, AspxPlatformRegistryV1 registry, out IReadOnlyList<string> gaps)
     {
         var found = new HashSet<string>(reference.GapCodes ?? Array.Empty<string>(), StringComparer.Ordinal);
@@ -513,19 +560,19 @@ internal static class AspxAcquisitionEnvelopeValidator
         return new(AspxAggregateVerdict.Unknown, PhysicalOnly: true, gaps);
     }
 
-    internal static AspxAcquisitionEnvelopeValidation Validate(AspxAcquisitionVerdictV1 envelope,
+    internal static AspxAcquisitionEnvelopeValidation Validate(AspxAcquisitionVerdictV2 envelope,
         string actualPhysicalHash, string actualReferenceHash, string physicalOutputVersion,
         string referenceOutputVersion)
     {
         if (envelope == null)
             return new(AspxAggregateVerdict.Unknown, false, new[] { "acquisition_envelope_missing" });
         var gaps = new HashSet<string>(StringComparer.Ordinal);
-        if (envelope.OutputVersion != AspxAcquisitionVerdictV1.Version) gaps.Add("aggregate_version_unknown");
+        if (envelope.OutputVersion != AspxAcquisitionVerdictV2.Version) gaps.Add("aggregate_version_unknown");
         if (physicalOutputVersion != AspxDiscoveryOutputV2.Version ||
             envelope.PhysicalVolume?.OutputVersion != AspxDiscoveryOutputV2.Version)
             gaps.Add("physical_version_incompatible");
-        if (referenceOutputVersion != AspxReferenceOutputV1.Version ||
-            envelope.ReferenceVolume?.OutputVersion != AspxReferenceOutputV1.Version)
+        if (referenceOutputVersion != AspxReferenceOutputV2.Version ||
+            envelope.ReferenceVolume?.OutputVersion != AspxReferenceOutputV2.Version)
             gaps.Add("reference_version_incompatible");
         if (envelope.PhysicalVolume == null || envelope.ReferenceVolume == null)
             gaps.Add("companion_volume_missing");

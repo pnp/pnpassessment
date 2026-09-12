@@ -21,12 +21,13 @@ internal sealed record AspxAcquisitionRuntimeOptions(
     string PlatformBuildRef,
     string SnapshotFence,
     AspxPlatformRegistryV1 Registry,
-    Guid? ResumeRunId = null);
+    Guid? ResumeRunId = null,
+    Guid? NewRunId = null);
 
 internal sealed record AspxAcquisitionRunResult(
     AspxDiscoveryOutputV2 Physical,
-    AspxReferenceOutputV1 Reference,
-    AspxAcquisitionVerdictV1 Aggregate);
+    AspxReferenceOutputV2 Reference,
+    AspxAcquisitionVerdictV2 Aggregate);
 
 internal sealed class AspxAcquisitionRuntime
 {
@@ -38,18 +39,27 @@ internal sealed class AspxAcquisitionRuntime
         if (provider is not IAspxReferenceAcquisitionProvider referenceProvider)
             throw new InvalidOperationException("The acquisition provider must expose the reference companion volume.");
         ValidateDistinctPaths(options);
-        var runId = options.ResumeRunId ?? Guid.NewGuid();
-        var physical = await new AspxInventoryRuntime().RunAsync(provider,
-            new(options.PhysicalDatabasePath, options.PhysicalOutputPath, options.PhysicalManifest,
-                options.ScopeMode, options.FixtureRun, options.ResumeRunId, options.TenantVisibilityVerified,
-                options.ResumeRunId == null ? runId : null), cancellationToken);
-
+        if (options.ResumeRunId != null && options.NewRunId != null)
+            throw new ArgumentException("ResumeRunId and NewRunId are mutually exclusive.", nameof(options));
+        var runId = options.ResumeRunId ?? options.NewRunId ?? Guid.NewGuid();
         var referenceManifest = new AspxReferenceRunManifest(
             AspxAcquisitionVersions.ReferenceProducer, AspxAcquisitionVersions.ReferenceStore,
             options.PhysicalManifest.ProductRef, options.PhysicalManifest.SdkRef,
             options.PhysicalManifest.ScopePolicyHash, options.PermissionBoundaryHash,
             options.Registry.RegistryRevision, options.Registry.RegistryHash, options.PlatformBuildRef,
             options.SnapshotFence, AspxAcquisitionVersions.LiveProvider, runId.ToString("D"));
+        if (options.ResumeRunId != null)
+        {
+            if (!File.Exists(options.ReferenceDatabasePath))
+                throw new InvalidOperationException("Reference resume rejected: the reference v2 ledger does not exist. Preserve prior outputs and start a new run or supply the matching ledger.");
+            using var resumeStore = new AspxReferenceStore(options.ReferenceDatabasePath);
+            resumeStore.ValidateResumeCompatibility(runId, referenceManifest);
+        }
+        var physical = await new AspxInventoryRuntime().RunAsync(provider,
+            new(options.PhysicalDatabasePath, options.PhysicalOutputPath, options.PhysicalManifest,
+                options.ScopeMode, options.FixtureRun, options.ResumeRunId, options.TenantVisibilityVerified,
+                options.ResumeRunId == null ? runId : null), cancellationToken);
+
         var reference = referenceProvider.ReferenceCollector.Build(runId, referenceManifest, physical, options.Registry);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.ReferenceDatabasePath))!);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.ReferenceOutputPath))!);
@@ -67,7 +77,7 @@ internal sealed class AspxAcquisitionRuntime
         var referenceBinding = new AspxVolumeBinding(reference.OutputVersion, reference.AcquisitionRunId,
             referenceFile.Hash, referenceFile.Length, options.PhysicalManifest.ProductRef,
             options.PhysicalManifest.ScopePolicyHash, options.SnapshotFence);
-        var aggregate = new AspxAcquisitionVerdictV1(AspxAcquisitionVerdictV1.Version, runId,
+        var aggregate = new AspxAcquisitionVerdictV2(AspxAcquisitionVerdictV2.Version, runId,
             aggregateVerdict, physicalBinding, referenceBinding, AspxAcquisitionVersions.SurfaceContract,
             options.Registry.RegistryRevision, options.Registry.RegistryHash, options.PlatformBuildRef,
             options.PhysicalManifest.ProductRef, options.PhysicalManifest.SdkRef, DateTimeOffset.UtcNow,

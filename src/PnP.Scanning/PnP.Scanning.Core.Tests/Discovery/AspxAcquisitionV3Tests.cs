@@ -1,7 +1,9 @@
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using PnP.Scanning.Core.Discovery;
+using PnP.Scanning.Process.Commands;
 using System.Net;
-using System.Text.Json;
+using System.Text;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
@@ -31,11 +33,47 @@ public sealed class AspxAcquisitionV3Tests
             DiscoveryTerminalOutcome.Complete);
         var p5 = AspxPaginationContract.Validate(new[] { Page(0, null, null, terminal: true) },
             DiscoveryTerminalOutcome.Denied);
+        var p6 = AspxPaginationContract.Validate(new[]
+        {
+            Page(0, null, null, terminal: true) with { AttemptCount = 2, AttemptLimit = 1 },
+        }, DiscoveryTerminalOutcome.Complete);
 
-        new[] { p1, p2, p3, p4 }.Should().OnlyContain(result => result.Outcome == DiscoveryTerminalOutcome.Unknown);
+        new[] { p1, p2, p3, p4, p6 }.Should().OnlyContain(result => result.Outcome == DiscoveryTerminalOutcome.Unknown);
         p4.OutstandingTokenCount.Should().Be(1);
         p5.Outcome.Should().Be(DiscoveryTerminalOutcome.Denied,
             "a denied child with a null next token is not complete");
+    }
+
+    [Fact]
+    public void Http_success_semantic_denial_is_terminal_denied_and_never_parsed_as_items()
+    {
+        var uri = new Uri("https://contoso.sharepoint.com/sites/a/_api/web/webs?$select=Id");
+        var login = SharePointRestResponseParser.Parse(uri, HttpStatusCode.OK,
+            Encoding.UTF8.GetBytes("<!DOCTYPE html><html><form id=\"loginForm\" action=\"https://login.microsoftonline.com/\">Sign in to your account</form></html>"),
+            "text/html", "request-1", "correlation-1", DateTimeOffset.Parse("2026-09-12T12:00:00Z"));
+        var accessDenied = SharePointRestResponseParser.Parse(uri, HttpStatusCode.OK,
+            Encoding.UTF8.GetBytes("{\"error\":{\"code\":\"-2147024891, System.UnauthorizedAccessException\",\"message\":{\"value\":\"Access denied.\"}}}"),
+            "application/json", "request-2", "correlation-2", DateTimeOffset.Parse("2026-09-12T12:00:01Z"));
+
+        login.Outcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        login.SemanticDetectorResult.Should().Be(SharePointSemanticDetectorResults.LoginShell);
+        login.Items.Should().BeEmpty();
+        accessDenied.Outcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        accessDenied.SemanticDetectorResult.Should().Be(SharePointSemanticDetectorResults.AccessDenied);
+        accessDenied.Items.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public void Transport_401_403_remain_terminal_denied(HttpStatusCode status)
+    {
+        var page = SharePointRestResponseParser.Parse(new Uri("https://contoso.sharepoint.com/_api/web"),
+            status, Encoding.UTF8.GetBytes("{\"error\":{\"message\":\"Access denied\"}}"),
+            "application/json");
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        page.Items.Should().BeEmpty();
+        page.ErrorCode.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -105,12 +143,12 @@ public sealed class AspxAcquisitionV3Tests
             .Should().Match<AspxAcquisitionEnvelopeValidation>(value => value.PhysicalOnly &&
                 value.Verdict == AspxAggregateVerdict.Unknown); // V1
         AspxAcquisitionEnvelopeValidator.Validate(null, HashA, HashB,
-            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV1.Version).GapCodes
+            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV2.Version).GapCodes
             .Should().Contain("acquisition_envelope_missing"); // V2
 
         var envelope = Envelope();
         AspxAcquisitionEnvelopeValidator.Validate(envelope, HashB, HashB,
-            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV1.Version).GapCodes
+            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV2.Version).GapCodes
             .Should().Contain("physical_hash_mismatch"); // V3
         Observation("future-disposition", null, null).Validate().Should().Contain("unknown_disposition"); // V4
 
@@ -119,7 +157,7 @@ public sealed class AspxAcquisitionV3Tests
             ReferenceVolume = envelope.ReferenceVolume with { SnapshotFence = "other-fence" },
         };
         AspxAcquisitionEnvelopeValidator.Validate(mixedFence, HashA, HashB,
-            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV1.Version).GapCodes
+            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV2.Version).GapCodes
             .Should().Contain("snapshot_fence_mismatch"); // V5
 
         var mixedProduct = envelope with
@@ -130,11 +168,84 @@ public sealed class AspxAcquisitionV3Tests
             },
         };
         AspxAcquisitionEnvelopeValidator.Validate(mixedProduct, HashA, HashB,
-            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV1.Version).GapCodes
+            AspxDiscoveryOutputV2.Version, AspxReferenceOutputV2.Version).GapCodes
             .Should().Contain("product_ref_mismatch"); // V6
         AspxAcquisitionEnvelopeValidator.Validate(envelope, HashA, HashB,
             AspxDiscoveryOutputV2.Version, "aspx-discovery-output/v2").GapCodes
             .Should().Contain("reference_version_incompatible"); // V7
+    }
+
+    [Fact]
+    public async Task Terminal_receipt_preserves_null_nonzero_zero_semantics_and_binds_all_official_volumes()
+    {
+        using var directory = new TemporaryDirectory();
+        var executablePath = directory.File("microsoft365-assessment.dll");
+        await File.WriteAllTextAsync(executablePath, "managed-executable");
+        var executableFile = await AspxAggregateEvaluator.HashFileAsync(executablePath);
+        var executable = new AspxManagedExecutableBinding("microsoft365-assessment", "1.13.0", "1.13.0",
+            Path.GetFileName(executablePath), executableFile.Hash, executableFile.Length, HashA, 3,
+            null, null, null);
+        var nullExit = new AspxTerminalRunReceiptV1(AspxTerminalRunReceiptV1.Version, RunId, null,
+            "Unknown", "pnp/assessment@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "1111111111111111111111111111111111111111", "snapshot-1", null, executable,
+            Array.Empty<AspxTerminalVolumeBinding>(), DateTimeOffset.UtcNow, null, null);
+        AspxTerminalRunReceiptValidator.Validate(nullExit).GapCodes.Should().Contain("terminal_exit_code_missing");
+
+        var failedPath = directory.File("failed-terminal.json");
+        var failed = await AspxTerminalRunReceiptWriter.WriteAsync(failedPath, RunId, 2, "Cancelled",
+            null, null, "snapshot-1", null, executable, Array.Empty<AspxTerminalOutputSpec>(),
+            "operation_cancelled", HashB);
+        failed.ExitCode.Should().Be(2);
+        (await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(failedPath)).ExitCode.Should().Be(2);
+
+        var outputs = AspxTerminalVolumeRoles.Required.Select((role, index) =>
+        {
+            var path = directory.File(role + ".volume");
+            File.WriteAllText(path, "volume-" + index);
+            return new AspxTerminalOutputSpec(role, "fixture/v1", path);
+        }).ToArray();
+        var successPath = directory.File("success-terminal.json");
+        var success = await AspxTerminalRunReceiptWriter.WriteAsync(successPath, RunId, 0, "Succeeded",
+            "pnp/assessment@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "1111111111111111111111111111111111111111", "snapshot-1", "Incomplete",
+            executable, outputs);
+        success.ExitCode.Should().Be(0);
+        success.Volumes.Should().HaveCount(5);
+        AspxTerminalRunReceiptValidator.Validate(success).Valid.Should().BeTrue();
+        (await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(successPath)).Volumes
+            .Should().OnlyContain(volume => volume.Length > 0 && volume.Sha256.Length == 64);
+    }
+
+    [Fact]
+    public void Cli_contract_requires_terminal_receipt_and_advertises_v2_companion_outputs()
+    {
+        var command = AspxAcquisitionCommandDefinition.Create((_, _) => Task.FromResult(0));
+        command.Options.Select(option => option.Name).Should().Contain("terminal-receipt");
+        command.Description.Should().Contain("reference v2").And.Contain("aggregate v2")
+            .And.Contain("terminal receipt v1");
+    }
+
+    [Fact]
+    public void Reference_resume_rejects_v1_contract_before_mutating_the_ledger()
+    {
+        using var directory = new TemporaryDirectory();
+        var database = directory.File("reference.sqlite");
+        var manifest = ReferenceManifest();
+        var output = new AspxReferenceCollector().Build(RunId, manifest, Physical(), Registry());
+        using (var store = new AspxReferenceStore(database)) store.Write(manifest, output, resume: false);
+        using (var connection = new SqliteConnection($"Data Source={database};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE ReferenceRuns SET OutputVersion='aspx-reference-output/v1' WHERE RunId=$runId";
+            command.Parameters.AddWithValue("$runId", RunId.ToString("D"));
+            command.ExecuteNonQuery();
+        }
+
+        using var resumed = new AspxReferenceStore(database);
+        var action = () => resumed.ValidateResumeCompatibility(RunId, manifest);
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*v1 receipts cannot be resumed as v2*");
     }
 
     [Fact]
@@ -153,13 +264,14 @@ public sealed class AspxAcquisitionV3Tests
         using var factory = new FakeRestClientFactory();
         using var provider = new SharePointLiveAspxDiscoveryProvider(new(
             new[] { new Uri("https://contoso.sharepoint.com/sites/a") }, "delegated-user-a",
-            "declared-sites", "fixture-authority/v1", HashA), factory);
+            "declared-sites", "fixture-authority/v1", HashA, "16.0.27709.12000"), factory);
         var geo = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.Single();
         var site = (await provider.EnumerateChildrenAsync(geo)).ObservedChildren.Single();
         var web = (await provider.EnumerateChildrenAsync(site)).ObservedChildren.Single();
         var containers = (await provider.EnumerateChildrenAsync(web)).ObservedChildren;
         var documentLibrary = containers.Single(item => item.Locator == "/sites/a/UnknownTemplateLibrary");
         var genericList = containers.Single(item => item.Locator == "/sites/a/Lists/Generic");
+        var userInformationList = containers.Single(item => item.Locator == "/sites/a/_catalogs/users");
         var documentChildren = (await provider.EnumerateChildrenAsync(documentLibrary)).ObservedChildren;
         documentChildren.Should().Contain(item => item.SourceKind == DiscoverySourceKind.RawListLibraryFiles);
         var genericChildren = (await provider.EnumerateChildrenAsync(genericList)).ObservedChildren;
@@ -171,6 +283,37 @@ public sealed class AspxAcquisitionV3Tests
         var batches = await ReadAllAsync(provider.CreateRawSource(forms));
         batches.SelectMany(batch => batch.Records).Should().ContainSingle(record =>
             record.FileUniqueId == FakeRestClientFactory.ResolvedFileId && record.FileName == "DispForm.aspx"); // F1
+
+        var userForms = (await provider.EnumerateChildrenAsync(userInformationList)).ObservedChildren
+            .Single(item => item.SourceKind == DiscoverySourceKind.ListFormBackingFiles);
+        var userBatches = await ReadAllAsync(provider.CreateRawSource(userForms));
+        userBatches.Should().ContainSingle(batch => batch.TerminalOutcome == DiscoveryTerminalOutcome.Failed);
+        var systemOutput = provider.ReferenceCollector.Build(RunId, ReferenceManifest(), Physical(), Registry());
+        var systemRow = systemOutput.Denominator.Single(row => row.RequiredAdapter == "AllListFormsAuthority" &&
+            row.ApplicabilityRuleId == AspxSystemListFormsPolicy.RuleId);
+        systemRow.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Failed);
+        systemRow.ExpectedCountState.Should().Be(AspxExpectedCountState.Unknown);
+        systemRow.ExpectedCount.Should().BeNull();
+        systemRow.Applicability.Should().Be(AspxSurfaceApplicability.SystemOrVirtualOnly);
+        systemRow.ClassificationEffect.Should().Contain("historical-virtual-unknown");
+        systemOutput.References.Should().Contain(item =>
+            item.ReasonCode == AspxSystemListFormsPolicy.ReasonCode &&
+            item.Disposition == AspxReferenceDispositions.ReferenceUnavailable);
+        var systemReceipt = systemOutput.PaginationReceipts.Single(receipt =>
+            receipt.ActualEndpoint.Contains("dddddddd-dddd-dddd-dddd-dddddddddddd", StringComparison.OrdinalIgnoreCase) &&
+            receipt.ActualEndpoint.Contains("/Forms?", StringComparison.OrdinalIgnoreCase));
+        systemReceipt.ReceiptVersion.Should().Be(AspxAcquisitionVersions.PaginationReceipt);
+        systemReceipt.ActualMethod.Should().Be("GET");
+        systemReceipt.ActualSelect.Should().Be("Id,ServerRelativeUrl,FormType");
+        systemReceipt.ActualFilter.Should().BeEmpty();
+        systemReceipt.HttpStatusCode.Should().Be(400);
+        systemReceipt.SemanticDetectorResult.Should().Be(SharePointSemanticDetectorResults.ErrorEnvelope);
+        systemReceipt.AttemptCount.Should().Be(1);
+        systemReceipt.AttemptLimit.Should().Be(1);
+        systemReceipt.RequestId.Should().Be("fixture-request-id");
+        systemReceipt.CorrelationId.Should().Be("fixture-correlation-id");
+        systemReceipt.ErrorCode.Should().Be("-1, Microsoft.SharePoint.SPException");
+        systemReceipt.ReceivedAtUtc.Should().NotBe(default);
 
         Observation(AspxReferenceDispositions.Unknown, null, null, rawLocator: null).Disposition
             .Should().Be(AspxReferenceDispositions.Unknown); // F2
@@ -216,7 +359,7 @@ public sealed class AspxAcquisitionV3Tests
     }
 
     [Fact]
-    public async Task Synthetic_live_provider_run_writes_separate_v2_v1_and_aggregate_volumes()
+    public async Task Synthetic_live_provider_run_writes_separate_v2_volumes()
     {
         using var directory = new TemporaryDirectory();
         using var factory = new FakeRestClientFactory();
@@ -231,18 +374,22 @@ public sealed class AspxAcquisitionV3Tests
             "fixture-snapshot", Registry()));
 
         result.Physical.OutputVersion.Should().Be(AspxDiscoveryOutputV2.Version);
-        result.Reference.OutputVersion.Should().Be(AspxReferenceOutputV1.Version);
-        result.Aggregate.OutputVersion.Should().Be(AspxAcquisitionVerdictV1.Version);
+        result.Reference.OutputVersion.Should().Be(AspxReferenceOutputV2.Version);
+        result.Aggregate.OutputVersion.Should().Be(AspxAcquisitionVerdictV2.Version);
         result.Physical.Inventory.Should().ContainSingle("the same resolved form is canonicalized once");
         result.Reference.References.Count(item => item.LinkedPhysicalCanonicalInventoryKey != null).Should().Be(2);
-        result.Aggregate.AggregateVerdict.Should().Be(AspxAggregateVerdict.CompleteAuthorizedSurface);
+        result.Aggregate.AggregateVerdict.Should().Be(AspxAggregateVerdict.Unknown,
+            "the retained _catalogs/users Forms failure has expectedCount Unknown");
         new[] { "physical.sqlite", "physical.json", "reference.sqlite", "reference.json", "aggregate.json" }
             .Should().OnlyContain(name => File.Exists(directory.File(name)));
     }
 
     private static AspxPaginationPageReceipt Page(int ordinal, string request, string next, bool terminal) => new(
-        "scope", "authority/v1", HashA, ordinal, AspxPaginationContract.TokenHash(request), 1,
-        AspxPaginationContract.TokenHash(next), HashB, terminal, DateTimeOffset.UtcNow);
+        AspxAcquisitionVersions.PaginationReceipt, "scope", "authority/v1", HashA, "GET",
+        "https://contoso.sharepoint.com/_api/web/lists?$select=Id", "Id", string.Empty, ordinal,
+        AspxPaginationContract.TokenHash(request), 1, AspxPaginationContract.TokenHash(next), HashB,
+        200, SharePointSemanticDetectorResults.None, 1, 1, "request", "correlation", null,
+        terminal, DateTimeOffset.UtcNow);
 
     private static AspxReferenceObservation Observation(string disposition, string canonical, string fileId,
         string rawLocator = "/x.aspx", string reason = null) => new(
@@ -262,8 +409,8 @@ public sealed class AspxAcquisitionV3Tests
         DiscoveryVerdict.CompleteAuthorizedSurface, inventory, Array.Empty<DiscoveryObservationRow>(),
         Array.Empty<DiscoveryCoverageRow>(), Array.Empty<DiscoveryDenominatorRow>(), Array.Empty<string>(), 0);
 
-    private static AspxReferenceOutputV1 Reference(IReadOnlyList<AspxSurfaceDenominatorRow> rows) => new(
-        AspxReferenceOutputV1.Version, RunId, HashA, AspxAggregateVerdict.CompleteAuthorizedSurface,
+    private static AspxReferenceOutputV2 Reference(IReadOnlyList<AspxSurfaceDenominatorRow> rows) => new(
+        AspxReferenceOutputV2.Version, RunId, HashA, AspxAggregateVerdict.CompleteAuthorizedSurface,
         Array.Empty<AspxReferenceObservation>(), rows, Array.Empty<AspxPaginationPageReceipt>(), Array.Empty<string>());
 
     private static AspxReferenceRunManifest ReferenceManifest() => new(
@@ -301,13 +448,13 @@ public sealed class AspxAcquisitionV3Tests
         "1111111111111111111111111111111111111111", "16.0.1", "registry/v1", HashA,
         RunId.ToString("D"), DateTimeOffset.UtcNow, Array.Empty<string>(), "fixture", "fixture");
 
-    private static AspxAcquisitionVerdictV1 Envelope()
+    private static AspxAcquisitionVerdictV2 Envelope()
     {
         var physical = new AspxVolumeBinding(AspxDiscoveryOutputV2.Version, RunId, HashA, 10,
             "pnp/assessment@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", HashA, "snapshot-1");
-        var reference = new AspxVolumeBinding(AspxReferenceOutputV1.Version, RunId, HashB, 20,
+        var reference = new AspxVolumeBinding(AspxReferenceOutputV2.Version, RunId, HashB, 20,
             physical.ProductRef, HashA, "snapshot-1");
-        return new(AspxAcquisitionVerdictV1.Version, RunId, AspxAggregateVerdict.CompleteAuthorizedSurface,
+        return new(AspxAcquisitionVerdictV2.Version, RunId, AspxAggregateVerdict.CompleteAuthorizedSurface,
             physical, reference, AspxAcquisitionVersions.SurfaceContract, "registry/v1", HashA, "16.0.1",
             physical.ProductRef, "1111111111111111111111111111111111111111", DateTimeOffset.UtcNow,
             Array.Empty<string>());
@@ -345,21 +492,24 @@ public sealed class AspxAcquisitionV3Tests
                     var value when value.Contains("/lists?$select", StringComparison.OrdinalIgnoreCase) => """
                         {"value":[
                           {"Id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","Title":"UnknownTemplateLibrary","BaseType":1,"BaseTemplate":99999,"Hidden":true,"IsCatalog":false,"RootFolder":{"ServerRelativeUrl":"/sites/a/UnknownTemplateLibrary"},"DefaultViewUrl":"/x.aspx"},
-                          {"Id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","Title":"Generic","BaseType":0,"BaseTemplate":100,"Hidden":false,"IsCatalog":false,"RootFolder":{"ServerRelativeUrl":"/sites/a/Lists/Generic"},"DefaultViewUrl":"/y.aspx"}
+                          {"Id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","Title":"Generic","BaseType":0,"BaseTemplate":100,"Hidden":false,"IsCatalog":false,"RootFolder":{"ServerRelativeUrl":"/sites/a/Lists/Generic"},"DefaultViewUrl":"/y.aspx"},
+                          {"Id":"dddddddd-dddd-dddd-dddd-dddddddddddd","Title":"User Information List","BaseType":0,"BaseTemplate":112,"Hidden":true,"IsCatalog":false,"RootFolder":{"ServerRelativeUrl":"/sites/a/_catalogs/users"},"DefaultViewUrl":"/_catalogs/users/simple.aspx"}
                         ]}
                         """,
+                    var value when value.Contains("dddddddd-dddd-dddd-dddd-dddddddddddd", StringComparison.OrdinalIgnoreCase) &&
+                        value.Contains("/Forms?", StringComparison.OrdinalIgnoreCase) =>
+                        "{\"error\":{\"code\":\"-1, Microsoft.SharePoint.SPException\",\"message\":{\"value\":\"The requested operation is not supported for this list.\"}}}",
                     var value when value.Contains("/Forms?", StringComparison.OrdinalIgnoreCase) =>
                         "{\"value\":[{\"Id\":\"form-1\",\"ServerRelativeUrl\":\"/sites/a/Lists/Generic/DispForm.aspx\",\"FormType\":4}]}",
                     var value when value.Contains("/Views?", StringComparison.OrdinalIgnoreCase) => "{\"value\":[]}",
                     _ => "{\"value\":[]}",
                 };
-                using var document = JsonDocument.Parse(json);
-                var parsed = document.RootElement.TryGetProperty("value", out var valueElement) &&
-                    valueElement.ValueKind == JsonValueKind.Array
-                    ? valueElement.EnumerateArray().Select(value => value.Clone()).ToArray()
-                    : new[] { document.RootElement.Clone() };
-                return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK, parsed, null,
-                    DiscoveryHash.Of(json), "fixture", DiscoveryTerminalOutcome.Complete));
+                var status = requestUri.AbsoluteUri.Contains("dddddddd-dddd-dddd-dddd-dddddddddddd", StringComparison.OrdinalIgnoreCase) &&
+                    requestUri.AbsoluteUri.Contains("/Forms?", StringComparison.OrdinalIgnoreCase)
+                    ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
+                return Task.FromResult(SharePointRestResponseParser.Parse(requestUri, status,
+                    Encoding.UTF8.GetBytes(json), "application/json", "fixture-request-id",
+                    "fixture-correlation-id", DateTimeOffset.Parse("2026-09-12T12:00:00Z")));
             }
 
             public Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
