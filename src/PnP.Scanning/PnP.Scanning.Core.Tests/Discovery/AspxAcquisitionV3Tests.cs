@@ -303,8 +303,109 @@ public sealed class AspxAcquisitionV3Tests
     {
         var command = AspxAcquisitionCommandDefinition.Create((_, _) => Task.FromResult(0));
         command.Options.Select(option => option.Name).Should().Contain("terminal-receipt");
+        command.Options.Select(option => option.Name).Should().Contain("scope-mode");
         command.Description.Should().Contain("reference v2").And.Contain("aggregate v2")
             .And.Contain("terminal receipt v1");
+    }
+
+    [Fact]
+    public async Task Product_tenant_authority_freezes_independent_site_and_subweb_denominator()
+    {
+        var adapter = new FakeTenantAuthorityAdapter();
+        var tenant = new Uri("https://contoso.sharepoint.com");
+        var first = await AspxTenantAuthorityCapture.CaptureAsync(AspxScopeModes.ProductTenantAuthority,
+            tenant, Array.Empty<Uri>(), adapter);
+        var second = await AspxTenantAuthorityCapture.CaptureAsync(AspxScopeModes.ProductTenantAuthority,
+            tenant, Array.Empty<Uri>(), adapter);
+
+        first.ContractVersion.Should().Be(AspxTenantAuthoritySnapshot.CurrentContractVersion);
+        first.AuthorityHash.Should().HaveLength(64).And.Be(second.AuthorityHash,
+            "UTC receipt times are evidence metadata, not scope identity");
+        first.TenantVisibilityVerified.Should().BeTrue();
+        first.Sites.Provider.Should().Be(PnPCoreAspxTenantAuthorityAdapter.SiteProvider);
+        first.Sites.ActualFilter.Should().Be(PnPCoreAspxTenantAuthorityAdapter.SiteFilter);
+        first.SiteWebs.Single().Webs.ActualFilter.Should().Be(PnPCoreAspxTenantAuthorityAdapter.WebFilter);
+        first.SiteWebs.Single().Webs.Items.Single(web => !web.IsRootWeb).ParentWebUrl.Should()
+            .Be(new Uri("https://contoso.sharepoint.com/sites/a"));
+        adapter.SiteEnumerationCount.Should().Be(2);
+        adapter.WebEnumerationCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Declared_subset_never_sets_tenant_visibility_even_when_subweb_authority_closes()
+    {
+        var adapter = new FakeTenantAuthorityAdapter();
+        var snapshot = await AspxTenantAuthorityCapture.CaptureAsync(AspxScopeModes.DeclaredSubset,
+            new Uri("https://contoso.sharepoint.com"),
+            new[] { new Uri("https://contoso.sharepoint.com/sites/a") }, adapter);
+
+        snapshot.TenantVisibilityVerified.Should().BeFalse();
+        snapshot.Sites.Provider.Should().Be("Assessment.CLI");
+        snapshot.Sites.Exclusions.Should().Contain("tenant-site-denominator-not-enumerated");
+        adapter.SiteEnumerationCount.Should().Be(0, "declared sites cannot prove tenant visibility");
+        adapter.WebEnumerationCount.Should().Be(1, "declared sites still use the product subweb authority adapter");
+    }
+
+    [Fact]
+    public async Task Denied_subweb_authority_is_persisted_per_site_and_cannot_become_complete()
+    {
+        var adapter = new FakeTenantAuthorityAdapter(denyWebs: true);
+        var snapshot = await AspxTenantAuthorityCapture.CaptureAsync(AspxScopeModes.ProductTenantAuthority,
+            new Uri("https://contoso.sharepoint.com"), Array.Empty<Uri>(), adapter);
+        snapshot.TenantVisibilityVerified.Should().BeFalse();
+
+        using var factory = new FakeRestClientFactory();
+        using var provider = new SharePointLiveAspxDiscoveryProvider(new(
+            snapshot.Sites.Items.Select(site => site.Url).ToArray(), "sites-read-all-app",
+            "authorized-tenant", snapshot.AuthorityRevision, snapshot.AuthorityHash,
+            "16.0.27709.12000", snapshot), factory);
+        var geo = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.Single();
+        var site = (await provider.EnumerateChildrenAsync(geo)).ObservedChildren.Single();
+        var webResult = await provider.EnumerateChildrenAsync(site);
+        webResult.Outcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        webResult.ObservedChildren.Should().ContainSingle("the known root remains scannable");
+
+        var output = provider.ReferenceCollector.Build(RunId,
+            ReferenceManifest() with { ScopeAuthorityHash = snapshot.AuthorityHash }, Physical(), Registry());
+        var receipt = output.Denominator.Single(row => row.RequiredAdapter == "ProductRootAndSubwebAuthority");
+        receipt.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        receipt.ExpectedCountState.Should().Be(AspxExpectedCountState.Unknown);
+        receipt.ExpectedCount.Should().BeNull();
+        receipt.ActualEndpoint.Should().Contain("GetSiteCollectionWebsWithDetailsAsync");
+        output.CoverageVerdict.Should().NotBe(AspxAggregateVerdict.CompleteAuthorizedSurface);
+    }
+
+    [Fact]
+    public async Task Modeled_welcome_page_and_web_root_denials_remain_explicit_fail_closed_surfaces()
+    {
+        var snapshot = await AspxTenantAuthorityCapture.CaptureAsync(AspxScopeModes.ProductTenantAuthority,
+            new Uri("https://contoso.sharepoint.com"), Array.Empty<Uri>(), new FakeTenantAuthorityAdapter());
+        using var factory = new FakeRestClientFactory(DiscoveryTerminalOutcome.Denied,
+            DiscoveryTerminalOutcome.Denied);
+        using var provider = new SharePointLiveAspxDiscoveryProvider(new(
+            snapshot.Sites.Items.Select(site => site.Url).ToArray(), "sites-read-all-app",
+            "authorized-tenant", snapshot.AuthorityRevision, snapshot.AuthorityHash,
+            "16.0.27709.12000", snapshot), factory);
+        var geo = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.Single();
+        var site = (await provider.EnumerateChildrenAsync(geo)).ObservedChildren.Single();
+        var web = (await provider.EnumerateChildrenAsync(site)).ObservedChildren.Single(item =>
+            item.Locator == "https://contoso.sharepoint.com/sites/a");
+        var containers = (await provider.EnumerateChildrenAsync(web)).ObservedChildren;
+        var webRoot = containers.Single(item => item.Locator == "https://contoso.sharepoint.com/sites/a");
+        var webRootFolder = (await provider.EnumerateChildrenAsync(webRoot)).ObservedChildren.Single();
+        (await ReadAllAsync(provider.CreateRawSource(webRootFolder))).Should().ContainSingle(batch =>
+            batch.TerminalOutcome == DiscoveryTerminalOutcome.Denied);
+        (await provider.EnumerateChildrenAsync(webRootFolder)).Outcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+
+        var output = provider.ReferenceCollector.Build(RunId,
+            ReferenceManifest() with { ScopeAuthorityHash = snapshot.AuthorityHash }, Physical(), Registry());
+        output.Denominator.Single(row => row.RequiredAdapter == "PnPCoreWelcomePageAuthority")
+            .TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        output.Denominator.Single(row => row.RequiredAdapter == "PnPCoreWebRootFilesAuthority")
+            .TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        output.References.Should().Contain(item => item.SourceKind == AspxReferenceSourceKinds.WebWelcomePage &&
+            item.Disposition == AspxReferenceDispositions.ReferenceUnavailable);
+        output.CoverageVerdict.Should().NotBe(AspxAggregateVerdict.CompleteAuthorizedSurface);
     }
 
     [Fact]
@@ -357,7 +458,11 @@ public sealed class AspxAcquisitionV3Tests
         var documentChildren = (await provider.EnumerateChildrenAsync(documentLibrary)).ObservedChildren;
         documentChildren.Should().Contain(item => item.SourceKind == DiscoverySourceKind.RawListLibraryFiles);
         var genericChildren = (await provider.EnumerateChildrenAsync(genericList)).ObservedChildren;
-        genericChildren.Should().NotContain(item => item.SourceKind == DiscoverySourceKind.RawListLibraryFiles);
+        genericChildren.Should().NotContain(item => item.SourceKind == DiscoverySourceKind.RawListLibraryFiles &&
+            item.Locator == genericList.Locator, "non-library list roots are not document-library file surfaces");
+        genericChildren.Should().Contain(item => item.SourceKind == DiscoverySourceKind.RawListLibraryFiles &&
+            item.Locator.EndsWith("/Forms", StringComparison.OrdinalIgnoreCase),
+            "the physical Forms tree is an independent required surface for every list with a root folder");
         genericChildren.Should().Contain(item => item.SourceKind == DiscoverySourceKind.ListFormBackingFiles);
         genericChildren.Should().Contain(item => item.SourceKind == DiscoverySourceKind.ListViewBackingFiles);
 
@@ -580,7 +685,10 @@ public sealed class AspxAcquisitionV3Tests
     private sealed class FakeRestClientFactory : ISharePointAspxRestClientFactory
     {
         internal const string ResolvedFileId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
-        private readonly FakeRestClient client = new();
+        private readonly FakeRestClient client;
+        internal FakeRestClientFactory(DiscoveryTerminalOutcome welcomeOutcome = DiscoveryTerminalOutcome.Complete,
+            DiscoveryTerminalOutcome folderOutcome = DiscoveryTerminalOutcome.Empty) =>
+            client = new FakeRestClient(welcomeOutcome, folderOutcome);
         public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl, CancellationToken cancellationToken = default)
         {
             client.WebUrlValue = webUrl;
@@ -590,6 +698,14 @@ public sealed class AspxAcquisitionV3Tests
 
         private sealed class FakeRestClient : ISharePointAspxRestClient
         {
+            private readonly DiscoveryTerminalOutcome welcomeOutcome;
+            private readonly DiscoveryTerminalOutcome folderOutcome;
+            internal FakeRestClient(DiscoveryTerminalOutcome welcomeOutcome,
+                DiscoveryTerminalOutcome folderOutcome)
+            {
+                this.welcomeOutcome = welcomeOutcome;
+                this.folderOutcome = folderOutcome;
+            }
             public Uri WebUrlValue { get; set; } = new("https://contoso.sharepoint.com/sites/a");
             public Uri WebUrl => WebUrlValue;
 
@@ -626,7 +742,65 @@ public sealed class AspxAcquisitionV3Tests
                 CancellationToken cancellationToken = default) => Task.FromResult(new SharePointResolvedFile(
                     DiscoveryTerminalOutcome.Complete, ResolvedFileId, "DispForm.aspx", serverRelativeUrl,
                     "Customized", "fixture:file-resolution"));
+            public Task<SharePointModeledValue> ReadWelcomePageAsync(
+                CancellationToken cancellationToken = default) => Task.FromResult(new SharePointModeledValue(
+                    welcomeOutcome, welcomeOutcome == DiscoveryTerminalOutcome.Complete ? string.Empty : null,
+                    "fixture:pnp-modeled-web", "GetAsync(WelcomePage)",
+                    welcomeOutcome == DiscoveryTerminalOutcome.Denied ? "welcome_page_denied" : null,
+                    "fixture:welcome-page", DateTimeOffset.UtcNow));
+            public Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
+                CancellationToken cancellationToken = default) => Task.FromResult(new SharePointModeledFolderResult(
+                    folderOutcome, "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", serverRelativeUrl,
+                    Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
+                    "fixture:pnp-modeled-folder", "GetFolder(Folders,Files)",
+                    folderOutcome == DiscoveryTerminalOutcome.Denied ? "web_root_folder_denied" : null,
+                    "fixture:web-root", DateTimeOffset.UtcNow));
             public void Dispose() { }
+        }
+    }
+
+    private sealed class FakeTenantAuthorityAdapter : IAspxTenantAuthorityAdapter
+    {
+        private readonly bool denyWebs;
+        internal FakeTenantAuthorityAdapter(bool denyWebs = false) => this.denyWebs = denyWebs;
+        internal int SiteEnumerationCount { get; private set; }
+        internal int WebEnumerationCount { get; private set; }
+
+        public Task<AspxAuthorityCollection<AspxAuthoritySite>> EnumerateSiteCollectionsAsync(
+            Uri tenantRoot, CancellationToken cancellationToken = default)
+        {
+            SiteEnumerationCount++;
+            var sites = new[]
+            {
+                new AspxAuthoritySite(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    new Uri("https://contoso.sharepoint.com/sites/a"), "graph-a", "Site A"),
+            };
+            return Task.FromResult(new AspxAuthorityCollection<AspxAuthoritySite>(
+                DiscoveryTerminalOutcome.Complete, sites, PnPCoreAspxTenantAuthorityAdapter.SiteProvider,
+                PnPCoreAspxTenantAuthorityAdapter.SiteOperation, PnPCoreAspxTenantAuthorityAdapter.SiteFilter,
+                Array.Empty<string>(), null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow));
+        }
+
+        public Task<AspxAuthorityCollection<AspxAuthorityWeb>> EnumerateWebsAsync(
+            AspxAuthoritySite site, CancellationToken cancellationToken = default)
+        {
+            WebEnumerationCount++;
+            var root = new AspxAuthorityWeb(site.RootWebId, site.Url, "/sites/a", null, "STS#3", true);
+            if (denyWebs)
+                return Task.FromResult(new AspxAuthorityCollection<AspxAuthorityWeb>(
+                    DiscoveryTerminalOutcome.Denied, new[] { root },
+                    PnPCoreAspxTenantAuthorityAdapter.WebProvider,
+                    PnPCoreAspxTenantAuthorityAdapter.WebOperation, PnPCoreAspxTenantAuthorityAdapter.WebFilter,
+                    Array.Empty<string>(), "root_and_subweb_authority_denied", "fixture 403",
+                    ContinuationRemaining: false, DateTimeOffset.UtcNow));
+            var subweb = new AspxAuthorityWeb(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                new Uri("https://contoso.sharepoint.com/sites/a/sub"), "/sites/a/sub", site.Url, "STS#3", false);
+            return Task.FromResult(new AspxAuthorityCollection<AspxAuthorityWeb>(
+                DiscoveryTerminalOutcome.Complete, new[] { root, subweb },
+                PnPCoreAspxTenantAuthorityAdapter.WebProvider,
+                PnPCoreAspxTenantAuthorityAdapter.WebOperation, PnPCoreAspxTenantAuthorityAdapter.WebFilter,
+                Array.Empty<string>(), null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow));
         }
     }
 

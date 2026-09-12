@@ -178,6 +178,25 @@ public sealed class AspxDiscoveryOrchestrationTests
             .WithMessage("*Immutable discovery provenance drift*EnvironmentManifestHash*");
     }
 
+    [Fact]
+    public async Task Resume_rejects_declared_subset_as_product_tenant_authority()
+    {
+        using var directory = new TemporaryDirectory();
+        var runtime = new AspxInventoryRuntime();
+        using var provider = await LoadProvider(directory, CompleteInput());
+        var first = await runtime.RunAsync(provider,
+            new(directory.DatabasePath, directory.OutputPath, Manifest(), AspxScopeModes.DeclaredSubset,
+                FixtureRun: true));
+        using var resumedProvider = await LoadProvider(directory, CompleteInput());
+
+        var action = () => runtime.RunAsync(resumedProvider,
+            new(directory.DatabasePath, directory.OutputPath, Manifest(),
+                AspxScopeModes.ProductTenantAuthority, FixtureRun: true, ResumeRunId: first.RunId));
+
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Resume scopeMode/fixtureRun does not match*");
+    }
+
     internal static AspxDiscoveryInputV1 CompleteInput()
     {
         var scopes = new[]

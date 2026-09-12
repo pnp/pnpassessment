@@ -110,8 +110,10 @@ internal sealed class AspxInventoryRuntime
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(options);
-        if (options.ScopeMode is not ("tenant_full" or "declared_subset"))
-            throw new ArgumentException("scopeMode must be 'tenant_full' or 'declared_subset'.", nameof(options));
+        if (!AspxScopeModes.IsKnown(options.ScopeMode))
+            throw new ArgumentException(
+                $"scopeMode must be '{AspxScopeModes.ProductTenantAuthority}', '{AspxScopeModes.TenantFull}' or '{AspxScopeModes.DeclaredSubset}'.",
+                nameof(options));
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.OutputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath))!);
@@ -277,8 +279,9 @@ internal sealed class ManifestAspxDiscoveryProvider : IAspxDiscoveryProvider
     {
         if (input.Version != AspxDiscoveryInputV1.CurrentVersion)
             throw new InvalidOperationException($"Unsupported input version '{input.Version}'.");
-        if (input.ScopeMode is not ("tenant_full" or "declared_subset"))
-            throw new InvalidOperationException("Input scopeMode must be 'tenant_full' or 'declared_subset'.");
+        if (!AspxScopeModes.IsKnown(input.ScopeMode))
+            throw new InvalidOperationException(
+                $"Input scopeMode must be '{AspxScopeModes.ProductTenantAuthority}', '{AspxScopeModes.TenantFull}' or '{AspxScopeModes.DeclaredSubset}'.");
         if (input.Scopes == null || input.Scopes.Count == 0)
             throw new InvalidOperationException("Input must contain at least one scope.");
         var duplicate = input.Scopes.GroupBy(scope => scope.ScopeKey, StringComparer.Ordinal)

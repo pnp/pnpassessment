@@ -12,6 +12,7 @@ namespace PnP.Scanning.Process.Commands;
 
 internal sealed record AspxAcquisitionCliOptions(
     IReadOnlyList<string> Sites,
+    string ScopeMode,
     string Tenant,
     AuthenticationMode AuthMode,
     Guid ApplicationId,
@@ -42,11 +43,12 @@ internal static class AspxAcquisitionCommandDefinition
         ArgumentNullException.ThrowIfNull(executeAsync);
         var command = new Command("aspx-acquisition",
             "Runs authenticated SharePoint live ASPX acquisition and writes physical v2, reference v2, aggregate v2, and product terminal receipt v1 volumes. Use aspx-inventory for explicit offline manifest replay.");
-        var sites = new Option<List<string>>("--site", "Authorized site collection URL. Repeat for multiple site collections.")
+        var sites = new Option<List<string>>("--site", "Authorized site collection URL. Repeat for declared_subset mode.")
         {
-            IsRequired = true,
             AllowMultipleArgumentsPerToken = true,
         };
+        var scopeMode = new Option<string>("--scope-mode", () => AspxScopeModes.DeclaredSubset,
+            $"Scope authority mode: {AspxScopeModes.ProductTenantAuthority} or {AspxScopeModes.DeclaredSubset}.");
         var tenant = RequiredString("--tenant", "SharePoint tenant host or URL used by the existing Assessment authentication path.");
         var authMode = new Option<AuthenticationMode>("--authMode", () => AuthenticationMode.Interactive,
             "Existing Assessment authentication mode: Interactive, Device, or Application.");
@@ -68,12 +70,14 @@ internal static class AspxAcquisitionCommandDefinition
         var snapshotFence = RequiredString("--snapshot-fence", "Immutable acquisition snapshot/as-of fence.");
         var permissionContext = RequiredString("--permission-context", "Non-secret effective identity/permission context label.");
         var visibilityBoundary = RequiredString("--visibility-boundary", "Authorized visibility boundary proven by this run.");
-        var authorityRevision = RequiredString("--authority-revision", "Independent scope authority revision.");
-        var authorityHash = RequiredString("--authority-hash", "SHA-256 of the independent scope authority artifact.");
+        var authorityRevision = new Option<string>("--authority-revision",
+            "Deprecated declared-subset authority label retained only for CLI compatibility; product authority is computed by this command.");
+        var authorityHash = new Option<string>("--authority-hash",
+            "Deprecated declared-subset authority hash retained only for CLI compatibility; product authority is computed by this command.");
         var resume = new Option<Guid?>("--resume-run-id", "Exact acquisition run id to resume after both manifests validate.");
         foreach (var option in new Option[]
         {
-            sites, tenant, authMode, applicationId, tenantId, certPath, certFile, certPassword,
+            sites, scopeMode, tenant, authMode, applicationId, tenantId, certPath, certFile, certPassword,
             manifest, registry, physicalDatabase, physicalOutput, referenceDatabase, referenceOutput,
             aggregateOutput, terminalReceipt, platformBuild, snapshotFence, permissionContext, visibilityBoundary,
             authorityRevision, authorityHash, resume,
@@ -97,15 +101,22 @@ internal static class AspxAcquisitionCommandDefinition
             var parsedSites = result.GetValueForOption(sites) ?? new List<string>();
             if (parsedSites.Any(site => !Uri.TryCreate(site, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
                 result.ErrorMessage = "Every --site value must be an absolute HTTPS URL.";
+            var parsedMode = result.GetValueForOption(scopeMode);
+            if (parsedMode is not (AspxScopeModes.ProductTenantAuthority or AspxScopeModes.DeclaredSubset))
+                result.ErrorMessage = $"--scope-mode must be '{AspxScopeModes.ProductTenantAuthority}' or '{AspxScopeModes.DeclaredSubset}'.";
+            if (parsedMode == AspxScopeModes.DeclaredSubset && parsedSites.Count == 0)
+                result.ErrorMessage = "declared_subset requires at least one --site value.";
+            if (parsedMode == AspxScopeModes.ProductTenantAuthority && parsedSites.Count > 0)
+                result.ErrorMessage = "product_tenant_authority enumerates its own independent site denominator; do not pass --site.";
             var hash = result.GetValueForOption(authorityHash);
-            if (hash?.Length != 64 || !hash.All(Uri.IsHexDigit))
-                result.ErrorMessage = "--authority-hash must be a 64-character SHA-256 hex value.";
+            if (!string.IsNullOrWhiteSpace(hash) && (hash.Length != 64 || !hash.All(Uri.IsHexDigit)))
+                result.ErrorMessage = "When supplied, --authority-hash must be a 64-character SHA-256 hex value.";
         });
         command.SetHandler(async (InvocationContext context) =>
         {
             var parse = context.ParseResult;
             var options = new AspxAcquisitionCliOptions(
-                parse.GetValueForOption(sites), parse.GetValueForOption(tenant),
+                parse.GetValueForOption(sites), parse.GetValueForOption(scopeMode), parse.GetValueForOption(tenant),
                 parse.GetValueForOption(authMode), parse.GetValueForOption(applicationId),
                 parse.GetValueForOption(tenantId), parse.GetValueForOption(certPath),
                 parse.GetValueForOption(certFile), parse.GetValueForOption(certPassword),
@@ -116,7 +127,7 @@ internal static class AspxAcquisitionCommandDefinition
                 parse.GetValueForOption(platformBuild),
                 parse.GetValueForOption(snapshotFence), parse.GetValueForOption(permissionContext),
                 parse.GetValueForOption(visibilityBoundary), parse.GetValueForOption(authorityRevision),
-                parse.GetValueForOption(authorityHash).ToLowerInvariant(), parse.GetValueForOption(resume));
+                parse.GetValueForOption(authorityHash)?.ToLowerInvariant(), parse.GetValueForOption(resume));
             context.ExitCode = await executeAsync(options, context.GetCancellationToken());
         });
         return command;
@@ -216,18 +227,29 @@ internal sealed class AspxAcquisitionCommandHandler
                 }).ConfigureAwait(false);
             var authProvider = new ExternalAuthenticationProvider((_, scopes) =>
                 authentication.GetAccessTokenAsync(scopes));
+            var tenantRoot = new Uri(AuthenticationManager.GetSiteFromTenant(options.Tenant));
+            var authority = await AspxTenantAuthorityCapture.CaptureAsync(options.ScopeMode, tenantRoot,
+                options.Sites.Select(site => new Uri(site)).ToArray(),
+                new PnPCoreAspxTenantAuthorityAdapter(contextFactory, authProvider), cancellationToken)
+                .ConfigureAwait(false);
+            manifest = manifest with
+            {
+                ScopePolicyHash = authority.AuthorityHash,
+                TenantManifestHash = authority.AuthorityHash,
+            };
             using var clientFactory = new PnPContextSharePointAspxRestClientFactory(contextFactory, authProvider);
             using var provider = new SharePointLiveAspxDiscoveryProvider(
-                new(options.Sites.Select(site => new Uri(site)).ToArray(), options.PermissionContext,
-                    options.VisibilityBoundary, options.AuthorityRevision, options.AuthorityHash,
-                    options.PlatformBuild), clientFactory);
+                new(authority.Sites.Items.Select(site => site.Url).ToArray(), options.PermissionContext,
+                    options.VisibilityBoundary, authority.AuthorityRevision, authority.AuthorityHash,
+                    options.PlatformBuild, authority), clientFactory);
             var permissionHash = DiscoveryHash.Of(options.PermissionContext, options.VisibilityBoundary,
-                options.AuthMode.ToString(), options.TenantId ?? string.Empty);
+                options.AuthMode.ToString(), options.TenantId ?? string.Empty, authority.ScopeMode,
+                authority.AuthorityHash);
             var result = await new AspxAcquisitionRuntime().RunAsync(provider,
                 new(options.PhysicalDatabase.FullName, options.PhysicalOutput.FullName,
                     options.ReferenceDatabase.FullName, options.ReferenceOutput.FullName,
-                    options.AggregateOutput.FullName, manifest, "declared_subset", FixtureRun: false,
-                    TenantVisibilityVerified: false, permissionHash, options.PlatformBuild,
+                    options.AggregateOutput.FullName, manifest, authority.ScopeMode, FixtureRun: false,
+                    TenantVisibilityVerified: authority.TenantVisibilityVerified, permissionHash, options.PlatformBuild,
                     options.SnapshotFence, registry, options.ResumeRunId,
                     options.ResumeRunId == null ? artifactRunId : null), cancellationToken).ConfigureAwait(false);
             aggregate = result.Aggregate;
@@ -266,7 +288,7 @@ internal sealed class AspxAcquisitionCommandHandler
             return 3;
         }
         if (exitCode == 0)
-            AnsiConsole.MarkupLine($"[green]ASPX live acquisition {artifactRunId:D} finished with {aggregate.AggregateVerdict}; physical={Markup.Escape(options.PhysicalOutput.FullName)}; reference={Markup.Escape(options.ReferenceOutput.FullName)}; aggregate={Markup.Escape(options.AggregateOutput.FullName)}; terminal={Markup.Escape(options.TerminalReceipt.FullName)}[/]");
+            AnsiConsole.MarkupLine($"[green]ASPX live acquisition {artifactRunId:D} finished with {aggregate.AggregateVerdict}; scopeMode={Markup.Escape(options.ScopeMode)}; physical={Markup.Escape(options.PhysicalOutput.FullName)}; reference={Markup.Escape(options.ReferenceOutput.FullName)}; aggregate={Markup.Escape(options.AggregateOutput.FullName)}; terminal={Markup.Escape(options.TerminalReceipt.FullName)}[/]");
         return exitCode;
     }
 

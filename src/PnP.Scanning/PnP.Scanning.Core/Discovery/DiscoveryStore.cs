@@ -254,7 +254,7 @@ internal sealed class DiscoveryStore : IDisposable
     internal DiscoveryVerdict EvaluateVerdict(Guid runId, bool tenantVisibilityVerified)
     {
         var scopeMode = Scalar<string>("SELECT ScopeMode FROM DiscoveryRuns WHERE RunId=$runId", ("$runId", runId.ToString("D")));
-        if (string.Equals(scopeMode, "tenant_full", StringComparison.Ordinal)) EnsureTenantFullDenominator(runId);
+        if (AspxScopeModes.RequiresTenantDenominator(scopeMode)) EnsureTenantFullDenominator(runId);
         var outcomes = Strings("SELECT Outcome FROM DiscoveryScopes WHERE RunId=$runId", ("$runId", runId.ToString("D")))
             .Select(Enum.Parse<DiscoveryTerminalOutcome>).ToArray();
         var enumerationOutcomes = Strings("SELECT Outcome FROM DiscoveryChildEnumerations WHERE RunId=$runId", ("$runId", runId.ToString("D")))
@@ -272,7 +272,7 @@ internal sealed class DiscoveryStore : IDisposable
                      DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled) ||
                  gaps.Contains(DiscoveryGapCodes.ExpectedChildMissing, StringComparer.Ordinal))
             verdict = DiscoveryVerdict.Incomplete;
-        else if (!string.Equals(scopeMode, "tenant_full", StringComparison.Ordinal) || outcomes.Contains(DiscoveryTerminalOutcome.PolicyExcluded))
+        else if (!AspxScopeModes.RequiresTenantDenominator(scopeMode) || outcomes.Contains(DiscoveryTerminalOutcome.PolicyExcluded))
             verdict = DiscoveryVerdict.CompleteDeclaredSubset;
         else
             verdict = tenantVisibilityVerified ? DiscoveryVerdict.CompleteTenantVerified : DiscoveryVerdict.CompleteAuthorizedSurface;
