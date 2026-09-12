@@ -185,7 +185,7 @@ internal sealed class AspxAcquisitionCommandHandler
                 try
                 {
                     previous = await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(
-                        options.TerminalReceipt.FullName, cancellationToken);
+                        options.TerminalReceipt.FullName, OutputSpecs(options), cancellationToken);
                 }
                 catch
                 {

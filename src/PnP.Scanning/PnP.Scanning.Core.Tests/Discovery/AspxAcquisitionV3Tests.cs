@@ -45,6 +45,34 @@ public sealed class AspxAcquisitionV3Tests
     }
 
     [Fact]
+    public void Multi_page_receipts_hash_tokens_and_remove_raw_continuation_from_durable_evidence()
+    {
+        const string rawToken = "Paged=TRUE&p_ID=42";
+        var nextLink = "https://contoso.sharepoint.com/_api/web/lists?$select=Id&$skiptoken=" +
+            Uri.EscapeDataString(rawToken);
+        var request = new Uri(nextLink);
+        var page = SharePointRestResponseParser.Parse(request, HttpStatusCode.OK,
+            Encoding.UTF8.GetBytes("{\"value\":[]}"), "application/json", "request", "correlation",
+            DateTimeOffset.Parse("2026-09-12T12:00:00Z"));
+        var durableEndpoint = AspxDurableRequestEvidence.Endpoint(request);
+        var durableEvidence = AspxDurableRequestEvidence.Reference(request, page, "Id");
+        durableEndpoint.Should().Contain("$skiptoken=sha256").And.NotContain("Paged");
+        durableEvidence.Should().Contain("$skiptoken=sha256").And.NotContain("Paged");
+
+        var receipts = new[]
+        {
+            Page(0, null, nextLink, terminal: false),
+            Page(1, nextLink, null, terminal: true) with { ActualEndpoint = durableEndpoint },
+        };
+        AspxPaginationContract.Validate(receipts, DiscoveryTerminalOutcome.Complete).GapCodes.Should().BeEmpty();
+        receipts[0].NextTokenHash.Should().Be(receipts[1].RequestTokenHash).And.HaveLength(64);
+
+        AspxPaginationContract.Validate(new[] { receipts[1] with { ActualEndpoint = request.AbsoluteUri } },
+                DiscoveryTerminalOutcome.Complete).GapCodes
+            .Should().Contain("pagination_raw_continuation_value_persisted");
+    }
+
+    [Fact]
     public void Http_success_semantic_denial_is_terminal_denied_and_never_parsed_as_items()
     {
         var uri = new Uri("https://contoso.sharepoint.com/sites/a/_api/web/webs?$select=Id");
@@ -198,12 +226,7 @@ public sealed class AspxAcquisitionV3Tests
         failed.ExitCode.Should().Be(2);
         (await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(failedPath)).ExitCode.Should().Be(2);
 
-        var outputs = AspxTerminalVolumeRoles.Required.Select((role, index) =>
-        {
-            var path = directory.File(role + ".volume");
-            File.WriteAllText(path, "volume-" + index);
-            return new AspxTerminalOutputSpec(role, "fixture/v1", path);
-        }).ToArray();
+        var outputs = await CreateOfficialVolumesAsync(directory);
         var successPath = directory.File("success-terminal.json");
         var success = await AspxTerminalRunReceiptWriter.WriteAsync(successPath, RunId, 0, "Succeeded",
             "pnp/assessment@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -212,8 +235,67 @@ public sealed class AspxAcquisitionV3Tests
         success.ExitCode.Should().Be(0);
         success.Volumes.Should().HaveCount(5);
         AspxTerminalRunReceiptValidator.Validate(success).Valid.Should().BeTrue();
-        (await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(successPath)).Volumes
+        (await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(successPath, outputs)).Volumes
             .Should().OnlyContain(volume => volume.Length > 0 && volume.Sha256.Length == 64);
+    }
+
+    [Fact]
+    public async Task Terminal_fresh_readback_rejects_missing_swapped_truncated_and_wrong_version_volumes()
+    {
+        using var directory = new TemporaryDirectory();
+        var executablePath = directory.File("microsoft365-assessment.dll");
+        await File.WriteAllTextAsync(executablePath, "managed-executable");
+        var executableFile = await AspxAggregateEvaluator.HashFileAsync(executablePath);
+        var executable = new AspxManagedExecutableBinding("microsoft365-assessment", "1.13.0", "1.13.0",
+            Path.GetFileName(executablePath), executableFile.Hash, executableFile.Length, HashA, 3,
+            null, null, null);
+        var outputs = await CreateOfficialVolumesAsync(directory);
+        var receiptPath = directory.File("terminal.json");
+        var receipt = await AspxTerminalRunReceiptWriter.WriteAsync(receiptPath, RunId, 0, "Succeeded",
+            "pnp/assessment@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "1111111111111111111111111111111111111111", "snapshot-1", "Unknown",
+            executable, outputs);
+
+        var missingPath = outputs.Single(output => output.Role == AspxTerminalVolumeRoles.PhysicalOutput).Path;
+        var original = await File.ReadAllBytesAsync(missingPath);
+        File.Delete(missingPath);
+        var missing = () => AspxTerminalRunReceiptValidator.ReadAndValidateAsync(receiptPath, outputs);
+        await missing.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*terminal_official_volume_missing:physical-output*");
+        await File.WriteAllBytesAsync(missingPath, original);
+
+        await File.WriteAllBytesAsync(missingPath, original[..Math.Max(1, original.Length / 2)]);
+        var truncated = () => AspxTerminalRunReceiptValidator.ReadAndValidateAsync(receiptPath, outputs);
+        await truncated.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*terminal_official_volume_hash_mismatch:physical-output*");
+        await File.WriteAllBytesAsync(missingPath, original);
+
+        var swappedVolumes = receipt.Volumes.Select(volume => volume.Role switch
+        {
+            AspxTerminalVolumeRoles.PhysicalOutput => volume with
+            {
+                FileName = receipt.Volumes.Single(item => item.Role == AspxTerminalVolumeRoles.ReferenceOutput).FileName,
+            },
+            AspxTerminalVolumeRoles.ReferenceOutput => volume with
+            {
+                FileName = receipt.Volumes.Single(item => item.Role == AspxTerminalVolumeRoles.PhysicalOutput).FileName,
+            },
+            _ => volume,
+        }).ToArray();
+        var swappedPath = directory.File("terminal-swapped.json");
+        await File.WriteAllTextAsync(swappedPath, System.Text.Json.JsonSerializer.Serialize(
+            receipt with { Volumes = swappedVolumes }, AspxInventoryRuntime.JsonOptions(indented: true)));
+        var swapped = () => AspxTerminalRunReceiptValidator.ReadAndValidateAsync(swappedPath, outputs);
+        await swapped.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*terminal_official_file_name_mismatch:physical-output*");
+
+        var wrongVersion = receipt with
+        {
+            Volumes = receipt.Volumes.Select(volume => volume.Role == AspxTerminalVolumeRoles.AggregateOutput
+                ? volume with { OutputVersion = "fixture/v1" } : volume).ToArray(),
+        };
+        AspxTerminalRunReceiptValidator.Validate(wrongVersion).GapCodes.Should()
+            .Contain("terminal_volume_version_incompatible:aggregate-output");
     }
 
     [Fact]
@@ -390,6 +472,34 @@ public sealed class AspxAcquisitionV3Tests
         AspxPaginationContract.TokenHash(request), 1, AspxPaginationContract.TokenHash(next), HashB,
         200, SharePointSemanticDetectorResults.None, 1, 1, "request", "correlation", null,
         terminal, DateTimeOffset.UtcNow);
+
+    private static async Task<IReadOnlyList<AspxTerminalOutputSpec>> CreateOfficialVolumesAsync(
+        TemporaryDirectory directory)
+    {
+        using var factory = new FakeRestClientFactory();
+        using var provider = new SharePointLiveAspxDiscoveryProvider(new(
+            new[] { new Uri("https://contoso.sharepoint.com/sites/a") }, "delegated-user-a",
+            "declared-sites", "fixture-authority/v1", HashA, "16.0.1"), factory);
+        await new AspxAcquisitionRuntime().RunAsync(provider, new(
+            directory.File("physical.sqlite"), directory.File("physical.json"),
+            directory.File("reference.sqlite"), directory.File("reference.json"),
+            directory.File("aggregate.json"), PhysicalManifest(), "declared_subset",
+            FixtureRun: false, TenantVisibilityVerified: false, HashB, "16.0.1",
+            "snapshot-1", Registry(), NewRunId: RunId));
+        return new[]
+        {
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.PhysicalDatabase,
+                DiscoveryRunManifest.CurrentSchemaVersion, directory.File("physical.sqlite")),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.PhysicalOutput,
+                AspxDiscoveryOutputV2.Version, directory.File("physical.json")),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.ReferenceDatabase,
+                AspxAcquisitionVersions.ReferenceStore, directory.File("reference.sqlite")),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.ReferenceOutput,
+                AspxReferenceOutputV2.Version, directory.File("reference.json")),
+            new AspxTerminalOutputSpec(AspxTerminalVolumeRoles.AggregateOutput,
+                AspxAcquisitionVerdictV2.Version, directory.File("aggregate.json")),
+        };
+    }
 
     private static AspxReferenceObservation Observation(string disposition, string canonical, string fileId,
         string rawLocator = "/x.aspx", string reason = null) => new(

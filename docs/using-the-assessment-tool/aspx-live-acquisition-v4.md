@@ -41,7 +41,7 @@ Each `AspxPaginationPageReceipt` v2 persists:
 - structured error code;
 - pagination ordinal, request/next token hashes, item count and terminal flag.
 
-Authentication headers, cookies, passwords, certificates, private keys and access tokens are never copied to the receipt. Raw continuation tokens remain hashed.
+Authentication headers, cookies, passwords, certificates, private keys and access tokens are never copied to the receipt. Raw continuation values are replaced by the stable `sha256` marker in durable endpoint/evidence strings; the request/next token chain remains bound only by its SHA-256 fields.
 
 Denied, failed and unknown surfaces retain `expectedCountState=Unknown`, `expectedCount=null`, their terminal outcome, and their denominator row. They are not converted to empty or complete.
 
@@ -71,7 +71,7 @@ The receipt records the actual nullable contract field `exitCode`; the product w
 - `.deps.json` SHA-256 and length when present;
 - SHA-256, length, role and output version for physical SQLite, physical JSON, reference SQLite, reference JSON and aggregate JSON.
 
-A zero exit is invalid unless all five official volumes are present exactly once. Fresh readback uses `AspxTerminalRunReceiptValidator`.
+A zero exit is invalid unless all five official volumes are present exactly once with the exact role mapping: physical SQLite `aspx-discovery-sqlite/v2`, physical JSON `aspx-discovery-output/v2`, reference SQLite `aspx-reference-sqlite/v2`, reference JSON `aspx-reference-output/v2`, and aggregate JSON `aspx-acquisition-verdict/v2`. Fresh readback uses `AspxTerminalRunReceiptValidator` to reopen every bound JSON/SQLite volume, recompute hash and length, and verify content version, run ID, product/SDK binding and snapshot fence where those fields are owned by the volume.
 
 ## Resume compatibility
 

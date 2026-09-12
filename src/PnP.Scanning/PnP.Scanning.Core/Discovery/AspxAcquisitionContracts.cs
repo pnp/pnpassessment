@@ -290,6 +290,8 @@ internal static class AspxPaginationContract
             if (!string.Equals(page.ActualMethod, "GET", StringComparison.Ordinal))
                 gaps.Add("pagination_actual_method_invalid");
             if (string.IsNullOrWhiteSpace(page.ActualEndpoint)) gaps.Add("pagination_actual_endpoint_missing");
+            else if (AspxDurableRequestEvidence.ContainsRawContinuationValue(page.ActualEndpoint))
+                gaps.Add("pagination_raw_continuation_value_persisted");
             if (!SharePointSemanticDetectorResults.IsKnown(page.SemanticDetectorResult))
                 gaps.Add("pagination_semantic_result_invalid");
             if (page.AttemptLimit < 1 || page.AttemptCount < 1 || page.AttemptCount > page.AttemptLimit)

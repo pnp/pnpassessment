@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using System.Reflection;
 using System.Text.Json;
 
@@ -15,6 +16,16 @@ internal static class AspxTerminalVolumeRoles
     {
         PhysicalDatabase, PhysicalOutput, ReferenceDatabase, ReferenceOutput, AggregateOutput,
     };
+
+    internal static readonly IReadOnlyDictionary<string, string> ExpectedVersions =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [PhysicalDatabase] = DiscoveryRunManifest.CurrentSchemaVersion,
+            [PhysicalOutput] = AspxDiscoveryOutputV2.Version,
+            [ReferenceDatabase] = AspxAcquisitionVersions.ReferenceStore,
+            [ReferenceOutput] = AspxReferenceOutputV2.Version,
+            [AggregateOutput] = AspxAcquisitionVerdictV2.Version,
+        };
 }
 
 internal sealed record AspxTerminalOutputSpec(string Role, string OutputVersion, string Path);
@@ -113,11 +124,19 @@ internal static class AspxTerminalRunReceiptValidator
         if (receipt.ArtifactRunId == Guid.Empty) gaps.Add("terminal_artifact_run_id_missing");
         if (receipt.CompletedAtUtc == default) gaps.Add("terminal_completed_utc_missing");
         ValidateExecutable(receipt.Executable, gaps);
-        foreach (var volume in receipt.Volumes ?? Array.Empty<AspxTerminalVolumeBinding>())
+        var volumes = receipt.Volumes ?? Array.Empty<AspxTerminalVolumeBinding>();
+        foreach (var duplicate in volumes.GroupBy(volume => volume.Role, StringComparer.Ordinal)
+                     .Where(group => group.Count() > 1))
+            gaps.Add("terminal_volume_role_duplicate:" + duplicate.Key);
+        foreach (var volume in volumes)
         {
-            if (!AspxTerminalVolumeRoles.Required.Contains(volume.Role, StringComparer.Ordinal))
+            if (!AspxTerminalVolumeRoles.ExpectedVersions.TryGetValue(volume.Role, out var expectedVersion))
                 gaps.Add("terminal_volume_role_unknown:" + volume.Role);
-            if (string.IsNullOrWhiteSpace(volume.OutputVersion)) gaps.Add("terminal_volume_version_missing:" + volume.Role);
+            else if (!string.Equals(volume.OutputVersion, expectedVersion, StringComparison.Ordinal))
+                gaps.Add("terminal_volume_version_incompatible:" + volume.Role);
+            if (string.IsNullOrWhiteSpace(volume.FileName) ||
+                !string.Equals(Path.GetFileName(volume.FileName), volume.FileName, StringComparison.Ordinal))
+                gaps.Add("terminal_volume_file_name_invalid:" + volume.Role);
             if (!IsHash(volume.Sha256)) gaps.Add("terminal_volume_hash_invalid:" + volume.Role);
             if (volume.Length < 0) gaps.Add("terminal_volume_length_invalid:" + volume.Role);
         }
@@ -126,8 +145,7 @@ internal static class AspxTerminalRunReceiptValidator
             if (!IsProductRef(receipt.ProductRef)) gaps.Add("terminal_product_ref_invalid");
             if (!IsFullSha(receipt.SdkRef)) gaps.Add("terminal_sdk_ref_invalid");
             if (string.IsNullOrWhiteSpace(receipt.SnapshotFence)) gaps.Add("terminal_snapshot_fence_missing");
-            var roles = (receipt.Volumes ?? Array.Empty<AspxTerminalVolumeBinding>())
-                .Select(volume => volume.Role).ToArray();
+            var roles = volumes.Select(volume => volume.Role).ToArray();
             foreach (var role in AspxTerminalVolumeRoles.Required)
                 if (roles.Count(value => string.Equals(value, role, StringComparison.Ordinal)) != 1)
                     gaps.Add("terminal_official_volume_binding_invalid:" + role);
@@ -138,6 +156,11 @@ internal static class AspxTerminalRunReceiptValidator
 
     internal static async Task<AspxTerminalRunReceiptV1> ReadAndValidateAsync(string path,
         CancellationToken cancellationToken = default)
+        => await ReadAndValidateAsync(path, null, cancellationToken);
+
+    internal static async Task<AspxTerminalRunReceiptV1> ReadAndValidateAsync(string path,
+        IReadOnlyList<AspxTerminalOutputSpec> officialOutputs,
+        CancellationToken cancellationToken = default)
     {
         var json = await File.ReadAllTextAsync(path, cancellationToken);
         var receipt = JsonSerializer.Deserialize<AspxTerminalRunReceiptV1>(json,
@@ -146,8 +169,170 @@ internal static class AspxTerminalRunReceiptValidator
         var validation = Validate(receipt);
         if (!validation.Valid) throw new InvalidOperationException(
             "Terminal receipt validation failed: " + string.Join(", ", validation.GapCodes));
+        var volumeGaps = await ValidateFreshVolumesAsync(path, receipt, officialOutputs, cancellationToken);
+        if (volumeGaps.Count > 0) throw new InvalidOperationException(
+            "Terminal receipt fresh-volume validation failed: " + string.Join(", ", volumeGaps));
         return receipt;
     }
+
+    private static async Task<IReadOnlyList<string>> ValidateFreshVolumesAsync(string receiptPath,
+        AspxTerminalRunReceiptV1 receipt, IReadOnlyList<AspxTerminalOutputSpec> officialOutputs,
+        CancellationToken cancellationToken)
+    {
+        var gaps = new HashSet<string>(StringComparer.Ordinal);
+        var supplied = (officialOutputs ?? Array.Empty<AspxTerminalOutputSpec>())
+            .GroupBy(output => output.Role, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        foreach (var pair in supplied.Where(pair => pair.Value.Length != 1))
+            gaps.Add("terminal_official_path_binding_invalid:" + pair.Key);
+        var receiptDirectory = Path.GetDirectoryName(Path.GetFullPath(receiptPath))!;
+        foreach (var volume in receipt.Volumes ?? Array.Empty<AspxTerminalVolumeBinding>())
+        {
+            string volumePath;
+            if (officialOutputs != null)
+            {
+                if (!supplied.TryGetValue(volume.Role, out var candidates) || candidates.Length != 1)
+                {
+                    gaps.Add("terminal_official_path_binding_missing:" + volume.Role);
+                    continue;
+                }
+                var output = candidates[0];
+                if (!string.Equals(output.OutputVersion, volume.OutputVersion, StringComparison.Ordinal))
+                    gaps.Add("terminal_official_path_version_mismatch:" + volume.Role);
+                volumePath = output.Path;
+            }
+            else
+            {
+                volumePath = Path.Combine(receiptDirectory, volume.FileName);
+            }
+            if (!string.Equals(Path.GetFileName(volumePath), volume.FileName, StringComparison.Ordinal))
+                gaps.Add("terminal_official_file_name_mismatch:" + volume.Role);
+            if (!File.Exists(volumePath))
+            {
+                gaps.Add("terminal_official_volume_missing:" + volume.Role);
+                continue;
+            }
+            try
+            {
+                var actual = await AspxAggregateEvaluator.HashFileAsync(volumePath, cancellationToken);
+                if (!string.Equals(actual.Hash, volume.Sha256, StringComparison.Ordinal))
+                    gaps.Add("terminal_official_volume_hash_mismatch:" + volume.Role);
+                if (actual.Length != volume.Length)
+                    gaps.Add("terminal_official_volume_length_mismatch:" + volume.Role);
+                await ValidateVolumeContentAsync(volume.Role, volumePath, receipt, gaps, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                gaps.Add("terminal_official_volume_read_failed:" + volume.Role + ":" + ex.GetType().Name);
+            }
+        }
+        return gaps.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+    }
+
+    private static async Task ValidateVolumeContentAsync(string role, string path,
+        AspxTerminalRunReceiptV1 receipt, ISet<string> gaps, CancellationToken cancellationToken)
+    {
+        switch (role)
+        {
+            case AspxTerminalVolumeRoles.PhysicalDatabase:
+                await ValidatePhysicalDatabaseAsync(path, receipt, gaps, cancellationToken);
+                break;
+            case AspxTerminalVolumeRoles.ReferenceDatabase:
+                await ValidateReferenceDatabaseAsync(path, receipt, gaps, cancellationToken);
+                break;
+            case AspxTerminalVolumeRoles.PhysicalOutput:
+            case AspxTerminalVolumeRoles.ReferenceOutput:
+            case AspxTerminalVolumeRoles.AggregateOutput:
+                await ValidateJsonOutputAsync(role, path, receipt, gaps, cancellationToken);
+                break;
+        }
+    }
+
+    private static async Task ValidatePhysicalDatabaseAsync(string path, AspxTerminalRunReceiptV1 receipt,
+        ISet<string> gaps, CancellationToken cancellationToken)
+    {
+        var json = await ReadSqliteScalarAsync(path,
+            "SELECT ManifestJson FROM DiscoveryRuns WHERE RunId=$runId", receipt.ArtifactRunId,
+            cancellationToken);
+        var manifest = JsonSerializer.Deserialize<DiscoveryRunManifest>(json,
+            AspxInventoryRuntime.JsonOptions());
+        ValidateManifestBinding(AspxTerminalVolumeRoles.PhysicalDatabase, manifest?.SchemaVersion,
+            manifest?.ProductRef, manifest?.SdkRef, null, receipt, gaps);
+    }
+
+    private static async Task ValidateReferenceDatabaseAsync(string path, AspxTerminalRunReceiptV1 receipt,
+        ISet<string> gaps, CancellationToken cancellationToken)
+    {
+        var json = await ReadSqliteScalarAsync(path,
+            "SELECT ManifestJson FROM ReferenceRuns WHERE RunId=$runId", receipt.ArtifactRunId,
+            cancellationToken);
+        var manifest = JsonSerializer.Deserialize<AspxReferenceRunManifest>(json,
+            AspxInventoryRuntime.JsonOptions());
+        ValidateManifestBinding(AspxTerminalVolumeRoles.ReferenceDatabase, manifest?.SchemaVersion,
+            manifest?.ProductRef, manifest?.SdkRef, manifest?.SnapshotFence, receipt, gaps);
+    }
+
+    private static void ValidateManifestBinding(string role, string outputVersion, string productRef,
+        string sdkRef, string snapshotFence, AspxTerminalRunReceiptV1 receipt, ISet<string> gaps)
+    {
+        if (!string.Equals(outputVersion, AspxTerminalVolumeRoles.ExpectedVersions[role], StringComparison.Ordinal))
+            gaps.Add("terminal_official_content_version_mismatch:" + role);
+        if (!string.Equals(productRef, receipt.ProductRef, StringComparison.Ordinal))
+            gaps.Add("terminal_official_product_ref_mismatch:" + role);
+        if (!string.Equals(sdkRef, receipt.SdkRef, StringComparison.Ordinal))
+            gaps.Add("terminal_official_sdk_ref_mismatch:" + role);
+        if (snapshotFence != null && !string.Equals(snapshotFence, receipt.SnapshotFence, StringComparison.Ordinal))
+            gaps.Add("terminal_official_snapshot_fence_mismatch:" + role);
+    }
+
+    private static async Task ValidateJsonOutputAsync(string role, string path,
+        AspxTerminalRunReceiptV1 receipt, ISet<string> gaps, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(path);
+        var header = await JsonSerializer.DeserializeAsync<AspxTerminalJsonVolumeHeader>(stream,
+            AspxInventoryRuntime.JsonOptions(), cancellationToken);
+        if (!string.Equals(header?.OutputVersion, AspxTerminalVolumeRoles.ExpectedVersions[role],
+                StringComparison.Ordinal))
+            gaps.Add("terminal_official_content_version_mismatch:" + role);
+        var runId = header?.RunId ?? header?.AcquisitionRunId;
+        if (runId != receipt.ArtifactRunId) gaps.Add("terminal_official_run_id_mismatch:" + role);
+        if (role != AspxTerminalVolumeRoles.AggregateOutput) return;
+        if (!string.Equals(header.ProductRef, receipt.ProductRef, StringComparison.Ordinal))
+            gaps.Add("terminal_official_product_ref_mismatch:" + role);
+        if (!string.Equals(header.SdkRef, receipt.SdkRef, StringComparison.Ordinal))
+            gaps.Add("terminal_official_sdk_ref_mismatch:" + role);
+        foreach (var fence in new[] { header.PhysicalVolume?.SnapshotFence, header.ReferenceVolume?.SnapshotFence })
+            if (!string.Equals(fence, receipt.SnapshotFence, StringComparison.Ordinal))
+                gaps.Add("terminal_official_snapshot_fence_mismatch:" + role);
+    }
+
+    private static async Task<string> ReadSqliteScalarAsync(string path, string commandText, Guid runId,
+        CancellationToken cancellationToken)
+    {
+        var builder = new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false,
+        };
+        await using var connection = new SqliteConnection(builder.ToString());
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        command.Parameters.AddWithValue("$runId", runId.ToString("D"));
+        return (string)await command.ExecuteScalarAsync(cancellationToken);
+    }
+
+    private sealed record AspxTerminalJsonVolumeHeader(
+        string OutputVersion,
+        Guid? RunId,
+        Guid? AcquisitionRunId,
+        string ProductRef,
+        string SdkRef,
+        AspxTerminalEnvelopeVolumeHeader PhysicalVolume,
+        AspxTerminalEnvelopeVolumeHeader ReferenceVolume);
+
+    private sealed record AspxTerminalEnvelopeVolumeHeader(string SnapshotFence);
 
     private static void ValidateExecutable(AspxManagedExecutableBinding executable, ISet<string> gaps)
     {
@@ -211,8 +396,17 @@ internal static class AspxTerminalRunReceiptWriter
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         var json = JsonSerializer.Serialize(receipt, AspxInventoryRuntime.JsonOptions(indented: true));
-        await File.WriteAllTextAsync(temporaryPath, json, cancellationToken);
-        File.Move(temporaryPath, path, overwrite: true);
-        return receipt;
+        try
+        {
+            await File.WriteAllTextAsync(temporaryPath, json, cancellationToken);
+            var verified = await AspxTerminalRunReceiptValidator.ReadAndValidateAsync(temporaryPath, outputs,
+                cancellationToken);
+            File.Move(temporaryPath, path, overwrite: true);
+            return verified;
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
     }
 }
