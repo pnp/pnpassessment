@@ -371,18 +371,73 @@ internal sealed class DiscoveryStore : IDisposable
     internal IReadOnlyList<DiscoveryCoverageRow> ReadCoverage(Guid runId)
     {
         using var command = Command("""
-            SELECT ScopeKey, ParentScopeKey, Kind, SourceKind, Outcome
-            FROM DiscoveryScopes WHERE RunId=$runId ORDER BY ScopeKey
+            WITH RankedAttempts AS (
+                SELECT AttemptId, ScopeKey,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY ScopeKey
+                           ORDER BY CASE WHEN Status='Complete' THEN 0 ELSE 1 END, StartedUtc DESC
+                       ) AS Rank
+                FROM DiscoveryAttempts
+                WHERE RunId=$runId
+            ),
+            SelectedAttempts AS (
+                SELECT AttemptId, ScopeKey FROM RankedAttempts WHERE Rank=1
+            ),
+            AttemptObservationCounts AS (
+                SELECT AttemptId, COUNT(*) AS ObservedCount,
+                       SUM(CASE WHEN Emitted=1 THEN 1 ELSE 0 END) AS EmittedCount
+                FROM DiscoveryAttemptObservations GROUP BY AttemptId
+            ),
+            BatchCounts AS (
+                SELECT AttemptId, COUNT(*) AS BatchCount FROM DiscoveryBatches GROUP BY AttemptId
+            ),
+            TotalAttemptCounts AS (
+                SELECT ScopeKey, COUNT(*) AS AttemptCount
+                FROM DiscoveryAttempts WHERE RunId=$runId GROUP BY ScopeKey
+            ),
+            InventoryCounts AS (
+                SELECT ScopeKey, COUNT(*) AS InventoryCount
+                FROM DiscoveryInventory WHERE RunId=$runId GROUP BY ScopeKey
+            ),
+            GapCounts AS (
+                SELECT ScopeKey, COUNT(*) AS GapCount
+                FROM DiscoveryGaps WHERE RunId=$runId AND Resolved=0 GROUP BY ScopeKey
+            ),
+            ConflictCounts AS (
+                SELECT ScopeKey, COUNT(*) AS ConflictCount
+                FROM DiscoveryConflicts WHERE RunId=$runId AND Resolved=0 GROUP BY ScopeKey
+            ),
+            ExpectedCounts AS (
+                SELECT ParentScopeKey, SUM(ExpectedCount) AS ExpectedCount
+                FROM DiscoveryChildEnumerations WHERE RunId=$runId GROUP BY ParentScopeKey
+            )
+            SELECT s.ScopeKey, s.ParentScopeKey, s.Kind, s.SourceKind, s.Outcome,
+                   e.ExpectedCount,
+                   COALESCE(o.ObservedCount, 0), COALESCE(o.EmittedCount, 0),
+                   COALESCE(i.InventoryCount, 0), COALESCE(b.BatchCount, 0),
+                   COALESCE(a.AttemptCount, 0), COALESCE(g.GapCount, 0),
+                   COALESCE(c.ConflictCount, 0)
+            FROM DiscoveryScopes s
+            LEFT JOIN SelectedAttempts selected ON selected.ScopeKey=s.ScopeKey
+            LEFT JOIN AttemptObservationCounts o ON o.AttemptId=selected.AttemptId
+            LEFT JOIN BatchCounts b ON b.AttemptId=selected.AttemptId
+            LEFT JOIN TotalAttemptCounts a ON a.ScopeKey=s.ScopeKey
+            LEFT JOIN InventoryCounts i ON i.ScopeKey=s.ScopeKey
+            LEFT JOIN GapCounts g ON g.ScopeKey=s.ScopeKey
+            LEFT JOIN ConflictCounts c ON c.ScopeKey=s.ScopeKey
+            LEFT JOIN ExpectedCounts e ON e.ParentScopeKey=s.ScopeKey
+            WHERE s.RunId=$runId
+            ORDER BY s.ScopeKey
             """, null, ("$runId", runId.ToString("D")));
         using var reader = command.ExecuteReader();
-        var raw = new List<(string Key, string Parent, string Kind, string Source, DiscoveryTerminalOutcome Outcome)>();
-        while (reader.Read()) raw.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetString(2),
-            reader.IsDBNull(3) ? null : reader.GetString(3), Enum.Parse<DiscoveryTerminalOutcome>(reader.GetString(4))));
-        reader.Close();
-        return raw.Select(row => new DiscoveryCoverageRow(row.Key, row.Parent, row.Kind, row.Source, row.Outcome,
-            ExpectedCount: Scalar<long>("SELECT COALESCE(SUM(ExpectedCount), -1) FROM DiscoveryChildEnumerations WHERE RunId=$runId AND ParentScopeKey=$parent",
-                ("$runId", runId.ToString("D")), ("$parent", row.Key)) is var expected && expected >= 0 ? (int)expected : null,
-            GetCounts(runId, row.Key))).ToArray();
+        var rows = new List<DiscoveryCoverageRow>();
+        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3),
+            Enum.Parse<DiscoveryTerminalOutcome>(reader.GetString(4)),
+            reader.IsDBNull(5) ? null : reader.GetInt32(5),
+            new DiscoveryCounts(reader.GetInt32(6), reader.GetInt32(7), reader.GetInt32(8),
+                reader.GetInt32(9), reader.GetInt32(10), reader.GetInt32(11), reader.GetInt32(12))));
+        return rows;
     }
 
     internal IReadOnlyList<DiscoveryDenominatorRow> ReadDenominator(Guid runId)

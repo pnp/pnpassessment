@@ -174,6 +174,73 @@ public sealed class AspxAcquisitionV3Tests
     }
 
     [Fact]
+    public void Reobserved_reference_surfaces_are_reconciled_before_the_unique_store_contract()
+    {
+        using var directory = new TemporaryDirectory();
+        var collector = new AspxReferenceCollector();
+        var row = Row(DiscoveryTerminalOutcome.Complete, AspxExpectedCountState.Known, 1, 1);
+        var page = Page(0, null, null, terminal: true);
+        var fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+        var physical = Physical(new DiscoveryInventoryRow("scope", DiscoveryHash.Of("file", fileId),
+            "/forms/shared.aspx", "shared.aspx", "strong", "fixture"));
+        collector.AddSurface(row with { EvidenceRefs = new[] { "attempt-1" } }, new[] { page });
+        collector.AddSurface(row with
+        {
+            AsOfUtc = row.AsOfUtc.AddMinutes(1),
+            EvidenceRefs = new[] { "attempt-2" },
+        }, new[]
+        {
+            page with
+            {
+                ReceivedAtUtc = page.ReceivedAtUtc.AddMinutes(1),
+                RequestId = "request-2",
+                CorrelationId = "correlation-2",
+            },
+        });
+        collector.AddReference(Candidate("repeated", "/forms/shared.aspx", fileId));
+        collector.AddReference(Candidate("repeated", "/forms/shared.aspx", fileId));
+
+        var output = collector.Build(RunId, ReferenceManifest(), physical, Registry());
+
+        output.Denominator.Count(item => item.SurfaceId == row.SurfaceId).Should().Be(1);
+        output.Denominator.Single(item => item.SurfaceId == row.SurfaceId).EvidenceRefs
+            .Should().Contain("surface-reobservation-count=2");
+        output.PaginationReceipts.Should().ContainSingle();
+        output.References.Should().ContainSingle();
+        output.GapCodes.Should().NotContain(item => item.Contains("reobservation_conflict"));
+        using var store = new AspxReferenceStore(directory.File("reference.sqlite"));
+        var action = () => store.Write(ReferenceManifest(), output, resume: false);
+        action.Should().NotThrow("equivalent rescans are one logical denominator surface");
+    }
+
+    [Fact]
+    public void Conflicting_surface_reobservation_fails_closed_instead_of_crashing_the_store()
+    {
+        using var directory = new TemporaryDirectory();
+        var collector = new AspxReferenceCollector();
+        var first = Row(DiscoveryTerminalOutcome.Complete, AspxExpectedCountState.Known, 1, 1);
+        collector.AddSurface(first, Array.Empty<AspxPaginationPageReceipt>());
+        collector.AddSurface(first with
+        {
+            ExpectedCount = 2,
+            ObservedCount = 2,
+            PaginationChainHash = HashB,
+            AsOfUtc = first.AsOfUtc.AddMinutes(1),
+        }, Array.Empty<AspxPaginationPageReceipt>());
+
+        var output = collector.Build(RunId, ReferenceManifest(), Physical(), Registry());
+        var reconciled = output.Denominator.Single(item => item.SurfaceId == first.SurfaceId);
+
+        reconciled.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Unknown);
+        reconciled.ExpectedCountState.Should().Be(AspxExpectedCountState.Unknown);
+        reconciled.ExpectedCount.Should().BeNull();
+        output.GapCodes.Should().Contain("reference_surface_reobservation_conflict:" + first.SurfaceId);
+        using var store = new AspxReferenceStore(directory.File("reference.sqlite"));
+        var action = () => store.Write(ReferenceManifest(), output, resume: false);
+        action.Should().NotThrow("conflicts remain explicit evidence instead of violating the SQLite key");
+    }
+
+    [Fact]
     public void V1_V7_exact_version_and_companion_binding_reject_legacy_or_drifted_composition()
     {
         AspxAcquisitionEnvelopeValidator.PhysicalOnly(AspxDiscoveryOutputV2.Version)

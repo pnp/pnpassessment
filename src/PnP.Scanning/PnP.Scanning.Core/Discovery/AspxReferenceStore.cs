@@ -108,6 +108,7 @@ internal sealed class AspxReferenceCollector
             manifest.RegistryRevision, manifest.RegistryHash, manifest.ArtifactRunId, DateTimeOffset.UtcNow,
             new[] { registry.AuthoritySourceRef, registry.ReviewRef }, "IndependentPlatformRegistry",
             "reference-only")).ToArray();
+        denominatorSnapshot = ReconcileDenominator(denominatorSnapshot, gapSnapshot);
 
         var observations = candidateSnapshot.Select(candidate => Finalize(candidate, manifest, physical, gapSnapshot))
             .Concat((registry.Entries ?? Array.Empty<AspxPlatformRegistryEntry>()).Select(entry =>
@@ -124,6 +125,8 @@ internal sealed class AspxReferenceCollector
                         ? "verified-registry-virtual" : "registry-reference-only",
                     "independent-platform-registry", new[] { registry.AuthoritySourceRef, registry.ReviewRef })))
             .OrderBy(item => item.ReferenceObservationId, StringComparer.Ordinal).ToArray();
+        observations = ReconcileObservations(observations, gapSnapshot);
+        paginationSnapshot = ReconcilePagination(paginationSnapshot, gapSnapshot);
 
         foreach (var observation in observations)
             foreach (var invalid in observation.Validate()) gapSnapshot.Add(observation.ReferenceObservationId + ":" + invalid);
@@ -149,6 +152,96 @@ internal sealed class AspxReferenceCollector
                 .ThenBy(row => row.PageOrdinal).ToArray(),
             gapSnapshot.OrderBy(value => value, StringComparer.Ordinal).ToArray());
     }
+
+    private static AspxSurfaceDenominatorRow[] ReconcileDenominator(
+        IReadOnlyList<AspxSurfaceDenominatorRow> rows, ISet<string> gaps) =>
+        rows.GroupBy(row => row.SurfaceId, StringComparer.Ordinal).Select(group =>
+        {
+            var observations = group.OrderBy(row => row.AsOfUtc).ToArray();
+            var latest = observations[^1];
+            if (observations.Length == 1) return latest;
+
+            var fingerprints = observations.Select(SurfaceFingerprint).Distinct(StringComparer.Ordinal).ToArray();
+            var evidence = observations.SelectMany(row => row.EvidenceRefs ?? Array.Empty<string>())
+                .Append($"surface-reobservation-count={observations.Length}")
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            if (fingerprints.Length == 1) return latest with { EvidenceRefs = evidence };
+
+            gaps.Add("reference_surface_reobservation_conflict:" + latest.SurfaceId);
+            return latest with
+            {
+                ExpectedCount = null,
+                ExpectedCountState = AspxExpectedCountState.Unknown,
+                TerminalOutcome = DiscoveryTerminalOutcome.Unknown,
+                AggregateEffect = "unknown",
+                ContinuationRemaining = observations.Any(row => row.ContinuationRemaining),
+                PaginationOutstandingTokenCount = observations.Max(row => row.PaginationOutstandingTokenCount),
+                AbsenceProofKind = null,
+                AbsenceProofRef = null,
+                EvidenceRefs = evidence.Append("surface-reobservation-conflict=" +
+                    DiscoveryHash.Of(string.Join('|', fingerprints.OrderBy(value => value, StringComparer.Ordinal))))
+                    .ToArray(),
+            };
+        }).OrderBy(row => row.SurfaceId, StringComparer.Ordinal).ToArray();
+
+    private static AspxReferenceObservation[] ReconcileObservations(
+        IReadOnlyList<AspxReferenceObservation> observations, ISet<string> gaps) =>
+        observations.GroupBy(item => item.ReferenceObservationId, StringComparer.Ordinal).Select(group =>
+        {
+            var repeated = group.ToArray();
+            var latest = repeated[^1];
+            if (repeated.Length == 1) return latest;
+
+            var fingerprints = repeated.Select(ObservationFingerprint).Distinct(StringComparer.Ordinal).ToArray();
+            var evidence = repeated.SelectMany(item => item.EvidenceRefs ?? Array.Empty<string>())
+                .Append($"reference-reobservation-count={repeated.Length}")
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            if (fingerprints.Length == 1) return latest with { EvidenceRefs = evidence };
+
+            gaps.Add("reference_observation_reobservation_conflict:" + latest.ReferenceObservationId);
+            return latest with
+            {
+                Disposition = AspxReferenceDispositions.Unknown,
+                ReasonCode = "reference_reobservation_conflict",
+                LinkedPhysicalCanonicalInventoryKey = null,
+                LinkedFileUniqueId = null,
+                ContentOrigin = "unknown",
+                EvidenceRefs = evidence.Append("reference-reobservation-conflict=" +
+                    DiscoveryHash.Of(string.Join('|', fingerprints.OrderBy(value => value, StringComparer.Ordinal))))
+                    .ToArray(),
+            };
+        }).OrderBy(item => item.ReferenceObservationId, StringComparer.Ordinal).ToArray();
+
+    private static AspxPaginationPageReceipt[] ReconcilePagination(
+        IReadOnlyList<AspxPaginationPageReceipt> receipts, ISet<string> gaps) =>
+        receipts.GroupBy(receipt => (receipt.CollectionScopeKey, receipt.PageOrdinal)).Select(group =>
+        {
+            var repeated = group.OrderBy(receipt => receipt.ReceivedAtUtc).ToArray();
+            var latest = repeated[^1];
+            if (repeated.Length == 1) return latest;
+            if (repeated.Select(PaginationFingerprint).Distinct(StringComparer.Ordinal).Count() > 1)
+                gaps.Add($"reference_pagination_reobservation_conflict:{latest.CollectionScopeKey}:{latest.PageOrdinal}");
+            return latest;
+        }).OrderBy(receipt => receipt.CollectionScopeKey, StringComparer.Ordinal)
+            .ThenBy(receipt => receipt.PageOrdinal).ToArray();
+
+    private static string SurfaceFingerprint(AspxSurfaceDenominatorRow row) => DiscoveryHash.Of(
+        JsonSerializer.Serialize(row with
+        {
+            AsOfUtc = default,
+            EvidenceRefs = Array.Empty<string>(),
+        }, AspxInventoryRuntime.JsonOptions()));
+
+    private static string ObservationFingerprint(AspxReferenceObservation observation) => DiscoveryHash.Of(
+        JsonSerializer.Serialize(observation with { EvidenceRefs = Array.Empty<string>() },
+            AspxInventoryRuntime.JsonOptions()));
+
+    private static string PaginationFingerprint(AspxPaginationPageReceipt receipt) => DiscoveryHash.Of(string.Join('|',
+        receipt.ReceiptVersion, receipt.CollectionScopeKey, receipt.AuthorityRevision, receipt.ActualEndpointHash,
+        receipt.ActualMethod, receipt.ActualEndpoint, receipt.ActualSelect, receipt.ActualFilter,
+        receipt.PageOrdinal, receipt.RequestTokenHash, receipt.ResponseItemCount, receipt.NextTokenHash,
+        receipt.ResponseDigest, receipt.HttpStatusCode, receipt.SemanticDetectorResult, receipt.ErrorCode,
+        receipt.TerminalFlag));
 
     private static AspxReferenceObservation Finalize(AspxReferenceCandidate candidate,
         AspxReferenceRunManifest manifest, AspxDiscoveryOutputV2 physical, ISet<string> gaps)

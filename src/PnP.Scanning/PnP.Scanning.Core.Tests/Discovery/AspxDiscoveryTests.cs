@@ -261,6 +261,26 @@ public sealed class AspxDiscoveryTests
     }
 
     [Fact]
+    public async Task Bulk_coverage_counts_keep_the_completed_attempt_when_a_newer_retry_fails()
+    {
+        using var database = new TemporaryDatabase();
+        using var store = new DiscoveryStore(database.Path);
+        var runId = CreateRun(store);
+        var surface = Surface("web/bulk-coverage");
+        await new AspxDiscoveryRunner(store).RunSurfaceAsync(runId, surface, Source(
+            Batch(0, new[] { Record("F01", "/bulk/a.aspx", "a.aspx") }, true)));
+        var failedAttempt = store.BeginAttempt(runId, surface.ScopeKey, surface.SourceKind.Value);
+        store.CommitBatch(runId, surface.ScopeKey, surface.SourceKind.Value, failedAttempt,
+            new RawDiscoveryBatch(0, "failed-request", "failed-response", Array.Empty<RawDiscoveryRecord>(),
+                true, DiscoveryTerminalOutcome.Failed));
+
+        var coverage = store.ReadCoverage(runId).Single(row => row.ScopeKey == surface.ScopeKey);
+
+        coverage.Counts.Should().Be(store.GetCounts(runId, surface.ScopeKey));
+        coverage.Counts.Should().Be(new DiscoveryCounts(1, 1, 1, 1, 2, 0, 0));
+    }
+
+    [Fact]
     public async Task Duplicate_continuation_token_is_persisted_as_unknown_gap()
     {
         using var database = new TemporaryDatabase();
