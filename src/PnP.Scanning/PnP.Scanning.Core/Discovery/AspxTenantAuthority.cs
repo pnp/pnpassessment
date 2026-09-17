@@ -133,6 +133,10 @@ internal interface IAspxTenantAuthorityAdapter
         Uri tenantRoot, CancellationToken cancellationToken = default);
     Task<AspxAuthorityCollection<AspxAuthorityWeb>> EnumerateWebsAsync(
         AspxAuthoritySite site, CancellationToken cancellationToken = default);
+
+    Task<AspxAuthoritySite> ResolveDeclaredSiteAsync(Uri siteUrl,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AspxAuthoritySite(Guid.Empty, Guid.Empty, siteUrl, null, null));
 }
 
 internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAdapter
@@ -237,6 +241,18 @@ internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAd
         }
     }
 
+    public async Task<AspxAuthoritySite> ResolveDeclaredSiteAsync(Uri siteUrl,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(siteUrl);
+        using var context = await contextFactory.CreateAsync(siteUrl, authenticationProvider,
+            cancellationToken, new PnPContextOptions()).ConfigureAwait(false);
+        var site = await context.Site.GetAsync(value => value.Id).ConfigureAwait(false);
+        var rootWeb = await context.Web.GetAsync(value => value.Id, value => value.Url,
+            value => value.Title).ConfigureAwait(false);
+        return new AspxAuthoritySite(site.Id, rootWeb.Id, rootWeb.Url ?? siteUrl, null, rootWeb.Title);
+    }
+
     private static Uri FindParent(Uri child, IEnumerable<Uri> candidates)
     {
         var childPath = child.AbsolutePath.TrimEnd('/');
@@ -279,15 +295,32 @@ internal static class AspxTenantAuthorityCapture
         }
         else if (scopeMode == AspxScopeModes.DeclaredSubset)
         {
-            var declared = (declaredSites ?? Array.Empty<Uri>())
+            var declaredUrls = (declaredSites ?? Array.Empty<Uri>())
                 .DistinctBy(AspxTenantAuthoritySnapshot.Normalize, StringComparer.Ordinal)
                 .OrderBy(AspxTenantAuthoritySnapshot.Normalize, StringComparer.Ordinal)
-                .Select(url => new AspxAuthoritySite(Guid.Empty, Guid.Empty, url, null, null)).ToArray();
-            sites = new(declared.Length == 0 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete,
-                declared, "Assessment.CLI", "DeclaredSiteArguments", "--site", new[]
+                .ToArray();
+            var declared = new List<AspxAuthoritySite>();
+            var identityFailures = new List<string>();
+            foreach (var url in declaredUrls)
+            {
+                try
+                {
+                    declared.Add(await adapter.ResolveDeclaredSiteAsync(url, cancellationToken).ConfigureAwait(false));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    declared.Add(new AspxAuthoritySite(Guid.Empty, Guid.Empty, url, null, null));
+                    identityFailures.Add($"{AspxTenantAuthoritySnapshot.Normalize(url)}:{ex.GetType().Name}");
+                }
+            }
+            sites = new(declared.Count == 0 ? DiscoveryTerminalOutcome.Empty :
+                    identityFailures.Count == 0 ? DiscoveryTerminalOutcome.Complete : DiscoveryTerminalOutcome.Failed,
+                declared, "Assessment.CLI+PnP.Core", "DeclaredSiteArguments+ResolveDeclaredSiteAsync", "--site", new[]
                 {
                     "tenant-site-denominator-not-enumerated",
-                }, null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow);
+                }, identityFailures.Count == 0 ? null : "declared_site_identity_failed",
+                identityFailures.Count == 0 ? null : string.Join(';', identityFailures),
+                ContinuationRemaining: false, DateTimeOffset.UtcNow);
         }
         else
         {

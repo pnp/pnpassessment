@@ -808,12 +808,15 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         {
             var modeledResult = await ReadModeledFolderAsync(parent, cancellationToken).ConfigureAwait(false);
             RecordModeledFolderSurface(parent, modeledResult, files: false);
-            var modeledChildren = modeledResult.Folders.Select(item => Add(new LiveScope(
-                Key("web-root-folder", parent.WebUrl.AbsoluteUri, item.ServerRelativeUrl), parent.ScopeKey,
-                DiscoveryScopeKind.Folder, DiscoverySourceKind.WebRootFiles, item.ServerRelativeUrl,
-                "web-root-folder", parent.WebUrl, null, null, item.ServerRelativeUrl,
-                WithMetadata(parent.Metadata, ("folderUniqueId", item.UniqueId))))).ToArray();
-            return Result(parent, modeledChildren, modeledResult.Outcome, modeledResult.ErrorCode);
+            if (modeledResult.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty)
+            {
+                var modeledChildren = modeledResult.Folders.Select(item => Add(new LiveScope(
+                    Key("web-root-folder", parent.WebUrl.AbsoluteUri, item.ServerRelativeUrl), parent.ScopeKey,
+                    DiscoveryScopeKind.Folder, DiscoverySourceKind.WebRootFiles, item.ServerRelativeUrl,
+                    "web-root-folder", parent.WebUrl, null, null, item.ServerRelativeUrl,
+                    WithMetadata(parent.Metadata, ("folderUniqueId", item.UniqueId))))).ToArray();
+                return Result(parent, modeledChildren, modeledResult.Outcome, modeledResult.ErrorCode);
+            }
         }
         var endpoint = FolderEndpoint(parent.WebUrl, parent.FolderUrl, "Folders", FoldersSelect);
         var result = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
@@ -837,37 +840,36 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         {
             var modeled = await ReadModeledFolderAsync(scope, cancellationToken).ConfigureAwait(false);
             RecordModeledFolderSurface(scope, modeled, files: true);
-            var records = modeled.Files.Select(item => new RawDiscoveryRecord(
-                item.UniqueId, item.UniqueId, scope.ScopeKey, item.Name, item.ServerRelativeUrl, true,
-                options.PermissionContext, new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["actualProvider"] = modeled.Provider,
-                    ["actualOperation"] = modeled.Operation,
-                    ["customizedPageStatus"] = item.CustomizedPageStatus ?? "unknown",
-                },
-                SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
-                WebId: MetadataGuid(scope.Metadata, "webId"),
-                ListId: scope.ListId,
-                FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId") ??
-                    (Guid.TryParse(modeled.FolderUniqueId, out var modeledFolderId) ? modeledFolderId : null),
-                HomePage: IsHomePage(scope, item.ServerRelativeUrl),
-                LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
-                CustomizedPageStatusRaw: item.CustomizedPageStatus,
-                ObservationMethod: modeled.Provider + ":" + modeled.Operation,
-                WelcomePageStatus: HomePageStatus(scope, item.ServerRelativeUrl),
-                SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
-                WebUrl: scope.WebUrl?.AbsoluteUri)).ToArray();
-            var terminalOutcome = modeled.Outcome == DiscoveryTerminalOutcome.Complete && records.Length == 0
-                ? DiscoveryTerminalOutcome.Empty : modeled.Outcome;
-            yield return new RawDiscoveryBatch(0,
-                DiscoveryHash.Of(modeled.Provider, modeled.Operation, scope.FolderUrl),
-                DiscoveryHash.Of(string.Join('|', records.Select(item => item.FileUniqueId))), records,
-                IsTerminal: true, terminalOutcome, null,
-                terminalOutcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty
-                    ? null : modeled.ErrorCode,
-                terminalOutcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty
-                    ? null : modeled.EvidenceRef);
-            yield break;
+            if (modeled.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty)
+            {
+                var records = modeled.Files.Select(item => new RawDiscoveryRecord(
+                    item.UniqueId, item.UniqueId, scope.ScopeKey, item.Name, item.ServerRelativeUrl, true,
+                    options.PermissionContext, new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["actualProvider"] = modeled.Provider,
+                        ["actualOperation"] = modeled.Operation,
+                        ["customizedPageStatus"] = item.CustomizedPageStatus ?? "unknown",
+                    },
+                    SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
+                    WebId: MetadataGuid(scope.Metadata, "webId"),
+                    ListId: scope.ListId,
+                    FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId") ??
+                        (Guid.TryParse(modeled.FolderUniqueId, out var modeledFolderId) ? modeledFolderId : null),
+                    HomePage: IsHomePage(scope, item.ServerRelativeUrl),
+                    LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+                    CustomizedPageStatusRaw: item.CustomizedPageStatus,
+                    ObservationMethod: modeled.Provider + ":" + modeled.Operation,
+                    WelcomePageStatus: HomePageStatus(scope, item.ServerRelativeUrl),
+                    SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+                    WebUrl: scope.WebUrl?.AbsoluteUri)).ToArray();
+                var terminalOutcome = modeled.Outcome == DiscoveryTerminalOutcome.Complete && records.Length == 0
+                    ? DiscoveryTerminalOutcome.Empty : modeled.Outcome;
+                yield return new RawDiscoveryBatch(0,
+                    DiscoveryHash.Of(modeled.Provider, modeled.Operation, scope.FolderUrl),
+                    DiscoveryHash.Of(string.Join('|', records.Select(item => item.FileUniqueId))), records,
+                    IsTerminal: true, terminalOutcome);
+                yield break;
+            }
         }
         var endpoint = FolderEndpoint(scope.WebUrl, scope.FolderUrl, "Files", FilesSelect, "ListItemAllFields");
         var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
@@ -890,6 +892,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 ListItemId: NestedInt(item, "ListItemAllFields", "Id"),
                 HomePage: IsHomePage(scope, PropertyString(item, "ServerRelativeUrl")),
                 ContentTypeId: NestedString(item, "ListItemAllFields", "ContentTypeId"),
+                PageType: InferPageType(NestedString(item, "ListItemAllFields", "ContentTypeId")),
                 LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
                 CustomizedPageStatusRaw: PropertyString(item, "CustomizedPageStatus"),
                 ObservationMethod: "SharePoint REST folder files",
@@ -988,6 +991,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             ListItemId: resolved.ListItemId,
             HomePage: IsHomePage(scope, resolved.ServerRelativeUrl ?? locator),
             ContentTypeId: resolved.ContentTypeId,
+            PageType: InferPageType(resolved.ContentTypeId),
             LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
             CustomizedPageStatusRaw: resolved.CustomizedPageStatus,
             ObservationMethod: method,
@@ -1480,6 +1484,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         metadata != null && metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
     private static bool? MetadataBool(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
+    private static string InferPageType(string contentTypeId)
+    {
+        if (string.IsNullOrWhiteSpace(contentTypeId)) return null;
+        if (contentTypeId.StartsWith("0x0101009D1CB255DA76424F860D91F20E6C4118", StringComparison.OrdinalIgnoreCase))
+            return "ModernSitePage";
+        if (contentTypeId.StartsWith("0x01010007FF3E057FA8AB4AA42FCB67B453FFC1", StringComparison.OrdinalIgnoreCase))
+            return "PublishingPage";
+        if (contentTypeId.StartsWith("0x01010901", StringComparison.OrdinalIgnoreCase)) return "WebPartPage";
+        if (contentTypeId.StartsWith("0x010109", StringComparison.OrdinalIgnoreCase)) return "BasicPage";
+        if (contentTypeId.StartsWith("0x010108", StringComparison.OrdinalIgnoreCase)) return "WikiPage";
+        if (contentTypeId.StartsWith("0x010105", StringComparison.OrdinalIgnoreCase)) return "MasterPage";
+        return "OtherAspxContentType";
+    }
     private static IReadOnlyDictionary<string, string> WithMetadata(
         IReadOnlyDictionary<string, string> metadata, params (string Key, string Value)[] additions)
     {

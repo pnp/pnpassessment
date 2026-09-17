@@ -416,8 +416,10 @@ public sealed class AspxAcquisitionV3Tests
             new[] { new Uri("https://contoso.sharepoint.com/sites/a") }, adapter);
 
         snapshot.TenantVisibilityVerified.Should().BeFalse();
-        snapshot.Sites.Provider.Should().Be("Assessment.CLI");
+        snapshot.Sites.Provider.Should().Be("Assessment.CLI+PnP.Core");
         snapshot.Sites.Exclusions.Should().Contain("tenant-site-denominator-not-enumerated");
+        snapshot.Sites.Items.Single().SiteId.Should().NotBe(Guid.Empty);
+        snapshot.Sites.Items.Single().RootWebId.Should().NotBe(Guid.Empty);
         adapter.SiteEnumerationCount.Should().Be(0, "declared sites cannot prove tenant visibility");
         adapter.WebEnumerationCount.Should().Be(1, "declared sites still use the product subweb authority adapter");
     }
@@ -469,9 +471,10 @@ public sealed class AspxAcquisitionV3Tests
         var containers = (await provider.EnumerateChildrenAsync(web)).ObservedChildren;
         var webRoot = containers.Single(item => item.Locator == "https://contoso.sharepoint.com/sites/a");
         var webRootFolder = (await provider.EnumerateChildrenAsync(webRoot)).ObservedChildren.Single();
-        (await ReadAllAsync(provider.CreateRawSource(webRootFolder))).Should().ContainSingle(batch =>
-            batch.TerminalOutcome == DiscoveryTerminalOutcome.Denied);
-        (await provider.EnumerateChildrenAsync(webRootFolder)).Outcome.Should().Be(DiscoveryTerminalOutcome.Denied);
+        (await ReadAllAsync(provider.CreateRawSource(webRootFolder))).Should().NotContain(batch =>
+            batch.TerminalOutcome == DiscoveryTerminalOutcome.Denied,
+            "the PnP modeled denial is retained as evidence while authenticated REST is the fallback");
+        (await provider.EnumerateChildrenAsync(webRootFolder)).Outcome.Should().NotBe(DiscoveryTerminalOutcome.Denied);
 
         var output = provider.ReferenceCollector.Build(RunId,
             ReferenceManifest() with { ScopeAuthorityHash = snapshot.AuthorityHash }, Physical(), Registry());
@@ -903,6 +906,11 @@ public sealed class AspxAcquisitionV3Tests
                 PnPCoreAspxTenantAuthorityAdapter.WebOperation, PnPCoreAspxTenantAuthorityAdapter.WebFilter,
                 Array.Empty<string>(), null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow));
         }
+
+        public Task<AspxAuthoritySite> ResolveDeclaredSiteAsync(Uri siteUrl,
+            CancellationToken cancellationToken = default) => Task.FromResult(new AspxAuthoritySite(
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), siteUrl, null, "Declared Site"));
     }
 
     private sealed class TemporaryDirectory : IDisposable
