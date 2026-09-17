@@ -441,6 +441,31 @@ public sealed class AspxAcquisitionV3Tests
     }
 
     [Fact]
+    public void Reference_resume_accepts_equivalent_build_but_rejects_registry_drift()
+    {
+        using var directory = new TemporaryDirectory();
+        var database = directory.File("reference.sqlite");
+        var baseline = ReferenceManifest();
+        var collector = new AspxReferenceCollector();
+        using var store = new AspxReferenceStore(database);
+        store.Write(baseline, collector.Build(RunId, baseline, Physical(), Registry()), resume: false);
+
+        var equivalentBuild = baseline with
+        {
+            ProductRef = "pnp/assessment@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            SdkRef = "2222222222222222222222222222222222222222",
+            PlatformBuildRef = "16.0.2",
+        };
+        var equivalentWrite = () => store.Write(equivalentBuild,
+            collector.Build(RunId, equivalentBuild, Physical(), Registry()), resume: true);
+        equivalentWrite.Should().NotThrow();
+
+        var registryDrift = equivalentBuild with { RegistryHash = HashB };
+        var incompatible = () => store.ValidateResumeCompatibility(RunId, registryDrift);
+        incompatible.Should().Throw<InvalidOperationException>().WithMessage("*RegistryHash*");
+    }
+
+    [Fact]
     public async Task F1_F8_and_A1_A2_actual_BaseType_controls_raw_admission_while_all_lists_keep_forms_views()
     {
         foreach (var baseType in new[] { 0, 3, 4, 5 })

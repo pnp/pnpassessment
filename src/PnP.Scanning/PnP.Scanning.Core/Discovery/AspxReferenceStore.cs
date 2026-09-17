@@ -226,6 +226,13 @@ internal sealed class AspxReferenceStore : IDisposable
             Execute("DELETE FROM ReferenceDenominator WHERE RunId=$runId", ("$runId", runId));
             Execute("DELETE FROM ReferencePaginationReceipts WHERE RunId=$runId", ("$runId", runId));
             Execute("DELETE FROM ReferenceGaps WHERE RunId=$runId", ("$runId", runId));
+            Execute("""
+                UPDATE ReferenceRuns SET ManifestJson=$manifest, ManifestHash=$hash,
+                  OutputVersion=$version, CoverageVerdict=$verdict, UpdatedUtc=$updated
+                WHERE RunId=$runId
+                """, ("$manifest", manifest.CanonicalJson()), ("$hash", manifest.Hash()),
+                ("$version", output.OutputVersion), ("$verdict", output.CoverageVerdict.ToString()),
+                ("$updated", DateTimeOffset.UtcNow.ToString("O")), ("$runId", runId));
         }
         else
         {
@@ -286,8 +293,10 @@ internal sealed class AspxReferenceStore : IDisposable
             stored.SchemaVersion != AspxAcquisitionVersions.ReferenceStore ||
             stored.ProviderVersion != AspxAcquisitionVersions.LiveProvider)
             throw new InvalidOperationException($"Reference resume rejected: stored contract/schema/provider versions are incompatible with {AspxAcquisitionVersions.ReferenceProducer} + {AspxAcquisitionVersions.ReferenceStore} + {AspxAcquisitionVersions.LiveProvider}. Preserve the ledger and start a new v2 run.");
-        if (!string.Equals(storedHash, candidate.Hash(), StringComparison.Ordinal))
-            throw new InvalidOperationException("Reference resume rejected: immutable v2 provenance drifted (product/sdk/authority/permission/registry/build/snapshot/provider binding). Preserve the prior run and use new output paths.");
+        var differences = stored.ResumeCompatibilityDiff(candidate);
+        if (differences.Count > 0)
+            throw new InvalidOperationException("Reference resume rejected: semantic provenance drifted: " +
+                string.Join(", ", differences) + ". Preserve the prior run and use new output paths.");
     }
 
     public void Dispose() => connection.Dispose();

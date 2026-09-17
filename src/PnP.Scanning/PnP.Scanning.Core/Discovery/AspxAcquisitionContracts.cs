@@ -110,6 +110,25 @@ internal sealed record AspxReferenceRunManifest(
 
     internal string Hash() => DiscoveryHash.Of(CanonicalJson());
 
+    internal IReadOnlyList<string> ResumeCompatibilityDiff(AspxReferenceRunManifest other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        var comparable = new (string Name, string Existing, string Candidate)[]
+        {
+            (nameof(ContractVersion), ContractVersion, other.ContractVersion),
+            (nameof(SchemaVersion), SchemaVersion, other.SchemaVersion),
+            (nameof(ScopeAuthorityHash), ScopeAuthorityHash, other.ScopeAuthorityHash),
+            (nameof(PermissionBoundaryHash), PermissionBoundaryHash, other.PermissionBoundaryHash),
+            (nameof(RegistryRevision), RegistryRevision, other.RegistryRevision),
+            (nameof(RegistryHash), RegistryHash, other.RegistryHash),
+            (nameof(SnapshotFence), SnapshotFence, other.SnapshotFence),
+            (nameof(ProviderVersion), ProviderVersion, other.ProviderVersion),
+            (nameof(ArtifactRunId), ArtifactRunId, other.ArtifactRunId),
+        };
+        return comparable.Where(value => !string.Equals(value.Existing, value.Candidate, StringComparison.Ordinal))
+            .Select(value => value.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+    }
+
     private static bool IsProductRef(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return false;
