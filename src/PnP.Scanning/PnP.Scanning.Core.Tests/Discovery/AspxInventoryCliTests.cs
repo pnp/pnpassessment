@@ -73,6 +73,10 @@ public sealed class AspxInventoryCliTests
         exit.Should().Be(0);
         File.Exists(database).Should().BeTrue();
         File.Exists(output).Should().BeTrue();
+        var gapCsv = output + ".gaps.csv";
+        File.Exists(gapCsv).Should().BeTrue();
+        (await File.ReadAllLinesAsync(gapCsv)).Should().StartWith(
+            "ScopeKey,SourceKind,GapCode,Detail,Resolved");
         var json = await File.ReadAllTextAsync(output);
         json.Should().Contain("\"outputVersion\": \"classic-page-discovery-output/v3\"");
         json.Should().Contain("\"coverageVerdict\": \"CompleteAuthorizedSurface\"");

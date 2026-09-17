@@ -186,6 +186,8 @@ internal sealed class AspxInventoryRuntime
         var verdict = store.EvaluateVerdict(runId, options.TenantVisibilityVerified);
         var output = AspxDiscoveryOutputV2.Create(runId, verdict, store);
         await WriteOutputAsync(options.OutputPath, output, cancellationToken);
+        await DiscoveryGapCsvWriter.WriteAsync(options.OutputPath + ".gaps.csv", output.Gaps,
+            cancellationToken);
         return output;
     }
 
