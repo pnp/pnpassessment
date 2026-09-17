@@ -1,3 +1,4 @@
+using PnP.Core;
 using PnP.Core.Admin.Model.SharePoint;
 using PnP.Core.Auth;
 using PnP.Core.Services;
@@ -300,7 +301,16 @@ internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAd
 
     private static string Bounded(Exception ex)
     {
-        var value = ex.GetType().Name + ": " + ex.Message;
+        var value = ex is ServiceException { Error: ServiceError error }
+            ? string.Join("; ", new[]
+            {
+                ex.GetType().Name,
+                $"http={error.HttpResponseCode}",
+                $"code={error.Code ?? "unknown"}",
+                $"message={error.Message ?? ex.Message}",
+                $"requestId={error.ClientRequestId ?? "unknown"}",
+            })
+            : ex.GetType().Name + ": " + ex.Message;
         return value[..Math.Min(value.Length, 1024)];
     }
 }
