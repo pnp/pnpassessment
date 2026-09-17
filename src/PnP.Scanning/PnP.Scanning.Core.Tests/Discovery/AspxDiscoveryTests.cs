@@ -33,6 +33,42 @@ public sealed class AspxDiscoveryTests
     }
 
     [Fact]
+    public async Task Inventory_round_trips_hierarchical_identity_and_page_fields()
+    {
+        using var database = new TemporaryDatabase();
+        using var store = new DiscoveryStore(database.Path);
+        var runId = CreateRun(store);
+        var siteId = Guid.NewGuid();
+        var webId = Guid.NewGuid();
+        var listId = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var record = new RawDiscoveryRecord(fileId.ToString("D"), fileId.ToString("D"), listId.ToString("D"),
+            "Page.aspx", "/sites/a/Pages/Page.aspx", true, "synthetic-authorized",
+            new Dictionary<string, string> { ["source"] = "fixture" }, siteId, webId, listId, folderId,
+            ListItemId: 42, HomePage: true, ContentTypeId: "0x010100", PageType: "PublishingPage",
+            LibraryHidden: false, CustomizedPageStatusRaw: "Customized", ObservationMethod: "fixture-rest",
+            SelectionState: "selected", WelcomePageStatus: "matched", ScanId: "scan-1",
+            SiteUrl: "https://contoso.sharepoint.com/sites/a", WebUrl: "https://contoso.sharepoint.com/sites/a");
+
+        await new AspxDiscoveryRunner(store).RunSurfaceAsync(runId, Surface("web/pages"),
+            Source(Batch(0, new[] { record }, true)));
+
+        var row = store.ReadInventory(runId).Should().ContainSingle().Which;
+        row.DiscoveryState.Should().Be(PageDiscoveryState.Discovered);
+        row.SiteCollectionId.Should().Be(siteId);
+        row.WebId.Should().Be(webId);
+        row.ListId.Should().Be(listId);
+        row.FolderUniqueId.Should().Be(folderId);
+        row.ListItemId.Should().Be(42);
+        row.FileUniqueId.Should().Be(fileId);
+        row.HomePage.Should().BeTrue();
+        row.ContentTypeId.Should().Be("0x010100");
+        row.PageType.Should().Be("PublishingPage");
+        row.MetadataJson.Should().Contain("fixture");
+    }
+
+    [Fact]
     public async Task Missing_name_is_gap_and_locator_fallback_requires_physical_path_guarantee()
     {
         using var database = new TemporaryDatabase();
@@ -46,6 +82,9 @@ public sealed class AspxDiscoveryTests
 
         store.ReadInventory(runId).Should().ContainSingle(row => row.FileName == "Fallback.aspx" && row.IdentityQuality == "fallback");
         store.ReadGapCodes(runId).Should().ContainSingle(code => code == DiscoveryGapCodes.FilenameMissing);
+        store.ReadGaps(runId).Should().ContainSingle(row =>
+            row.ScopeKey == surface.ScopeKey && row.Code == DiscoveryGapCodes.FilenameMissing &&
+            row.Detail.Contains("leaf name"));
         store.EvaluateVerdict(runId, false).Should().Be(DiscoveryVerdict.Unknown);
     }
 
@@ -131,14 +170,25 @@ public sealed class AspxDiscoveryTests
     }
 
     [Fact]
-    public void Resume_requires_complete_immutable_provenance_and_rejects_drift()
+    public void Resume_accepts_equivalent_build_provenance_but_rejects_semantic_drift()
     {
         var baseline = Manifest();
         ResumeDecision.Evaluate(baseline, baseline, true).CanResume.Should().BeTrue();
-        var drifted = baseline with { EnvironmentManifestHash = new string('b', 64) };
+        var equivalentBuild = baseline with
+        {
+            ProductRef = "pnp/pnpassessment@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            SdkRef = "cccccccccccccccccccccccccccccccccccccccc",
+            BinaryArtifactHash = new string('b', 64),
+            BuildManifestHash = new string('c', 64),
+            DependencyManifestHash = new string('d', 64),
+            EnvironmentManifestHash = new string('e', 64),
+        };
+        ResumeDecision.Evaluate(baseline, equivalentBuild, true).CanResume.Should().BeTrue();
+
+        var drifted = baseline with { ScopePolicyHash = new string('b', 64) };
         var decision = ResumeDecision.Evaluate(baseline, drifted, true);
         decision.CanResume.Should().BeFalse();
-        decision.MismatchFields.Should().Contain(nameof(DiscoveryRunManifest.EnvironmentManifestHash));
+        decision.MismatchFields.Should().Contain(nameof(DiscoveryRunManifest.ScopePolicyHash));
         ResumeDecision.Evaluate(baseline, baseline with { ProductRef = "pnp/pnpassessment@main" }, true).CanResume.Should().BeFalse();
     }
 

@@ -74,7 +74,7 @@ public sealed class AspxInventoryCliTests
         File.Exists(database).Should().BeTrue();
         File.Exists(output).Should().BeTrue();
         var json = await File.ReadAllTextAsync(output);
-        json.Should().Contain("\"outputVersion\": \"aspx-discovery-output/v2\"");
+        json.Should().Contain("\"outputVersion\": \"classic-page-discovery-output/v3\"");
         json.Should().Contain("\"coverageVerdict\": \"CompleteAuthorizedSurface\"");
         using var document = JsonDocument.Parse(json);
         var inventoryNames = document.RootElement.GetProperty("inventory").EnumerateArray()

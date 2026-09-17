@@ -65,11 +65,17 @@ internal sealed class AspxDiscoveryOrchestrator
             {
                 result = new(ChildKindFor(scope.Kind), Array.Empty<DiscoveryChildExpectation>(),
                     Array.Empty<DiscoveryScopeRegistration>(), DiscoveryTerminalOutcome.Failed,
-                    scope.PermissionContext, GapDetail: $"{ex.GetType().Name}: {ex.Message}");
+                    scope.PermissionContext, DiscoveryGapCodes.ScopeExecutionFailed,
+                    $"{ex.GetType().Name}: {ex.Message}");
             }
 
+            var normalizedGapCode = NormalizeEnumerationGap(result.Outcome, result.GapCode);
+            var normalizedGapDetail = string.IsNullOrWhiteSpace(result.GapCode) ||
+                string.Equals(result.GapCode, normalizedGapCode, StringComparison.Ordinal)
+                ? result.GapDetail
+                : $"providerGapCode={result.GapCode}; {result.GapDetail}".TrimEnd(' ', ';');
             store.RecordChildEnumeration(runId, scope.ScopeKey, result.ChildKind, result.ExpectedChildren,
-                result.Outcome, result.PermissionContext, result.GapCode, result.GapDetail);
+                result.Outcome, result.PermissionContext, normalizedGapCode, normalizedGapDetail);
             foreach (var child in result.ObservedChildren)
             {
                 store.RegisterScope(runId, child);
@@ -91,6 +97,27 @@ internal sealed class AspxDiscoveryOrchestrator
         DiscoveryScopeKind.Folder => DiscoveryScopeKind.Folder,
         _ => throw new ArgumentOutOfRangeException(nameof(parentKind), parentKind, null),
     };
+
+    private static string NormalizeEnumerationGap(DiscoveryTerminalOutcome outcome, string providerGapCode)
+    {
+        if (providerGapCode is DiscoveryGapCodes.SourceUnsupported or
+            DiscoveryGapCodes.SupplementSourceUnverified or DiscoveryGapCodes.PermissionVisibilityUnknown or
+            DiscoveryGapCodes.FilenameMissing or DiscoveryGapCodes.IdentityMissing or
+            DiscoveryGapCodes.MetadataConflict or DiscoveryGapCodes.LocatorIdentityConflict or
+            DiscoveryGapCodes.ChangedDuringScan or DiscoveryGapCodes.PaginationTokenLoopOrLoss or
+            DiscoveryGapCodes.ExpectedChildMissing or DiscoveryGapCodes.DenominatorDrift or
+            DiscoveryGapCodes.BatchReplayConflict or DiscoveryGapCodes.ScopeEnumerationFailed or
+            DiscoveryGapCodes.ScopeExecutionFailed or DiscoveryGapCodes.LegacyVersionIncompatible)
+            return providerGapCode;
+        return outcome switch
+        {
+            DiscoveryTerminalOutcome.Denied => DiscoveryGapCodes.PermissionVisibilityUnknown,
+            DiscoveryTerminalOutcome.Failed or DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Unknown =>
+                DiscoveryGapCodes.ScopeEnumerationFailed,
+            DiscoveryTerminalOutcome.Cancelled => DiscoveryGapCodes.ScopeExecutionFailed,
+            _ => providerGapCode,
+        };
+    }
 }
 
 internal sealed record AspxInventoryRuntimeOptions(

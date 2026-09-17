@@ -10,6 +10,15 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 
 public sealed class AspxAcquisitionV3Tests
 {
+    [Fact]
+    public void Acquisition_rest_requests_use_the_required_test_traffic_user_agent()
+    {
+        using var request = PnPContextSharePointAspxRestClient.CreateGetRequest(
+            new Uri("https://contoso.sharepoint.com/_api/web"));
+
+        request.Headers.UserAgent.ToString().Should().Be("testtraffic-smr");
+    }
+
     private static readonly string HashA = new('a', 64);
     private static readonly string HashB = new('b', 64);
     private static readonly Guid RunId = Guid.Parse("11111111-1111-1111-1111-111111111111");

@@ -160,7 +160,7 @@ public sealed class AspxDiscoveryOrchestrationTests
     }
 
     [Fact]
-    public async Task Resume_rejects_immutable_provenance_drift_before_enumeration()
+    public async Task Resume_rejects_semantic_scope_policy_drift_before_enumeration()
     {
         using var directory = new TemporaryDirectory();
         using var provider = await LoadProvider(directory, CompleteInput());
@@ -171,11 +171,11 @@ public sealed class AspxDiscoveryOrchestrationTests
 
         var action = () => runtime.RunAsync(resumedProvider,
             new(directory.DatabasePath, directory.OutputPath,
-                Manifest() with { EnvironmentManifestHash = new string('b', 64) },
+                Manifest() with { ScopePolicyHash = new string('b', 64) },
                 "tenant_full", FixtureRun: true, ResumeRunId: first.RunId));
 
         await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Immutable discovery provenance drift*EnvironmentManifestHash*");
+            .WithMessage("*Immutable discovery provenance drift*ScopePolicyHash*");
     }
 
     [Fact]

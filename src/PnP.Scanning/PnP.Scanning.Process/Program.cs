@@ -182,6 +182,9 @@ namespace PnP.Scanning.Process
                                options.DisableTelemetry = true;
                            });
                            services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
+                           // Acquisition traffic over the 60k-page corpus must remain identifiable in service telemetry.
+                           services.PostConfigure<PnPCoreOptions>(options =>
+                               options.HttpRequests.UserAgent = "testtraffic-smr");
                            services.AddPnPCoreAuthentication();
                            services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 

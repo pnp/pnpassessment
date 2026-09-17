@@ -60,8 +60,8 @@ internal static class AspxAcquisitionCommandDefinition
         var certPassword = new Option<string>("--certPassword", "Application-mode PFX password; never persisted in acquisition outputs.");
         var manifest = RequiredFile("--manifest", "Immutable physical DiscoveryRunManifest JSON.");
         var registry = RequiredFile("--registry", "Independent aspx-platform-registry/v1 JSON.");
-        var physicalDatabase = RequiredOutput("--physical-database", "aspx-discovery-sqlite/v2 path.");
-        var physicalOutput = RequiredOutput("--physical-output", "aspx-discovery-output/v2 path.");
+        var physicalDatabase = RequiredOutput("--physical-database", "classic-page-discovery-sqlite/v3 path.");
+        var physicalOutput = RequiredOutput("--physical-output", "classic-page-discovery-output/v3 path.");
         var referenceDatabase = RequiredOutput("--reference-database", "aspx-reference-sqlite/v2 path.");
         var referenceOutput = RequiredOutput("--reference-output", "aspx-reference-output/v2 path.");
         var aggregateOutput = RequiredOutput("--aggregate-output", "aspx-acquisition-verdict/v2 path.");
@@ -182,7 +182,7 @@ internal sealed class AspxAcquisitionCommandHandler
                 ?? throw new InvalidOperationException("Manifest JSON did not contain a DiscoveryRunManifest.");
             if (manifest.ContractVersion != DiscoveryRunManifest.CurrentContractVersion ||
                 manifest.SchemaVersion != DiscoveryRunManifest.CurrentSchemaVersion)
-                throw new InvalidOperationException("Physical manifest must remain aspx-discovery/v2 + aspx-discovery-sqlite/v2.");
+                throw new InvalidOperationException("Physical manifest must use the current classic page discovery contract and schema versions.");
             var registry = JsonSerializer.Deserialize<AspxPlatformRegistryV1>(
                 await File.ReadAllTextAsync(options.Registry.FullName, cancellationToken),
                 AspxInventoryRuntime.JsonOptions())
@@ -204,12 +204,11 @@ internal sealed class AspxAcquisitionCommandHandler
                     throw;
                 }
                 if (previous.ArtifactRunId != artifactRunId ||
-                    !string.Equals(previous.ProductRef, manifest.ProductRef, StringComparison.Ordinal) ||
                     !string.Equals(previous.SnapshotFence, options.SnapshotFence, StringComparison.Ordinal))
                 {
                     terminalPathSafe = false;
                     throw new InvalidOperationException(
-                        "Terminal resume rejected: the existing receipt is bound to a different run, product ref, or snapshot fence. Preserve it and use a new terminal receipt path.");
+                        "Terminal resume rejected: the existing receipt is bound to a different run or snapshot fence. Preserve it and use a new terminal receipt path.");
                 }
             }
 

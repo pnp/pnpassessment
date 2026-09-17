@@ -7,7 +7,27 @@ internal enum BatchCommitResult { Committed, ReplayNoOp, ReplayConflict }
 
 internal sealed record DiscoveryInventoryRow(
     string ScopeKey, string CanonicalInventoryKey, string PhysicalLocator,
-    string FileName, string IdentityQuality, string PermissionContext);
+    string FileName, string IdentityQuality, string PermissionContext,
+    PageDiscoveryState DiscoveryState = PageDiscoveryState.Discovered,
+    string StableSourceObjectKey = null,
+    Guid? SiteCollectionId = null,
+    Guid? WebId = null,
+    Guid? ListId = null,
+    Guid? FolderUniqueId = null,
+    int? ListItemId = null,
+    Guid? FileUniqueId = null,
+    bool? HomePage = null,
+    string ContentTypeId = null,
+    string PageType = null,
+    bool? LibraryHidden = null,
+    string CustomizedPageStatusRaw = null,
+    string ObservationMethod = null,
+    string SelectionState = null,
+    string WelcomePageStatus = null,
+    string ScanId = null,
+    string SiteUrl = null,
+    string WebUrl = null,
+    string MetadataJson = null);
 
 internal sealed record DiscoveryObservationRow(
     string ScopeKey, string SourceKind, string ObservationKey, string FactHash,
@@ -20,6 +40,15 @@ internal sealed record DiscoveryCoverageRow(
 internal sealed record DiscoveryDenominatorRow(
     string ParentScopeKey, string ChildKind, DiscoveryTerminalOutcome Outcome,
     int ExpectedCount, int ObservedCount, string EnumerationFingerprint, string PermissionContext);
+
+internal sealed record DiscoveryScopeDetailRow(
+    string ScopeKey, string ParentScopeKey, string Kind, string SourceKind, string Locator,
+    string PermissionContext, bool Required, DiscoveryTerminalOutcome Outcome,
+    string ExclusionRuleId, string ExclusionRuleVersion, string ExclusionRuleHash,
+    string ExclusionApprovalRef);
+
+internal sealed record DiscoveryGapDetailRow(
+    string ScopeKey, string GapKey, string SourceKind, string Code, string Detail, bool Resolved);
 
 internal sealed record AspxAdmissionResult(bool IsAspx, string LeafName, string GapCode = null, string Detail = null);
 
@@ -301,12 +330,27 @@ internal sealed class DiscoveryStore : IDisposable
     internal IReadOnlyList<DiscoveryInventoryRow> ReadInventory(Guid runId)
     {
         using var command = Command("""
-            SELECT ScopeKey, CanonicalInventoryKey, PhysicalLocator, FileName, IdentityQuality, PermissionContext
+            SELECT ScopeKey, CanonicalInventoryKey, PhysicalLocator, FileName, IdentityQuality, PermissionContext,
+                   DiscoveryState, StableSourceObjectKey, SiteCollectionId, WebId, ListId, FolderUniqueId,
+                   ListItemId, FileUniqueId, HomePage, ContentTypeId, PageType, LibraryHidden,
+                   CustomizedPageStatusRaw, ObservationMethod, SelectionState, WelcomePageStatus,
+                   ScanId, SiteUrl, WebUrl, MetadataJson
             FROM DiscoveryInventory WHERE RunId=$runId ORDER BY CanonicalInventoryKey
             """, null, ("$runId", runId.ToString("D")));
         using var reader = command.ExecuteReader();
         var rows = new List<DiscoveryInventoryRow>();
-        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5)));
+        while (reader.Read()) rows.Add(new(
+            reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5),
+            Enum.Parse<PageDiscoveryState>(reader.GetString(6)), reader.IsDBNull(7) ? null : reader.GetString(7),
+            ReadGuid(reader, 8), ReadGuid(reader, 9), ReadGuid(reader, 10), ReadGuid(reader, 11),
+            reader.IsDBNull(12) ? null : reader.GetInt32(12), ReadGuid(reader, 13), ReadNullableBool(reader, 14),
+            reader.IsDBNull(15) ? null : reader.GetString(15), reader.IsDBNull(16) ? null : reader.GetString(16),
+            ReadNullableBool(reader, 17), reader.IsDBNull(18) ? null : reader.GetString(18),
+            reader.IsDBNull(19) ? null : reader.GetString(19), reader.IsDBNull(20) ? null : reader.GetString(20),
+            reader.IsDBNull(21) ? null : reader.GetString(21), reader.IsDBNull(22) ? null : reader.GetString(22),
+            reader.IsDBNull(23) ? null : reader.GetString(23), reader.IsDBNull(24) ? null : reader.GetString(24),
+            reader.IsDBNull(25) ? null : reader.GetString(25)));
         return rows;
     }
 
@@ -364,6 +408,37 @@ internal sealed class DiscoveryStore : IDisposable
 
     internal IReadOnlyList<string> ReadGapCodes(Guid runId) => Strings(
         "SELECT Code FROM DiscoveryGaps WHERE RunId=$runId AND Resolved=0 ORDER BY Code", ("$runId", runId.ToString("D"))).ToArray();
+
+    internal IReadOnlyList<DiscoveryGapDetailRow> ReadGaps(Guid runId)
+    {
+        using var command = Command("""
+            SELECT ScopeKey, GapKey, SourceKind, Code, Detail, Resolved
+            FROM DiscoveryGaps WHERE RunId=$runId ORDER BY ScopeKey, Code, GapKey
+            """, null, ("$runId", runId.ToString("D")));
+        using var reader = command.ExecuteReader();
+        var rows = new List<DiscoveryGapDetailRow>();
+        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+            reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4), reader.GetInt32(5) != 0));
+        return rows;
+    }
+
+    internal IReadOnlyList<DiscoveryScopeDetailRow> ReadScopes(Guid runId)
+    {
+        using var command = Command("""
+            SELECT ScopeKey, ParentScopeKey, Kind, SourceKind, Locator, PermissionContext, Required, Outcome,
+                   ExclusionRuleId, ExclusionRuleVersion, ExclusionRuleHash, ExclusionApprovalRef
+            FROM DiscoveryScopes WHERE RunId=$runId ORDER BY ScopeKey
+            """, null, ("$runId", runId.ToString("D")));
+        using var reader = command.ExecuteReader();
+        var rows = new List<DiscoveryScopeDetailRow>();
+        while (reader.Read()) rows.Add(new(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.GetInt32(6) != 0, Enum.Parse<DiscoveryTerminalOutcome>(reader.GetString(7)),
+            reader.IsDBNull(8) ? null : reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetString(9),
+            reader.IsDBNull(10) ? null : reader.GetString(10), reader.IsDBNull(11) ? null : reader.GetString(11)));
+        return rows;
+    }
     internal int ReadConflictCount(Guid runId) => (int)Scalar<long>(
         "SELECT COUNT(*) FROM DiscoveryConflicts WHERE RunId=$runId AND Resolved=0", ("$runId", runId.ToString("D")));
 
@@ -466,7 +541,12 @@ internal sealed class DiscoveryStore : IDisposable
         var observationKey = DiscoveryHash.Of(DiscoveryRunManifest.CurrentContractVersion, scopeKey, sourceKind.ToString(), sourceObjectKey);
         var metadata = DiscoveryHash.Metadata(record.Metadata);
         var factHash = DiscoveryHash.Of(record.FileUniqueId, record.ContainerStableId, record.FileName, locator,
-            record.LocatorIsGuaranteedPhysicalFilePath.ToString(), record.PermissionContext, metadata);
+            record.LocatorIsGuaranteedPhysicalFilePath.ToString(), record.PermissionContext, metadata,
+            record.SiteCollectionId?.ToString("D"), record.WebId?.ToString("D"), record.ListId?.ToString("D"),
+            record.FolderUniqueId?.ToString("D"), record.ListItemId?.ToString(), record.HomePage?.ToString(),
+            record.ContentTypeId, record.PageType, record.LibraryHidden?.ToString(),
+            record.CustomizedPageStatusRaw, record.ObservationMethod, record.SelectionState,
+            record.WelcomePageStatus, record.ScanId, record.SiteUrl, record.WebUrl);
         var changed = Scalar<long>("SELECT COUNT(*) FROM DiscoveryObservations WHERE RunId=$runId AND ObservationKey=$key AND FactHash<>$fact",
             transaction, ("$runId", runId.ToString("D")), ("$key", observationKey), ("$fact", factHash)) > 0;
         Execute(transaction, """
@@ -493,8 +573,7 @@ internal sealed class DiscoveryStore : IDisposable
             return;
         }
 
-        var canonicalKey = !string.IsNullOrWhiteSpace(record.FileUniqueId)
-            ? DiscoveryHash.Of("file", record.FileUniqueId) : DiscoveryHash.Of("locator", record.ContainerStableId, locator);
+        var canonicalKey = CanonicalInventoryKey(record, locator);
         if (!string.IsNullOrWhiteSpace(locator))
         {
             using var command = Command("SELECT CanonicalInventoryKey FROM DiscoveryInventory WHERE RunId=$runId AND PhysicalLocator=$locator AND CanonicalInventoryKey<>$key",
@@ -515,13 +594,41 @@ internal sealed class DiscoveryStore : IDisposable
             }
         }
         Execute(transaction, """
-            INSERT INTO DiscoveryInventory (RunId, ScopeKey, CanonicalInventoryKey, PhysicalLocator, FileName, IdentityQuality, PermissionContext)
-            VALUES ($runId, $scopeKey, $key, $locator, $fileName, $quality, $permission)
+            INSERT INTO DiscoveryInventory
+              (RunId, ScopeKey, CanonicalInventoryKey, PhysicalLocator, FileName, IdentityQuality,
+               PermissionContext, DiscoveryState, StableSourceObjectKey, SiteCollectionId, WebId, ListId,
+               FolderUniqueId, ListItemId, FileUniqueId, HomePage, ContentTypeId, PageType, LibraryHidden,
+               CustomizedPageStatusRaw, ObservationMethod, SelectionState, WelcomePageStatus,
+               ScanId, SiteUrl, WebUrl, MetadataJson)
+            VALUES
+              ($runId, $scopeKey, $key, $locator, $fileName, $quality, $permission, $state, $sourceObject,
+               $siteCollectionId, $webId, $listId, $folderUniqueId, $listItemId, $fileUniqueId,
+               $homePage, $contentTypeId, $pageType, $libraryHidden, $customizedPageStatusRaw,
+               $observationMethod, $selectionState, $welcomePageStatus, $scanId, $siteUrl, $webUrl, $metadata)
             ON CONFLICT(RunId, CanonicalInventoryKey) DO UPDATE SET
-              PhysicalLocator=excluded.PhysicalLocator, FileName=excluded.FileName, PermissionContext=excluded.PermissionContext
+              ScopeKey=excluded.ScopeKey, PhysicalLocator=excluded.PhysicalLocator, FileName=excluded.FileName,
+              PermissionContext=excluded.PermissionContext, DiscoveryState=excluded.DiscoveryState,
+              StableSourceObjectKey=excluded.StableSourceObjectKey, SiteCollectionId=excluded.SiteCollectionId,
+              WebId=excluded.WebId, ListId=excluded.ListId, FolderUniqueId=excluded.FolderUniqueId,
+              ListItemId=excluded.ListItemId, FileUniqueId=excluded.FileUniqueId, HomePage=excluded.HomePage,
+              ContentTypeId=excluded.ContentTypeId, PageType=excluded.PageType,
+              LibraryHidden=excluded.LibraryHidden, CustomizedPageStatusRaw=excluded.CustomizedPageStatusRaw,
+              ObservationMethod=excluded.ObservationMethod, SelectionState=excluded.SelectionState,
+              WelcomePageStatus=excluded.WelcomePageStatus, ScanId=excluded.ScanId,
+              SiteUrl=excluded.SiteUrl, WebUrl=excluded.WebUrl, MetadataJson=excluded.MetadataJson
             """, ("$runId", runId.ToString("D")), ("$scopeKey", scopeKey), ("$key", canonicalKey), ("$locator", locator),
             ("$fileName", admission.LeafName), ("$quality", string.IsNullOrWhiteSpace(record.FileUniqueId) ? "fallback" : "strong"),
-            ("$permission", record.PermissionContext));
+            ("$permission", record.PermissionContext), ("$state", PageDiscoveryState.Discovered.ToString()),
+            ("$sourceObject", sourceObjectKey), ("$siteCollectionId", record.SiteCollectionId?.ToString("D")),
+            ("$webId", record.WebId?.ToString("D")), ("$listId", record.ListId?.ToString("D")),
+            ("$folderUniqueId", record.FolderUniqueId?.ToString("D")), ("$listItemId", record.ListItemId),
+            ("$fileUniqueId", NormalizeGuid(record.FileUniqueId)), ("$homePage", ToSqlBool(record.HomePage)),
+            ("$contentTypeId", record.ContentTypeId), ("$pageType", record.PageType),
+            ("$libraryHidden", ToSqlBool(record.LibraryHidden)),
+            ("$customizedPageStatusRaw", record.CustomizedPageStatusRaw),
+            ("$observationMethod", record.ObservationMethod), ("$selectionState", record.SelectionState),
+            ("$welcomePageStatus", record.WelcomePageStatus), ("$scanId", record.ScanId),
+            ("$siteUrl", record.SiteUrl), ("$webUrl", record.WebUrl), ("$metadata", metadata));
         Execute(transaction, "INSERT OR IGNORE INTO DiscoveryInventoryObservations (RunId, CanonicalInventoryKey, ObservationId) VALUES ($runId, $key, $observation)",
             ("$runId", runId.ToString("D")), ("$key", canonicalKey), ("$observation", observationId));
     }
@@ -564,7 +671,17 @@ internal sealed class DiscoveryStore : IDisposable
         CREATE TABLE IF NOT EXISTS DiscoveryBatches (BatchId TEXT PRIMARY KEY, AttemptId TEXT NOT NULL, BatchOrdinal INTEGER NOT NULL, RequestFingerprint TEXT NOT NULL, ResponseFingerprint TEXT NOT NULL, TerminalFlag INTEGER NOT NULL, NextCheckpoint TEXT NULL, CommittedUtc TEXT NOT NULL, UNIQUE (AttemptId, BatchOrdinal));
         CREATE TABLE IF NOT EXISTS DiscoveryObservations (ObservationId TEXT PRIMARY KEY, RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, SourceKind TEXT NOT NULL, ObservationKey TEXT NOT NULL, FactHash TEXT NOT NULL, SourceObjectKey TEXT NOT NULL, FileName TEXT NULL, PhysicalLocator TEXT NULL, PermissionContext TEXT NULL, MetadataJson TEXT NOT NULL, UNIQUE (RunId, ObservationKey, FactHash));
         CREATE TABLE IF NOT EXISTS DiscoveryAttemptObservations (AttemptId TEXT NOT NULL, ObservationId TEXT NOT NULL, BatchId TEXT NOT NULL, Emitted INTEGER NOT NULL, PRIMARY KEY (AttemptId, ObservationId));
-        CREATE TABLE IF NOT EXISTS DiscoveryInventory (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, CanonicalInventoryKey TEXT NOT NULL, PhysicalLocator TEXT NULL, FileName TEXT NOT NULL, IdentityQuality TEXT NOT NULL, PermissionContext TEXT NULL, PRIMARY KEY (RunId, CanonicalInventoryKey));
+        CREATE TABLE IF NOT EXISTS DiscoveryInventory (
+          RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, CanonicalInventoryKey TEXT NOT NULL,
+          PhysicalLocator TEXT NULL, FileName TEXT NOT NULL, IdentityQuality TEXT NOT NULL,
+          PermissionContext TEXT NULL, DiscoveryState TEXT NOT NULL, StableSourceObjectKey TEXT NULL,
+          SiteCollectionId TEXT NULL, WebId TEXT NULL, ListId TEXT NULL, FolderUniqueId TEXT NULL,
+          ListItemId INTEGER NULL, FileUniqueId TEXT NULL, HomePage INTEGER NULL,
+          ContentTypeId TEXT NULL, PageType TEXT NULL, LibraryHidden INTEGER NULL,
+          CustomizedPageStatusRaw TEXT NULL, ObservationMethod TEXT NULL,
+          SelectionState TEXT NULL, WelcomePageStatus TEXT NULL, ScanId TEXT NULL,
+          SiteUrl TEXT NULL, WebUrl TEXT NULL, MetadataJson TEXT NOT NULL DEFAULT '{}',
+          PRIMARY KEY (RunId, CanonicalInventoryKey));
         CREATE INDEX IF NOT EXISTS IX_DiscoveryInventory_Locator ON DiscoveryInventory(RunId, PhysicalLocator);
         CREATE TABLE IF NOT EXISTS DiscoveryInventoryObservations (RunId TEXT NOT NULL, CanonicalInventoryKey TEXT NOT NULL, ObservationId TEXT NOT NULL, PRIMARY KEY (RunId, CanonicalInventoryKey, ObservationId));
         CREATE TABLE IF NOT EXISTS DiscoveryGaps (RunId TEXT NOT NULL, ScopeKey TEXT NOT NULL, GapKey TEXT NOT NULL, SourceKind TEXT NOT NULL, Code TEXT NOT NULL, Detail TEXT NULL, Resolved INTEGER NOT NULL, PRIMARY KEY (RunId, GapKey));
@@ -578,6 +695,38 @@ internal sealed class DiscoveryStore : IDisposable
         while (normalized.Contains("//", StringComparison.Ordinal)) normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
         return normalized.TrimEnd('/').ToLowerInvariant();
     }
+
+    private static string CanonicalInventoryKey(RawDiscoveryRecord record, string normalizedLocator)
+    {
+        var site = record.SiteCollectionId?.ToString("D");
+        var web = record.WebId?.ToString("D");
+        var list = record.ListId?.ToString("D");
+        var folder = record.FolderUniqueId?.ToString("D");
+        if (!string.IsNullOrWhiteSpace(record.FileUniqueId))
+        {
+            var fileIdentity = Guid.TryParse(record.FileUniqueId, out var fileUniqueId)
+                ? fileUniqueId.ToString("D") : record.FileUniqueId.Trim();
+            // File identity is scoped by its owning site/web. List/folder provenance must not split
+            // one physical file when Forms/Views and folder traversal observe the same object.
+            return DiscoveryHash.Of("hierarchical-file", site, web, fileIdentity);
+        }
+        if (record.ListItemId != null && record.ListId != null)
+            return DiscoveryHash.Of("hierarchical-list-item", site, web, list,
+                record.ListItemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return DiscoveryHash.Of("hierarchical-locator", site, web, list, folder,
+            record.ContainerStableId, normalizedLocator);
+    }
+
+    private static string NormalizeGuid(string value) =>
+        Guid.TryParse(value, out var parsed) ? parsed.ToString("D") : null;
+
+    private static object ToSqlBool(bool? value) => value == null ? null : value.Value ? 1 : 0;
+
+    private static Guid? ReadGuid(SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) || !Guid.TryParse(reader.GetString(ordinal), out var value) ? null : value;
+
+    private static bool? ReadNullableBool(SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal) != 0;
 
     private void Execute(string sql, params (string Name, object Value)[] parameters) => Execute(null, sql, parameters);
     private void Execute(SqliteTransaction transaction, string sql, params (string Name, object Value)[] parameters)

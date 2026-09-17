@@ -1,8 +1,8 @@
 {
   "productRef": "pnp/pnpassessment@34f34e2e3c56909ed5fc98afcb118390b025d7db",
   "sdkRef": "1f07296b186698c3cc9ca8580f00af36c0f3f4f5",
-  "contractVersion": "aspx-discovery/v2",
-  "schemaVersion": "aspx-discovery-sqlite/v2",
+  "contractVersion": "classic-page-discovery/v3",
+  "schemaVersion": "classic-page-discovery-sqlite/v3",
   "migrationSetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "inputManifestHash": "3689a344ac6fd09d114001208018a8d1d3ba3c85a5e60595fe3968d1382a7aaf",
   "scopePolicyHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

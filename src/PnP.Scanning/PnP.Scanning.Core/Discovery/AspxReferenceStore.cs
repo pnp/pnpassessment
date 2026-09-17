@@ -158,12 +158,16 @@ internal sealed class AspxReferenceCollector
         var fileUniqueId = candidate.LinkedFileUniqueId;
         if (!string.IsNullOrWhiteSpace(fileUniqueId))
         {
-            var expectedKey = DiscoveryHash.Of("file", fileUniqueId);
+            var normalizedFileId = Guid.TryParse(fileUniqueId, out var parsedFileId)
+                ? parsedFileId.ToString("D") : fileUniqueId.Trim();
+            var legacyCanonicalKey = DiscoveryHash.Of("file", fileUniqueId);
             var matches = physical.Inventory.Where(row =>
-                string.Equals(row.CanonicalInventoryKey, expectedKey, StringComparison.Ordinal)).ToArray();
+                string.Equals(row.FileUniqueId?.ToString("D"), normalizedFileId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(row.StableSourceObjectKey, "file:" + fileUniqueId, StringComparison.Ordinal) ||
+                string.Equals(row.CanonicalInventoryKey, legacyCanonicalKey, StringComparison.Ordinal)).ToArray();
             if (matches.Length == 1)
             {
-                canonicalKey = expectedKey;
+                canonicalKey = matches[0].CanonicalInventoryKey;
             }
             else
             {

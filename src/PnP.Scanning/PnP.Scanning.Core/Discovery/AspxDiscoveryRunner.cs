@@ -77,11 +77,14 @@ internal sealed record AspxDiscoveryOutputV2(
     IReadOnlyList<DiscoveryCoverageRow> Coverage,
     IReadOnlyList<DiscoveryDenominatorRow> Denominator,
     IReadOnlyList<string> UnresolvedGapCodes,
-    int UnresolvedConflictCount)
+    int UnresolvedConflictCount,
+    IReadOnlyList<DiscoveryScopeDetailRow> Scopes = null,
+    IReadOnlyList<DiscoveryGapDetailRow> Gaps = null)
 {
-    internal const string Version = "aspx-discovery-output/v2";
+    internal const string Version = "classic-page-discovery-output/v3";
     internal static AspxDiscoveryOutputV2 Create(Guid runId, DiscoveryVerdict verdict, DiscoveryStore store) =>
         new(Version, runId, store.ReadExecutionStatus(runId), verdict, store.ReadInventory(runId),
             store.ReadObservations(runId), store.ReadCoverage(runId), store.ReadDenominator(runId),
-            store.ReadGapCodes(runId), store.ReadConflictCount(runId));
+            store.ReadGapCodes(runId), store.ReadConflictCount(runId),
+            store.ReadScopes(runId), store.ReadGaps(runId));
 }

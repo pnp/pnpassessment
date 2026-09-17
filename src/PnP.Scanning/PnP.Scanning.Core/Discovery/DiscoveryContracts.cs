@@ -10,6 +10,7 @@ public enum DiscoveryTerminalOutcome { Pending, Complete, Empty, PolicyExcluded,
 internal enum DiscoveryAttemptStatus { Running, Interrupted, Failed, Superseded, Complete }
 internal enum DiscoveryExecutionStatus { Running, Finished, Failed, Cancelled }
 public enum DiscoveryVerdict { CompleteTenantVerified, CompleteAuthorizedSurface, CompleteDeclaredSubset, Incomplete, Unknown }
+public enum PageDiscoveryState { Discovered, Denied, Failed, Unknown }
 
 internal static class DiscoveryGapCodes
 {
@@ -25,11 +26,15 @@ internal static class DiscoveryGapCodes
     internal const string ExpectedChildMissing = "expected_child_missing";
     internal const string DenominatorDrift = "denominator_drift";
     internal const string BatchReplayConflict = "batch_replay_conflict";
+    internal const string ScopeEnumerationFailed = "scope_enumeration_failed";
+    internal const string ScopeExecutionFailed = "scope_execution_failed";
+    internal const string LegacyVersionIncompatible = "legacy_version_incompatible";
 
     internal static bool ForcesUnknown(string code) => code is
         SourceUnsupported or SupplementSourceUnverified or PermissionVisibilityUnknown or
         FilenameMissing or IdentityMissing or MetadataConflict or LocatorIdentityConflict or
-        ChangedDuringScan or PaginationTokenLoopOrLoss or DenominatorDrift or BatchReplayConflict;
+        ChangedDuringScan or PaginationTokenLoopOrLoss or DenominatorDrift or BatchReplayConflict or
+        ScopeEnumerationFailed or ScopeExecutionFailed or LegacyVersionIncompatible;
 }
 
 internal sealed record DiscoveryRunManifest(
@@ -48,8 +53,8 @@ internal sealed record DiscoveryRunManifest(
     string FixtureRevision = null,
     string FixtureHash = null)
 {
-    internal const string CurrentContractVersion = "aspx-discovery/v2";
-    internal const string CurrentSchemaVersion = "aspx-discovery-sqlite/v2";
+    internal const string CurrentContractVersion = "classic-page-discovery/v3";
+    internal const string CurrentSchemaVersion = "classic-page-discovery-sqlite/v3";
 
     internal IReadOnlyList<string> Validate(bool fixtureRun)
     {
@@ -82,11 +87,22 @@ internal sealed record DiscoveryRunManifest(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     });
 
-    internal IReadOnlyList<string> Diff(DiscoveryRunManifest other) => GetType().GetProperties()
-        .Where(property => !Equals(property.GetValue(this), property.GetValue(other)))
-        .Select(property => property.Name)
-        .OrderBy(name => name, StringComparer.Ordinal)
-        .ToArray();
+    internal IReadOnlyList<string> ResumeCompatibilityDiff(DiscoveryRunManifest other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        var comparable = new (string Name, string Existing, string Candidate)[]
+        {
+            (nameof(ContractVersion), ContractVersion, other.ContractVersion),
+            (nameof(SchemaVersion), SchemaVersion, other.SchemaVersion),
+            (nameof(MigrationSetHash), MigrationSetHash, other.MigrationSetHash),
+            (nameof(InputManifestHash), InputManifestHash, other.InputManifestHash),
+            (nameof(ScopePolicyHash), ScopePolicyHash, other.ScopePolicyHash),
+            (nameof(TenantManifestHash), TenantManifestHash, other.TenantManifestHash),
+            (nameof(FixtureHash), FixtureHash, other.FixtureHash),
+        };
+        return comparable.Where(value => !string.Equals(value.Existing, value.Candidate, StringComparison.Ordinal))
+            .Select(value => value.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+    }
 
     private static bool IsImmutableGitRef(string value)
     {
@@ -123,7 +139,8 @@ internal sealed record DiscoveryScopeRegistration(
     string ExclusionRuleId = null,
     string ExclusionRuleVersion = null,
     string ExclusionRuleHash = null,
-    string ExclusionApprovalRef = null);
+    string ExclusionApprovalRef = null,
+    IReadOnlyDictionary<string, string> Metadata = null);
 
 internal sealed record DiscoveryChildExpectation(
     string ScopeKey,
@@ -141,7 +158,23 @@ internal sealed record RawDiscoveryRecord(
     string PhysicalLocator,
     bool LocatorIsGuaranteedPhysicalFilePath,
     string PermissionContext,
-    IReadOnlyDictionary<string, string> Metadata = null);
+    IReadOnlyDictionary<string, string> Metadata = null,
+    Guid? SiteCollectionId = null,
+    Guid? WebId = null,
+    Guid? ListId = null,
+    Guid? FolderUniqueId = null,
+    int? ListItemId = null,
+    bool? HomePage = null,
+    string ContentTypeId = null,
+    string PageType = null,
+    bool? LibraryHidden = null,
+    string CustomizedPageStatusRaw = null,
+    string ObservationMethod = null,
+    string SelectionState = null,
+    string WelcomePageStatus = null,
+    string ScanId = null,
+    string SiteUrl = null,
+    string WebUrl = null);
 
 internal sealed record RawDiscoveryBatch(
     int BatchOrdinal,
@@ -165,7 +198,9 @@ internal sealed record ResumeDecision(bool CanResume, IReadOnlyList<string> Mism
         var invalid = existing.Validate(fixtureRun).Concat(candidate.Validate(fixtureRun))
             .Distinct(StringComparer.Ordinal).ToArray();
         if (invalid.Length > 0) return new ResumeDecision(false, invalid);
-        var differences = existing.Diff(candidate);
+        // Product/SDK/build/dependency/environment hashes remain provenance, but an equivalent
+        // build may resume when the discovery contract, schema, input and scope semantics match.
+        var differences = existing.ResumeCompatibilityDiff(candidate);
         return new ResumeDecision(differences.Count == 0, differences);
     }
 }

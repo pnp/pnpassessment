@@ -325,6 +325,8 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
 
 internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestClient
 {
+    internal const string AcquisitionUserAgent = "testtraffic-smr";
+
     private readonly PnPContext context;
 
     internal PnPContextSharePointAspxRestClient(PnPContext context) =>
@@ -335,8 +337,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     public async Task<SharePointRestPage> GetPageAsync(Uri requestUri,
         CancellationToken cancellationToken = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        request.Headers.Accept.ParseAdd("application/json;odata=nometadata");
+        using var request = CreateGetRequest(requestUri);
         await context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request).ConfigureAwait(false);
         using var response = await context.RestClient.Client.SendAsync(request,
             HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
@@ -345,6 +346,14 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             response.Content.Headers.ContentType?.MediaType, Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
             Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id"),
             DateTimeOffset.UtcNow, attemptCount: 1, attemptLimit: 1);
+    }
+
+    internal static HttpRequestMessage CreateGetRequest(Uri requestUri)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Accept.ParseAdd("application/json;odata=nometadata");
+        request.Headers.UserAgent.ParseAdd(AcquisitionUserAgent);
+        return request;
     }
 
     public async Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
@@ -565,7 +574,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,DefaultViewUrl";
     private const string FormsSelect = "Id,ServerRelativeUrl,FormType";
     private const string ViewsSelect = "Id,ServerRelativeUrl,Hidden,DefaultView,PersonalView,Title";
-    private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus";
+    private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId";
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
     private const string WebsSelect = "Id,Url,ServerRelativeUrl,Title,WebTemplate,Configuration";
     private readonly SharePointLiveAspxDiscoveryOptions options;
@@ -573,6 +582,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private readonly ISharePointAspxRestClientFactory clientFactory;
     private readonly Dictionary<string, LiveScope> scopes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> welcomePageByWeb = new(StringComparer.OrdinalIgnoreCase);
     private bool disposed;
 
     internal SharePointLiveAspxDiscoveryProvider(SharePointLiveAspxDiscoveryOptions options,
@@ -681,6 +691,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             web.Url.AbsoluteUri.TrimEnd('/'), "web", web.Url, null, null, null,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
+                ["siteId"] = parent.Metadata?.GetValueOrDefault("siteId", string.Empty) ?? string.Empty,
                 ["webId"] = web.WebId.ToString("D"),
                 ["authorityParentUrl"] = AspxTenantAuthoritySnapshot.Normalize(web.ParentWebUrl) ?? string.Empty,
                 ["webTemplateConfiguration"] = web.WebTemplateConfiguration ?? string.Empty,
@@ -709,7 +720,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         {
             Add(new LiveScope(Key("web-root", parent.WebUrl.AbsoluteUri), parent.ScopeKey,
                 DiscoveryScopeKind.Container, null, parent.WebUrl.AbsoluteUri, "web-root", parent.WebUrl,
-                null, null, null, null)),
+                null, null, null, parent.Metadata)),
         };
         foreach (var item in listResult.Items)
         {
@@ -720,6 +731,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var title = PropertyString(item, "Title") ?? listId?.ToString("D") ?? "unknown-list";
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
             {
+                ["siteId"] = parent.Metadata?.GetValueOrDefault("siteId", string.Empty) ?? string.Empty,
+                ["webId"] = parent.Metadata?.GetValueOrDefault("webId", string.Empty) ?? string.Empty,
                 ["title"] = title,
                 ["baseType"] = baseType?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "missing",
                 ["baseTemplate"] = template?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "missing",
@@ -819,7 +832,18 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                     ["actualProvider"] = modeled.Provider,
                     ["actualOperation"] = modeled.Operation,
                     ["customizedPageStatus"] = item.CustomizedPageStatus ?? "unknown",
-                })).ToArray();
+                },
+                SiteCollectionId: MetadataGuid(scope.Metadata, "siteId"),
+                WebId: MetadataGuid(scope.Metadata, "webId"),
+                ListId: scope.ListId,
+                FolderUniqueId: Guid.TryParse(modeled.FolderUniqueId, out var modeledFolderId) ? modeledFolderId : null,
+                HomePage: IsHomePage(scope, item.ServerRelativeUrl),
+                LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+                CustomizedPageStatusRaw: item.CustomizedPageStatus,
+                ObservationMethod: modeled.Provider + ":" + modeled.Operation,
+                WelcomePageStatus: HomePageStatus(scope, item.ServerRelativeUrl),
+                SiteUrl: scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+                WebUrl: scope.WebUrl?.AbsoluteUri)).ToArray();
             var terminalOutcome = modeled.Outcome == DiscoveryTerminalOutcome.Complete && records.Length == 0
                 ? DiscoveryTerminalOutcome.Empty : modeled.Outcome;
             yield return new RawDiscoveryBatch(0,
@@ -832,7 +856,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                     ? null : modeled.EvidenceRef);
             yield break;
         }
-        var endpoint = FolderEndpoint(scope.WebUrl, scope.FolderUrl, "Files", FilesSelect);
+        var endpoint = FolderEndpoint(scope.WebUrl, scope.FolderUrl, "Files", FilesSelect, "ListItemAllFields");
         var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
             "files:" + scope.ScopeKey, endpoint, FilesSelect, string.Empty,
             AspxSurfaceApplicability.Applicable, scope.Role == "physical-forms"
@@ -844,7 +868,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 scope.ListId?.ToString("D") ?? scope.ScopeKey, PropertyString(item, "Name"),
                 PropertyString(item, "ServerRelativeUrl"), true, options.PermissionContext,
                 EvidenceMetadata(endpoint, FilesSelect, string.Empty, page.Page.SchemaFlavor,
-                    ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown"))))
+                    ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown")),
+                SiteCollectionId: MetadataGuid(scope.Metadata, "siteId"),
+                WebId: MetadataGuid(scope.Metadata, "webId"),
+                ListId: scope.ListId,
+                ListItemId: NestedInt(item, "ListItemAllFields", "Id"),
+                HomePage: IsHomePage(scope, PropertyString(item, "ServerRelativeUrl")),
+                ContentTypeId: NestedString(item, "ListItemAllFields", "ContentTypeId"),
+                LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+                CustomizedPageStatusRaw: PropertyString(item, "CustomizedPageStatus"),
+                ObservationMethod: "SharePoint REST folder files",
+                WelcomePageStatus: HomePageStatus(scope, PropertyString(item, "ServerRelativeUrl")),
+                SiteUrl: scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+                WebUrl: scope.WebUrl?.AbsoluteUri))
                 .ToArray();
             yield return ToRawBatch(page, records, result.Validation.Outcome);
         }
@@ -929,7 +965,17 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             resolved.ServerRelativeUrl ?? locator, true, options.PermissionContext,
             EvidenceMetadata(new Uri(scope.WebUrl, locator), string.Empty, string.Empty, "pnp-file-resolution",
                 ("referenceSourceKind", sourceKind), ("referenceObjectId", objectId),
-                ("customizedPageStatus", resolved.CustomizedPageStatus ?? "unknown")));
+                ("customizedPageStatus", resolved.CustomizedPageStatus ?? "unknown")),
+            SiteCollectionId: MetadataGuid(scope.Metadata, "siteId"),
+            WebId: MetadataGuid(scope.Metadata, "webId"),
+            ListId: scope.ListId,
+            HomePage: IsHomePage(scope, resolved.ServerRelativeUrl ?? locator),
+            LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+            CustomizedPageStatusRaw: resolved.CustomizedPageStatus,
+            ObservationMethod: method,
+            WelcomePageStatus: HomePageStatus(scope, resolved.ServerRelativeUrl ?? locator),
+            SiteUrl: scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+            WebUrl: scope.WebUrl?.AbsoluteUri);
         return (Candidate(sourceKind, sourceObjectIdentity, method, locator, dispositionValue, null,
             resolved.FileUniqueId, contentOrigin, evidenceRef, resolved.EvidenceRef), physical);
     }
@@ -962,6 +1008,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             return;
         }
         var absolutePath = value.StartsWith('/') ? value : web.WebUrl.AbsolutePath.TrimEnd('/') + "/" + value.TrimStart('/');
+        welcomePageByWeb[web.WebUrl.AbsoluteUri.TrimEnd('/')] = NormalizeServerRelativePath(absolutePath);
         var resolved = await ResolveReferenceAsync(web with { ListId = null }, isForm: false,
             web.ScopeKey, absolutePath, result.EvidenceRef,
             cancellationToken).ConfigureAwait(false);
@@ -1339,7 +1386,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private static DiscoveryScopeRegistration Registration(LiveScope scope) => new(
         scope.ScopeKey, scope.ParentScopeKey, scope.Kind, scope.SourceKind, scope.Locator,
-        scope.PermissionContext, Required: true);
+        scope.PermissionContext, Required: true, Metadata: scope.Metadata);
 
     private LiveScope Add(LiveScope scope)
     {
@@ -1380,10 +1427,11 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private string Key(params string[] values) => DiscoveryHash.Of(values)[..24];
     private static Uri Endpoint(Uri webUrl, string relative) => new(webUrl.AbsoluteUri.TrimEnd('/') + "/" + relative.TrimStart('/'));
-    private static Uri FolderEndpoint(Uri webUrl, string folderUrl, string child, string select)
+    private static Uri FolderEndpoint(Uri webUrl, string folderUrl, string child, string select, string expand = null)
     {
         var escaped = (folderUrl ?? string.Empty).Replace("'", "''", StringComparison.Ordinal);
-        return Endpoint(webUrl, $"_api/web/GetFolderByServerRelativePath(decodedurl='{escaped}')/{child}?$select={select}");
+        var query = $"$select={select}" + (string.IsNullOrWhiteSpace(expand) ? string.Empty : $"&$expand={expand}");
+        return Endpoint(webUrl, $"_api/web/GetFolderByServerRelativePath(decodedurl='{escaped}')/{child}?{query}");
     }
     private static Uri ResolveNext(Uri initial, string next) =>
         Uri.TryCreate(next, UriKind.Absolute, out var absolute) ? absolute : new Uri(initial, next);
@@ -1406,6 +1454,26 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         Guid.TryParse(PropertyString(item, name), out var value) ? value : null;
     private static string NestedString(JsonElement item, string parent, string child) =>
         PnPContextSharePointAspxRestClient.TryProperty(item, parent, out var nested) ? PropertyString(nested, child) : null;
+    private static int? NestedInt(JsonElement item, string parent, string child) =>
+        PnPContextSharePointAspxRestClient.TryProperty(item, parent, out var nested) ? PropertyInt(nested, child) : null;
+    private static Guid? MetadataGuid(IReadOnlyDictionary<string, string> metadata, string key) =>
+        metadata != null && metadata.TryGetValue(key, out var value) && Guid.TryParse(value, out var parsed) ? parsed : null;
+    private static bool? MetadataBool(IReadOnlyDictionary<string, string> metadata, string key) =>
+        metadata != null && metadata.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
+    private bool? IsHomePage(LiveScope scope, string serverRelativeUrl)
+    {
+        if (scope.WebUrl == null || !welcomePageByWeb.TryGetValue(scope.WebUrl.AbsoluteUri.TrimEnd('/'), out var welcomePage))
+            return null;
+        return string.Equals(welcomePage, NormalizeServerRelativePath(serverRelativeUrl), StringComparison.OrdinalIgnoreCase);
+    }
+    private string HomePageStatus(LiveScope scope, string serverRelativeUrl) => IsHomePage(scope, serverRelativeUrl) switch
+    {
+        true => "matched",
+        false => "not-matched",
+        null => "unknown",
+    };
+    private static string NormalizeServerRelativePath(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : "/" + value.Replace('\\', '/').Trim().TrimStart('/');
     private static DiscoveryTerminalOutcome MergeOutcome(DiscoveryTerminalOutcome current,
         DiscoveryTerminalOutcome next)
     {
