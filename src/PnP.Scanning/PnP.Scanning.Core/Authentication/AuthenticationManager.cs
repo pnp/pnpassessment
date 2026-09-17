@@ -226,7 +226,7 @@ namespace PnP.Scanning.Core.Authentication
                             builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, AadAuthorityAudience.AzureAdMyOrg);
                             break;
                         }
-                    case Microsoft365Environment.Germany:
+                    case Microsoft365Environment.DelosCloud:
                         {
                             builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, AadAuthorityAudience.AzureAdMyOrg);
                             break;
@@ -273,7 +273,7 @@ namespace PnP.Scanning.Core.Authentication
                             }
                             break;
                         }
-                    case Microsoft365Environment.Germany:
+                    case Microsoft365Environment.DelosCloud:
                         {
                             if (string.IsNullOrEmpty(tenantId))
                             {
