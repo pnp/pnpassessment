@@ -228,7 +228,8 @@ namespace PnP.Scanning.Core.Authentication
                         }
                     case Microsoft365Environment.DelosCloud:
                         {
-                            builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, AadAuthorityAudience.AzureAdMyOrg);
+                            var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
+                            builder = builder.WithAuthority($"{azureADEndPoint}/organizations");
                             break;
                         }
                     case Microsoft365Environment.China:
@@ -275,13 +276,14 @@ namespace PnP.Scanning.Core.Authentication
                         }
                     case Microsoft365Environment.DelosCloud:
                         {
+                            var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
                             if (string.IsNullOrEmpty(tenantId))
                             {
-                                builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, AadAuthorityAudience.AzureAdMyOrg);
+                                builder = builder.WithAuthority($"{azureADEndPoint}/organizations");
                             }
                             else
                             {
-                                builder = builder.WithAuthority(AzureCloudInstance.AzureGermany, tenantId);
+                                builder = builder.WithAuthority(azureADEndPoint, tenantId, true);
                             }
                             break;
                         }

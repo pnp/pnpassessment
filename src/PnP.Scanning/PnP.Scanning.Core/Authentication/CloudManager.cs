@@ -32,7 +32,7 @@ namespace PnP.Scanning.Core.Authentication
                 Microsoft365Environment.USGovernment => "graph.microsoft.com",
                 Microsoft365Environment.USGovernmentHigh => "graph.microsoft.us",
                 Microsoft365Environment.USGovernmentDoD => "dod-graph.microsoft.us",
-                Microsoft365Environment.DelosCloud => "graph.microsoft.de",
+                Microsoft365Environment.DelosCloud => "graph.svc.sovcloud.de",
                 Microsoft365Environment.China => "microsoftgraph.chinacloudapi.cn",
                 _ => "graph.microsoft.com"
             };
@@ -51,7 +51,8 @@ namespace PnP.Scanning.Core.Authentication
                 Microsoft365Environment.USGovernment => "manage-gcc.office.com",
                 Microsoft365Environment.USGovernmentHigh => "manage.office365.us",
                 Microsoft365Environment.USGovernmentDoD => "manage.protection.apps.mil",
-                Microsoft365Environment.DelosCloud => "manage.office.de",
+                Microsoft365Environment.DelosCloud => throw new NotSupportedException(
+                    "The Microsoft 365 Management Activity API endpoint for Delos Cloud is not supported."),
                 Microsoft365Environment.China => "manage.office365.cn",
                 _ => "manage.office.com"
             };
@@ -71,7 +72,7 @@ namespace PnP.Scanning.Core.Authentication
                 Microsoft365Environment.USGovernment => "login.microsoftonline.us",
                 Microsoft365Environment.USGovernmentHigh => "login.microsoftonline.us",
                 Microsoft365Environment.USGovernmentDoD => "login.microsoftonline.us",
-                Microsoft365Environment.DelosCloud => "login.microsoftonline.de",
+                Microsoft365Environment.DelosCloud => "login.sovcloud-identity.de",
                 Microsoft365Environment.China => "login.chinacloudapi.cn",
                 _ => "login.microsoftonline.com"
             };
