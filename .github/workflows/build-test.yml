@@ -46,16 +46,18 @@ jobs:
           ref: ${{ steps.pnpcore_ref.outputs.ref }}
           path: pnpcore
 
-      - name: Setup .NET 8
+      - name: Setup pinned .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          global-json-file: pnpassessment/global.json
 
       - name: Restore
-        run: dotnet restore pnpassessment/src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj
+        working-directory: pnpassessment
+        run: dotnet restore src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj -p:TargetFramework=net8.0
 
       - name: Test
-        run: dotnet test pnpassessment/src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=test-results.trx"
+        working-directory: pnpassessment
+        run: dotnet test src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj --framework net8.0 --configuration Release --no-restore --logger "trx;LogFileName=test-results.trx"
 
       - name: Publish test results
         if: always()
