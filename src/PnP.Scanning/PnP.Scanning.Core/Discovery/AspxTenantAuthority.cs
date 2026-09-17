@@ -161,17 +161,14 @@ internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAd
     public async Task<AspxAuthorityCollection<AspxAuthoritySite>> EnumerateSiteCollectionsAsync(
         Uri tenantRoot, CancellationToken cancellationToken = default)
     {
+        using var context = await contextFactory.CreateAsync(tenantRoot, authenticationProvider,
+            cancellationToken, new PnPContextOptions()).ConfigureAwait(false);
+        var manager = context.GetSiteCollectionManager();
         try
         {
-            using var context = await contextFactory.CreateAsync(tenantRoot, authenticationProvider,
-                cancellationToken, new PnPContextOptions()).ConfigureAwait(false);
-            var found = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
+            var found = await manager.GetSiteCollectionsAsync(
                 filter: SiteCollectionFilter.Default).ConfigureAwait(false);
-            var sites = found.Where(site => site?.Url != null)
-                .Select(site => new AspxAuthoritySite(site.Id, site.RootWebId, site.Url, site.GraphId, site.Name))
-                .DistinctBy(site => AspxTenantAuthoritySnapshot.Normalize(site.Url), StringComparer.Ordinal)
-                .OrderBy(site => AspxTenantAuthoritySnapshot.Normalize(site.Url), StringComparer.Ordinal)
-                .ToArray();
+            var sites = MapSites(found);
             var outcome = sites.Length == 0 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete;
             return new(outcome, sites, SiteProvider, SiteOperation, SiteFilter, Array.Empty<string>(),
                 null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow);
@@ -180,15 +177,42 @@ internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAd
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception primary)
         {
-            var outcome = Classify(ex);
-            return new(outcome, Array.Empty<AspxAuthoritySite>(), SiteProvider, SiteOperation, SiteFilter,
-                Array.Empty<string>(), outcome == DiscoveryTerminalOutcome.Denied
-                    ? "tenant_site_authority_denied" : "tenant_site_authority_failed",
-                Bounded(ex), ContinuationRemaining: false, DateTimeOffset.UtcNow);
+            try
+            {
+                var visible = await manager.GetSiteCollectionsAsync(ignoreUserIsSharePointAdmin: true,
+                    filter: SiteCollectionFilter.Default).ConfigureAwait(false);
+                var sites = MapSites(visible);
+                var outcome = sites.Length == 0 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete;
+                return new(outcome, sites, SiteProvider,
+                    "GetSiteCollectionsAsync(ignoreUserIsSharePointAdmin=true)", SiteFilter,
+                    new[] { "tenant-admin-authority-failed:fallback-user-visible-graph-search" },
+                    null, "primary=" + Bounded(primary), ContinuationRemaining: false, DateTimeOffset.UtcNow);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception fallback)
+            {
+                var outcome = Classify(fallback);
+                return new(outcome, Array.Empty<AspxAuthoritySite>(), SiteProvider,
+                    "GetSiteCollectionsAsync(Default)+GetSiteCollectionsAsync(ignoreUserIsSharePointAdmin=true)",
+                    SiteFilter, Array.Empty<string>(), outcome == DiscoveryTerminalOutcome.Denied
+                        ? "tenant_site_authority_denied" : "tenant_site_authority_failed",
+                    "primary=" + Bounded(primary) + "; fallback=" + Bounded(fallback),
+                    ContinuationRemaining: false, DateTimeOffset.UtcNow);
+            }
         }
     }
+
+    private static AspxAuthoritySite[] MapSites(IEnumerable<ISiteCollection> found) =>
+        (found ?? Array.Empty<ISiteCollection>()).Where(site => site?.Url != null)
+        .Select(site => new AspxAuthoritySite(site.Id, site.RootWebId, site.Url, site.GraphId, site.Name))
+        .DistinctBy(site => AspxTenantAuthoritySnapshot.Normalize(site.Url), StringComparer.Ordinal)
+        .OrderBy(site => AspxTenantAuthoritySnapshot.Normalize(site.Url), StringComparer.Ordinal)
+        .ToArray();
 
     public async Task<AspxAuthorityCollection<AspxAuthorityWeb>> EnumerateWebsAsync(
         AspxAuthoritySite site, CancellationToken cancellationToken = default)
