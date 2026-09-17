@@ -241,7 +241,9 @@ internal sealed record SharePointResolvedFile(
     string ServerRelativeUrl,
     string CustomizedPageStatus,
     string EvidenceRef,
-    string ErrorCode = null);
+    string ErrorCode = null,
+    int? ListItemId = null,
+    string ContentTypeId = null);
 
 internal sealed record SharePointModeledValue(
     DiscoveryTerminalOutcome Outcome,
@@ -364,13 +366,16 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             cancellationToken.ThrowIfCancellationRequested();
             var file = await context.Web.GetFileByServerRelativeUrlOrDefaultAsync(serverRelativeUrl,
                 item => item.UniqueId, item => item.Name, item => item.ServerRelativeUrl,
-                item => item.CustomizedPageStatus).ConfigureAwait(false);
+                item => item.CustomizedPageStatus,
+                item => item.ListItemAllFields)
+                .ConfigureAwait(false);
             if (file == null)
                 return new(DiscoveryTerminalOutcome.Failed, null, null, serverRelativeUrl, null,
                     "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", "locator_not_found");
             return new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
                 file.ServerRelativeUrl, file.CustomizedPageStatus.ToString(),
-                "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync");
+                "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", null,
+                file.ListItemAllFields?.Id, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -980,7 +985,9 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             WebId: MetadataGuid(scope.Metadata, "webId"),
             ListId: scope.ListId,
             FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId"),
+            ListItemId: resolved.ListItemId,
             HomePage: IsHomePage(scope, resolved.ServerRelativeUrl ?? locator),
+            ContentTypeId: resolved.ContentTypeId,
             LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
             CustomizedPageStatusRaw: resolved.CustomizedPageStatus,
             ObservationMethod: method,
