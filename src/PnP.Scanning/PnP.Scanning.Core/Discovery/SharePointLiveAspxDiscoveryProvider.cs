@@ -571,10 +571,10 @@ internal static class AspxSystemListFormsPolicy
 /// </summary>
 internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvider, IAspxReferenceAcquisitionProvider
 {
-    private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,DefaultViewUrl";
+    private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl";
     private const string FormsSelect = "Id,ServerRelativeUrl,FormType";
     private const string ViewsSelect = "Id,ServerRelativeUrl,Hidden,DefaultView,PersonalView,Title";
-    private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId";
+    private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId,Length";
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
     private const string WebsSelect = "Id,Url,ServerRelativeUrl,Title,WebTemplate,Configuration";
     private readonly SharePointLiveAspxDiscoveryOptions options;
@@ -661,7 +661,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             parent.ScopeKey, DiscoveryScopeKind.SiteCollection, null, site.Url.AbsoluteUri.TrimEnd('/'),
             "site", site.Url, null, null, null, new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["siteId"] = site.SiteId.ToString("D"),
+                ["siteCollectionId"] = site.SiteId.ToString("D"),
+                ["siteUrl"] = site.Url.AbsoluteUri,
                 ["rootWebId"] = site.RootWebId.ToString("D"),
                 ["graphId"] = site.GraphId ?? string.Empty,
             }))).ToArray();
@@ -691,7 +692,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             web.Url.AbsoluteUri.TrimEnd('/'), "web", web.Url, null, null, null,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["siteId"] = parent.Metadata?.GetValueOrDefault("siteId", string.Empty) ?? string.Empty,
+                ["siteCollectionId"] = parent.Metadata?.GetValueOrDefault("siteCollectionId", string.Empty) ?? string.Empty,
+                ["siteUrl"] = parent.Metadata?.GetValueOrDefault("siteUrl", parent.WebUrl?.AbsoluteUri ?? string.Empty) ?? string.Empty,
                 ["webId"] = web.WebId.ToString("D"),
                 ["authorityParentUrl"] = AspxTenantAuthoritySnapshot.Normalize(web.ParentWebUrl) ?? string.Empty,
                 ["webTemplateConfiguration"] = web.WebTemplateConfiguration ?? string.Empty,
@@ -728,11 +730,14 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var baseType = PropertyInt(item, "BaseType");
             var template = PropertyInt(item, "BaseTemplate");
             var rootFolder = NestedString(item, "RootFolder", "ServerRelativeUrl");
+            var rootFolderUniqueId = NestedString(item, "RootFolder", "UniqueId");
             var title = PropertyString(item, "Title") ?? listId?.ToString("D") ?? "unknown-list";
             var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["siteId"] = parent.Metadata?.GetValueOrDefault("siteId", string.Empty) ?? string.Empty,
+                ["siteCollectionId"] = parent.Metadata?.GetValueOrDefault("siteCollectionId", string.Empty) ?? string.Empty,
+                ["siteUrl"] = parent.Metadata?.GetValueOrDefault("siteUrl", parent.WebUrl?.AbsoluteUri ?? string.Empty) ?? string.Empty,
                 ["webId"] = parent.Metadata?.GetValueOrDefault("webId", string.Empty) ?? string.Empty,
+                ["folderUniqueId"] = rootFolderUniqueId ?? string.Empty,
                 ["title"] = title,
                 ["baseType"] = baseType?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "missing",
                 ["baseTemplate"] = template?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "missing",
@@ -801,7 +806,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var modeledChildren = modeledResult.Folders.Select(item => Add(new LiveScope(
                 Key("web-root-folder", parent.WebUrl.AbsoluteUri, item.ServerRelativeUrl), parent.ScopeKey,
                 DiscoveryScopeKind.Folder, DiscoverySourceKind.WebRootFiles, item.ServerRelativeUrl,
-                "web-root-folder", parent.WebUrl, null, null, item.ServerRelativeUrl, null))).ToArray();
+                "web-root-folder", parent.WebUrl, null, null, item.ServerRelativeUrl,
+                WithMetadata(parent.Metadata, ("folderUniqueId", item.UniqueId))))).ToArray();
             return Result(parent, modeledChildren, modeledResult.Outcome, modeledResult.ErrorCode);
         }
         var endpoint = FolderEndpoint(parent.WebUrl, parent.FolderUrl, "Folders", FoldersSelect);
@@ -813,7 +819,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var folderUrl = PropertyString(item, "ServerRelativeUrl");
             return Add(new LiveScope(Key("folder", parent.WebUrl.AbsoluteUri, folderUrl ?? Guid.NewGuid().ToString("N")),
                 parent.ScopeKey, DiscoveryScopeKind.Folder, parent.SourceKind, folderUrl ?? "missing-folder-url",
-                "folder", parent.WebUrl, parent.ListId, parent.BaseType, folderUrl, parent.Metadata));
+                "folder", parent.WebUrl, parent.ListId, parent.BaseType, folderUrl,
+                WithMetadata(parent.Metadata, ("folderUniqueId", PropertyString(item, "UniqueId") ?? string.Empty))));
         }).ToArray();
         return Result(parent, children, result.Validation.Outcome);
     }
@@ -833,16 +840,17 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                     ["actualOperation"] = modeled.Operation,
                     ["customizedPageStatus"] = item.CustomizedPageStatus ?? "unknown",
                 },
-                SiteCollectionId: MetadataGuid(scope.Metadata, "siteId"),
+                SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
                 WebId: MetadataGuid(scope.Metadata, "webId"),
                 ListId: scope.ListId,
-                FolderUniqueId: Guid.TryParse(modeled.FolderUniqueId, out var modeledFolderId) ? modeledFolderId : null,
+                FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId") ??
+                    (Guid.TryParse(modeled.FolderUniqueId, out var modeledFolderId) ? modeledFolderId : null),
                 HomePage: IsHomePage(scope, item.ServerRelativeUrl),
                 LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
                 CustomizedPageStatusRaw: item.CustomizedPageStatus,
                 ObservationMethod: modeled.Provider + ":" + modeled.Operation,
                 WelcomePageStatus: HomePageStatus(scope, item.ServerRelativeUrl),
-                SiteUrl: scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+                SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
                 WebUrl: scope.WebUrl?.AbsoluteUri)).ToArray();
             var terminalOutcome = modeled.Outcome == DiscoveryTerminalOutcome.Complete && records.Length == 0
                 ? DiscoveryTerminalOutcome.Empty : modeled.Outcome;
@@ -868,10 +876,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 scope.ListId?.ToString("D") ?? scope.ScopeKey, PropertyString(item, "Name"),
                 PropertyString(item, "ServerRelativeUrl"), true, options.PermissionContext,
                 EvidenceMetadata(endpoint, FilesSelect, string.Empty, page.Page.SchemaFlavor,
-                    ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown")),
-                SiteCollectionId: MetadataGuid(scope.Metadata, "siteId"),
+                    ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown"),
+                    ("length", PropertyString(item, "Length") ?? "unknown")),
+                SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
                 WebId: MetadataGuid(scope.Metadata, "webId"),
                 ListId: scope.ListId,
+                FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId"),
                 ListItemId: NestedInt(item, "ListItemAllFields", "Id"),
                 HomePage: IsHomePage(scope, PropertyString(item, "ServerRelativeUrl")),
                 ContentTypeId: NestedString(item, "ListItemAllFields", "ContentTypeId"),
@@ -879,7 +889,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 CustomizedPageStatusRaw: PropertyString(item, "CustomizedPageStatus"),
                 ObservationMethod: "SharePoint REST folder files",
                 WelcomePageStatus: HomePageStatus(scope, PropertyString(item, "ServerRelativeUrl")),
-                SiteUrl: scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+                SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
                 WebUrl: scope.WebUrl?.AbsoluteUri))
                 .ToArray();
             yield return ToRawBatch(page, records, result.Validation.Outcome);
@@ -966,15 +976,16 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             EvidenceMetadata(new Uri(scope.WebUrl, locator), string.Empty, string.Empty, "pnp-file-resolution",
                 ("referenceSourceKind", sourceKind), ("referenceObjectId", objectId),
                 ("customizedPageStatus", resolved.CustomizedPageStatus ?? "unknown")),
-            SiteCollectionId: MetadataGuid(scope.Metadata, "siteId"),
+            SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
             WebId: MetadataGuid(scope.Metadata, "webId"),
             ListId: scope.ListId,
+            FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId"),
             HomePage: IsHomePage(scope, resolved.ServerRelativeUrl ?? locator),
             LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
             CustomizedPageStatusRaw: resolved.CustomizedPageStatus,
             ObservationMethod: method,
             WelcomePageStatus: HomePageStatus(scope, resolved.ServerRelativeUrl ?? locator),
-            SiteUrl: scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+            SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
             WebUrl: scope.WebUrl?.AbsoluteUri);
         return (Candidate(sourceKind, sourceObjectIdentity, method, locator, dispositionValue, null,
             resolved.FileUniqueId, contentOrigin, evidenceRef, resolved.EvidenceRef), physical);
@@ -1458,8 +1469,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         PnPContextSharePointAspxRestClient.TryProperty(item, parent, out var nested) ? PropertyInt(nested, child) : null;
     private static Guid? MetadataGuid(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && Guid.TryParse(value, out var parsed) ? parsed : null;
+    private static string MetadataString(IReadOnlyDictionary<string, string> metadata, string key) =>
+        metadata != null && metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
     private static bool? MetadataBool(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
+    private static IReadOnlyDictionary<string, string> WithMetadata(
+        IReadOnlyDictionary<string, string> metadata, params (string Key, string Value)[] additions)
+    {
+        var copy = metadata == null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(metadata, StringComparer.Ordinal);
+        foreach (var (key, value) in additions) copy[key] = value ?? string.Empty;
+        return copy;
+    }
     private bool? IsHomePage(LiveScope scope, string serverRelativeUrl)
     {
         if (scope.WebUrl == null || !welcomePageByWeb.TryGetValue(scope.WebUrl.AbsoluteUri.TrimEnd('/'), out var welcomePage))
