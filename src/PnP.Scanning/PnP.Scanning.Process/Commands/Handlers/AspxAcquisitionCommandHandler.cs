@@ -42,7 +42,7 @@ internal static class AspxAcquisitionCommandDefinition
     {
         ArgumentNullException.ThrowIfNull(executeAsync);
         var command = new Command("aspx-acquisition",
-            "Runs authenticated SharePoint live ASPX acquisition and writes physical v2, reference v2, aggregate v2, and product terminal receipt v1 volumes. Use aspx-inventory for explicit offline manifest replay.");
+            "Runs authenticated SharePoint live ASPX acquisition and writes classic page discovery v3, reference v2, aggregate v2, and product terminal receipt v1 volumes. Use aspx-inventory for explicit offline manifest replay.");
         var sites = new Option<List<string>>("--site", "Authorized site collection URL. Repeat for declared_subset mode.")
         {
             AllowMultipleArgumentsPerToken = true,
