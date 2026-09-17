@@ -818,7 +818,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 return Result(parent, modeledChildren, modeledResult.Outcome, modeledResult.ErrorCode);
             }
         }
-        var endpoint = FolderEndpoint(parent.WebUrl, parent.FolderUrl, "Folders", FoldersSelect);
+        var endpoint = FolderEndpoint(parent, "Folders", FoldersSelect);
         var result = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
             "folders:" + parent.ScopeKey, endpoint, FoldersSelect, string.Empty,
             AspxSurfaceApplicability.Applicable, "RecursiveFolderAuthority", cancellationToken).ConfigureAwait(false);
@@ -871,7 +871,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 yield break;
             }
         }
-        var endpoint = FolderEndpoint(scope.WebUrl, scope.FolderUrl, "Files", FilesSelect, "ListItemAllFields");
+        var endpoint = FolderEndpoint(scope, "Files", FilesSelect, "ListItemAllFields");
         var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
             "files:" + scope.ScopeKey, endpoint, FilesSelect, string.Empty,
             AspxSurfaceApplicability.Applicable, scope.Role == "physical-forms"
@@ -1449,11 +1449,13 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private string Key(params string[] values) => DiscoveryHash.Of(values)[..24];
     private static Uri Endpoint(Uri webUrl, string relative) => new(webUrl.AbsoluteUri.TrimEnd('/') + "/" + relative.TrimStart('/'));
-    private static Uri FolderEndpoint(Uri webUrl, string folderUrl, string child, string select, string expand = null)
+    private static Uri FolderEndpoint(LiveScope scope, string child, string select, string expand = null)
     {
-        var escaped = (folderUrl ?? string.Empty).Replace("'", "''", StringComparison.Ordinal);
         var query = $"$select={select}" + (string.IsNullOrWhiteSpace(expand) ? string.Empty : $"&$expand={expand}");
-        return Endpoint(webUrl, $"_api/web/GetFolderByServerRelativePath(decodedurl='{escaped}')/{child}?{query}");
+        if (scope.Role == "web-root-folder")
+            return Endpoint(scope.WebUrl, $"_api/web/RootFolder/{child}?{query}");
+        var escaped = (scope.FolderUrl ?? string.Empty).Replace("'", "''", StringComparison.Ordinal);
+        return Endpoint(scope.WebUrl, $"_api/web/GetFolderByServerRelativePath(decodedurl='{escaped}')/{child}?{query}");
     }
     private static Uri ResolveNext(Uri initial, string next) =>
         Uri.TryCreate(next, UriKind.Absolute, out var absolute) ? absolute : new Uri(initial, next);

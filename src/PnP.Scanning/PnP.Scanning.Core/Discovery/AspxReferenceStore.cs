@@ -230,6 +230,7 @@ internal sealed class AspxReferenceCollector
         {
             AsOfUtc = default,
             EvidenceRefs = Array.Empty<string>(),
+            PaginationChainHash = null,
         }, AspxInventoryRuntime.JsonOptions()));
 
     private static string ObservationFingerprint(AspxReferenceObservation observation) => DiscoveryHash.Of(
