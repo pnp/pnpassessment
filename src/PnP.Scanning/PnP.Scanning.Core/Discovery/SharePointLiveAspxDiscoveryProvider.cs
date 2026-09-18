@@ -1001,16 +1001,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             resolved.ServerRelativeUrl ?? locator, true, options.PermissionContext,
             EvidenceMetadata(new Uri(scope.WebUrl, locator), string.Empty, string.Empty, "pnp-file-resolution",
                 ("referenceSourceKind", sourceKind), ("referenceObjectId", objectId),
+                ("referenceListId", scope.ListId?.ToString("D") ?? string.Empty),
                 ("customizedPageStatus", resolved.CustomizedPageStatus ?? "unknown")),
             SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
             WebId: MetadataGuid(scope.Metadata, "webId"),
-            ListId: scope.ListId,
-            FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId"),
+            // A List.Views URL may point to a page in another library. The referring list is
+            // provenance, not the physical file's owner; retain ownership from raw discovery.
+            ListId: null,
+            FolderUniqueId: null,
             ListItemId: resolved.ListItemId,
             HomePage: IsHomePage(scope, resolved.ServerRelativeUrl ?? locator),
             ContentTypeId: resolved.ContentTypeId,
             PageType: InferPageType(resolved.ContentTypeId),
-            LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+            LibraryHidden: null,
             CustomizedPageStatusRaw: resolved.CustomizedPageStatus,
             ObservationMethod: method,
             WelcomePageStatus: HomePageStatus(scope, resolved.ServerRelativeUrl ?? locator),
@@ -1510,7 +1513,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         if (string.IsNullOrWhiteSpace(contentTypeId)) return null;
         if (contentTypeId.StartsWith("0x0101009D1CB255DA76424F860D91F20E6C4118", StringComparison.OrdinalIgnoreCase))
             return "ModernSitePage";
-        if (contentTypeId.StartsWith("0x01010007FF3E057FA8AB4AA42FCB67B453FFC1", StringComparison.OrdinalIgnoreCase))
+        if (IsPublishingPageContentType(contentTypeId))
             return "PublishingPage";
         if (contentTypeId.StartsWith("0x01010901", StringComparison.OrdinalIgnoreCase)) return "WebPartPage";
         if (contentTypeId.StartsWith("0x010109", StringComparison.OrdinalIgnoreCase)) return "BasicPage";
@@ -1518,6 +1521,10 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         if (contentTypeId.StartsWith("0x010105", StringComparison.OrdinalIgnoreCase)) return "MasterPage";
         return "OtherAspxContentType";
     }
+
+    internal static bool IsPublishingPageContentType(string contentTypeId) => !string.IsNullOrWhiteSpace(contentTypeId) &&
+        (contentTypeId.StartsWith("0x010100C568DB52D9D0A14D9B2FDCC96666E9F2007948130EC3DB064584E219954237AF39", StringComparison.OrdinalIgnoreCase) ||
+         contentTypeId.StartsWith("0x01010007FF3E057FA8AB4AA42FCB67B453FFC1", StringComparison.OrdinalIgnoreCase));
     private static IReadOnlyDictionary<string, string> WithMetadata(
         IReadOnlyDictionary<string, string> metadata, params (string Key, string Value)[] additions)
     {

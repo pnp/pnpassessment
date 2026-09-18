@@ -366,6 +366,9 @@ namespace PnP.Scanning.Core.Scanners
 
         private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)
         {
+            // All Webs can fail before producing summaries. Keep their discovery/error rows
+            // reportable without a secondary NullReferenceException during post-scan rollup.
+            if (classicSiteCollection == null) return;
             // Get the unique list of sub web templates
             if (webTemplates.Count > 0)
             {

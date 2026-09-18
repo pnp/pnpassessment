@@ -133,6 +133,35 @@ public sealed class AssessmentNativeDiscoveryTests : IClassFixture<ScanContextFi
 
     private AssessmentDiscoveryWriter Writer() => new(database.CreateContext);
     [Fact]
+    public void Missing_item_fields_never_collapse_physical_pages_to_their_list_item_number()
+    {
+        var minimalFields = new Dictionary<string, object> { ["Id"] = 1 };
+        var first = Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(minimalFields, "/Pages/a.aspx");
+        var second = Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(minimalFields, "/OtherPages/b.aspx");
+        first.Should().Be("/Pages/a.aspx");
+        second.Should().Be("/OtherPages/b.aspx").And.NotBe(first);
+        var invalid = () => Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(minimalFields, "1");
+        invalid.Should().Throw<InvalidDataException>();
+    }
+
+    [Fact]
+    public void Metadata_for_a_different_file_is_rejected_before_it_enters_classic_page_assessment()
+    {
+        var fields = new Dictionary<string, object> { ["FileRef"] = "/OtherPages/not-this-file.aspx" };
+        var resolve = () => Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(fields, "/Pages/a.aspx");
+        resolve.Should().Throw<InvalidDataException>();
+    }
+
+    [Theory]
+    [InlineData("0x010100C568DB52D9D0A14D9B2FDCC96666E9F2007948130EC3DB064584E219954237AF39004C1F8B46085B4D22B1CDC3DE08CFFB9C0", true)]
+    [InlineData("0x0101009D1CB255DA76424F860D91F20E6C4118", false)]
+    [InlineData(null, false)]
+    public void Publishing_page_classification_recognizes_actual_enterprise_wiki_content_type(string id, bool expected)
+    {
+        SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(id).Should().Be(expected);
+    }
+
+    [Fact]
     public async Task Conflicting_metadata_keeps_one_physical_page_and_a_visible_discovery_error()
     {
         var scan = Guid.NewGuid();

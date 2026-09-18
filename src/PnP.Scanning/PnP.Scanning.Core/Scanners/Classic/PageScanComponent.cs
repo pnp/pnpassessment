@@ -122,12 +122,14 @@ namespace PnP.Scanning.Core.Scanners
                 }
                 try
                 {
-                    var item = await list.Items.GetByIdAsync(row.ListItemId.Value).ConfigureAwait(false);
-                    var isPublishing = row.ContentTypeId?.StartsWith("0x01010007FF3E057FA8AB4AA42FCB67B453FFC1",
-                        StringComparison.OrdinalIgnoreCase) == true;
+                    // GetByIdAsync without All does not select the expando fields used below
+                    // (FileRef, WikiField, ContentTypeId, ClientSideApplicationId, etc.).
+                    var item = await list.Items.GetByIdAsync(row.ListItemId.Value, value => value.All).ConfigureAwait(false);
+                    var contentType = GetFieldValue(item, ContentTypeIdField, row.ContentTypeId);
+                    var isPublishing = SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(contentType);
                     row.PageType = isPublishing ? PublishingPage : GetPageType(item);
-                    if (isPublishing) AddPublishingPage(discovery, list, item, alreadySelected: true);
-                    else AddSitePage(discovery, list, item, alreadySelected: true);
+                    if (isPublishing) AddPublishingPage(discovery, list, item, row.Url);
+                    else AddSitePage(discovery, list, item, row.Url);
                     row.AssessmentStatus = row.PageType == ModernPage ? "NotApplicable" : "Complete";
                 }
                 catch (Exception ex)
@@ -272,14 +274,9 @@ namespace PnP.Scanning.Core.Scanners
             disc.RemediationCodes.Add(RemediationCodes.CP4.ToString());
         }
 
-        private static void AddSitePage(PageDiscovery disc, IList sitePagesLibrary, IListItem listItem, bool alreadySelected = false)
+        private static void AddSitePage(PageDiscovery disc, IList sitePagesLibrary, IListItem listItem, string discoveredUrl)
         {
-            string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
-
-            if (!alreadySelected && disc.HomePageOnly && !HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage))
-            {
-                return;
-            }
+            string pageUrl = ResolvePhysicalPageUrl(listItem.Values, discoveredUrl);
 
             var pageToAdd = new ClassicPage
             {
@@ -334,14 +331,9 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private static void AddPublishingPage(PageDiscovery disc, IList pagesLibrary, IListItem listItem, bool alreadySelected = false)
+        private static void AddPublishingPage(PageDiscovery disc, IList pagesLibrary, IListItem listItem, string discoveredUrl)
         {
-            string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
-
-            if (!alreadySelected && disc.HomePageOnly && !HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage))
-            {
-                return;
-            }
+            string pageUrl = ResolvePhysicalPageUrl(listItem.Values, discoveredUrl);
 
             var pageToAdd = new ClassicPage
             {
@@ -599,6 +591,16 @@ namespace PnP.Scanning.Core.Scanners
         private static string GetPageType(IListItem listItem)
         {
             return GetPageType(listItem.Values);
+        }
+
+        internal static string ResolvePhysicalPageUrl(IDictionary<string, object> fields, string discoveredUrl)
+        {
+            if (string.IsNullOrWhiteSpace(discoveredUrl) || !discoveredUrl.StartsWith('/'))
+                throw new InvalidDataException("Physical page assessment requires its discovered server-relative URL; ListItemId is not a URL.");
+            var fileRef = GetFieldValue(fields, FileRefField, string.Empty);
+            if (!string.IsNullOrWhiteSpace(fileRef) && !string.Equals(fileRef, discoveredUrl, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The list item's FileRef differs from the discovered file; its owner/identity must be resolved before assessment.");
+            return discoveredUrl;
         }
 
         // Pure classification over the raw field values (no CSOM) so it is unit-testable.
