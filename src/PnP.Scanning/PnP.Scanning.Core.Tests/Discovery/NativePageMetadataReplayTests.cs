@@ -12,6 +12,7 @@ using PnP.Scanning.Core.Tests.Fixtures;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Xml.Linq;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
@@ -59,7 +60,8 @@ public sealed class NativePageMetadataReplayTests : IClassFixture<ScanContextFix
         foreach (var fixture in fixtures)
         {
             var input = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
-            fixture.AllProjectionRequests.Should().Be(1, "the native SDK call must explicitly select expando fields");
+            fixture.StreamRequests.Should().Be(1, "computed metadata requires explicit native list-stream ViewFields");
+            fixture.AllProjectionRequests.Should().Be(0, "$select=* is not complete page metadata");
             fixture.Row.PageType = input.Page.PageType;
             fixture.Row.AssessmentStatus = input.Page.AddToDatabase() ? "Complete" : "NotApplicable";
             if (input.Page.PageType == PageScanComponent.WikiPage)
@@ -122,17 +124,48 @@ public sealed class NativePageMetadataReplayTests : IClassFixture<ScanContextFix
     }
 
     [Fact]
-    public async Task Default_sdk_projection_is_not_sufficient_and_native_loader_requests_all_fields()
+    public async Task Wildcard_rest_projection_omits_computed_fields_but_native_list_stream_loads_them()
+    {
+        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/webpart.aspx", new()
+        {
+            ["ContentTypeId"] = "0x010109006DC758714F143A4FB8A7253506F98C5F",
+            ["HTML_x0020_File_x0020_Type"] = "SharePoint.WebPartPage.Document",
+        });
+        var wildcardItem = await fixture.List.Items.GetByIdAsync(1, value => value.All);
+        wildcardItem.Values.Should().ContainKey("ContentTypeId");
+        wildcardItem.Values.Should().NotContainKey("HTML_x0020_File_x0020_Type");
+        wildcardItem.Values.Should().NotContainKey("FileLeafRef");
+        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+        loaded.Page.PageType.Should().Be("WebPartPage");
+        loaded.Page.PageUrl.Should().Be(fixture.Row.Url);
+        loaded.FileLeafRef.Should().Be("webpart.aspx");
+        fixture.AllProjectionRequests.Should().Be(1);
+        fixture.StreamRequests.Should().Be(1);
+        fixture.LastViewFields.Should().Contain("ClientSideApplicationId", "an absent optional modern field is allowed in the native CAML query");
+        fixture.LastViewFields.Should().NotContain("Editor", "SkipUserInformation should avoid requesting user details");
+    }
+
+    [Fact]
+    public async Task Native_list_stream_modern_marker_is_classified_without_inflating_classic_rows()
+    {
+        var fixture = new MetadataFixture(Guid.NewGuid(), "SitePages/modern.aspx", new()
+        {
+            ["HTML_x0020_File_x0020_Type"] = "",
+            ["ClientSideApplicationId"] = "{B6917CB1-93A0-4B97-A84D-7CF49975D4EC}",
+            ["BSN"] = "265",
+        });
+        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+        loaded.Page.PageType.Should().Be("ModernPage");
+        loaded.Page.AddToDatabase().Should().BeFalse();
+        fixture.StreamRequests.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Native_metadata_query_requests_editor_only_when_user_information_is_enabled()
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/wiki.aspx", new() { ["WikiField"] = "<p>body</p>" });
-        var defaultItem = await fixture.List.Items.GetByIdAsync(1);
-        defaultItem.Values.Should().NotContainKey("WikiField");
-        defaultItem.Values.Should().NotContainKey("FileRef");
-        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
-        loaded.Page.PageType.Should().Be("WikiPage");
-        loaded.Page.PageUrl.Should().Be(fixture.Row.Url);
-        loaded.WikiFieldHtml.Should().Be("<p>body</p>");
-        fixture.AllProjectionRequests.Should().Be(1);
+        await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, false);
+        fixture.LastViewFields.Should().Contain("Editor");
     }
 
     [Fact]
@@ -190,6 +223,8 @@ public sealed class NativePageMetadataReplayTests : IClassFixture<ScanContextFix
         public int? ReturnedId { get; init; } = 1;
         public int ItemRequests { get; private set; }
         public int AllProjectionRequests { get; private set; }
+        public int StreamRequests { get; private set; }
+        public string[] LastViewFields { get; private set; } = Array.Empty<string>();
 
         public MetadataFixture(Guid scan, string path, Dictionary<string, object> fields)
         {
@@ -218,8 +253,19 @@ public sealed class NativePageMetadataReplayTests : IClassFixture<ScanContextFix
                 "get_Values" => SdkValues(new() { ["Id"] = 1 }),
                 _ => throw new InvalidOperationException("Unexpected default-projection call: " + method.Name),
             });
+            var computed = new HashSet<string> { "FileRef", "FileLeafRef", "HTML_x0020_File_x0020_Type", "ClientSideApplicationId", "File_x0020_Type", "BSN" };
+            var wildcardValues = SdkValues(fields.Where(field => !computed.Contains(field.Key)).ToDictionary(field => field.Key, field => field.Value));
+            var wildcardItem = StrictProxy.Create<IListItem>((method, _) => method.Name switch
+            {
+                "get_Id" => ReturnedId.GetValueOrDefault(),
+                "get_Values" => wildcardValues,
+                _ => throw new InvalidOperationException("Unexpected wildcard-projection call: " + method.Name),
+            });
+            var requestedItems = new List<IListItem>();
             var items = StrictProxy.Create<IListItemCollection>((method, args) =>
             {
+                if (method.Name == "Clear") { requestedItems.Clear(); return null; }
+                if (method.Name == "get_RequestedItems") return requestedItems;
                 if (method.Name != nameof(IListItemCollection.GetByIdAsync))
                     throw new InvalidOperationException("Unexpected collection call: " + method.Name);
                 ItemRequests++;
@@ -227,18 +273,39 @@ public sealed class NativePageMetadataReplayTests : IClassFixture<ScanContextFix
                 var selectors = (Expression<Func<IListItem, object>>[])args[1];
                 var hasAll = selectors.Any(selector => selector.Body is MemberExpression { Member.Name: nameof(IListItem.All) });
                 if (hasAll) AllProjectionRequests++;
-                return Task.FromResult(ReturnedId == null ? null : hasAll ? item : minimalItem);
+                return Task.FromResult(ReturnedId == null ? null : hasAll ? wildcardItem : minimalItem);
             });
             var folder = StrictProxy.Create<IFolder>((method, _) => method.Name == "get_ServerRelativeUrl"
                 ? Web + "/" + path.Split('/')[0]
                 : throw new InvalidOperationException("Unexpected folder call: " + method.Name));
-            List = StrictProxy.Create<IList>((method, _) => method.Name switch
+            List = StrictProxy.Create<IList>((method, args) =>
             {
-                "get_Id" => listId,
-                "get_Title" => path.Split('/')[0],
-                "get_Items" => items,
-                "get_RootFolder" => folder,
-                _ => throw new InvalidOperationException("Unexpected list call: " + method.Name),
+                if (method.Name == nameof(IList.LoadListDataAsStreamAsync))
+                {
+                    ItemRequests++;
+                    StreamRequests++;
+                    var options = (RenderListDataOptions)args[0];
+                    options.RenderOptions.Should().Be(RenderListDataOptionsFlags.ListData);
+                    var view = XDocument.Parse(options.ViewXml);
+                    view.Root.Attribute("Scope").Value.Should().Be("RecursiveAll");
+                    var equal = view.Root.Element("Query").Element("Where").Element("Eq");
+                    equal.Element("FieldRef").Attribute("Name").Value.Should().Be("ID");
+                    equal.Element("Value").Value.Should().Be("1");
+                    view.Root.Element("RowLimit").Value.Should().Be("2");
+                    LastViewFields = view.Root.Element("ViewFields").Elements("FieldRef").Select(field => field.Attribute("Name").Value).ToArray();
+                    LastViewFields.Should().Contain(new[] { "ID", "FileRef", "FileLeafRef", "ContentTypeId", "HTML_x0020_File_x0020_Type", "ClientSideApplicationId", "WikiField" });
+                    requestedItems.Should().BeEmpty("the preceding query's cached items must be cleared");
+                    if (ReturnedId != null) requestedItems.Add(item);
+                    return Task.FromResult(new Dictionary<string, object>());
+                }
+                return method.Name switch
+                {
+                    "get_Id" => listId,
+                    "get_Title" => path.Split('/')[0],
+                    "get_Items" => items,
+                    "get_RootFolder" => folder,
+                    _ => throw new InvalidOperationException("Unexpected list call: " + method.Name),
+                };
             });
         }
     }

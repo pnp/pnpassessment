@@ -272,10 +272,23 @@ namespace PnP.Scanning.Core.Scanners
             if (row.ListId != list.Id || row.ListItemId == null || row.ListItemId <= 0)
                 throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
 
-            // GetByIdAsync without All omits expando fields such as FileRef, WikiField,
-            // ContentTypeId and ClientSideApplicationId; the SDK default projection is insufficient.
-            var item = await list.Items.GetByIdAsync(row.ListItemId.Value, value => value.All).ConfigureAwait(false);
-            if (item == null || item.Id != row.ListItemId.Value)
+            // REST $select=* (IListItem.All) still omits computed fields such as FileRef,
+            // HTML_x0020_File_x0020_Type and ClientSideApplicationId. Reuse the native
+            // list-stream reader with explicit ViewFields, restricted to this discovered ID.
+            // Unlike selecting optional REST properties, missing ViewFields are omitted by
+            // SharePoint rather than failing classic libraries that lack a modern-only field.
+            IListItem item = null;
+            await QueryListAsync(list, PageQuery(new List<string> { WikiField, HtmlFileTypeField, ClientSideApplicationIdField },
+                filterOnASPXPages: false, itemId: row.ListItemId.Value, skipUserInformation: skipUserInformation), items =>
+            {
+                foreach (var candidate in items)
+                {
+                    if (candidate.Id != row.ListItemId.Value || item != null)
+                        throw new InvalidDataException("The requested physical page list item was not returned uniquely.");
+                    item = candidate;
+                }
+            }).ConfigureAwait(false);
+            if (item == null)
                 throw new InvalidDataException("The requested physical page list item was not returned.");
 
             string pageUrl = ResolvePhysicalPageUrl(item.Values, row.Url);
@@ -516,7 +529,8 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private static string PageQuery(List<string> extraFields, bool filterOnASPXPages = true)
+        private static string PageQuery(List<string> extraFields, bool filterOnASPXPages = true,
+            int? itemId = null, bool skipUserInformation = false)
         {
             string extraViewFields = "";
             string filter = "";
@@ -529,7 +543,11 @@ namespace PnP.Scanning.Core.Scanners
                 }
             }
 
-            if (filterOnASPXPages)
+            if (itemId.HasValue)
+            {
+                filter = $"<Query><Where><Eq><FieldRef Name='ID' /><Value Type='Counter'>{itemId.Value}</Value></Eq></Where></Query>";
+            }
+            else if (filterOnASPXPages)
             {
                 filter = $@"
                           <Query>
@@ -545,12 +563,13 @@ namespace PnP.Scanning.Core.Scanners
             return $@"
                 <View Scope='RecursiveAll'>
                   <ViewFields>
+                    <FieldRef Name='ID' />
                     <FieldRef Name='{ContentTypeIdField}' />
                     <FieldRef Name='{FileRefField}' />
                     <FieldRef Name='{FileLeafRefField}' />
                     <FieldRef Name='{FileTypeField}' />
                     <FieldRef Name='{ModifiedField}' />
-                    <FieldRef Name='{ModifiedByField}' />
+                    {(skipUserInformation ? string.Empty : $"<FieldRef Name='{ModifiedByField}' />")}
                     <FieldRef Name='{CreatedField}' />
                     <FieldRef Name='{TitleField}' />
                     <FieldRef Name='{BSNField}' />
@@ -558,7 +577,7 @@ namespace PnP.Scanning.Core.Scanners
                   </ViewFields>
                   {filter}
                   <OrderBy Override='TRUE'><FieldRef Name= 'ID' Ascending= 'FALSE' /></OrderBy>
-                  <RowLimit Paged='TRUE'>1000</RowLimit>
+                  <RowLimit Paged='TRUE'>{(itemId.HasValue ? 2 : 1000)}</RowLimit>
                 </View>";
         }
 

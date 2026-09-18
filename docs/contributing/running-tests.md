@@ -29,10 +29,11 @@ The suite exercises production `AssessmentWebDiscovery`, `AssessmentDiscoveryWri
 
 - Partial/denied enumeration and missing expected children remain Scope rows; other discovered files survive.
 - Repeated Web discovery does not duplicate physical pages; cancellation retains committed rows and concurrent Web writers use separate EF contexts.
-- The list-item metadata call explicitly selects `IListItem.All`. Default SDK fields are insufficient for `FileRef`, `WikiField`, `ContentTypeId` and `ClientSideApplicationId`.
+- Physical-page metadata reuses the native `LoadListDataAsStreamAsync` reader with explicit CAML ViewFields and an exact discovered item-ID filter. Even REST `$select=*` (`IListItem.All`) omits computed fields such as `FileRef`, `HTML_x0020_File_x0020_Type` and `ClientSideApplicationId`. Optional modern-only ViewFields do not cause classic libraries to fail as an explicit REST selection would.
 - Different libraries can each contain item `1` without collapsing their physical page URLs or colliding in the database.
 - Publishing/Enterprise Wiki, Wiki, Web Part, custom ASPX and Modern metadata are classified correctly in the replay fixtures.
 - A wrong list, missing/wrong item or mismatched `FileRef` is rejected rather than assessing another file.
+- The metadata query is bounded to the discovered item, clears previously cached list items and omits `Editor` when user information is disabled.
 - Native `discovery.csv` preserves modern pages, nullable home-page state, identities and enrichment errors; `classicpages.csv` retains Classic-only assessment rows. Quotes, commas and newlines round-trip through CSV; no native gap CSV is produced.
 
 `NativePageMetadataReplayTests` replaces only the PnP SDK list/item boundary with a strict offline test double. It uses synthetic metadata shaped after the cross-library item-ID failure, not captured tenant responses. It does **not** validate PnP SDK HTTP serialization, authentication, actual SharePoint enumeration completeness, CSOM Web Part extraction, TPL scheduling or the live restart lifecycle. Passing this suite is a local regression gate, not tenant acceptance.
