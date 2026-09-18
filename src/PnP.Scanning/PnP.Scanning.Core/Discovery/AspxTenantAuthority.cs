@@ -317,6 +317,8 @@ internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAd
 
 internal static class AspxTenantAuthorityCapture
 {
+    private const int WebAuthorityMaxConcurrency = 4;
+
     internal static async Task<AspxTenantAuthoritySnapshot> CaptureAsync(string scopeMode, Uri tenantRoot,
         IReadOnlyList<Uri> declaredSites, IAspxTenantAuthorityAdapter adapter,
         CancellationToken cancellationToken = default)
@@ -362,12 +364,17 @@ internal static class AspxTenantAuthorityCapture
                 $"Live acquisition supports only '{AspxScopeModes.ProductTenantAuthority}' or '{AspxScopeModes.DeclaredSubset}'.");
         }
 
-        var siteWebs = new List<AspxSiteWebAuthority>();
-        foreach (var site in sites.Items)
+        var siteWebs = new AspxSiteWebAuthority[sites.Items.Count];
+        await Parallel.ForEachAsync(Enumerable.Range(0, sites.Items.Count), new ParallelOptions
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            siteWebs.Add(new(site, await adapter.EnumerateWebsAsync(site, cancellationToken).ConfigureAwait(false)));
-        }
+            MaxDegreeOfParallelism = WebAuthorityMaxConcurrency,
+            CancellationToken = cancellationToken,
+        }, async (index, token) =>
+        {
+            var site = sites.Items[index];
+            siteWebs[index] = new(site,
+                await adapter.EnumerateWebsAsync(site, token).ConfigureAwait(false));
+        }).ConfigureAwait(false);
         return AspxTenantAuthoritySnapshot.Freeze(scopeMode, tenantRoot, sites, siteWebs);
     }
 }
