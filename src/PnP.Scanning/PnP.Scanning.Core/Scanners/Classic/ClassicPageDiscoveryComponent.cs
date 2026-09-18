@@ -1,6 +1,7 @@
 using PnP.Core.Auth;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Scanners;
 
@@ -29,8 +30,20 @@ internal static class ClassicPageDiscoveryComponent
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }
 
+    internal static Task RecordWebEnumerationScopeAsync(Guid scanId, string siteUrl,
+        WebEnumerationResult enumeration, Exception error = null, AssessmentDiscoveryWriter writer = null)
+    {
+        // The checkpoint contains only pending work. Do not replace the original authority's
+        // child counts (or a retained denial/failure) with the size of this restart queue.
+        if (enumeration.IsCheckpointReplay && error == null) return Task.CompletedTask;
+        return RecordScopeAsync(scanId, siteUrl, "", "SiteCollection",
+            error == null ? "Complete" : AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(error)),
+            error, children: error == null ? enumeration.Webs.Count : null, stage: "EnumerateWebs", writer: writer);
+    }
+
     internal static Task RecordScopeAsync(Guid scanId, string siteUrl, string webUrl, string scopeType,
-        string status, Exception error = null, int? children = null, string stage = "Discovery")
+        string status, Exception error = null, int? children = null, string stage = "Discovery",
+        AssessmentDiscoveryWriter writer = null)
     {
         var row = new ClassicPageDiscovery
         {
@@ -42,6 +55,6 @@ internal static class ClassicPageDiscoveryComponent
         };
         if (error != null) AssessmentWebDiscovery.AddError(row, stage,
             AssessmentWebDiscovery.ErrorCode(error), AssessmentWebDiscovery.ErrorDetail(error));
-        return new AssessmentDiscoveryWriter(scanId).WriteAsync(new[] { row });
+        return (writer ?? new AssessmentDiscoveryWriter(scanId)).WriteAsync(new[] { row });
     }
 }

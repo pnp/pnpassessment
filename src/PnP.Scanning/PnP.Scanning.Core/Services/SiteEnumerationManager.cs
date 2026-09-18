@@ -163,7 +163,7 @@ namespace PnP.Scanning.Core.Services
             return list;
         }
 
-        internal async Task<List<EnumeratedWeb>> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
+        internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
             
@@ -175,7 +175,7 @@ namespace PnP.Scanning.Core.Services
                 if (websToRestart != null && websToRestart.Count > 0)
                 {
                     Log.Information("Loaded {Count} webs for restarting assessment {ScanId} with site collection {SiteCollectionUrl}", websToRestart.Count, scanId, siteCollectionUrl);
-                    return websToRestart;
+                    return new(websToRestart, IsCheckpointReplay: true);
                 }
             }
 
@@ -222,7 +222,7 @@ namespace PnP.Scanning.Core.Services
             }
 #endif
 
-            return webUrlsToScan;
+            return new(webUrlsToScan);
         }
 
         /// <summary>

@@ -88,24 +88,24 @@ namespace PnP.Scanning.Core.Queues
 
                     // Enumerate the webs to scan
                     var fullPageDiscovery = siteCollection.OptionsBase is ClassicOptions { Pages: true };
-                    List<EnumeratedWeb> webUrlsToScan;
+                    WebEnumerationResult webEnumeration;
                     Exception webAuthorityError = null;
                     try
                     {
-                        webUrlsToScan = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase,
+                        webEnumeration = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase,
                             ScanManager.GetScanAuthenticationManager(ScanId), siteCollection.Restart);
                     }
                     catch (Exception ex) when (fullPageDiscovery && !CancellationToken.IsCancellationRequested)
                     {
                         webAuthorityError = ex;
                         // A failed subweb enumeration does not erase the known site root.
-                        webUrlsToScan = new() { new EnumeratedWeb { WebUrl = "/", WebTemplate = null } };
+                        webEnumeration = new(new() { new EnumeratedWeb { WebUrl = "/", WebTemplate = null } });
                     }
                     if (fullPageDiscovery)
-                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, siteCollection.SiteCollectionUrl, "",
-                            "SiteCollection", webAuthorityError == null ? "Complete" :
-                                AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(webAuthorityError)), webAuthorityError,
-                            children: webAuthorityError == null ? webUrlsToScan.Count : null, stage: "EnumerateWebs");
+                        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(ScanId,
+                            siteCollection.SiteCollectionUrl, webEnumeration, webAuthorityError);
+
+                    var webUrlsToScan = webEnumeration.Webs;
 
                     // Build list of web queue items to be processed
                     List<WebQueueItem> webToScan = new();
