@@ -425,6 +425,21 @@ public sealed class AspxAcquisitionV3Tests
     }
 
     [Fact]
+    public async Task Slow_site_web_authority_times_out_without_blocking_the_known_root()
+    {
+        var adapter = new FakeTenantAuthorityAdapter(webDelay: TimeSpan.FromSeconds(1));
+        var snapshot = await AspxTenantAuthorityCapture.CaptureAsync(AspxScopeModes.ProductTenantAuthority,
+            new Uri("https://contoso.sharepoint.com"), Array.Empty<Uri>(), adapter,
+            webAuthorityTimeout: TimeSpan.FromMilliseconds(10));
+
+        snapshot.TenantVisibilityVerified.Should().BeFalse();
+        snapshot.SiteWebs.Should().ContainSingle();
+        snapshot.SiteWebs.Single().Webs.Outcome.Should().Be(DiscoveryTerminalOutcome.Failed);
+        snapshot.SiteWebs.Single().Webs.FailureCode.Should().Be("site_web_authority_timeout");
+        snapshot.SiteWebs.Single().Webs.Items.Should().ContainSingle(web => web.IsRootWeb);
+    }
+
+    [Fact]
     public async Task Denied_subweb_authority_is_persisted_per_site_and_cannot_become_complete()
     {
         var adapter = new FakeTenantAuthorityAdapter(denyWebs: true);
@@ -866,7 +881,12 @@ public sealed class AspxAcquisitionV3Tests
     private sealed class FakeTenantAuthorityAdapter : IAspxTenantAuthorityAdapter
     {
         private readonly bool denyWebs;
-        internal FakeTenantAuthorityAdapter(bool denyWebs = false) => this.denyWebs = denyWebs;
+        private readonly TimeSpan webDelay;
+        internal FakeTenantAuthorityAdapter(bool denyWebs = false, TimeSpan? webDelay = null)
+        {
+            this.denyWebs = denyWebs;
+            this.webDelay = webDelay ?? TimeSpan.Zero;
+        }
         internal int SiteEnumerationCount { get; private set; }
         internal int WebEnumerationCount { get; private set; }
 
@@ -886,25 +906,27 @@ public sealed class AspxAcquisitionV3Tests
                 Array.Empty<string>(), null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow));
         }
 
-        public Task<AspxAuthorityCollection<AspxAuthorityWeb>> EnumerateWebsAsync(
+        public async Task<AspxAuthorityCollection<AspxAuthorityWeb>> EnumerateWebsAsync(
             AspxAuthoritySite site, CancellationToken cancellationToken = default)
         {
             WebEnumerationCount++;
+            if (webDelay > TimeSpan.Zero)
+                await Task.Delay(webDelay, cancellationToken);
             var root = new AspxAuthorityWeb(site.RootWebId, site.Url, "/sites/a", null, "STS#3", true);
             if (denyWebs)
-                return Task.FromResult(new AspxAuthorityCollection<AspxAuthorityWeb>(
+                return new AspxAuthorityCollection<AspxAuthorityWeb>(
                     DiscoveryTerminalOutcome.Denied, new[] { root },
                     PnPCoreAspxTenantAuthorityAdapter.WebProvider,
                     PnPCoreAspxTenantAuthorityAdapter.WebOperation, PnPCoreAspxTenantAuthorityAdapter.WebFilter,
                     Array.Empty<string>(), "root_and_subweb_authority_denied", "fixture 403",
-                    ContinuationRemaining: false, DateTimeOffset.UtcNow));
+                    ContinuationRemaining: false, DateTimeOffset.UtcNow);
             var subweb = new AspxAuthorityWeb(Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
                 new Uri("https://contoso.sharepoint.com/sites/a/sub"), "/sites/a/sub", site.Url, "STS#3", false);
-            return Task.FromResult(new AspxAuthorityCollection<AspxAuthorityWeb>(
+            return new AspxAuthorityCollection<AspxAuthorityWeb>(
                 DiscoveryTerminalOutcome.Complete, new[] { root, subweb },
                 PnPCoreAspxTenantAuthorityAdapter.WebProvider,
                 PnPCoreAspxTenantAuthorityAdapter.WebOperation, PnPCoreAspxTenantAuthorityAdapter.WebFilter,
-                Array.Empty<string>(), null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow));
+                Array.Empty<string>(), null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow);
         }
 
         public Task<AspxAuthoritySite> ResolveDeclaredSiteAsync(Uri siteUrl,

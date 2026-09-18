@@ -318,10 +318,11 @@ internal sealed class PnPCoreAspxTenantAuthorityAdapter : IAspxTenantAuthorityAd
 internal static class AspxTenantAuthorityCapture
 {
     private const int WebAuthorityMaxConcurrency = 4;
+    private static readonly TimeSpan DefaultWebAuthorityTimeout = TimeSpan.FromSeconds(30);
 
     internal static async Task<AspxTenantAuthoritySnapshot> CaptureAsync(string scopeMode, Uri tenantRoot,
         IReadOnlyList<Uri> declaredSites, IAspxTenantAuthorityAdapter adapter,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, TimeSpan? webAuthorityTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(adapter);
         AspxAuthorityCollection<AspxAuthoritySite> sites;
@@ -372,8 +373,26 @@ internal static class AspxTenantAuthorityCapture
         }, async (index, token) =>
         {
             var site = sites.Items[index];
-            siteWebs[index] = new(site,
-                await adapter.EnumerateWebsAsync(site, token).ConfigureAwait(false));
+            using var siteCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+            siteCancellation.CancelAfter(webAuthorityTimeout ?? DefaultWebAuthorityTimeout);
+            try
+            {
+                siteWebs[index] = new(site,
+                    await adapter.EnumerateWebsAsync(site, siteCancellation.Token).ConfigureAwait(false));
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested && siteCancellation.IsCancellationRequested)
+            {
+                var root = new AspxAuthorityWeb(site.RootWebId, site.Url, site.Url.AbsolutePath,
+                    null, null, IsRootWeb: true);
+                siteWebs[index] = new(site, new AspxAuthorityCollection<AspxAuthorityWeb>(
+                    DiscoveryTerminalOutcome.Failed, new[] { root },
+                    PnPCoreAspxTenantAuthorityAdapter.WebProvider,
+                    PnPCoreAspxTenantAuthorityAdapter.WebOperation,
+                    $"{PnPCoreAspxTenantAuthorityAdapter.WebFilter};timeout={(webAuthorityTimeout ?? DefaultWebAuthorityTimeout).TotalSeconds:0}s",
+                    Array.Empty<string>(), "site_web_authority_timeout",
+                    $"Web authority enumeration exceeded {(webAuthorityTimeout ?? DefaultWebAuthorityTimeout).TotalSeconds:0} seconds; the known root remains scannable.",
+                    ContinuationRemaining: false, DateTimeOffset.UtcNow));
+            }
         }).ConfigureAwait(false);
         return AspxTenantAuthoritySnapshot.Freeze(scopeMode, tenantRoot, sites, siteWebs);
     }
