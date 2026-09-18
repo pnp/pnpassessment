@@ -1,7 +1,9 @@
 ﻿using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Scanners;
 using Serilog;
 using System.Threading.Tasks.Dataflow;
+using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Queues
 {
@@ -85,8 +87,25 @@ namespace PnP.Scanning.Core.Queues
                     // Get the sub sites in the given site collection
 
                     // Enumerate the webs to scan
-                    var webUrlsToScan = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase,
-                                                                                                          ScanManager.GetScanAuthenticationManager(ScanId), siteCollection.Restart);
+                    var fullPageDiscovery = siteCollection.OptionsBase is ClassicOptions { Pages: true };
+                    List<EnumeratedWeb> webUrlsToScan;
+                    Exception webAuthorityError = null;
+                    try
+                    {
+                        webUrlsToScan = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase,
+                            ScanManager.GetScanAuthenticationManager(ScanId), siteCollection.Restart);
+                    }
+                    catch (Exception ex) when (fullPageDiscovery && !CancellationToken.IsCancellationRequested)
+                    {
+                        webAuthorityError = ex;
+                        // A failed subweb enumeration does not erase the known site root.
+                        webUrlsToScan = new() { new EnumeratedWeb { WebUrl = "/", WebTemplate = null } };
+                    }
+                    if (fullPageDiscovery)
+                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, siteCollection.SiteCollectionUrl, "",
+                            "SiteCollection", webAuthorityError == null ? "Complete" :
+                                AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(webAuthorityError)), webAuthorityError,
+                            children: webAuthorityError == null ? webUrlsToScan.Count : null, stage: "EnumerateWebs");
 
                     // Build list of web queue items to be processed
                     List<WebQueueItem> webToScan = new();
@@ -101,6 +120,12 @@ namespace PnP.Scanning.Core.Queues
 
                     // Store the webs to be processed, for a restart the webs might already be there
                     await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
+                    if (fullPageDiscovery)
+                    {
+                        foreach (var web in webUrlsToScan)
+                            await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, siteCollection.SiteCollectionUrl,
+                                web.WebUrl, "Web", "Pending", stage: "WebScan");
+                    }
 
                     // Start parallel execution per web in this site collection
                     var webQueue = new WebQueue(ScanManager, StorageManager, ScanId, CancellationToken, AdminCenterUrl, MySiteHostUrl);
@@ -114,7 +139,7 @@ namespace PnP.Scanning.Core.Queues
                     }
 
                     // Wait until the queue is completely drained
-                    webQueue.WaitForCompletion();
+                    await webQueue.WaitForCompletionAsync();
 
                     // Increase the site collections scanned in memory counter
                     ScanManager.SiteCollectionScanned(ScanId);
@@ -139,6 +164,10 @@ namespace PnP.Scanning.Core.Queues
                 }
                 catch (Exception ex)
                 {
+                    if (siteCollection.OptionsBase is ClassicOptions { Pages: true })
+                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, siteCollection.SiteCollectionUrl, "",
+                            "SiteCollection", CancellationToken.IsCancellationRequested ? "Cancelled" : "Failed", ex,
+                            stage: "SiteScan");
                     // Increase the site collections scanned in memory counter to ensure the "to process count" is updated
                     ScanManager.SiteCollectionScanned(ScanId);
                     

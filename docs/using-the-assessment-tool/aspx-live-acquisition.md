@@ -1,7 +1,62 @@
 # Lossless ASPX discovery and live acquisition
 
-The `aspx-inventory` and `aspx-acquisition` commands are advanced, non-default entry points for
-building an auditable physical ASPX denominator. They do not replace the existing Classic scan.
+Full ASPX discovery is part of the existing Classic Pages scan. Start one native assessment,
+then generate its normal report using the same ScanId. There is no additional authentication,
+registry file, manifest, acquisition run or output-path configuration for this workflow.
+
+```powershell
+microsoft365-assessment start `
+  --mode Classic --classicinclude Pages `
+  --tenant contoso.sharepoint.com `
+  --applicationid <application-id> --tenantid <tenant-id> `
+  --authmode Application --certpath 'My|CurrentUser|<thumbprint>' `
+  --threads 4 --skipusageinformation
+
+microsoft365-assessment report --id <scan-id> --mode CsvOnly --open false
+```
+
+Use `--siteslist`/`--sitesfile` for a declared subset; omit them for tenant enumeration.
+Application authentication uses the native certificate support and requires the read-only
+application permissions Microsoft Graph `Sites.Read.All` and SharePoint `Sites.Read.All`.
+Audit usage has its own permissions and is skipped in the example.
+
+## One native discovery report
+
+The normal report contains `discovery.csv`, exported from the scan's `assessment.db`:
+
+- `RowType=Page`: a discovered physical ASPX, deduplicated by owning Site/Web/file identity.
+- `RowType=Scope`: an attempted tenant, site, Web, list, folder or API surface, including
+  failures and expected children that were not observed. These rows are not page counts.
+- `DiscoveryStatus`: `Discovered` for known pages, or the scope's `Pending`, `Complete`,
+  `Empty`, `Partial`, `Denied`, `Failed`, `Cancelled`, `Unknown` or `PolicyExcluded` state.
+- `AssessmentStatus`: separate page-enrichment outcome. A metadata/Web Part failure never
+  removes a discovered page or changes its existence to false.
+- `ErrorStage`, `ErrorCodes`, `ErrorDetail`: unresolved discovery/enrichment evidence in the
+  same CSV. Unknown child counts and unavailable identities remain null, not zero or guessed.
+- `HomePage` is nullable. Modern and non-transformable physical ASPX remain in discovery even
+  when they do not become Classic page-assessment rows.
+
+There is no separate gap CSV for the native scan. Existing `classicpages.csv`, Web Part and
+summary CSVs remain available; the page detail also gains identity and discovery/assessment
+status fields. Do not count Scope rows as pages or assume that a finished job proves complete
+coverage. The existing Power BI visuals are not a discovery-completeness dashboard; use the
+unified CSV for the new coverage fields.
+
+The native Site/Web TPL queues schedule Web-local discovery before classification and enrichment.
+Hidden libraries, catalogs, page-family classification and publishing features are not discovery
+admission gates. `--homepageonly` limits assessment, not the physical ASPX denominator. Existing
+non-file Blog post assessment remains supported separately from physical ASPX inventory.
+
+Each Web owns its provider/context state; short discovery database writes are serialized. Batch
+results survive a later denied/failed scope. The native restart lifecycle remains Web-granular:
+restarted Webs replay discovery idempotently, rather than promising continuation directly from an
+individual saved folder token. Run history/diagnostic replay is not a second user-facing scan.
+
+## Standalone diagnostic commands
+
+The `aspx-inventory` and `aspx-acquisition` commands remain available for offline contract replay
+and independent diagnostic comparisons. Their sealed multi-volume outputs below are not inputs
+required by the native Classic scan or its report.
 
 ## Contract boundaries
 

@@ -297,13 +297,15 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
 {
     private readonly IPnPContextFactory contextFactory;
     private readonly IAuthenticationProvider authenticationProvider;
+    private readonly Guid? nativeScanId;
     private readonly Dictionary<string, ISharePointAspxRestClient> clients = new(StringComparer.OrdinalIgnoreCase);
 
     internal PnPContextSharePointAspxRestClientFactory(IPnPContextFactory contextFactory,
-        IAuthenticationProvider authenticationProvider)
+        IAuthenticationProvider authenticationProvider, Guid? nativeScanId = null)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         this.authenticationProvider = authenticationProvider ?? throw new ArgumentNullException(nameof(authenticationProvider));
+        this.nativeScanId = nativeScanId;
     }
 
     public async Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
@@ -311,8 +313,11 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
     {
         var key = webUrl.AbsoluteUri.TrimEnd('/');
         if (clients.TryGetValue(key, out var existing)) return existing;
+        var contextOptions = new PnPContextOptions();
+        if (nativeScanId.HasValue)
+            contextOptions.Properties = new Dictionary<string, object> { [Constants.PnPContextPropertyScanId] = nativeScanId.Value };
         var context = await contextFactory.CreateAsync(webUrl, authenticationProvider, cancellationToken,
-            new PnPContextOptions()).ConfigureAwait(false);
+            contextOptions).ConfigureAwait(false);
         var client = new PnPContextSharePointAspxRestClient(context);
         clients.Add(key, client);
         return client;
@@ -591,7 +596,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private bool disposed;
 
     internal SharePointLiveAspxDiscoveryProvider(SharePointLiveAspxDiscoveryOptions options,
-        ISharePointAspxRestClientFactory clientFactory)
+        ISharePointAspxRestClientFactory clientFactory, AspxAuthoritySite owningSite = null, AspxAuthorityWeb currentWeb = null)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         this.clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
@@ -600,6 +605,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         authority = options.AuthoritySnapshot ?? LegacyDeclaredAuthority(options);
         var root = new LiveScope("tenant", null, DiscoveryScopeKind.Tenant, null,
             "sharepoint-live://" + authority.ScopeMode, "tenant", null, null, null, null, null);
+        if (currentWeb != null)
+        {
+            ArgumentNullException.ThrowIfNull(owningSite);
+            root = new LiveScope(Key("web", currentWeb.Url.AbsoluteUri), null, DiscoveryScopeKind.Web, null,
+                currentWeb.Url.AbsoluteUri.TrimEnd('/'), "web", currentWeb.Url, null, null, null,
+                new Dictionary<string, string>
+                {
+                    ["siteCollectionId"] = owningSite.SiteId.ToString("D"),
+                    ["siteUrl"] = owningSite.Url.AbsoluteUri,
+                    ["webId"] = currentWeb.WebId.ToString("D"),
+                    ["webTemplateConfiguration"] = currentWeb.WebTemplateConfiguration ?? string.Empty,
+                });
+        }
         scopes.Add(root.ScopeKey, root);
         RootScope = Registration(root);
     }
@@ -1408,7 +1426,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private static DiscoveryScopeRegistration Registration(LiveScope scope) => new(
         scope.ScopeKey, scope.ParentScopeKey, scope.Kind, scope.SourceKind, scope.Locator,
-        scope.PermissionContext, Required: true, Metadata: scope.Metadata);
+        scope.PermissionContext, Required: true, Metadata: WithMetadata(scope.Metadata,
+            ("listId", scope.ListId?.ToString("D") ?? string.Empty), ("role", scope.Role)));
 
     private LiveScope Add(LiveScope scope)
     {

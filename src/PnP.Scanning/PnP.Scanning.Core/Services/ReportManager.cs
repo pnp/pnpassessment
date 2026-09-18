@@ -396,6 +396,16 @@ namespace PnP.Scanning.Core.Services
         /// </summary>
         internal static async Task ExportClassicReportDataAsync(ScanContext dbContext, Guid scanId, string exportPath, CsvConfiguration config)
         {
+            // Page and Scope rows share one report, including scope-level denial/partial results.
+            // Do not emit a separate gap CSV or require the acquisition command to run first.
+            using (var writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))
+            using (var csv = new CsvWriter(writer, config))
+            {
+                await csv.WriteRecordsAsync(dbContext.ClassicPageDiscoveries.AsNoTracking()
+                    .Where(row => row.ScanId == scanId).OrderBy(row => row.RowType).ThenBy(row => row.RecordKey)
+                    .AsAsyncEnumerable());
+            }
+
             using (var writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
             {
                 using (var csv = new CsvWriter(writer, config))

@@ -24,6 +24,12 @@ namespace PnP.Scanning.Core.Scanners
         {
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
+            // Persist existence and discovery failures before feature-dependent enrichment loads.
+            // Each native TPL Web worker owns its own provider and PnP contexts.
+            var discoveredPages = Options.Pages
+                ? await ClassicPageDiscoveryComponent.ExecuteAsync(this).ConfigureAwait(false)
+                : null;
+
             // Define extra Web/Site data that we want to load when the context is inialized
             // This will not require extra server roundtrips
             PnPContextOptions options = new()
@@ -103,7 +109,7 @@ namespace PnP.Scanning.Core.Scanners
                     Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
                     // Call the Page scan component
-                    await PageScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
+                    await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
 
                     Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
@@ -165,7 +171,18 @@ namespace PnP.Scanning.Core.Scanners
         {
             Logger.Information("Pre assessment work is starting");
 
-            await SendRequestWithClientTagAsync();
+            try
+            {
+                await SendRequestWithClientTagAsync();
+            }
+            catch (Exception ex) when (Options.Pages && !ScanManager.GetCancellationTokenSource(ScanId).IsCancellationRequested)
+            {
+                // Client-tag telemetry against the first site is not an admission gate for
+                // other authorized sites. Each native Web worker will record its own result.
+                await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, SiteUrl, WebUrl, "Web", "Failed", ex,
+                    stage: "PreScanClientTag");
+                Logger.Warning(ex, "Client tag preflight failed; continuing full ASPX discovery");
+            }
 
             if (Options.Workflow)
             {

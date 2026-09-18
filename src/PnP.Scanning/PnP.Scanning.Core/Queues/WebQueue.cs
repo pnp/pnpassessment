@@ -3,6 +3,7 @@ using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Threading.Tasks.Dataflow;
+using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Queues
 {
@@ -29,6 +30,7 @@ namespace PnP.Scanning.Core.Queues
                 {
                     SingleProducerConstrained = true,
                     MaxDegreeOfParallelism = ParallelThreads,
+                    BoundedCapacity = Math.Max(1, ParallelThreads * 2),
                     CancellationToken = CancellationToken
                 };
 
@@ -41,12 +43,12 @@ namespace PnP.Scanning.Core.Queues
             await websToScan.SendAsync(web);
         }
 
-        internal void WaitForCompletion()
+        internal async Task WaitForCompletionAsync()
         {
             if (websToScan != null)
             {
                 websToScan.Complete();
-                websToScan.Completion.Wait();
+                await websToScan.Completion.ConfigureAwait(false);
             }
         }
 
@@ -78,9 +80,20 @@ namespace PnP.Scanning.Core.Queues
 
                     // Mark the web was scanned
                     await StorageManager.EndWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
+                    if (web.OptionsBase is ClassicOptions { Pages: true })
+                    {
+                        var coverage = await new AssessmentDiscoveryWriter(ScanId)
+                            .ReadWebCoverageAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
+                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, web.SiteCollectionUrl, web.WebUrl,
+                            "Web", coverage, stage: "WebScan");
+                    }
                 }
                 catch (Exception ex)
                 {
+                    if (web.OptionsBase is ClassicOptions { Pages: true })
+                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, web.SiteCollectionUrl, web.WebUrl,
+                            "Web", CancellationToken.IsCancellationRequested ? "Cancelled" :
+                                AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(ex)), ex, stage: "WebScan");
                     // The web scan failed, log accordingly
                     Log.Error(ex, "Assessment of {SiteUrl}{WebUrl} failed with assessment component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
                     await StorageManager.EndWebScanWithErrorAsync(ScanId, web.SiteCollectionUrl, web.WebUrl, ex);

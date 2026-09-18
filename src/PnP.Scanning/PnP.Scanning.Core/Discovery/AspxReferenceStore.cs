@@ -26,6 +26,11 @@ internal sealed class AspxReferenceCollector
     private readonly List<AspxPaginationPageReceipt> pagination = new();
     private readonly HashSet<string> gaps = new(StringComparer.Ordinal);
 
+    internal IReadOnlyList<AspxSurfaceDenominatorRow> ReadSurfaceEvidence()
+    {
+        lock (gate) return denominator.ToArray();
+    }
+
     internal void AddReference(AspxReferenceCandidate candidate)
     {
         ArgumentNullException.ThrowIfNull(candidate);

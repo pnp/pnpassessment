@@ -7,6 +7,7 @@ using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Linq.Expressions;
+using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Services
 {
@@ -22,9 +23,12 @@ namespace PnP.Scanning.Core.Services
 
         internal StorageManager StorageManager { get; private set; }
 
-        internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback)
+        internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback,
+            ICollection<ClassicPageDiscovery> discoveryEvidence = null)
         {
             List<string> list = new();
+            var fullPageDiscovery = OptionsBase.FromScannerInput(start) is ClassicOptions { Pages: true };
+            Exception authorityError = null;
 
             Log.Information("Building list of site collections to assess");
 
@@ -71,6 +75,8 @@ namespace PnP.Scanning.Core.Services
             {
                 Log.Information("Building list of site collections: using tenant scope");
 
+                try
+                {
                 using (var context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
                                                                         new ExternalAuthenticationProvider((resourceUri, scopes) =>
                                                                         {
@@ -94,13 +100,24 @@ namespace PnP.Scanning.Core.Services
                         Log.Information("VanityUrlOptions instance populated");
                     }
 
-                    var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(filter: SiteCollectionFilter.ExcludePersonalSites, vanityUrlOptions: vanityUrlOptions);
+                    var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
+                        filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
+                        vanityUrlOptions: vanityUrlOptions);
                     foreach(var siteCollection in siteCollections)
                     {
                         list.Add(siteCollection.Url.ToString());
                     }
                 }
 
+                }
+                catch (Exception ex) when (fullPageDiscovery && ex is not OperationCanceledException)
+                {
+                    authorityError = ex;
+                    // A failed authority is not an empty tenant. Schedule the known root while
+                    // retaining the error in the native scan's discovery report.
+                    list.Add(AuthenticationManager.GetSiteFromTenant(start.Tenant).TrimEnd('/'));
+                    feedback.Invoke("Tenant enumeration failed; retaining its error and scheduling the known root.");
+                }
                 feedback.Invoke($"Enumerated {list.Count} site collections for tenant {start.Tenant}");
             }
 
@@ -125,6 +142,23 @@ namespace PnP.Scanning.Core.Services
             }
 #endif
             Log.Information("Assessment scope defined: {SitesToScan} site collections will be assessed", list.Count);
+
+            if (fullPageDiscovery && discoveryEvidence != null)
+            {
+                var declared = !string.IsNullOrWhiteSpace(start.SitesList) || !string.IsNullOrWhiteSpace(start.SitesFile);
+                var row = new ClassicPageDiscovery
+                {
+                    RecordKey = "native:site-selection", RowType = "Scope", ScopeType = declared ? "SiteSelection" : "Tenant",
+                    Url = !string.IsNullOrEmpty(start.Tenant) ? AuthenticationManager.GetSiteFromTenant(start.Tenant) : null,
+                    DiscoveryStatus = authorityError == null ? "Complete" : AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(authorityError)),
+                    ExpectedChildCount = authorityError == null ? list.Count : null,
+                    ObservedChildCount = list.Count, ObservationMethod = declared ? "DeclaredSites" : "PnPCoreTenantAuthority",
+                    ObservedAtUtc = DateTime.UtcNow,
+                };
+                if (authorityError != null) AssessmentWebDiscovery.AddError(row, "EnumerateSites",
+                    AssessmentWebDiscovery.ErrorCode(authorityError), AssessmentWebDiscovery.ErrorDetail(authorityError));
+                discoveryEvidence.Add(row);
+            }
 
             return list;
         }
@@ -159,9 +193,10 @@ namespace PnP.Scanning.Core.Services
                                                                     }),
                                                                     contextOptions))
             {
-                if (!context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
+                if (options is ClassicOptions { Pages: true } || !context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
                 {
-                    webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context));
+                    webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context,
+                        skipAppWebs: options is not ClassicOptions { Pages: true }));
                 }
                 else
                 {
@@ -209,7 +244,7 @@ namespace PnP.Scanning.Core.Services
         }
 
 
-        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context)
+        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context, bool skipAppWebs = true)
         {
             List<EnumeratedWeb> webs = new();
 
@@ -221,7 +256,7 @@ namespace PnP.Scanning.Core.Services
             });
 
             // Get the sub webs from the root web of the site collection
-            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync();       
+            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync(skipAppWebs: skipAppWebs);
 
             foreach(var enumeratedWeb in enumeratedWebs)
             {
