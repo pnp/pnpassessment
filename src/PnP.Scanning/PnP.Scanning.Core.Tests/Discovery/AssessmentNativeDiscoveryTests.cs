@@ -12,6 +12,7 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
+[Trait("Category", "NativeScanIntegration")]
 public sealed class AssessmentNativeDiscoveryTests : IClassFixture<ScanContextFixture>
 {
     private const string Site = "https://contoso.sharepoint.com/sites/a";
