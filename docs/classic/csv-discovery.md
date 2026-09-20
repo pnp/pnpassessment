@@ -8,6 +8,7 @@ Rows with `RowType=Page` represent physical ASPX files. Rows with `RowType=Scope
 
 > [!NOTE]
 > A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` scope rows. Use these rows to identify parts of the selected tenant or sites that could not be fully inspected. Page assessment failures do not remove the corresponding discovered page from this file.
+> Discovery and assessment gaps are reported through the Scope rows and the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Classic report does not generate a separate discovery gaps csv file.
 
 ## Columns
 
