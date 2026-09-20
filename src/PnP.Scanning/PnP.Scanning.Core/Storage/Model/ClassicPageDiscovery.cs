@@ -1,7 +1,7 @@
 namespace PnP.Scanning.Core.Storage;
 
 /// <summary>
-/// One discovered physical ASPX or one attempted discovery scope, owned by the native scan.
+/// One discovered physical ASPX or one acquisition-evidence row owned by the Classic assessment.
 /// Scope rows never represent invented pages. Page existence survives enrichment failures.
 /// </summary>
 internal sealed class ClassicPageDiscovery : BaseScanResult
@@ -30,5 +30,6 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     public string ErrorStage { get; set; }
     public string ErrorCodes { get; set; }
     public string ErrorDetail { get; set; }
+    public string EvidenceJson { get; set; }
     public DateTime ObservedAtUtc { get; set; }
 }

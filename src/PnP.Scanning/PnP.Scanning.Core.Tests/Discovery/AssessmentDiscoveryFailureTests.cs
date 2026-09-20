@@ -14,13 +14,13 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
-[Trait("Category", "NativeScanIntegration")]
-public sealed class NativeAssessmentFailureTests : IClassFixture<ScanContextFixture>
+[Trait("Category", "ClassicDiscoveryIntegration")]
+public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextFixture>
 {
     private const string Site = "https://contoso.sharepoint.com/sites/initialization";
     private const string Web = "/";
     private readonly ScanContextFixture database;
-    public NativeAssessmentFailureTests(ScanContextFixture database) => this.database = database;
+    public AssessmentDiscoveryFailureTests(ScanContextFixture database) => this.database = database;
     private AssessmentDiscoveryWriter Writer() => new(database.CreateContext);
     private static Task NoDelay(TimeSpan _, CancellationToken token) { token.ThrowIfCancellationRequested(); return Task.CompletedTask; }
     private static HttpRequestException ResponseEnded() => new("Error while copying content to a stream.",

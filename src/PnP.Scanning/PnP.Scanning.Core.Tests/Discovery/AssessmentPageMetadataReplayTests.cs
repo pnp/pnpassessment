@@ -23,15 +23,15 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 /// discovery persistence, EF migrations and native CSV export are production code.
 /// This does not establish live SharePoint coverage or validate the SDK's HTTP serialization.
 /// </summary>
-[Trait("Category", "NativeScanIntegration")]
-public sealed class NativePageMetadataReplayTests : IClassFixture<ScanContextFixture>
+[Trait("Category", "ClassicDiscoveryIntegration")]
+public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContextFixture>
 {
     private const string Site = "https://contoso.sharepoint.com/sites/replay";
     private const string Web = "/sites/replay";
     private const string PublishingContentType = "0x010100C568DB52D9D0A14D9B2FDCC96666E9F2007948130EC3DB064584E219954237AF39004C1F8B46085B4D22B1CDC3DE08CFFB9C0";
     private readonly ScanContextFixture database;
 
-    public NativePageMetadataReplayTests(ScanContextFixture database) => this.database = database;
+    public AssessmentPageMetadataReplayTests(ScanContextFixture database) => this.database = database;
 
     [Fact]
     public async Task Same_item_number_in_different_libraries_survives_projection_database_and_native_report()

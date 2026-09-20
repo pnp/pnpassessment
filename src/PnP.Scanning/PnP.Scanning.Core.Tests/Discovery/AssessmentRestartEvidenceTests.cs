@@ -9,12 +9,12 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
-[Trait("Category", "NativeScanIntegration")]
-public sealed class NativeRestartEvidenceTests : IClassFixture<ScanContextFixture>
+[Trait("Category", "ClassicDiscoveryIntegration")]
+public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFixture>
 {
     private const string Site = "https://contoso.sharepoint.com/sites/restart";
     private readonly ScanContextFixture database;
-    public NativeRestartEvidenceTests(ScanContextFixture database) => this.database = database;
+    public AssessmentRestartEvidenceTests(ScanContextFixture database) => this.database = database;
     private AssessmentDiscoveryWriter Writer() => new(database.CreateContext);
 
     [Fact]

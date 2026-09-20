@@ -12,12 +12,12 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
-[Trait("Category", "NativeScanIntegration")]
-public sealed class AssessmentNativeDiscoveryTests : IClassFixture<ScanContextFixture>
+[Trait("Category", "ClassicDiscoveryIntegration")]
+public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanContextFixture>
 {
     private const string Site = "https://contoso.sharepoint.com/sites/a";
     private readonly ScanContextFixture database;
-    public AssessmentNativeDiscoveryTests(ScanContextFixture database) => this.database = database;
+    public AssessmentDiscoveryIntegrationTests(ScanContextFixture database) => this.database = database;
 
     [Fact]
     public async Task Denied_list_and_partial_folder_are_scope_rows_and_do_not_discard_pages()

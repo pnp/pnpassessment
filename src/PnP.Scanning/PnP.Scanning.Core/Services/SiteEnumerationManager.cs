@@ -148,7 +148,7 @@ namespace PnP.Scanning.Core.Services
                 var declared = !string.IsNullOrWhiteSpace(start.SitesList) || !string.IsNullOrWhiteSpace(start.SitesFile);
                 var row = new ClassicPageDiscovery
                 {
-                    RecordKey = "native:site-selection", RowType = "Scope", ScopeType = declared ? "SiteSelection" : "Tenant",
+                    RecordKey = "assessment:site-selection", RowType = "Scope", ScopeType = declared ? "SiteSelection" : "Tenant",
                     Url = !string.IsNullOrEmpty(start.Tenant) ? AuthenticationManager.GetSiteFromTenant(start.Tenant) : null,
                     DiscoveryStatus = authorityError == null ? "Complete" : AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(authorityError)),
                     ExpectedChildCount = authorityError == null ? list.Count : null,

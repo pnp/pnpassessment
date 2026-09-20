@@ -1,10 +1,12 @@
 using PnP.Core;
 using PnP.Scanning.Core.Storage;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace PnP.Scanning.Core.Discovery;
 
 /// <summary>
-/// Web-local acquisition executed by the native WebQueue. The provider and its PnP contexts
+/// Web-local acquisition executed by the existing Classic WebQueue. The provider and its PnP contexts
 /// belong to one worker; batches are committed before the next scope is requested.
 /// </summary>
 internal sealed class AssessmentWebDiscovery
@@ -25,85 +27,89 @@ internal sealed class AssessmentWebDiscovery
     internal async Task RunAsync(IAspxDiscoveryProvider provider, CancellationToken cancellationToken)
     {
         if (provider.RootScope.Kind != DiscoveryScopeKind.Web)
-            throw new ArgumentException("The native Web worker requires a Web-rooted discovery provider.", nameof(provider));
+            throw new ArgumentException("The Classic Web worker requires a Web-rooted discovery provider.", nameof(provider));
 
-        var pending = new Queue<DiscoveryScopeRegistration>();
-        var scheduled = new HashSet<string>(StringComparer.Ordinal);
-        pending.Enqueue(provider.RootScope);
-        scheduled.Add(provider.RootScope.ScopeKey);
-        await writer.WriteAsync(new[] { Scope(provider.RootScope) }, cancellationToken).ConfigureAwait(false);
-        while (pending.TryDequeue(out var scope))
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!scope.Required) continue;
-            var resultRow = Scope(scope);
-            var rawOutcome = DiscoveryTerminalOutcome.Complete;
-            if (scope.SourceKind != null)
+            var pending = new Queue<DiscoveryScopeRegistration>();
+            var scheduled = new HashSet<string>(StringComparer.Ordinal);
+            pending.Enqueue(provider.RootScope);
+            scheduled.Add(provider.RootScope.ScopeKey);
+            await writer.WriteAsync(new[] { Scope(provider.RootScope) }, cancellationToken).ConfigureAwait(false);
+            while (pending.TryDequeue(out var scope))
             {
-                rawOutcome = await ReadSurfaceAsync(provider, scope, resultRow, cancellationToken).ConfigureAwait(false);
-            }
-
-            DiscoveryChildEnumerationResult children;
-            try { children = await provider.EnumerateChildrenAsync(scope, cancellationToken).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-            catch (Exception ex)
-            {
-                AddError(resultRow, "EnumerateChildren", ErrorCode(ex), ErrorDetail(ex));
-                children = new(AspxDiscoveryOrchestrator.ChildKindFor(scope.Kind), Array.Empty<DiscoveryChildExpectation>(),
-                    Array.Empty<DiscoveryScopeRegistration>(), Classify(ex), scope.PermissionContext);
-            }
-
-            var childKeys = children.ObservedChildren.Select(child => child.ScopeKey).ToHashSet(StringComparer.Ordinal);
-            resultRow.ObservedChildCount = childKeys.Count;
-            resultRow.ExpectedChildCount = Success(children.Outcome) ? children.ExpectedChildren.Count : null;
-            var outcome = !Success(rawOutcome) ? rawOutcome : children.Outcome;
-            resultRow.DiscoveryStatus = Status(outcome);
-            AddError(resultRow, "EnumerateChildren", children.GapCode, children.GapDetail);
-            if (!Success(outcome) && string.IsNullOrWhiteSpace(resultRow.ErrorCodes))
-                AddError(resultRow, "Discovery", "scope_" + outcome.ToString().ToLowerInvariant(),
-                    "This scope did not finish successfully; its unobserved contents are unknown.");
-            var rows = new List<ClassicPageDiscovery> { resultRow };
-            foreach (var expected in children.ExpectedChildren.Where(child => child.Required && !childKeys.Contains(child.ScopeKey)))
-            {
-                var missing = Scope(new(expected.ScopeKey, scope.ScopeKey, expected.Kind, expected.SourceKind,
-                    expected.Locator, expected.PermissionContext));
-                missing.DiscoveryStatus = "Unknown";
-                AddError(missing, "EnumerateChildren", DiscoveryGapCodes.ExpectedChildMissing,
-                    "The parent declared this child, but it was not returned by enumeration.");
-                rows.Add(missing);
-            }
-            foreach (var child in children.ObservedChildren)
-            {
-                if (!scheduled.Add(child.ScopeKey)) continue;
-                rows.Add(Scope(child));
-                pending.Enqueue(child);
-            }
-            // Failed/unknown parents retain already discovered children. Missing children remain
-            // Scope rows, never fabricated Page rows. Register children before attempting their reads.
-            await writer.WriteAsync(rows, cancellationToken).ConfigureAwait(false);
-        }
-        if (provider is IAspxReferenceAcquisitionProvider referenceProvider)
-        {
-            var evidence = referenceProvider.ReferenceCollector.ReadSurfaceEvidence();
-            var surfaces = evidence.GroupBy(row => row.SurfaceId, StringComparer.Ordinal).Select(group =>
-            {
-                // Preserve a failing observation even if a later surface visit succeeds.
-                var surface = group.FirstOrDefault(row => !Success(row.TerminalOutcome)) ?? group.Last();
-                var row = new ClassicPageDiscovery
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!scope.Required) continue;
+                var resultRow = Scope(scope);
+                var rawOutcome = DiscoveryTerminalOutcome.Complete;
+                if (scope.SourceKind != null)
                 {
-                    ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
-                    RecordKey = "surface:" + DiscoveryHash.Of(siteUrl, webUrl, surface.SurfaceId),
-                    ParentScopeKey = "scope:" + surface.ScopeKey, RowType = "Scope", ScopeType = "Surface",
-                    Url = surface.ActualEndpoint, ObservationMethod = surface.RequiredAdapter,
-                    DiscoveryStatus = Status(surface.TerminalOutcome), ExpectedChildCount = surface.ExpectedCount,
-                    ObservedChildCount = surface.ObservedCount, ObservedAtUtc = DateTime.UtcNow,
-                };
-                if (!Success(surface.TerminalOutcome))
-                    AddError(row, surface.RequiredAdapter, "surface_" + surface.TerminalOutcome.ToString().ToLowerInvariant(),
-                        "An API surface did not complete; inspect the endpoint and discovery status.");
-                return row;
-            }).ToArray();
-            await writer.WriteAsync(surfaces, cancellationToken).ConfigureAwait(false);
+                    rawOutcome = await ReadSurfaceAsync(provider, scope, resultRow, cancellationToken).ConfigureAwait(false);
+                }
+
+                DiscoveryChildEnumerationResult children;
+                try { children = await provider.EnumerateChildrenAsync(scope, cancellationToken).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                catch (Exception ex)
+                {
+                    AddError(resultRow, "EnumerateChildren", ErrorCode(ex), ErrorDetail(ex));
+                    children = new(AspxDiscoveryHierarchy.ChildKindFor(scope.Kind), Array.Empty<DiscoveryChildExpectation>(),
+                        Array.Empty<DiscoveryScopeRegistration>(), Classify(ex), scope.PermissionContext);
+                }
+
+                var childKeys = children.ObservedChildren.Select(child => child.ScopeKey).ToHashSet(StringComparer.Ordinal);
+                resultRow.ObservedChildCount = childKeys.Count;
+                resultRow.ExpectedChildCount = Success(children.Outcome) ? children.ExpectedChildren.Count : null;
+                var outcome = !Success(rawOutcome) ? rawOutcome : children.Outcome;
+                resultRow.DiscoveryStatus = Status(outcome);
+                AddError(resultRow, "EnumerateChildren", children.GapCode, children.GapDetail);
+                if (!Success(outcome) && string.IsNullOrWhiteSpace(resultRow.ErrorCodes))
+                    AddError(resultRow, "Discovery", "scope_" + outcome.ToString().ToLowerInvariant(),
+                        "This scope did not finish successfully; its unobserved contents are unknown.");
+                var rows = new List<ClassicPageDiscovery> { resultRow };
+                foreach (var expected in children.ExpectedChildren.Where(child => child.Required && !childKeys.Contains(child.ScopeKey)))
+                {
+                    var missing = Scope(new(expected.ScopeKey, scope.ScopeKey, expected.Kind, expected.SourceKind,
+                        expected.Locator, expected.PermissionContext));
+                    missing.DiscoveryStatus = "Unknown";
+                    AddError(missing, "EnumerateChildren", DiscoveryGapCodes.ExpectedChildMissing,
+                        "The parent declared this child, but it was not returned by enumeration.");
+                    rows.Add(missing);
+                }
+                foreach (var child in children.ObservedChildren)
+                {
+                    if (!scheduled.Add(child.ScopeKey)) continue;
+                    rows.Add(Scope(child));
+                    pending.Enqueue(child);
+                }
+                // Failed/unknown parents retain already discovered children. Missing children remain
+                // Scope rows, never fabricated Page rows. Register children before attempting their reads.
+                await writer.WriteAsync(rows, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (provider is IAspxReferenceAcquisitionProvider referenceProvider)
+            {
+                var collector = referenceProvider.ReferenceCollector;
+                var surfaces = collector.ReadSurfaceEvidence()
+                    .GroupBy(row => row.SurfaceId, StringComparer.Ordinal).Select(group =>
+                {
+                    // Preserve a failing observation even if a later surface visit succeeds.
+                    var surface = group.FirstOrDefault(row => !Success(row.TerminalOutcome)) ?? group.Last();
+                    var row = SurfaceEvidence(surface);
+                    if (!Success(surface.TerminalOutcome))
+                        AddError(row, surface.RequiredAdapter,
+                            "surface_" + surface.TerminalOutcome.ToString().ToLowerInvariant(),
+                            "An API surface did not complete; inspect the endpoint and discovery status.");
+                    return row;
+                });
+                var references = collector.ReadReferenceEvidence().Select(ReferenceEvidence);
+                var pagination = collector.ReadPaginationEvidence().Select(PaginationEvidence);
+                var gaps = collector.ReadGaps().Select(GapEvidence);
+                await writer.WriteAsync(surfaces.Concat(references).Concat(pagination).Concat(gaps),
+                    CancellationToken.None).ConfigureAwait(false);
+            }
         }
     }
 
@@ -192,7 +198,7 @@ internal sealed class AssessmentWebDiscovery
         {
             ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
             RecordKey = "page:" + DiscoveryHash.Of(siteIdentity, webIdentity,
-                fileId?.ToString("D") ?? record.PhysicalLocator?.ToLowerInvariant() ?? record.NativeObjectId),
+                fileId?.ToString("D") ?? record.PhysicalLocator?.ToLowerInvariant() ?? record.SourceObjectId),
             RowType = "Page", ScopeType = "File", ParentScopeKey = "scope:" + scope.ScopeKey,
             Url = record.PhysicalLocator, FileName = record.FileName, FileUniqueId = fileId,
             SiteCollectionId = record.SiteCollectionId, WebId = record.WebId, ListId = record.ListId,
@@ -209,6 +215,106 @@ internal sealed class AssessmentWebDiscovery
         row.ErrorStage = AssessmentDiscoveryWriter.Join(row.ErrorStage, stage);
         row.ErrorCodes = AssessmentDiscoveryWriter.Join(row.ErrorCodes, code);
         row.ErrorDetail = AssessmentDiscoveryWriter.Join(row.ErrorDetail, detail, "\n");
+    }
+
+    private ClassicPageDiscovery SurfaceEvidence(AspxSurfaceDenominatorRow surface) => new()
+    {
+        ScanId = scanId,
+        SiteUrl = siteUrl,
+        WebUrl = webUrl,
+        RecordKey = "surface:" + DiscoveryHash.Of(siteUrl, webUrl, surface.SurfaceId),
+        ParentScopeKey = "scope:" + surface.ScopeKey,
+        RowType = "Scope",
+        ScopeType = "Surface",
+        Url = surface.ActualEndpoint,
+        ObservationMethod = surface.RequiredAdapter,
+        DiscoveryStatus = Status(surface.TerminalOutcome),
+        ExpectedChildCount = surface.ExpectedCount,
+        ObservedChildCount = surface.ObservedCount,
+        EvidenceJson = EvidenceJson(surface),
+        ObservedAtUtc = surface.AsOfUtc.UtcDateTime,
+    };
+
+    private ClassicPageDiscovery ReferenceEvidence(AspxReferenceCandidate reference)
+    {
+        var status = reference.Disposition switch
+        {
+            AspxReferenceDispositions.LinkedPhysicalGhosted or
+                AspxReferenceDispositions.LinkedPhysicalCustomized => "Discovered",
+            AspxReferenceDispositions.ReferenceUnavailable => "Failed",
+            AspxReferenceDispositions.Unknown => "Unknown",
+            _ => "Complete",
+        };
+        return new()
+        {
+            ScanId = scanId,
+            SiteUrl = siteUrl,
+            WebUrl = webUrl,
+            RecordKey = "reference:" + DiscoveryHash.Of(siteUrl, webUrl, reference.SourceKind,
+                reference.SourceObjectId, reference.RawLocator),
+            RowType = "Reference",
+            ScopeType = reference.SourceKind,
+            Url = reference.RawLocator,
+            FileUniqueId = Guid.TryParse(reference.LinkedFileUniqueId, out var fileId) ? fileId : null,
+            ObservationMethod = reference.AcquisitionMethod,
+            DiscoveryStatus = status,
+            ErrorCodes = status is "Failed" or "Unknown" ? reference.ReasonCode : null,
+            EvidenceJson = EvidenceJson(reference),
+            ObservedAtUtc = DateTime.UtcNow,
+        };
+    }
+
+    private ClassicPageDiscovery PaginationEvidence(AspxPaginationPageReceipt page)
+    {
+        var denied = page.HttpStatusCode is 401 or 403 ||
+            page.SemanticDetectorResult is SharePointSemanticDetectorResults.AccessDenied or
+                SharePointSemanticDetectorResults.Unauthorized or SharePointSemanticDetectorResults.LoginShell;
+        var status = denied ? "Denied" : !string.IsNullOrWhiteSpace(page.ErrorCode) ? "Failed" :
+            page.TerminalFlag ? "Complete" : "Pending";
+        return new()
+        {
+            ScanId = scanId,
+            SiteUrl = siteUrl,
+            WebUrl = webUrl,
+            RecordKey = "pagination:" + DiscoveryHash.Of(siteUrl, webUrl, page.CollectionScopeKey,
+                page.PageOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                page.ActualEndpointHash, page.RequestTokenHash),
+            ParentScopeKey = "scope:" + page.CollectionScopeKey,
+            RowType = "Pagination",
+            ScopeType = "RequestPage",
+            Url = page.ActualEndpoint,
+            ObservationMethod = page.ActualMethod,
+            DiscoveryStatus = status,
+            ObservedChildCount = page.ResponseItemCount,
+            ErrorCodes = page.ErrorCode,
+            EvidenceJson = EvidenceJson(page),
+            ObservedAtUtc = page.ReceivedAtUtc.UtcDateTime,
+        };
+    }
+
+    private ClassicPageDiscovery GapEvidence(string gap) => new()
+    {
+        ScanId = scanId,
+        SiteUrl = siteUrl,
+        WebUrl = webUrl,
+        RecordKey = "gap:" + DiscoveryHash.Of(siteUrl, webUrl, gap),
+        RowType = "Gap",
+        ScopeType = "Evidence",
+        DiscoveryStatus = "Unknown",
+        ErrorStage = "AcquisitionEvidence",
+        ErrorCodes = gap,
+        ObservedAtUtc = DateTime.UtcNow,
+    };
+
+    private static string EvidenceJson<T>(T value) => JsonSerializer.Serialize(value, EvidenceJsonOptions);
+
+    private static readonly JsonSerializerOptions EvidenceJsonOptions = CreateEvidenceJsonOptions();
+
+    private static JsonSerializerOptions CreateEvidenceJsonOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
     }
 
     internal static bool Success(DiscoveryTerminalOutcome outcome) => outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty;

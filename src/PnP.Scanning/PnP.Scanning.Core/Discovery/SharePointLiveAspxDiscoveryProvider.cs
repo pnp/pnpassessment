@@ -9,13 +9,19 @@ using System.Text.Json;
 namespace PnP.Scanning.Core.Discovery;
 
 internal sealed record SharePointLiveAspxDiscoveryOptions(
-    IReadOnlyList<Uri> SiteCollectionUrls,
     string PermissionContext,
     string VisibilityBoundary,
     string AuthorityRevision,
     string AuthorityHash,
-    string PlatformBuildRef = null,
-    AspxTenantAuthoritySnapshot AuthoritySnapshot = null);
+    string PlatformBuildRef = null);
+
+internal sealed record AspxWebAcquisitionContext(
+    Guid SiteCollectionId,
+    Uri SiteUrl,
+    Guid WebId,
+    Uri WebUrl,
+    string ServerRelativeUrl,
+    string WebTemplateConfiguration);
 
 internal sealed record SharePointRestPage(
     Uri RequestUri,
@@ -297,15 +303,15 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
 {
     private readonly IPnPContextFactory contextFactory;
     private readonly IAuthenticationProvider authenticationProvider;
-    private readonly Guid? nativeScanId;
+    private readonly Guid? scanId;
     private readonly Dictionary<string, ISharePointAspxRestClient> clients = new(StringComparer.OrdinalIgnoreCase);
 
     internal PnPContextSharePointAspxRestClientFactory(IPnPContextFactory contextFactory,
-        IAuthenticationProvider authenticationProvider, Guid? nativeScanId = null)
+        IAuthenticationProvider authenticationProvider, Guid? scanId = null)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         this.authenticationProvider = authenticationProvider ?? throw new ArgumentNullException(nameof(authenticationProvider));
-        this.nativeScanId = nativeScanId;
+        this.scanId = scanId;
     }
 
     public async Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
@@ -314,8 +320,8 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
         var key = webUrl.AbsoluteUri.TrimEnd('/');
         if (clients.TryGetValue(key, out var existing)) return existing;
         var contextOptions = new PnPContextOptions();
-        if (nativeScanId.HasValue)
-            contextOptions.Properties = new Dictionary<string, object> { [Constants.PnPContextPropertyScanId] = nativeScanId.Value };
+        if (scanId.HasValue)
+            contextOptions.Properties = new Dictionary<string, object> { [Constants.PnPContextPropertyScanId] = scanId.Value };
         var context = await contextFactory.CreateAsync(webUrl, authenticationProvider, cancellationToken,
             contextOptions).ConfigureAwait(false);
         var client = new PnPContextSharePointAspxRestClient(context);
@@ -586,9 +592,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private const string ViewsSelect = "Id,ServerRelativeUrl,Hidden,DefaultView,PersonalView,Title";
     private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId,Length";
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
-    private const string WebsSelect = "Id,Url,ServerRelativeUrl,Title,WebTemplate,Configuration";
     private readonly SharePointLiveAspxDiscoveryOptions options;
-    private readonly AspxTenantAuthoritySnapshot authority;
     private readonly ISharePointAspxRestClientFactory clientFactory;
     private readonly Dictionary<string, LiveScope> scopes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
@@ -596,28 +600,23 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private bool disposed;
 
     internal SharePointLiveAspxDiscoveryProvider(SharePointLiveAspxDiscoveryOptions options,
-        ISharePointAspxRestClientFactory clientFactory, AspxAuthoritySite owningSite = null, AspxAuthorityWeb currentWeb = null)
+        ISharePointAspxRestClientFactory clientFactory, AspxWebAcquisitionContext web)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         this.clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-        if (options.SiteCollectionUrls?.Any(url => url == null || !url.IsAbsoluteUri || url.Scheme != Uri.UriSchemeHttps) == true)
-            throw new ArgumentException("Every site collection URL must be an absolute HTTPS URL.", nameof(options));
-        authority = options.AuthoritySnapshot ?? LegacyDeclaredAuthority(options);
-        var root = new LiveScope("tenant", null, DiscoveryScopeKind.Tenant, null,
-            "sharepoint-live://" + authority.ScopeMode, "tenant", null, null, null, null, null);
-        if (currentWeb != null)
-        {
-            ArgumentNullException.ThrowIfNull(owningSite);
-            root = new LiveScope(Key("web", currentWeb.Url.AbsoluteUri), null, DiscoveryScopeKind.Web, null,
-                currentWeb.Url.AbsoluteUri.TrimEnd('/'), "web", currentWeb.Url, null, null, null,
-                new Dictionary<string, string>
-                {
-                    ["siteCollectionId"] = owningSite.SiteId.ToString("D"),
-                    ["siteUrl"] = owningSite.Url.AbsoluteUri,
-                    ["webId"] = currentWeb.WebId.ToString("D"),
-                    ["webTemplateConfiguration"] = currentWeb.WebTemplateConfiguration ?? string.Empty,
-                });
-        }
+        ArgumentNullException.ThrowIfNull(web);
+        if (!web.SiteUrl.IsAbsoluteUri || web.SiteUrl.Scheme != Uri.UriSchemeHttps ||
+            !web.WebUrl.IsAbsoluteUri || web.WebUrl.Scheme != Uri.UriSchemeHttps)
+            throw new ArgumentException("Site and Web URLs must be absolute HTTPS URLs.", nameof(web));
+        var root = new LiveScope(Key("web", web.WebUrl.AbsoluteUri), null, DiscoveryScopeKind.Web, null,
+            web.WebUrl.AbsoluteUri.TrimEnd('/'), "web", web.WebUrl, null, null, null,
+            new Dictionary<string, string>
+            {
+                ["siteCollectionId"] = web.SiteCollectionId.ToString("D"),
+                ["siteUrl"] = web.SiteUrl.AbsoluteUri,
+                ["webId"] = web.WebId.ToString("D"),
+                ["webTemplateConfiguration"] = web.WebTemplateConfiguration ?? string.Empty,
+            });
         scopes.Add(root.ScopeKey, root);
         RootScope = Registration(root);
     }
@@ -632,9 +631,6 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var scope = scopes[parent.ScopeKey];
         return scope.Kind switch
         {
-            DiscoveryScopeKind.Tenant => EnumerateTenantAsync(scope, cancellationToken),
-            DiscoveryScopeKind.Geo => EnumerateGeoAsync(scope, cancellationToken),
-            DiscoveryScopeKind.SiteCollection => EnumerateSiteCollectionAsync(scope, cancellationToken),
             DiscoveryScopeKind.Web => EnumerateWebAsync(scope, cancellationToken),
             DiscoveryScopeKind.Container => EnumerateContainerAsync(scope, cancellationToken),
             DiscoveryScopeKind.Folder => EnumerateFolderAsync(scope, cancellationToken),
@@ -661,75 +657,6 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         if (disposed) return;
         disposed = true;
         clientFactory.Dispose();
-    }
-
-    private Task<DiscoveryChildEnumerationResult> EnumerateTenantAsync(LiveScope parent,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var geo = Add(new LiveScope(Key("geo", authority.TenantRoot.Host), parent.ScopeKey, DiscoveryScopeKind.Geo, null,
-            "sharepoint-live://" + authority.TenantRoot.Host, "geo", null, null, null, null, null));
-        return Task.FromResult(Result(parent, new[] { geo }, authority.Sites.Outcome,
-            authority.Sites.FailureCode));
-    }
-
-    private Task<DiscoveryChildEnumerationResult> EnumerateGeoAsync(LiveScope parent,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        RecordAuthoritySurface(parent.ScopeKey, parent.ParentScopeKey, "tenant-site-authority",
-            authority.TenantRoot.AbsoluteUri, authority.Sites, authority.Sites.Items.Count,
-            "ProductTenantSiteCollectionAuthority", AspxSurfaceApplicability.Applicable);
-        var sites = authority.Sites.Items.Select(site => Add(new LiveScope(Key("site", site.Url.AbsoluteUri),
-            parent.ScopeKey, DiscoveryScopeKind.SiteCollection, null, site.Url.AbsoluteUri.TrimEnd('/'),
-            "site", site.Url, null, null, null, new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["siteCollectionId"] = site.SiteId.ToString("D"),
-                ["siteUrl"] = site.Url.AbsoluteUri,
-                ["rootWebId"] = site.RootWebId.ToString("D"),
-                ["graphId"] = site.GraphId ?? string.Empty,
-            }))).ToArray();
-        return Task.FromResult(Result(parent, sites, authority.Sites.Outcome, authority.Sites.FailureCode));
-    }
-
-    private Task<DiscoveryChildEnumerationResult> EnumerateSiteCollectionAsync(LiveScope parent,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var siteAuthority = authority.SiteWebs.SingleOrDefault(item =>
-            string.Equals(AspxTenantAuthoritySnapshot.Normalize(item.Site.Url),
-                AspxTenantAuthoritySnapshot.Normalize(parent.WebUrl), StringComparison.Ordinal));
-        if (siteAuthority == null)
-        {
-            ReferenceCollector.AddGap("site-web-authority-missing:" + parent.ScopeKey);
-            return Task.FromResult(Result(parent, Array.Empty<LiveScope>(), DiscoveryTerminalOutcome.Unknown,
-                "site_web_authority_missing"));
-        }
-        RecordAuthoritySurface(parent.ScopeKey, parent.ParentScopeKey, "root-subweb-authority:" + parent.ScopeKey,
-            parent.WebUrl.AbsoluteUri, siteAuthority.Webs, siteAuthority.Webs.Items.Count,
-            "ProductRootAndSubwebAuthority", AspxSurfaceApplicability.Applicable);
-        var scopeByUrl = siteAuthority.Webs.Items.ToDictionary(web =>
-            AspxTenantAuthoritySnapshot.Normalize(web.Url), web => Key("web", web.Url.AbsoluteUri), StringComparer.Ordinal);
-        var observed = siteAuthority.Webs.Items.Select(web => Add(new LiveScope(scopeByUrl[
-                AspxTenantAuthoritySnapshot.Normalize(web.Url)], parent.ScopeKey, DiscoveryScopeKind.Web, null,
-            web.Url.AbsoluteUri.TrimEnd('/'), "web", web.Url, null, null, null,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["siteCollectionId"] = parent.Metadata?.GetValueOrDefault("siteCollectionId", string.Empty) ?? string.Empty,
-                ["siteUrl"] = parent.Metadata?.GetValueOrDefault("siteUrl", parent.WebUrl?.AbsoluteUri ?? string.Empty) ?? string.Empty,
-                ["webId"] = web.WebId.ToString("D"),
-                ["authorityParentUrl"] = AspxTenantAuthoritySnapshot.Normalize(web.ParentWebUrl) ?? string.Empty,
-                ["webTemplateConfiguration"] = web.WebTemplateConfiguration ?? string.Empty,
-                ["isRootWeb"] = web.IsRootWeb.ToString(),
-            }))).OrderBy(item => item.ScopeKey, StringComparer.Ordinal).ToArray();
-        foreach (var web in siteAuthority.Webs.Items)
-        {
-            var webScopeKey = scopeByUrl[AspxTenantAuthoritySnapshot.Normalize(web.Url)];
-            var authorityParentKey = web.ParentWebUrl == null ? parent.ScopeKey :
-                scopeByUrl.GetValueOrDefault(AspxTenantAuthoritySnapshot.Normalize(web.ParentWebUrl), parent.ScopeKey);
-            RecordWebIdentitySurface(webScopeKey, authorityParentKey, web, siteAuthority.Webs);
-        }
-        return Task.FromResult(Result(parent, observed, siteAuthority.Webs.Outcome, siteAuthority.Webs.FailureCode));
     }
 
     private async Task<DiscoveryChildEnumerationResult> EnumerateWebAsync(LiveScope parent,
@@ -1142,76 +1069,10 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         return list.BaseType == (int)ListBaseType.DocumentLibrary ? "document-library" : "list";
     }
 
-    private void RecordAuthoritySurface<T>(string scopeKey, string parentScopeKey, string surfaceId,
-        string locator, AspxAuthorityCollection<T> result, int observed, string authorityKind,
-        AspxSurfaceApplicability applicability)
-    {
-        var known = result.IsTerminalSuccess && !result.ContinuationRemaining;
-        int? expected = known ? observed : null;
-        var outcome = known && observed == 0 ? DiscoveryTerminalOutcome.Empty : result.Outcome;
-        var evidence = new List<string>
-        {
-            "provider=" + result.Provider,
-            "operation=" + result.Operation,
-            "actualFilter=" + (result.ActualFilter ?? string.Empty),
-            "continuationRemaining=" + result.ContinuationRemaining,
-        };
-        evidence.AddRange((result.Exclusions ?? Array.Empty<string>()).Select(value => "exclusion=" + value));
-        if (!string.IsNullOrWhiteSpace(result.FailureCode)) evidence.Add("failureCode=" + result.FailureCode);
-        if (!string.IsNullOrWhiteSpace(result.FailureDetail)) evidence.Add("failure=" + result.FailureDetail);
-        var row = SurfaceRow(scopeKey, parentScopeKey, surfaceId, locator, result.Provider,
-            result.ActualFilter ?? string.Empty, authorityKind, applicability, outcome, expected,
-            known ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown, observed,
-            DiscoveryHash.Of(authority.AuthorityHash, surfaceId, result.Provider, result.Operation,
-                result.ActualFilter ?? string.Empty, observed.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            result.ContinuationRemaining ? 1 : 0, evidence, authorityKind,
-            known && observed == 0 ? "AuthorityTerminalZero" : null,
-            known && observed == 0 ? locator : null) with
-        {
-            ActualMethod = "INVOKE",
-            ActualEndpoint = result.Provider + ":" + result.Operation,
-            AsOfUtc = result.CompletedAtUtc,
-        };
-        var gaps = new List<string>();
-        if (!known || (result.Exclusions?.Count ?? 0) > 0)
-            gaps.Add(surfaceId + ":authority_incomplete");
-        if (result.ContinuationRemaining) gaps.Add(surfaceId + ":authority_continuation_remaining");
-        ReferenceCollector.AddSurface(row, Array.Empty<AspxPaginationPageReceipt>(), gaps);
-    }
-
-    private void RecordWebIdentitySurface(string scopeKey, string parentScopeKey, AspxAuthorityWeb web,
-        AspxAuthorityCollection<AspxAuthorityWeb> result)
-    {
-        var known = result.IsTerminalSuccess && !result.ContinuationRemaining;
-        var evidence = new[]
-        {
-            "webId=" + web.WebId.ToString("D"),
-            "serverRelativeUrl=" + (web.ServerRelativeUrl ?? string.Empty),
-            "parentWebUrl=" + (AspxTenantAuthoritySnapshot.Normalize(web.ParentWebUrl) ?? string.Empty),
-            "isRootWeb=" + web.IsRootWeb,
-            "provider=" + result.Provider,
-            "operation=" + result.Operation,
-            "actualFilter=" + (result.ActualFilter ?? string.Empty),
-        };
-        var row = SurfaceRow(scopeKey, parentScopeKey, "web-identity:" + scopeKey, web.Url.AbsoluteUri,
-            result.Provider, result.ActualFilter ?? string.Empty, "ProductRootAndSubwebIdentity",
-            AspxSurfaceApplicability.Applicable, result.Outcome, known ? 1 : null,
-            known ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown, 1,
-            DiscoveryHash.Of(authority.AuthorityHash, scopeKey, parentScopeKey, web.Url.AbsoluteUri),
-            result.ContinuationRemaining ? 1 : 0, evidence, result.Operation) with
-        {
-            ActualMethod = "INVOKE",
-            ActualEndpoint = result.Provider + ":" + result.Operation,
-            AsOfUtc = result.CompletedAtUtc,
-        };
-        ReferenceCollector.AddSurface(row, Array.Empty<AspxPaginationPageReceipt>(), known
-            ? Array.Empty<string>() : new[] { "web-identity:" + scopeKey + ":authority_incomplete" });
-    }
-
     private async Task<SharePointModeledFolderResult> ReadModeledFolderAsync(LiveScope scope,
         CancellationToken cancellationToken)
     {
-        var key = AspxTenantAuthoritySnapshot.Normalize(scope.WebUrl) + "|" + scope.FolderUrl;
+        var key = scope.WebUrl.AbsoluteUri.TrimEnd('/').ToLowerInvariant() + "|" + scope.FolderUrl;
         if (modeledFolders.TryGetValue(key, out var existing)) return existing;
         var client = await clientFactory.GetAsync(scope.WebUrl, cancellationToken).ConfigureAwait(false);
         var result = await client.ReadFolderAsync(scope.FolderUrl, cancellationToken).ConfigureAwait(false);
@@ -1304,7 +1165,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var terminal = string.IsNullOrWhiteSpace(nextLink) || page.Outcome != DiscoveryTerminalOutcome.Complete;
             var nextUri = terminal ? null : ResolveNext(initialEndpoint, nextLink);
             var receipt = new AspxPaginationPageReceipt(AspxAcquisitionVersions.PaginationReceipt,
-                surfaceId, authority.AuthorityRevision,
+                surfaceId, options.AuthorityRevision,
                 DiscoveryHash.Of(initialEndpoint.GetLeftPart(UriPartial.Path), select, filter ?? string.Empty),
                 "GET", AspxDurableRequestEvidence.Endpoint(page.RequestUri), select, filter ?? string.Empty, ordinal,
                 AspxPaginationContract.TokenHash(requestToken), page.Items.Count,
@@ -1361,19 +1222,18 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         AspxExpectedCountState expectedState, int observed, string chainHash, int outstanding,
         IReadOnlyList<string> evidenceRefs, string adapter, string absenceKind = null, string absenceRef = null,
         AspxSurfaceDispositionRule dispositionRule = null) =>
-        new(AspxAcquisitionVersions.SurfaceContract, Guid.Empty, null, null, scopeKey, parentScopeKey,
-            surfaceId, applicability, dispositionRule?.RuleId, dispositionRule?.RuleVersion,
-            dispositionRule?.RuleHash, dispositionRule?.ReviewRef, null, dispositionRule?.PlatformBinding,
+        new(scopeKey, parentScopeKey, surfaceId, applicability,
+            dispositionRule?.RuleId, dispositionRule?.RuleVersion,
+            dispositionRule?.RuleHash, dispositionRule?.ReviewRef, dispositionRule?.PlatformBinding,
             applicability == AspxSurfaceApplicability.NotApplicable
                 ? AspxRuntimeCounterexampleState.Observed : AspxRuntimeCounterexampleState.NoneObserved,
-            authorityKind, endpoint, authority.AuthorityRevision, authority.AuthorityHash,
+            authorityKind, endpoint, options.AuthorityRevision, options.AuthorityHash,
             "GET", endpoint, select, filter, options.VisibilityBoundary, options.PermissionContext,
             expected, expectedState, observed, outcome,
             outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty ? "satisfied"
                 : outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed or
                     DiscoveryTerminalOutcome.Truncated or DiscoveryTerminalOutcome.Cancelled ? "incomplete" : "unknown",
-            outstanding != 0, chainHash, outstanding, absenceKind, absenceRef,
-            null, null, null, null, null, null, null, DateTimeOffset.UtcNow,
+            outstanding != 0, chainHash, outstanding, absenceKind, absenceRef, DateTimeOffset.UtcNow,
             (evidenceRefs ?? Array.Empty<string>()).Concat(dispositionRule?.EvidenceRefs ?? Array.Empty<string>())
                 .Distinct(StringComparer.Ordinal).ToArray(), adapter,
             dispositionRule?.ClassificationEffect ??
@@ -1395,7 +1255,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private AspxReferenceCandidate Candidate(string sourceKind, string objectId, string method, string locator,
         string disposition, string reason, string fileUniqueId, string contentOrigin,
         params string[] evidence) => new(sourceKind, objectId, method, null, locator,
-            AspxPlatformRegistryV1.NormalizeRequestPath(locator), null, disposition, reason, fileUniqueId,
+            AspxReferencePath.Normalize(locator), null, disposition, reason, fileUniqueId,
             contentOrigin, options.PermissionContext,
             evidence.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray());
 
@@ -1422,7 +1282,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     {
         var expected = children.Select(child => new DiscoveryChildExpectation(child.ScopeKey, child.Kind,
             child.SourceKind, child.Locator, child.PermissionContext, Required: true)).ToArray();
-        return new(AspxDiscoveryOrchestrator.ChildKindFor(parent.Kind), expected,
+        return new(AspxDiscoveryHierarchy.ChildKindFor(parent.Kind), expected,
             children.Select(Registration).ToArray(), outcome, parent.PermissionContext, gapCode,
             gapCode == null ? null : $"Live acquisition retained '{parent.ScopeKey}' and failed closed: {gapCode}.");
     }
@@ -1436,37 +1296,6 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     {
         scopes.TryAdd(scope.ScopeKey, scope);
         return scopes[scope.ScopeKey];
-    }
-
-    private static AspxTenantAuthoritySnapshot LegacyDeclaredAuthority(
-        SharePointLiveAspxDiscoveryOptions options)
-    {
-        var sites = (options.SiteCollectionUrls ?? Array.Empty<Uri>())
-            .DistinctBy(AspxTenantAuthoritySnapshot.Normalize, StringComparer.Ordinal)
-            .OrderBy(AspxTenantAuthoritySnapshot.Normalize, StringComparer.Ordinal)
-            .Select(url => new AspxAuthoritySite(Guid.Empty, Guid.Empty, url, null, null)).ToArray();
-        var siteResult = new AspxAuthorityCollection<AspxAuthoritySite>(
-            sites.Length == 0 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete,
-            sites, "Assessment.Legacy", "DeclaredSiteArguments", "--site",
-            new[] { "tenant-site-denominator-not-enumerated" }, null, null,
-            ContinuationRemaining: false, DateTimeOffset.UtcNow);
-        var webs = sites.Select(site => new AspxSiteWebAuthority(site,
-            new AspxAuthorityCollection<AspxAuthorityWeb>(DiscoveryTerminalOutcome.Complete,
-                new[] { new AspxAuthorityWeb(site.RootWebId, site.Url, site.Url.AbsolutePath,
-                    null, null, IsRootWeb: true) }, "Assessment.Legacy", "DeclaredRootWeb",
-                "subweb-authority-not-enumerated", new[] { "subweb-authority-not-enumerated" },
-                null, null, ContinuationRemaining: false, DateTimeOffset.UtcNow))).ToArray();
-        var tenantRoot = sites.FirstOrDefault()?.Url is { } first
-            ? new Uri(first.GetLeftPart(UriPartial.Authority))
-            : new Uri("https://invalid.sharepoint.com");
-        var snapshot = AspxTenantAuthoritySnapshot.Freeze(AspxScopeModes.DeclaredSubset,
-            tenantRoot, siteResult, webs);
-        return snapshot with
-        {
-            AuthorityRevision = options.AuthorityRevision ?? snapshot.AuthorityRevision,
-            AuthorityHash = options.AuthorityHash ?? snapshot.AuthorityHash,
-            TenantVisibilityVerified = false,
-        };
     }
 
     private string Key(params string[] values) => DiscoveryHash.Of(values)[..24];

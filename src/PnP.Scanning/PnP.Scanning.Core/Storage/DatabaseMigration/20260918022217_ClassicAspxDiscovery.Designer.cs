@@ -11,8 +11,8 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20260918022217_NativeClassicDiscovery")]
-    partial class NativeClassicDiscovery
+    [Migration("20260918022217_ClassicAspxDiscovery")]
+    partial class ClassicAspxDiscovery
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -639,6 +639,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ErrorDetail")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EvidenceJson")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ErrorStage")

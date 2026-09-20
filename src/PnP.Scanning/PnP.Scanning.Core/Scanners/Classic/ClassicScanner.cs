@@ -26,7 +26,7 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
             // Persist existence and discovery failures before feature-dependent enrichment loads.
-            // Each native TPL Web worker owns its own provider and PnP contexts.
+            // Each existing TPL Web worker owns its own acquisition provider and PnP contexts.
             var discoveredPages = Options.Pages
                 ? await ClassicPageDiscoveryComponent.ExecuteAsync(this).ConfigureAwait(false)
                 : null;
@@ -190,7 +190,7 @@ namespace PnP.Scanning.Core.Scanners
             catch (Exception ex) when (Options.Pages && !ScanManager.GetCancellationTokenSource(ScanId).IsCancellationRequested)
             {
                 // Client-tag telemetry against the first site is not an admission gate for
-                // other authorized sites. Each native Web worker will record its own result.
+                // other authorized sites. Each scheduled Web worker records its own result.
                 await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, SiteUrl, WebUrl, "Web", "Failed", ex,
                     stage: "PreScanClientTag");
                 Logger.Warning(ex, "Client tag preflight failed; continuing full ASPX discovery");
@@ -208,6 +208,13 @@ namespace PnP.Scanning.Core.Scanners
         {
 
             Logger.Information("Post assessment work is starting");
+            if (Options.Pages)
+            {
+                var verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
+                    .ConfigureAwait(false);
+                Logger.Information("ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",
+                    ScanId, verdict);
+            }
             using (var dbContext = new ScanContext(ScanId))
             {
                 // T9: before aggregating webs into site collections, roll each web's per-page

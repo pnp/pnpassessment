@@ -634,7 +634,7 @@ namespace PnP.Scanning.Core.Storage
 
         internal static Task<List<EnumeratedWeb>> WebsToRestartScanningAsync(ScanContext dbContext, Guid scanId, string siteUrl)
         {
-            // Preserve the original enumeration's template when rebuilding the native Web queue.
+            // Preserve the original enumeration's template when rebuilding the existing Web queue.
             // Dropping it makes resumed Classic Web/site summaries differ from an uninterrupted scan.
             return dbContext.Webs.AsNoTracking()
                 .Where(web => web.ScanId == scanId && web.SiteUrl == siteUrl && web.Status == SiteWebStatus.Queued)

@@ -114,7 +114,6 @@ namespace PnP.Scanning.Core.Scanners
                 if (options.HomePageOnly && row.HomePage != true)
                 {
                     row.AssessmentStatus = "NotSelected";
-                    await discoveryWriter.WriteAsync(new[] { row }).ConfigureAwait(false);
                     continue;
                 }
                 var list = lists.FirstOrDefault(value => value.Id == row.ListId);
@@ -123,7 +122,6 @@ namespace PnP.Scanning.Core.Scanners
                     // Forms/Views and root files may not have a list item. Their physical
                     // discovery is still valid; do not pretend that zero extracted WPs is a pass.
                     row.AssessmentStatus = "NotApplicable";
-                    await discoveryWriter.WriteAsync(new[] { row }).ConfigureAwait(false);
                     continue;
                 }
                 try
@@ -147,8 +145,11 @@ namespace PnP.Scanning.Core.Scanners
                         AssessmentWebDiscovery.ErrorDetail(ex));
                     scannerBase.Logger.Warning(ex, "Page metadata assessment failed for {PageUrl}; retaining discovery", row.Url);
                 }
-                await discoveryWriter.WriteAsync(new[] { row }).ConfigureAwait(false);
             }
+            // Commit one Web's assessment dispositions in a single EF transaction. In particular,
+            // --homepageonly can mark thousands of physical pages NotSelected without opening one
+            // context and transaction per page.
+            await discoveryWriter.UpdateExistingAsync(discoveredPages).ConfigureAwait(false);
 
             // Enrich the discovered classic pages with their web part inventory, mapping readiness, page
             // layout and (for the home page) the uncustomized-home-page verdict. Only web part / wiki /
@@ -274,7 +275,7 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
-        // can be replayed offline against the native database/report pipeline.
+        // can be replayed offline against the assessment database/report pipeline.
         internal static async Task<PageEnrichmentInput> LoadPhysicalPageAsync(IList list, ClassicPageDiscovery row,
             string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null)
         {
@@ -282,7 +283,7 @@ namespace PnP.Scanning.Core.Scanners
                 throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
 
             // REST $select=* (IListItem.All) still omits computed fields such as FileRef,
-            // HTML_x0020_File_x0020_Type and ClientSideApplicationId. Reuse the native
+            // HTML_x0020_File_x0020_Type and ClientSideApplicationId. Reuse the assessment
             // list-stream reader with explicit ViewFields, restricted to this discovered ID.
             // Unlike selecting optional REST properties, missing ViewFields are omitted by
             // SharePoint rather than failing classic libraries that lack a modern-only field.

@@ -11,20 +11,20 @@ internal static class ClassicPageDiscoveryComponent
     {
         var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
         var writer = new AssessmentDiscoveryWriter(scanner.ScanId);
-        // Use the native run's authentication. No second login, CLI, registry or artifact run id.
+        // Use the existing assessment authentication, ScanId and scheduled Web scope.
         var auth = new ExternalAuthenticationProvider((_, scopes) =>
             scanner.ScanManager.GetScanAuthenticationManager(scanner.ScanId).GetAccessTokenAsync(scopes));
         using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
         var site = await context.Site.GetAsync(value => value.Id).ConfigureAwait(false);
         var web = await context.Web.GetAsync(value => value.Id, value => value.Url,
             value => value.ServerRelativeUrl).ConfigureAwait(false);
-        var owner = new AspxAuthoritySite(site.Id, Guid.Empty, new Uri(scanner.SiteUrl), null, null);
-        var current = new AspxAuthorityWeb(web.Id, web.Url, web.ServerRelativeUrl, null, scanner.WebTemplate,
-            string.IsNullOrEmpty(scanner.WebUrl.Trim('/')));
         using var factory = new PnPContextSharePointAspxRestClientFactory(scanner.PnPContextFactory, auth, scanner.ScanId);
-        using var provider = new SharePointLiveAspxDiscoveryProvider(new(new[] { owner.Url },
-            "native-assessment:" + scanner.ScanId.ToString("D"), "scheduled-web", "native-scan", string.Empty),
-            factory, owner, current);
+        using var provider = new SharePointLiveAspxDiscoveryProvider(new(
+            "assessment:" + scanner.ScanId.ToString("D"), "scheduled-web", "classic-assessment",
+            DiscoveryHash.Of("classic-assessment", scanner.ScanId.ToString("D"), site.Id.ToString("D"),
+                web.Id.ToString("D"))), factory,
+            new AspxWebAcquisitionContext(site.Id, new Uri(scanner.SiteUrl), web.Id, web.Url,
+                web.ServerRelativeUrl, scanner.WebTemplate));
         await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer)
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
@@ -48,7 +48,7 @@ internal static class ClassicPageDiscoveryComponent
         var row = new ClassicPageDiscovery
         {
             ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
-            RecordKey = "native:" + DiscoveryHash.Of(scopeType, siteUrl?.ToLowerInvariant(), webUrl?.ToLowerInvariant(), stage),
+            RecordKey = "assessment:" + DiscoveryHash.Of(scopeType, siteUrl?.ToLowerInvariant(), webUrl?.ToLowerInvariant(), stage),
             RowType = "Scope", ScopeType = scopeType, Url = siteUrl?.TrimEnd('/') + webUrl,
             DiscoveryStatus = status, ExpectedChildCount = children, ObservedChildCount = children,
             ObservationMethod = stage, ObservedAtUtc = DateTime.UtcNow,

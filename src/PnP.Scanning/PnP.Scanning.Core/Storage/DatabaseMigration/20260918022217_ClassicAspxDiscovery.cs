@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     /// <inheritdoc />
-    public partial class NativeClassicDiscovery : Migration
+    public partial class ClassicAspxDiscovery : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -84,6 +84,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     ErrorStage = table.Column<string>(type: "TEXT", nullable: true),
                     ErrorCodes = table.Column<string>(type: "TEXT", nullable: true),
                     ErrorDetail = table.Column<string>(type: "TEXT", nullable: true),
+                    EvidenceJson = table.Column<string>(type: "TEXT", nullable: true),
                     ObservedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
                     SiteUrl = table.Column<string>(type: "TEXT", nullable: true),
                     WebUrl = table.Column<string>(type: "TEXT", nullable: true)

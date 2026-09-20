@@ -396,8 +396,8 @@ namespace PnP.Scanning.Core.Services
         /// </summary>
         internal static async Task ExportClassicReportDataAsync(ScanContext dbContext, Guid scanId, string exportPath, CsvConfiguration config)
         {
-            // Page and Scope rows share one report, including scope-level denial/partial results.
-            // Do not emit a separate gap CSV or require the acquisition command to run first.
+            // Physical inventory, scope coverage, references, pagination, gaps and the final verdict
+            // share the assessment-owned discovery.csv report.
             using (var writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))
             using (var csv = new CsvWriter(writer, config))
             {

@@ -638,6 +638,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ErrorDetail")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("EvidenceJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ErrorStage")
                         .HasColumnType("TEXT");
 

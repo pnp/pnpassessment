@@ -44,7 +44,7 @@ Task | CLI
 Generate Power BI report (includes CSV export) in the default location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3
 Export the gathered data as CSV files in a custom location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --mode CsvOnly --path "c:\reports"
 
-The CSV export includes [discovery.csv](csv-discovery.md), which lists discovered physical ASPX files and the scopes inspected during discovery. Use its Scope rows to identify denied, failed, partial or otherwise incomplete discovery. The existing [classicpages.csv](csv-classicpages.md) continues to contain the classic pages selected for page assessment and modernization analysis.
+The CSV export includes [discovery.csv](csv-discovery.md), which lists discovered physical ASPX files, inspected scopes, sanitized acquisition evidence and the final coverage verdict. Use its Scope and Gap rows to identify denied, failed, partial or otherwise incomplete discovery. The existing [classicpages.csv](csv-classicpages.md) continues to contain the classic pages selected for page assessment and modernization analysis.
 
 [!INCLUDE [Clarify the --id parameter](./../fragments/clarify-id-parameter.md)]
 

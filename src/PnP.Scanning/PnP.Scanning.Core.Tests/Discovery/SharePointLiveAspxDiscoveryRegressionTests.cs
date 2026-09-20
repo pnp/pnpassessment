@@ -2,15 +2,20 @@ using FluentAssertions;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Tests.Fixtures;
 using System.Net;
 using System.Text.Json;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
-[Trait("Category", "NativeScanIntegration")]
-public sealed class SharePointLiveAspxDiscoveryRegressionTests
+[Trait("Category", "ClassicDiscoveryIntegration")]
+public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<ScanContextFixture>
 {
+    private readonly ScanContextFixture database;
+
+    public SharePointLiveAspxDiscoveryRegressionTests(ScanContextFixture database) => this.database = database;
+
     [Fact]
     public async Task Web_root_records_retain_known_site_and_web_identity()
     {
@@ -51,57 +56,45 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests
     }
 
     [Fact]
-    public void Later_sparse_observation_does_not_erase_known_file_ownership()
+    public async Task Later_sparse_observation_does_not_erase_known_file_ownership()
     {
-        var database = Path.Combine(Path.GetTempPath(), "aspx-regression-" + Guid.NewGuid().ToString("N") + ".sqlite");
-        try
+        var scanId = Guid.NewGuid();
+        var siteUrl = "https://contoso.sharepoint.com/sites/a";
+        var webUrl = "/";
+        var richScope = new DiscoveryScopeRegistration("rich", null, DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.RawListLibraryFiles, "/docs", "test");
+        var sparseScope = new DiscoveryScopeRegistration("sparse", null, DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.ListViewBackingFiles, "/view", "test");
+        var siteId = Guid.NewGuid();
+        var webId = Guid.NewGuid();
+        var listId = Guid.NewGuid();
+        var folderId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var rich = new RawDiscoveryRecord(fileId.ToString("D"), fileId.ToString("D"), listId.ToString("D"),
+            "page.aspx", "/sites/a/docs/page.aspx", true, "test", SiteCollectionId: siteId,
+            WebId: webId, ListId: listId, FolderUniqueId: folderId, ListItemId: 7,
+            ContentTypeId: "0x0101", PageType: "WikiPage", LibraryHidden: false);
+        var sparse = rich with
         {
-            using (var store = new DiscoveryStore(database))
-            {
-                var runId = Guid.NewGuid();
-                store.CreateRun(runId, Manifest(), AspxScopeModes.DeclaredSubset, fixtureRun: false);
-                var richScope = new DiscoveryScopeRegistration("rich", null, DiscoveryScopeKind.Folder,
-                    DiscoverySourceKind.RawListLibraryFiles, "/docs", "test");
-                var sparseScope = new DiscoveryScopeRegistration("sparse", null, DiscoveryScopeKind.Folder,
-                    DiscoverySourceKind.ListViewBackingFiles, "/view", "test");
-                store.RegisterScope(runId, richScope);
-                store.RegisterScope(runId, sparseScope);
-                var siteId = Guid.NewGuid();
-                var webId = Guid.NewGuid();
-                var listId = Guid.NewGuid();
-                var folderId = Guid.NewGuid();
-                var fileId = Guid.NewGuid();
-                var rich = new RawDiscoveryRecord(fileId.ToString("D"), fileId.ToString("D"), listId.ToString("D"),
-                    "page.aspx", "/sites/a/docs/page.aspx", true, "test", SiteCollectionId: siteId,
-                    WebId: webId, ListId: listId, FolderUniqueId: folderId, ListItemId: 7,
-                    ContentTypeId: "0x0101", PageType: "WikiPage", LibraryHidden: false);
-                var sparse = rich with
-                {
-                    ListId = null,
-                    FolderUniqueId = null,
-                    ListItemId = null,
-                    ContentTypeId = null,
-                    PageType = null,
-                    LibraryHidden = null,
-                };
+            ListId = null,
+            FolderUniqueId = null,
+            ListItemId = null,
+            ContentTypeId = null,
+            PageType = null,
+            LibraryHidden = null,
+        };
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        await writer.WriteAsync(new[] { AssessmentWebDiscovery.Page(scanId, siteUrl, webUrl, richScope, rich) });
+        await writer.WriteAsync(new[] { AssessmentWebDiscovery.Page(scanId, siteUrl, webUrl, sparseScope, sparse) });
 
-                Commit(store, runId, richScope, rich);
-                Commit(store, runId, sparseScope, sparse);
-
-                var row = store.ReadInventory(runId).Single();
-                row.ListId.Should().Be(listId);
-                row.FolderUniqueId.Should().Be(folderId);
-                row.ListItemId.Should().Be(7);
-                row.ContentTypeId.Should().Be("0x0101");
-                row.PageType.Should().Be("WikiPage");
-                row.LibraryHidden.Should().BeFalse();
-            }
-        }
-        finally
-        {
-            foreach (var path in new[] { database, database + "-wal", database + "-shm" })
-                if (File.Exists(path)) File.Delete(path);
-        }
+        using var read = database.CreateContext();
+        var row = read.ClassicPageDiscoveries.Single(value => value.ScanId == scanId && value.RowType == "Page");
+        row.ListId.Should().Be(listId);
+        row.FolderUniqueId.Should().Be(folderId);
+        row.ListItemId.Should().Be(7);
+        row.ContentTypeId.Should().Be("0x0101");
+        row.PageType.Should().Be("WikiPage");
+        row.LibraryHidden.Should().BeFalse();
     }
 
     [Fact]
@@ -119,10 +112,8 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests
 
     private static SharePointLiveAspxDiscoveryProvider Provider(RootTraversalFactory factory, Uri siteUrl,
         Guid siteId, Guid webId) => new(
-        new SharePointLiveAspxDiscoveryOptions(new[] { siteUrl }, "test", "declared", "revision",
-            new string('a', 64)), factory,
-        new AspxAuthoritySite(siteId, webId, siteUrl, null, null),
-        new AspxAuthorityWeb(webId, siteUrl, "/sites/a", null, "STS#3", true));
+        new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64)),
+        factory, new AspxWebAcquisitionContext(siteId, siteUrl, webId, siteUrl, "/sites/a", "STS#3"));
 
     private static async Task<DiscoveryScopeRegistration> WebRootFolderAsync(
         SharePointLiveAspxDiscoveryProvider provider)
@@ -138,21 +129,6 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests
         await foreach (var batch in source.ReadBatchesAsync()) records.AddRange(batch.Records);
         return records;
     }
-
-    private static void Commit(DiscoveryStore store, Guid runId, DiscoveryScopeRegistration scope,
-        RawDiscoveryRecord record)
-    {
-        var attempt = store.BeginAttempt(runId, scope.ScopeKey, scope.SourceKind!.Value);
-        store.CommitBatch(runId, scope.ScopeKey, scope.SourceKind.Value, attempt,
-            new RawDiscoveryBatch(0, "request", "response", new[] { record }, true,
-                DiscoveryTerminalOutcome.Complete));
-    }
-
-    private static DiscoveryRunManifest Manifest() => new(
-        "repo@" + new string('1', 40), new string('2', 40),
-        DiscoveryRunManifest.CurrentContractVersion, DiscoveryRunManifest.CurrentSchemaVersion,
-        new string('3', 64), new string('4', 64), new string('5', 64), new string('6', 64),
-        new string('7', 64), new string('8', 64), new string('9', 64), new string('a', 64));
 
     private sealed class RootTraversalFactory : ISharePointAspxRestClientFactory
     {
