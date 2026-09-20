@@ -91,9 +91,16 @@ namespace PnP.Scanning.Core.Queues
                 catch (Exception ex)
                 {
                     if (web.OptionsBase is ClassicOptions { Pages: true })
+                    {
+                        // Discovery may have committed pages before an unhandled Web-level
+                        // failure. Finalize only undisposed rows; cancellation remains resumable.
+                        if (!CancellationToken.IsCancellationRequested)
+                            await new AssessmentDiscoveryWriter(ScanId).FailUnassessedPagesAsync(
+                                ScanId, web.SiteCollectionUrl, web.WebUrl, ex, "WebScan");
                         await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, web.SiteCollectionUrl, web.WebUrl,
                             "Web", CancellationToken.IsCancellationRequested ? "Cancelled" :
                                 AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(ex)), ex, stage: "WebScan");
+                    }
                     // The web scan failed, log accordingly
                     Log.Error(ex, "Assessment of {SiteUrl}{WebUrl} failed with assessment component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
                     await StorageManager.EndWebScanWithErrorAsync(ScanId, web.SiteCollectionUrl, web.WebUrl, ex);

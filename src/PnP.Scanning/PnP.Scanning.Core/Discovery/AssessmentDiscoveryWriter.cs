@@ -70,6 +70,30 @@ internal sealed class AssessmentDiscoveryWriter
             .OrderBy(row => row.RecordKey).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    internal async Task<int> FailUnassessedPagesAsync(Guid scanId, string siteUrl, string webUrl,
+        Exception error, string stage)
+    {
+        // This is failure finalization, not discovery: retain file identities and existence,
+        // and never overwrite pages that already reached an assessment disposition.
+        await WriteGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            using var db = createContext();
+            var unfinished = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
+                row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page" &&
+                (row.AssessmentStatus == null || row.AssessmentStatus == "")).ToListAsync().ConfigureAwait(false);
+            foreach (var row in unfinished)
+            {
+                row.AssessmentStatus = "Failed";
+                AssessmentWebDiscovery.AddError(row, stage, AssessmentWebDiscovery.ErrorCode(error),
+                    "Page assessment did not finish because its Web failed: " + error.GetBaseException().Message);
+            }
+            await db.SaveChangesAsync().ConfigureAwait(false);
+            return unfinished.Count;
+        }
+        finally { WriteGate.Release(); }
+    }
+
     internal static string Join(string left, string right, string separator = ";")
     {
         var values = new[] { left, right }.Where(value => !string.IsNullOrWhiteSpace(value));

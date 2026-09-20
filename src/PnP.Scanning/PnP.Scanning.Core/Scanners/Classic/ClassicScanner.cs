@@ -5,6 +5,7 @@ using PnP.Core.QueryModel;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Discovery;
 using System.Linq.Expressions;
 
 namespace PnP.Scanning.Core.Scanners
@@ -73,7 +74,7 @@ namespace PnP.Scanning.Core.Scanners
                                                                                                                                                w => w.MasterUrl });
             }
 
-            using (var context = await GetPnPContextAsync(options))
+            using (var context = await GetAssessmentContextAsync(options))
             using (var csomContext = GetClientContext(context))
             {
                 if (Options.Workflow)
@@ -165,6 +166,17 @@ namespace PnP.Scanning.Core.Scanners
             }
 
             Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+        }
+
+        private Task<PnPContext> GetAssessmentContextAsync(PnPContextOptions options)
+        {
+            if (!Options.Pages) return GetPnPContextAsync(options);
+            return ClassicAssessmentInitialization.ExecuteAsync(() => GetPnPContextAsync(options),
+                new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl,
+                ScanManager.GetCancellationTokenSource(ScanId).Token,
+                (attempt, error) => Logger.Warning(error,
+                    "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
+                    SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1));
         }
 
         internal async override Task PreScanningAsync()
