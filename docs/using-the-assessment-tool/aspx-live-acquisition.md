@@ -107,11 +107,14 @@ uses the PnP Core Web authority to enumerate subwebs. It never claims tenant-wid
 tenant visibility only when site and Web authority collections finish without continuation,
 exclusion or failure.
 
-All acquisition traffic uses:
+The direct SharePoint REST collection requests issued by the live acquisition provider use:
 
 ```text
 User-Agent: testtraffic-smr
 ```
+
+The scanner's shared PnP Core configuration keeps its normal product user agent, so unrelated
+assessment modes and page-enrichment requests are not relabeled as acquisition test traffic.
 
 ## Offline replay
 

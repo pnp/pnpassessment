@@ -785,7 +785,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         {
             var child = Add(new LiveScope(Key("folder", parent.WebUrl.AbsoluteUri, "web-root"), parent.ScopeKey,
                 DiscoveryScopeKind.Folder, DiscoverySourceKind.WebRootFiles, parent.WebUrl.AbsolutePath,
-                "web-root-folder", parent.WebUrl, null, null, parent.WebUrl.AbsolutePath, null));
+                "web-root-folder", parent.WebUrl, null, null, parent.WebUrl.AbsolutePath, parent.Metadata));
             return Task.FromResult(Result(parent, new[] { child }, DiscoveryTerminalOutcome.Complete));
         }
 
@@ -831,7 +831,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 var modeledChildren = modeledResult.Folders.Select(item => Add(new LiveScope(
                     Key("web-root-folder", parent.WebUrl.AbsoluteUri, item.ServerRelativeUrl), parent.ScopeKey,
                     DiscoveryScopeKind.Folder, DiscoverySourceKind.WebRootFiles, item.ServerRelativeUrl,
-                    "web-root-folder", parent.WebUrl, null, null, item.ServerRelativeUrl,
+                    "folder", parent.WebUrl, null, null, item.ServerRelativeUrl,
                     WithMetadata(parent.Metadata, ("folderUniqueId", item.UniqueId))))).ToArray();
                 return Result(parent, modeledChildren, modeledResult.Outcome, modeledResult.ErrorCode);
             }
@@ -1476,8 +1476,13 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var query = $"$select={select}" + (string.IsNullOrWhiteSpace(expand) ? string.Empty : $"&$expand={expand}");
         if (scope.Role == "web-root-folder")
             return Endpoint(scope.WebUrl, $"_api/web/RootFolder/{child}?{query}");
-        var escaped = (scope.FolderUrl ?? string.Empty).Replace("'", "''", StringComparison.Ordinal);
-        return Endpoint(scope.WebUrl, $"_api/web/GetFolderByServerRelativePath(decodedurl='{escaped}')/{child}?{query}");
+        // Keep decoded ResourcePath values unambiguous inside the HTTP URI. In particular, a raw '#'
+        // would otherwise start the URI fragment and silently truncate the requested folder and query.
+        var decoded = (scope.FolderUrl ?? string.Empty).Replace("%20", " ", StringComparison.Ordinal)
+            .Replace('\\', '/').Replace("'", "''", StringComparison.Ordinal);
+        var encoded = WebUtility.UrlEncode(decoded).Replace("+", "%20", StringComparison.Ordinal);
+        return Endpoint(scope.WebUrl,
+            $"_api/web/GetFolderByServerRelativePath(decodedUrl=@u)/{child}?@u='{encoded}'&{query}");
     }
     private static Uri ResolveNext(Uri initial, string next) =>
         Uri.TryCreate(next, UriKind.Absolute, out var absolute) ? absolute : new Uri(initial, next);

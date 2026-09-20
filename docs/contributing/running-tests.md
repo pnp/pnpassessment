@@ -38,6 +38,25 @@ The suite exercises production `AssessmentWebDiscovery`, `AssessmentDiscoveryWri
 
 `NativePageMetadataReplayTests` replaces only the PnP SDK list/item boundary with a strict offline test double. It uses synthetic metadata shaped after the cross-library item-ID failure, not captured tenant responses. It does **not** validate PnP SDK HTTP serialization, authentication, actual SharePoint enumeration completeness, CSOM Web Part extraction, TPL scheduling or the live restart lifecycle. Passing this suite is a local regression gate, not tenant acceptance.
 
+The repository also includes a PowerShell wrapper for the offline gate and an optional authenticated
+smoke test:
+
+```powershell
+# Offline: restores/builds and runs Category=NativeScanIntegration.
+.\build\Test-NativeAspxDiscovery.ps1
+
+# Live: prompts for any omitted identity values, waits for completion, exports discovery.csv,
+# and checks identities, duplicate physical files, ownership, assessment finalization and coverage.
+.\build\Test-NativeAspxDiscovery.ps1 -Live -HomePageOnly `
+  -Sites https://contoso.sharepoint.com/sites/classic `
+  -ExpectedPageUrl '/sites/classic/Docs/A#B/page.aspx'
+```
+
+Prefer `--certpath`/the certificate-store prompt for application authentication. PFX passwords are
+read as a secure prompt and are not written to the script, report or PowerShell command history.
+Use `-FailOnCoverageGap` when the selected validation scope is expected to have no incomplete Scope
+rows. `-ExpectedPageUrl` is useful for proving traversal of a known `%` or `#` folder.
+
 ## End-to-end validation
 
 The live SDK/CSOM code paths — reading a page's web parts via the `LimitedWebPartManager`, reading `Web.CanModernizeHomepage`, and discovering actual files/scopes — are validated by running an actual assessment against a test tenant with the CLI:

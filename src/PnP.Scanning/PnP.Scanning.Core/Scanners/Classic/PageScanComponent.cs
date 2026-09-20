@@ -69,12 +69,13 @@ namespace PnP.Scanning.Core.Scanners
             bool webPublishingEnabled = FeatureEnabled(context.Web.Features, FeatureId_Web_Publishing);
 
             // The web's welcome page drives the HomePage flag and the optional HomePageOnly filter.
-            string welcomePage = await GetWelcomePageAsync(csomContext).ConfigureAwait(false);
+            var (welcomePage, welcomePageKnown) = await GetWelcomePageAsync(csomContext).ConfigureAwait(false);
 
             var discovery = new PageDiscovery
             {
                 ScannerBase = scannerBase,
                 WelcomePage = welcomePage,
+                WelcomePageKnown = welcomePageKnown,
                 HomePageOnly = options.HomePageOnly,
                 SkipUserInformation = options.SkipUserInformation,
                 Pages = pagesList,
@@ -105,6 +106,11 @@ namespace PnP.Scanning.Core.Scanners
             // only selected libraries or gate their existence on publishing features/template.
             foreach (var row in discoveredPages)
             {
+                // The discovery provider records a nullable value so an unavailable modeled call is
+                // not mistaken for false. Prefer the later CSOM read when it succeeded; it is also the
+                // value used by the page assessment and keeps --homepageonly from filtering every page
+                // merely because the discovery-specific WelcomePage read failed.
+                row.HomePage = ResolveHomePageState(row.Url, welcomePage, welcomePageKnown, row.HomePage);
                 if (options.HomePageOnly && row.HomePage != true)
                 {
                     row.AssessmentStatus = "NotSelected";
@@ -122,8 +128,10 @@ namespace PnP.Scanning.Core.Scanners
                 }
                 try
                 {
-                    var input = await LoadPhysicalPageAsync(list, row, welcomePage, options.SkipUserInformation).ConfigureAwait(false);
+                    var input = await LoadPhysicalPageAsync(list, row, welcomePage,
+                        options.SkipUserInformation, welcomePageKnown).ConfigureAwait(false);
                     row.PageType = input.Page.PageType;
+                    row.HomePage = input.Page.HomePage;
                     if (row.PageType == PublishingPage) AddPublishingPage(discovery, input);
                     else AddSitePage(discovery, input);
                     row.AssessmentStatus = row.PageType == ModernPage ? "NotApplicable" : "Complete";
@@ -238,8 +246,9 @@ namespace PnP.Scanning.Core.Scanners
         private static void AddBlogPage(PageDiscovery disc, IList blogList, IListItem listItem)
         {
             string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
+            var homePage = ResolveHomePageState(pageUrl, disc.WelcomePage, disc.WelcomePageKnown, null);
 
-            if (disc.HomePageOnly && !HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage))
+            if (disc.HomePageOnly && homePage != true)
             {
                 return;
             }
@@ -257,7 +266,7 @@ namespace PnP.Scanning.Core.Scanners
                 ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
                 ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
                 PageType = BlogPage,
-                HomePage = HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage),
+                HomePage = homePage,
                 RemediationCode = RemediationCodes.CP4.ToString(),
             });
 
@@ -267,7 +276,7 @@ namespace PnP.Scanning.Core.Scanners
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
         // can be replayed offline against the native database/report pipeline.
         internal static async Task<PageEnrichmentInput> LoadPhysicalPageAsync(IList list, ClassicPageDiscovery row,
-            string welcomePage, bool skipUserInformation)
+            string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null)
         {
             if (row.ListId != list.Id || row.ListItemId == null || row.ListItemId <= 0)
                 throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
@@ -307,7 +316,8 @@ namespace PnP.Scanning.Core.Scanners
                 ModifiedAt = GetFieldValue<DateTime>(item, ModifiedField),
                 ModifiedBy = GetModifiedBy(item.Values, skipUserInformation),
                 PageType = isPublishing ? PublishingPage : GetPageType(item),
-                HomePage = HomePageDetector.IsHomePage(pageUrl, welcomePage),
+                HomePage = ResolveHomePageState(pageUrl, welcomePage,
+                    welcomePageKnown ?? welcomePage != null, row.HomePage),
             };
 
             return new PageEnrichmentInput
@@ -324,10 +334,15 @@ namespace PnP.Scanning.Core.Scanners
             page.WebId = found.WebId;
             page.FileUniqueId = found.FileUniqueId;
             page.ListItemId = found.ListItemId;
-            page.HomePage = found.HomePage;
+            page.HomePage = found.HomePage ?? page.HomePage;
             page.DiscoveryStatus = found.DiscoveryStatus;
             page.AssessmentStatus = found.AssessmentStatus;
         }
+
+        internal static bool? ResolveHomePageState(string pageUrl, string welcomePage,
+            bool welcomePageKnown, bool? discoveredHomePage) => welcomePageKnown
+            ? HomePageDetector.IsHomePage(pageUrl, welcomePage)
+            : discoveredHomePage;
 
         private static void AddSitePage(PageDiscovery disc, PageEnrichmentInput input)
         {
@@ -467,9 +482,9 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // Reads the web's welcome page (server-relative-from-web), used for the HomePage flag and the
-        // HomePageOnly filter. Returns an empty string when the property cannot be read so discovery
-        // continues (HomePageDetector defaults the empty welcome page to default.aspx).
-        private static async Task<string> GetWelcomePageAsync(ClientContext csomContext)
+        // HomePageOnly filter. Keep an unavailable read distinct from a successful empty value, because
+        // an empty WelcomePage legitimately means default.aspx while a failed read remains unknown.
+        private static async Task<(string WelcomePage, bool IsKnown)> GetWelcomePageAsync(ClientContext csomContext)
         {
             try
             {
@@ -477,11 +492,11 @@ namespace PnP.Scanning.Core.Scanners
                 csomContext.Load(rootFolder, f => f.WelcomePage);
                 await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
-                return rootFolder.WelcomePage ?? "";
+                return (rootFolder.WelcomePage ?? "", true);
             }
             catch
             {
-                return "";
+                return (null, false);
             }
         }
 
@@ -677,6 +692,8 @@ namespace PnP.Scanning.Core.Scanners
             public ScannerBase ScannerBase { get; init; }
 
             public string WelcomePage { get; init; }
+
+            public bool WelcomePageKnown { get; init; }
 
             public bool HomePageOnly { get; init; }
 

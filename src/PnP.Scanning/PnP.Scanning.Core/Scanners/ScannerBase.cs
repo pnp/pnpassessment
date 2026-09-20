@@ -157,7 +157,6 @@ namespace PnP.Scanning.Core.Scanners
 
                 string accessToken = ScanManager.GetScanAuthenticationManager(ScanId).GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                 args.WebRequestExecutor.RequestHeaders["Authorization"] = "Bearer " + accessToken;
-                args.WebRequestExecutor.RequestHeaders["User-Agent"] = "testtraffic-smr";
             };
 
             // Hookup custom WebRequestExecutorFactory 
