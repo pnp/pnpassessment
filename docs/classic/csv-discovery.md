@@ -7,8 +7,7 @@ This csv file contains the physical ASPX inventory collected by the classic page
 Rows with `RowType=Page` represent physical ASPX files. Rows with `RowType=Scope` represent a tenant, site, web, list, folder or API surface that was inspected. Scope rows make incomplete discovery visible without creating page rows for files that were not observed.
 
 > [!NOTE]
-> A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` scope rows. Use these rows to identify parts of the selected tenant or sites that could not be fully inspected. Page assessment failures do not remove the corresponding discovered page from this file.
-> Discovery and assessment gaps are reported through the Scope rows and the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Classic report does not generate a separate discovery gaps csv file.
+> A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` scope rows. These rows identify parts of the selected tenant or sites with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records all discovery and assessment gaps through Scope rows and the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns.
 
 ## Columns
 
