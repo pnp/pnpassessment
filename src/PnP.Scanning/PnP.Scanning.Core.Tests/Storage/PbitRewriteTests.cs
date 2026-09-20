@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using FluentAssertions;
 using PnP.Scanning.Core.Services;
 using Xunit;
@@ -7,13 +8,11 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Storage
 {
     /// <summary>
-    /// T12 — verifies the Power BI <c>.pbit</c> data-location rewrite
+    /// Verifies the shipped Power BI template schema and the <c>.pbit</c> data-location rewrite
     /// (<see cref="ReportManager.RewriteDataLocationsInPbit"/>). The rewrite is what makes the
     /// generated report point at the freshly exported CSVs instead of the hard-coded authoring
-    /// directory the template was created against. The <c>.pbit</c> visuals themselves are a binary
-    /// Power BI template (manual-verify only — no unit test), but the path/delimiter rewrite is pure
-    /// file logic and is exercised here against a hand-built fixture template containing the new
-    /// T11 page-scan CSV data sources (<c>classicpagewebparts.csv</c> / <c>classicwebpartunique.csv</c>).
+    /// directory the template was created against. Visual rendering remains a manual Power BI check;
+    /// schema contracts and path/delimiter rewriting are exercised here.
     /// </summary>
     public class PbitRewriteTests
     {
@@ -21,6 +20,31 @@ namespace PnP.Scanning.Core.Tests.Storage
         // passed by ReportManager.CreatePowerBiReportAsync. Inside the DataModelSchema's JSON-escaped M
         // code the backslashes are doubled, so the runtime string value carries doubled backslashes too.
         private const string OldLocation = "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\";
+
+        [Fact]
+        public void ClassicTemplate_PropertiesValue_IsText()
+        {
+            const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
+            using var pbit = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
+            pbit.Should().NotBeNull();
+
+            var schema = ReadDataModelSchema(pbit);
+            using var document = JsonDocument.Parse(schema);
+            var tables = document.RootElement.GetProperty("model").GetProperty("tables");
+            var properties = tables.EnumerateArray()
+                .Single(table => table.GetProperty("name").GetString() == "properties");
+            var value = properties.GetProperty("columns").EnumerateArray()
+                .Single(column => column.GetProperty("name").GetString() == "Value");
+
+            value.GetProperty("dataType").GetString().Should().Be("string");
+            value.TryGetProperty("formatString", out _).Should().BeFalse();
+
+            var expression = string.Join("\n", properties.GetProperty("partitions")[0]
+                .GetProperty("source").GetProperty("expression").EnumerateArray()
+                .Select(line => line.GetString()));
+            expression.Should().Contain("{\"Value\", type text}");
+            expression.Should().NotContain("{\"Value\", type logical}");
+        }
 
         [Fact]
         public void RewriteDataLocationsInPbit_NewCsvSources_PathsRewritten()
@@ -112,7 +136,13 @@ namespace PnP.Scanning.Core.Tests.Storage
 
         private static string ReadDataModelSchema(string pbit)
         {
-            using var archive = ZipFile.OpenRead(pbit);
+            using var stream = File.OpenRead(pbit);
+            return ReadDataModelSchema(stream);
+        }
+
+        private static string ReadDataModelSchema(Stream pbit)
+        {
+            using var archive = new ZipArchive(pbit, ZipArchiveMode.Read, leaveOpen: true);
             var entry = archive.GetEntry("DataModelSchema");
             entry.Should().NotBeNull();
 
