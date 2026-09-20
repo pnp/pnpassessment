@@ -1198,7 +1198,7 @@ namespace PnP.Scanning.Core.Scanners
                 Microsoft365Environment.USGovernment => "graph.microsoft.com",
                 Microsoft365Environment.USGovernmentHigh => "graph.microsoft.us",
                 Microsoft365Environment.USGovernmentDoD => "dod-graph.microsoft.us",
-                Microsoft365Environment.Germany => "graph.microsoft.de",
+                Microsoft365Environment.DelosCloud => "graph.svc.sovcloud.de",
                 Microsoft365Environment.China => "microsoftgraph.chinacloudapi.cn",
                 _ => "graph.microsoft.com"
             };
