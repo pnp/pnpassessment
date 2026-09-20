@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Process.Commands;
 using System.Net;
 using System.Text;
 using Xunit;
@@ -372,16 +371,6 @@ public sealed class AspxAcquisitionV3Tests
         };
         AspxTerminalRunReceiptValidator.Validate(wrongVersion).GapCodes.Should()
             .Contain("terminal_volume_version_incompatible:aggregate-output");
-    }
-
-    [Fact]
-    public void Cli_contract_requires_terminal_receipt_and_advertises_v2_companion_outputs()
-    {
-        var command = AspxAcquisitionCommandDefinition.Create((_, _) => Task.FromResult(0));
-        command.Options.Select(option => option.Name).Should().Contain("terminal-receipt");
-        command.Options.Select(option => option.Name).Should().Contain("scope-mode");
-        command.Description.Should().Contain("reference v2").And.Contain("aggregate v2")
-            .And.Contain("terminal receipt v1");
     }
 
     [Fact]

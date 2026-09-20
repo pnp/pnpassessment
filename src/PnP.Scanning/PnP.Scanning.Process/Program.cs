@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using PnP.Core.Services;
 using PnP.Core.Auth.Services.Builder.Configuration;
 using PnP.Core.Services.Builder.Configuration;
 using PnP.Scanning.Core.Authentication;
@@ -25,7 +24,7 @@ namespace PnP.Scanning.Process
 {
     internal class Program
     {
-        internal static async Task<int> Main(string[] args)
+        internal static async Task Main(string[] args)
         {
             bool isCliProcess = true;
 
@@ -38,32 +37,26 @@ namespace PnP.Scanning.Process
             if (isCliProcess)
             {
 
-                var isAspxAcquisitionCommand = args.Length > 0 &&
-                    (args[0].Equals("aspx-inventory", StringComparison.OrdinalIgnoreCase) ||
-                     args[0].Equals("aspx-acquisition", StringComparison.OrdinalIgnoreCase));
-                if (!isAspxAcquisitionCommand)
+                await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
                 {
-                    await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
-                    {
-                        var versions = await VersionManager.LatestVersionAsync();
+                    var versions = await VersionManager.LatestVersionAsync();
 
-                        // There's a newer version to download
-                        if (!string.IsNullOrEmpty(versions.Item2))
-                        {
-                            AnsiConsole.WriteLine();
-                            AnsiConsole.MarkupLine($"Version [yellow]{versions.Item2}[/] is available, you are currently using version {versions.Item1}");
-                            AnsiConsole.WriteLine();
-                            AnsiConsole.MarkupLine($"Download the latest version from [yellow]{VersionManager.newVersionDownloadUrl}[/]");
-                            AnsiConsole.WriteLine();
-                        }
-                        else
-                        {
-                            AnsiConsole.WriteLine();
-                            AnsiConsole.MarkupLine($"You are using the latest version {versions.Item1}");
-                            AnsiConsole.WriteLine();
-                        }
-                    });
-                }
+                    // There's a newer version to download                
+                    if (!string.IsNullOrEmpty(versions.Item2))
+                    {
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.MarkupLine($"Version [yellow]{versions.Item2}[/] is available, you are currently using version {versions.Item1}");
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.MarkupLine($"Download the latest version from [yellow]{VersionManager.newVersionDownloadUrl}[/]");
+                        AnsiConsole.WriteLine();
+                    }
+                    else
+                    {
+                        AnsiConsole.WriteLine();
+                        AnsiConsole.MarkupLine($"You are using the latest version {versions.Item1}");
+                        AnsiConsole.WriteLine();
+                    }
+                });
 
                 // Configure needed services
                 var host = ConfigureCliHost(args);
@@ -72,9 +65,8 @@ namespace PnP.Scanning.Process
                 var processManager = host.Services.GetRequiredService<ScannerManager>();
                 var dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
                 var configurationData = host.Services.GetRequiredService<ConfigurationOptions>();
-                var pnpContextFactory = host.Services.GetRequiredService<IPnPContextFactory>();
 
-                var root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData, pnpContextFactory).Create();
+                var root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
                 var builder = new CommandLineBuilder(root);
                 var parser = builder.UseDefaults().Build();
 
@@ -99,11 +91,10 @@ namespace PnP.Scanning.Process
                         AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
                         consoleInput = Console.ReadLine();
                     }
-                    return 0;
                 }
                 else
                 {
-                    return await parser.InvokeAsync(args);
+                    await parser.InvokeAsync(args);
                 }
             }
             else
@@ -154,7 +145,6 @@ namespace PnP.Scanning.Process
                 {
                     Log.CloseAndFlush();
                 }
-                return 0;
             }
         }
 
@@ -174,16 +164,6 @@ namespace PnP.Scanning.Process
                            services.AddSingleton(customSettings);
 
                            services.AddDataProtection();
-
-                           services.AddPnPCore(options =>
-                           {
-                               options.PnPContext.GraphFirst = false;
-                               options.HttpRequests.Timeout = -1;
-                               options.DisableTelemetry = true;
-                           });
-                           services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
-                           services.AddPnPCoreAuthentication();
-                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 
                            services.AddSingleton<ScannerManager>();
                            services.AddTransient<AuthenticationManager>();
