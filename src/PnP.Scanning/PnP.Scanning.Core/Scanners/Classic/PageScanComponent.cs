@@ -102,8 +102,8 @@ namespace PnP.Scanning.Core.Scanners
                     }).ConfigureAwait(false);
                 }
             }
-            // The lossless provider has already found the physical pages. Do not rediscover
-            // only selected libraries or gate their existence on publishing features/template.
+            // The provider has already found the physical pages in the requested page scope. Do not
+            // rediscover selected libraries or gate their existence on publishing features/template.
             foreach (var row in discoveredPages)
             {
                 // The discovery provider records a nullable value so an unavailable modeled call is
@@ -146,9 +146,7 @@ namespace PnP.Scanning.Core.Scanners
                     scannerBase.Logger.Warning(ex, "Page metadata assessment failed for {PageUrl}; retaining discovery", row.Url);
                 }
             }
-            // Commit one Web's assessment dispositions in a single EF transaction. In particular,
-            // --homepageonly can mark thousands of physical pages NotSelected without opening one
-            // context and transaction per page.
+            // Commit one Web's assessment dispositions in a single EF transaction.
             await discoveryWriter.UpdateExistingAsync(discoveredPages).ConfigureAwait(false);
 
             // Enrich the discovered classic pages with their web part inventory, mapping readiness, page

@@ -27,7 +27,9 @@ namespace PnP.Scanning.Core.Services
             ICollection<ClassicPageDiscovery> discoveryEvidence = null)
         {
             List<string> list = new();
-            var fullPageDiscovery = OptionsBase.FromScannerInput(start) is ClassicOptions { Pages: true };
+            var classicOptions = OptionsBase.FromScannerInput(start) as ClassicOptions;
+            var fullPageDiscovery = classicOptions is { Pages: true };
+            var homePageOnly = classicOptions is { Pages: true, HomePageOnly: true };
             Exception authorityError = null;
 
             Log.Information("Building list of site collections to assess");
@@ -158,6 +160,15 @@ namespace PnP.Scanning.Core.Services
                 if (authorityError != null) AssessmentWebDiscovery.AddError(row, "EnumerateSites",
                     AssessmentWebDiscovery.ErrorCode(authorityError), AssessmentWebDiscovery.ErrorDetail(authorityError));
                 discoveryEvidence.Add(row);
+                if (homePageOnly)
+                {
+                    discoveryEvidence.Add(new ClassicPageDiscovery
+                    {
+                        RecordKey = "assessment:page-selection", RowType = "Scope", ScopeType = "PageSelection",
+                        Url = "WelcomePage", DiscoveryStatus = "Complete", ObservationMethod = "HomePageOnly",
+                        ObservedAtUtc = DateTime.UtcNow,
+                    });
+                }
             }
 
             return list;

@@ -2,12 +2,12 @@
 
 ## Summary
 
-This csv file contains the physical ASPX inventory and acquisition evidence collected by the classic pages assessment. The existing assessment ScanId, database and report lifecycle own every row.
+This csv file contains the physical ASPX inventory and acquisition evidence collected within the requested page scope. The existing assessment ScanId, database and report lifecycle own every row. A normal classic pages assessment uses the full physical inventory scope. With `--homepageonly`, discovery resolves only each web's configured welcome page so the scan remains a fast home-page assessment.
 
 `Page` rows represent physical ASPX files. `Scope` rows represent tenant, site, web, list, folder and API surfaces. `Reference` rows record Forms, Views and welcome-page references. `Pagination` rows record sanitized request-chain evidence. `Gap` rows retain acquisition gaps that are not owned by one scope. After post-scan processing, the `Summary` row records the scan-wide coverage verdict.
 
 > [!NOTE]
-> A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` coverage rows. These rows identify parts of the selected tenant or sites with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records discovery and assessment gaps through Scope and Gap rows together with the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns.
+> A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` coverage rows. These rows identify parts of the requested scope with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records discovery and assessment gaps through Scope and Gap rows together with the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Summary evidence records `pageScope=HomePageOnly` for a scoped home-page scan and `pageScope=FullInventory` otherwise.
 
 ## Columns
 
@@ -17,7 +17,7 @@ Column|Description
 ------|-----------
 RecordKey | Stable key for the page or discovery scope within the assessment.
 RowType | `Page`, `Scope`, `Reference`, `Pagination`, `Gap` or `Summary`.
-ScopeType | Type of scope or object represented by the row, such as `Tenant`, `SiteCollection`, `Web`, `List`, `Folder`, `Surface` or `File`.
+ScopeType | Type of scope or object represented by the row, such as `Tenant`, `SiteCollection`, `PageSelection`, `Web`, `List`, `Folder`, `Surface` or `File`.
 ParentScopeKey | Record key of the parent discovery scope.
 Url | Server-relative page URL for a Page row. For a Scope row this is the inspected scope or endpoint.
 SiteCollectionId | Id of the owning site collection when it could be resolved.
@@ -33,7 +33,7 @@ HomePage | True or False when the web's welcome page could be resolved and compa
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
 ObservationMethod | API surface or adapter that observed the page or scope.
 DiscoveryStatus | Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on `RowType`. Summary verdicts are `CompleteTenantVerified`, `CompleteAuthorizedSurface`, `CompleteDeclaredSubset`, `Incomplete` or `Unknown`.
-AssessmentStatus | Page enrichment result: `Complete`, `NotSelected`, `NotApplicable` or `Failed`. Empty for Scope rows.
+AssessmentStatus | Page enrichment result: `Complete`, `NotSelected`, `NotApplicable` or `Failed`. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as `NotSelected`.
 ExpectedChildCount | Number of child scopes or objects expected when the source can provide a reliable count.
 ObservedChildCount | Number of child scopes or objects that were observed.
 ErrorStage | Discovery or assessment stage that produced an error or coverage gap.

@@ -4,7 +4,8 @@ using System.Text;
 namespace PnP.Scanning.Core.Discovery;
 
 internal enum DiscoveryScopeKind { Web, Container, Folder }
-internal enum DiscoverySourceKind { RawListLibraryFiles, WebRootFiles, ListFormBackingFiles, ListViewBackingFiles }
+internal enum DiscoverySourceKind { RawListLibraryFiles, WebRootFiles, ListFormBackingFiles, ListViewBackingFiles, WebWelcomePage }
+internal enum AspxDiscoveryIntent { FullInventory, HomePageOnly }
 public enum DiscoveryTerminalOutcome { Pending, Complete, Empty, PolicyExcluded, Denied, Failed, Truncated, Cancelled, Unknown }
 public enum DiscoveryVerdict { CompleteTenantVerified, CompleteAuthorizedSurface, CompleteDeclaredSubset, Incomplete, Unknown }
 

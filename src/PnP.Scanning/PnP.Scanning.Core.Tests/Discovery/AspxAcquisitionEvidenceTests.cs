@@ -192,20 +192,27 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
     {
         var completeScan = Guid.NewGuid();
         var declaredScan = Guid.NewGuid();
+        var homePageScan = Guid.NewGuid();
         var incompleteScan = Guid.NewGuid();
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        var pageSelection = Scope(homePageScan, "assessment:page-selection", "PageSelection", "Complete");
+        pageSelection.ObservationMethod = "HomePageOnly";
         await writer.WriteAsync(new[]
         {
             Scope(completeScan, "assessment:site-selection", "Tenant", "Complete"),
             Scope(completeScan, "web:root", "Web", "Complete"),
             Scope(declaredScan, "assessment:site-selection", "SiteSelection", "Complete"),
             Scope(declaredScan, "web:root", "Web", "Complete"),
+            Scope(homePageScan, "assessment:site-selection", "Tenant", "Complete"),
+            pageSelection,
+            Scope(homePageScan, "web:root", "Web", "Complete"),
             Scope(incompleteScan, "assessment:site-selection", "SiteSelection", "Complete"),
             Scope(incompleteScan, "web:root", "Web", "Denied"),
         });
 
         (await writer.FinalizeScanAsync(completeScan)).Should().Be(DiscoveryVerdict.CompleteTenantVerified);
         (await writer.FinalizeScanAsync(declaredScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
+        (await writer.FinalizeScanAsync(homePageScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(incompleteScan)).Should().Be(DiscoveryVerdict.Incomplete);
 
         using var read = database.CreateContext();
@@ -215,6 +222,10 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         read.ClassicPageDiscoveries.Single(row =>
             row.ScanId == incompleteScan && row.RecordKey == "summary:coverage")
             .DiscoveryStatus.Should().Be(nameof(DiscoveryVerdict.Incomplete));
+        var homePageSummary = read.ClassicPageDiscoveries.Single(row =>
+            row.ScanId == homePageScan && row.RecordKey == "summary:coverage");
+        homePageSummary.ObservationMethod.Should().Be("HomePageOnly");
+        homePageSummary.EvidenceJson.Should().Contain("\"pageScope\":\"HomePageOnly\"");
     }
 
     [Fact]

@@ -110,6 +110,65 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         page.HomePage.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Home_page_only_resolves_one_physical_file_without_enumerating_lists_or_folders()
+    {
+        var scanId = Guid.NewGuid();
+        var siteId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var webId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var listId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var fileId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var siteUrl = new Uri("https://contoso.sharepoint.com/sites/a");
+        using var factory = new HomePageOnlyFactory(siteUrl, listId, fileId);
+        using var provider = new SharePointLiveAspxDiscoveryProvider(
+            new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64),
+                Intent: AspxDiscoveryIntent.HomePageOnly),
+            factory, new AspxWebAcquisitionContext(siteId, siteUrl, webId, siteUrl, "/sites/a", "STS#3"));
+
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        await new AssessmentWebDiscovery(scanId, siteUrl.AbsoluteUri, "/", writer)
+            .RunAsync(provider, CancellationToken.None);
+
+        var page = (await writer.ReadPagesAsync(scanId, siteUrl.AbsoluteUri, "/")).Should().ContainSingle().Subject;
+        page.Url.Should().Be("/sites/a/SitePages/Home.aspx");
+        page.SiteCollectionId.Should().Be(siteId);
+        page.WebId.Should().Be(webId);
+        page.ListId.Should().Be(listId);
+        page.FileUniqueId.Should().Be(fileId);
+        page.ListItemId.Should().Be(42);
+        page.HomePage.Should().BeTrue();
+        factory.Client.WelcomePageReads.Should().Be(1);
+        factory.Client.FileResolutions.Should().Be(1);
+        factory.Client.RestCollectionReads.Should().Be(0);
+        factory.Client.FolderReads.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Home_page_only_resolution_failure_is_reported_without_falling_back_to_full_inventory()
+    {
+        var scanId = Guid.NewGuid();
+        var siteUrl = new Uri("https://contoso.sharepoint.com/sites/a");
+        using var factory = new HomePageOnlyFactory(siteUrl, Guid.NewGuid(), Guid.NewGuid(), failResolution: true);
+        using var provider = new SharePointLiveAspxDiscoveryProvider(
+            new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64),
+                Intent: AspxDiscoveryIntent.HomePageOnly),
+            factory, new AspxWebAcquisitionContext(Guid.NewGuid(), siteUrl, Guid.NewGuid(), siteUrl,
+                "/sites/a", "STS#3"));
+
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        await new AssessmentWebDiscovery(scanId, siteUrl.AbsoluteUri, "/", writer)
+            .RunAsync(provider, CancellationToken.None);
+
+        (await writer.ReadPagesAsync(scanId, siteUrl.AbsoluteUri, "/")).Should().BeEmpty();
+        using var read = database.CreateContext();
+        var webScope = read.ClassicPageDiscoveries.Single(row =>
+            row.ScanId == scanId && row.RowType == "Scope" && row.ScopeType == "Web");
+        webScope.DiscoveryStatus.Should().Be("Failed");
+        webScope.ErrorCodes.Should().Contain("locator_resolution_failed");
+        factory.Client.RestCollectionReads.Should().Be(0);
+        factory.Client.FolderReads.Should().Be(0);
+    }
+
     private static SharePointLiveAspxDiscoveryProvider Provider(RootTraversalFactory factory, Uri siteUrl,
         Guid siteId, Guid webId) => new(
         new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64)),
@@ -137,6 +196,73 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
             CancellationToken cancellationToken = default) => Task.FromResult<ISharePointAspxRestClient>(Client);
         public void Dispose() => Client.Dispose();
+    }
+
+    private sealed class HomePageOnlyFactory : ISharePointAspxRestClientFactory
+    {
+        internal HomePageOnlyFactory(Uri webUrl, Guid listId, Guid fileId, bool failResolution = false) =>
+            Client = new HomePageOnlyClient(webUrl, listId, fileId, failResolution);
+        internal HomePageOnlyClient Client { get; }
+        public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
+            CancellationToken cancellationToken = default) => Task.FromResult<ISharePointAspxRestClient>(Client);
+        public void Dispose() => Client.Dispose();
+    }
+
+    private sealed class HomePageOnlyClient : ISharePointAspxRestClient
+    {
+        private readonly Guid listId;
+        private readonly Guid fileId;
+        private readonly bool failResolution;
+
+        internal HomePageOnlyClient(Uri webUrl, Guid listId, Guid fileId, bool failResolution)
+        {
+            WebUrl = webUrl;
+            this.listId = listId;
+            this.fileId = fileId;
+            this.failResolution = failResolution;
+        }
+
+        internal int WelcomePageReads { get; private set; }
+        internal int FileResolutions { get; private set; }
+        internal int RestCollectionReads { get; private set; }
+        internal int FolderReads { get; private set; }
+        public Uri WebUrl { get; }
+
+        public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
+            CancellationToken cancellationToken = default)
+        {
+            RestCollectionReads++;
+            throw new InvalidOperationException("Home-page-only discovery must not enumerate REST collections.");
+        }
+
+        public Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
+            CancellationToken cancellationToken = default)
+        {
+            FileResolutions++;
+            return Task.FromResult(failResolution
+                ? new SharePointResolvedFile(DiscoveryTerminalOutcome.Failed, null, null, serverRelativeUrl,
+                    null, "fake:resolve", "locator_resolution_failed")
+                : new SharePointResolvedFile(DiscoveryTerminalOutcome.Complete, fileId.ToString("D"),
+                    "HOME.aspx", "/sites/a/SitePages/HOME.aspx", "Customized", "fake:resolve",
+                    ListId: listId, ListItemId: 42));
+        }
+
+        public Task<SharePointModeledValue> ReadWelcomePageAsync(
+            CancellationToken cancellationToken = default)
+        {
+            WelcomePageReads++;
+            return Task.FromResult(new SharePointModeledValue(DiscoveryTerminalOutcome.Complete,
+                "SitePages/Home.aspx", "fake", "welcome", null, "fake:welcome", DateTimeOffset.UtcNow));
+        }
+
+        public Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
+            CancellationToken cancellationToken = default)
+        {
+            FolderReads++;
+            throw new InvalidOperationException("Home-page-only discovery must not enumerate folders.");
+        }
+
+        public void Dispose() { }
     }
 
     private sealed class RootTraversalClient : ISharePointAspxRestClient

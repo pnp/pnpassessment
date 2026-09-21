@@ -6,7 +6,7 @@ This module carries the classic page scanning capability of the older [SharePoin
 
 The assessment provides you with:
 
-- A physical ASPX inventory with scope, reference, pagination and coverage evidence — see [discovery.csv](csv-discovery.md).
+- A physical ASPX inventory for the requested page scope, with scope, reference, pagination and coverage evidence — see [discovery.csv](csv-discovery.md).
 - A per-page inventory of the classic pages found (page type, layout, home-page flags, last modified, usage) — see [classicpages.csv](csv-classicpages.md).
 - A per-page audit log usage report (view/create/edit counts and distinct users per classic page) — see [classicpageauditusage.csv](csv-classicpageauditusage.md).
 - A per-web-part inventory of every web part found on those pages — see [classicpagewebparts.csv](csv-classicpagewebparts.md).

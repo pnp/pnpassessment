@@ -13,7 +13,8 @@ internal sealed record SharePointLiveAspxDiscoveryOptions(
     string VisibilityBoundary,
     string AuthorityRevision,
     string AuthorityHash,
-    string PlatformBuildRef = null);
+    string PlatformBuildRef = null,
+    AspxDiscoveryIntent Intent = AspxDiscoveryIntent.FullInventory);
 
 internal sealed record AspxWebAcquisitionContext(
     Guid SiteCollectionId,
@@ -248,6 +249,7 @@ internal sealed record SharePointResolvedFile(
     string CustomizedPageStatus,
     string EvidenceRef,
     string ErrorCode = null,
+    Guid? ListId = null,
     int? ListItemId = null,
     string ContentTypeId = null);
 
@@ -377,7 +379,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             cancellationToken.ThrowIfCancellationRequested();
             var file = await context.Web.GetFileByServerRelativeUrlOrDefaultAsync(serverRelativeUrl,
                 item => item.UniqueId, item => item.Name, item => item.ServerRelativeUrl,
-                item => item.CustomizedPageStatus,
+                item => item.CustomizedPageStatus, item => item.ListId,
                 item => item.ListItemAllFields)
                 .ConfigureAwait(false);
             if (file == null)
@@ -386,7 +388,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             return new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
                 file.ServerRelativeUrl, file.CustomizedPageStatus.ToString(),
                 "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", null,
-                file.ListItemAllFields?.Id, null);
+                file.ListId, file.ListItemAllFields?.Id, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -596,6 +598,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private readonly ISharePointAspxRestClientFactory clientFactory;
     private readonly Dictionary<string, LiveScope> scopes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RawDiscoveryRecord> targetedFiles = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> welcomePageByWeb = new(StringComparer.OrdinalIgnoreCase);
     private bool disposed;
 
@@ -648,6 +651,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             "folder" or "physical-forms" or "web-root-folder" => ReadFolderFilesAsync(scope, token),
             "forms" => ReadReferencesAsync(scope, isForm: true, token),
             "views" => ReadReferencesAsync(scope, isForm: false, token),
+            "welcome-page" => ReadTargetedFileAsync(scope, token),
             _ => throw new InvalidOperationException($"Unsupported live raw surface role '{scope.Role}'."),
         });
     }
@@ -662,7 +666,21 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private async Task<DiscoveryChildEnumerationResult> EnumerateWebAsync(LiveScope parent,
         CancellationToken cancellationToken)
     {
-        await AcquireWelcomePageAsync(parent, cancellationToken).ConfigureAwait(false);
+        var welcomePage = await AcquireWelcomePageAsync(parent, cancellationToken).ConfigureAwait(false);
+        if (options.Intent == AspxDiscoveryIntent.HomePageOnly)
+        {
+            if (welcomePage.Physical == null)
+                return Result(parent, Array.Empty<LiveScope>(), welcomePage.Outcome, welcomePage.ErrorCode);
+
+            var target = Add(new LiveScope(Key("welcome-page", parent.WebUrl.AbsoluteUri,
+                    welcomePage.Physical.FileUniqueId ?? welcomePage.Locator), parent.ScopeKey,
+                DiscoveryScopeKind.Folder, DiscoverySourceKind.WebWelcomePage,
+                welcomePage.Locator, "welcome-page", parent.WebUrl, welcomePage.Physical.ListId,
+                null, null, parent.Metadata));
+            targetedFiles[target.ScopeKey] = welcomePage.Physical;
+            return Result(parent, new[] { target }, DiscoveryTerminalOutcome.Complete);
+        }
+
         var endpoint = Endpoint(parent.WebUrl,
             $"_api/web/lists?$select={AllListsSelect}&$expand=RootFolder");
         var listResult = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
@@ -747,7 +765,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private async Task<DiscoveryChildEnumerationResult> EnumerateFolderAsync(LiveScope parent,
         CancellationToken cancellationToken)
     {
-        if (parent.Role is "forms" or "views")
+        if (parent.Role is "forms" or "views" or "welcome-page")
             return Result(parent, Array.Empty<LiveScope>(), DiscoveryTerminalOutcome.Empty);
         if (parent.SourceKind == DiscoverySourceKind.WebRootFiles)
         {
@@ -849,6 +867,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
     }
 
+    private async IAsyncEnumerable<RawDiscoveryBatch> ReadTargetedFileAsync(LiveScope scope,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!targetedFiles.TryGetValue(scope.ScopeKey, out var record))
+            throw new InvalidOperationException($"Targeted ASPX file '{scope.ScopeKey}' was not acquired.");
+        await Task.CompletedTask.ConfigureAwait(false);
+        yield return new RawDiscoveryBatch(0,
+            DiscoveryHash.Of("welcome-page", scope.ScopeKey, record.PhysicalLocator),
+            DiscoveryHash.Of(record.FileUniqueId, record.PhysicalLocator), new[] { record },
+            IsTerminal: true, DiscoveryTerminalOutcome.Complete);
+    }
+
     private async IAsyncEnumerable<RawDiscoveryBatch> ReadReferencesAsync(LiveScope scope, bool isForm,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -893,20 +924,22 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
     }
 
-    private async Task<(AspxReferenceCandidate Candidate, RawDiscoveryRecord Physical)> ResolveReferenceAsync(
+    private async Task<(AspxReferenceCandidate Candidate, RawDiscoveryRecord Physical,
+        DiscoveryTerminalOutcome Outcome)> ResolveReferenceAsync(
         LiveScope scope, bool isForm, string objectId, string locator, string evidenceRef,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string sourceKindOverride = null, string methodOverride = null)
     {
-        var sourceKind = isForm ? AspxReferenceSourceKinds.ListForm : AspxReferenceSourceKinds.ListView;
+        var sourceKind = sourceKindOverride ??
+            (isForm ? AspxReferenceSourceKinds.ListForm : AspxReferenceSourceKinds.ListView);
         var sourceObjectIdentity = scope.ListId == null ? objectId : scope.ListId.Value.ToString("D") + ":" + objectId;
-        var method = isForm ? "SharePoint REST List.Forms + PnP.Core file resolution"
-            : "SharePoint REST List.Views + PnP.Core file resolution";
+        var method = methodOverride ?? (isForm ? "SharePoint REST List.Forms + PnP.Core file resolution"
+            : "SharePoint REST List.Views + PnP.Core file resolution");
         if (string.IsNullOrWhiteSpace(locator))
             return (Candidate(sourceKind, sourceObjectIdentity, method, locator, AspxReferenceDispositions.Unknown,
-                "locator_missing", null, "unknown", evidenceRef), null);
+                "locator_missing", null, "unknown", evidenceRef), null, DiscoveryTerminalOutcome.Unknown);
         if (!string.Equals(Path.GetExtension(locator), ".aspx", StringComparison.OrdinalIgnoreCase))
             return (Candidate(sourceKind, sourceObjectIdentity, method, locator, AspxReferenceDispositions.NonAspx,
-                "locator_not_aspx", null, "not-applicable", evidenceRef), null);
+                "locator_not_aspx", null, "not-applicable", evidenceRef), null, DiscoveryTerminalOutcome.Empty);
 
         var client = await clientFactory.GetAsync(scope.WebUrl, cancellationToken).ConfigureAwait(false);
         var resolved = await client.ResolveFileAsync(locator, cancellationToken).ConfigureAwait(false);
@@ -915,7 +948,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var disposition = resolved.Outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed
                 ? AspxReferenceDispositions.ReferenceUnavailable : AspxReferenceDispositions.Unknown;
             return (Candidate(sourceKind, sourceObjectIdentity, method, locator, disposition,
-                resolved.ErrorCode, null, "unavailable", evidenceRef, resolved.EvidenceRef), null);
+                resolved.ErrorCode, null, "unavailable", evidenceRef, resolved.EvidenceRef), null, resolved.Outcome);
         }
 
         var ghosted = string.Equals(resolved.CustomizedPageStatus, nameof(CustomizedPageStatus.Uncustomized),
@@ -923,18 +956,21 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var dispositionValue = ghosted ? AspxReferenceDispositions.LinkedPhysicalGhosted
             : AspxReferenceDispositions.LinkedPhysicalCustomized;
         var contentOrigin = ghosted ? "verified-ghosted" : "verified-customized-or-physical";
+        var physicalOwnerListId = options.Intent == AspxDiscoveryIntent.HomePageOnly ? resolved.ListId : null;
         var physical = new RawDiscoveryRecord(objectId, resolved.FileUniqueId,
-            scope.ListId?.ToString("D") ?? scope.ScopeKey, resolved.Name ?? Path.GetFileName(locator),
+            physicalOwnerListId?.ToString("D") ?? scope.ListId?.ToString("D") ?? scope.ScopeKey,
+            resolved.Name ?? Path.GetFileName(locator),
             resolved.ServerRelativeUrl ?? locator, true, options.PermissionContext,
             EvidenceMetadata(new Uri(scope.WebUrl, locator), string.Empty, string.Empty, "pnp-file-resolution",
                 ("referenceSourceKind", sourceKind), ("referenceObjectId", objectId),
-                ("referenceListId", scope.ListId?.ToString("D") ?? string.Empty),
+                ("referenceListId", physicalOwnerListId?.ToString("D") ?? scope.ListId?.ToString("D") ?? string.Empty),
                 ("customizedPageStatus", resolved.CustomizedPageStatus ?? "unknown")),
             SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
             WebId: MetadataGuid(scope.Metadata, "webId"),
-            // A List.Views URL may point to a page in another library. The referring list is
-            // provenance, not the physical file's owner; retain ownership from raw discovery.
-            ListId: null,
+            // A List.Views URL may point to a page in another library. ResolveFileAsync returns
+            // the physical owner for targeted home-page acquisition. Full inventory retains the
+            // richer owner observed through the raw list-file surface during evidence merging.
+            ListId: physicalOwnerListId,
             FolderUniqueId: null,
             ListItemId: resolved.ListItemId,
             HomePage: IsHomePage(scope, resolved.ServerRelativeUrl ?? locator),
@@ -947,10 +983,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
             WebUrl: scope.WebUrl?.AbsoluteUri);
         return (Candidate(sourceKind, sourceObjectIdentity, method, locator, dispositionValue, null,
-            resolved.FileUniqueId, contentOrigin, evidenceRef, resolved.EvidenceRef), physical);
+            resolved.FileUniqueId, contentOrigin, evidenceRef, resolved.EvidenceRef), physical,
+            DiscoveryTerminalOutcome.Complete);
     }
 
-    private async Task AcquireWelcomePageAsync(LiveScope web, CancellationToken cancellationToken)
+    private async Task<WelcomePageAcquisition> AcquireWelcomePageAsync(LiveScope web,
+        CancellationToken cancellationToken)
     {
         var client = await clientFactory.GetAsync(web.WebUrl, cancellationToken).ConfigureAwait(false);
         var result = await client.ReadWelcomePageAsync(cancellationToken).ConfigureAwait(false);
@@ -967,7 +1005,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 result.ErrorCode ?? (outcome == DiscoveryTerminalOutcome.Denied
                     ? "welcome_page_denied" : "welcome_page_failed"),
                 null, "unavailable", result.EvidenceRef));
-            return;
+            return new(outcome, null, null, result.ErrorCode);
         }
         var value = result.Value;
         if (string.IsNullOrWhiteSpace(value))
@@ -975,18 +1013,26 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             ReferenceCollector.AddReference(Candidate(AspxReferenceSourceKinds.WebWelcomePage, web.ScopeKey,
                 result.Provider + ":" + result.Operation, value, AspxReferenceDispositions.NonAspx,
                 "welcome_page_success_empty", null, "empty", result.EvidenceRef));
-            return;
+            return new(DiscoveryTerminalOutcome.Empty, value, null, null);
         }
         var absolutePath = value.StartsWith('/') ? value : web.WebUrl.AbsolutePath.TrimEnd('/') + "/" + value.TrimStart('/');
         welcomePageByWeb[web.WebUrl.AbsoluteUri.TrimEnd('/')] = NormalizeServerRelativePath(absolutePath);
         var resolved = await ResolveReferenceAsync(web with { ListId = null }, isForm: false,
             web.ScopeKey, absolutePath, result.EvidenceRef,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken, AspxReferenceSourceKinds.WebWelcomePage,
+            result.Provider + ":" + result.Operation + " + PnP.Core file resolution").ConfigureAwait(false);
         ReferenceCollector.AddReference(resolved.Candidate with
         {
             SourceKind = AspxReferenceSourceKinds.WebWelcomePage,
             AcquisitionMethod = result.Provider + ":" + result.Operation + " + PnP.Core file resolution",
         });
+        var physical = resolved.Physical == null ? null : resolved.Physical with
+        {
+            PhysicalLocator = NormalizeServerRelativePath(absolutePath),
+            HomePage = true,
+            WelcomePageStatus = "Matched",
+        };
+        return new(resolved.Outcome, absolutePath, physical, resolved.Candidate.ReasonCode);
     }
 
     private void RecordListApplicability(LiveScope web, LiveScope list, int? template)
@@ -1411,6 +1457,11 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     }
 
     private sealed record LivePage(SharePointRestPage Page, AspxPaginationPageReceipt Receipt);
+    private sealed record WelcomePageAcquisition(
+        DiscoveryTerminalOutcome Outcome,
+        string Locator,
+        RawDiscoveryRecord Physical,
+        string ErrorCode);
     private sealed record LiveCollectionResult(
         IReadOnlyList<JsonElement> Items,
         IReadOnlyList<LivePage> Pages,

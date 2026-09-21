@@ -22,7 +22,8 @@ internal static class ClassicPageDiscoveryComponent
         using var provider = new SharePointLiveAspxDiscoveryProvider(new(
             "assessment:" + scanner.ScanId.ToString("D"), "scheduled-web", "classic-assessment",
             DiscoveryHash.Of("classic-assessment", scanner.ScanId.ToString("D"), site.Id.ToString("D"),
-                web.Id.ToString("D"))), factory,
+                web.Id.ToString("D")), Intent: scanner.Options.HomePageOnly
+                ? AspxDiscoveryIntent.HomePageOnly : AspxDiscoveryIntent.FullInventory), factory,
             new AspxWebAcquisitionContext(site.Id, new Uri(scanner.SiteUrl), web.Id, web.Url,
                 web.ServerRelativeUrl, scanner.WebTemplate));
         await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer)

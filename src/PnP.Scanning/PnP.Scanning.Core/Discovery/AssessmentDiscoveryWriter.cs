@@ -150,6 +150,7 @@ internal sealed class AssessmentDiscoveryWriter
             var coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
             var scopes = coverageRows.Where(row => row.RowType == "Scope").ToArray();
             var selection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:site-selection");
+            var pageSelection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:page-selection");
             var statuses = coverageRows.Select(row => row.DiscoveryStatus)
                 .Concat(allRows.Where(row => row.RowType == "Reference" ||
                     (row.RowType == "Pagination" && row.DiscoveryStatus is ("Denied" or "Failed" or "Unknown")))
@@ -170,7 +171,7 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 verdict = DiscoveryVerdict.Incomplete;
             }
-            else if (selection?.ScopeType == "SiteSelection")
+            else if (pageSelection?.ObservationMethod == "HomePageOnly" || selection?.ScopeType == "SiteSelection")
             {
                 verdict = DiscoveryVerdict.CompleteDeclaredSubset;
             }
@@ -194,7 +195,7 @@ internal sealed class AssessmentDiscoveryWriter
                 RowType = "Summary",
                 ScopeType = "Assessment",
                 Url = selection?.Url,
-                ObservationMethod = selection?.ObservationMethod,
+                ObservationMethod = pageSelection?.ObservationMethod ?? selection?.ObservationMethod,
                 DiscoveryStatus = verdict.ToString(),
                 ExpectedChildCount = selection?.ExpectedChildCount,
                 ObservedChildCount = pageCount,
@@ -203,7 +204,8 @@ internal sealed class AssessmentDiscoveryWriter
                 EvidenceJson = JsonSerializer.Serialize(new
                 {
                     verdict = verdict.ToString(),
-                    declaredScope = selection?.ScopeType == "SiteSelection",
+                    declaredScope = selection?.ScopeType == "SiteSelection" || pageSelection != null,
+                    pageScope = pageSelection?.ObservationMethod ?? AspxDiscoveryIntent.FullInventory.ToString(),
                     siteCount = selection?.ObservedChildCount,
                     pageCount,
                     scopeCount = scopes.Length,
