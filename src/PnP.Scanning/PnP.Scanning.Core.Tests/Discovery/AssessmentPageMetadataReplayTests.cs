@@ -114,8 +114,10 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             classic.Select(page => page.FileUniqueId).Should().BeEquivalentTo(stored.Select(page => page.FileUniqueId));
             discovery.Where(row => row.RowType == "Page").Should().HaveCount(5);
             discovery.Where(row => row.RowType == "Page").Should().OnlyContain(row => row.DiscoveryStatus == "Discovered");
-            discovery.Single(row => row.PageType == "ModernPage").AssessmentStatus.Should().Be("NotApplicable");
-            discovery.Single(row => row.PageType == "WikiPage").ErrorDetail.Should().Contain("access denied, \"web parts\"\nretained page");
+            discovery.Single(row => row.Url.EndsWith("/modern.aspx", StringComparison.Ordinal)).AssessmentStatus
+                .Should().Be("NotApplicable");
+            discovery.Single(row => row.Url.EndsWith("/wiki.aspx", StringComparison.Ordinal)).ErrorDetail
+                .Should().Contain("access denied, \"web parts\"\nretained page");
             discovery.Single(row => row.RowType == "Scope").FileUniqueId.Should().BeNull();
             discovery.Should().HaveCount(6);
             Directory.GetFiles(reportDirectory, "*gap*.csv").Should().BeEmpty();

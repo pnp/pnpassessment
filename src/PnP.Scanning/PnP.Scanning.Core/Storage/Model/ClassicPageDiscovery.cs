@@ -1,3 +1,5 @@
+using CsvHelper.Configuration.Attributes;
+
 namespace PnP.Scanning.Core.Storage;
 
 /// <summary>
@@ -17,9 +19,16 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     public Guid? FolderUniqueId { get; set; }
     public Guid? FileUniqueId { get; set; }
     public int? ListItemId { get; set; }
+
+    [Ignore]
     public string FileName { get; set; }
+
+    [Ignore]
     public string PageType { get; set; }
+
+    [Ignore]
     public string ContentTypeId { get; set; }
+
     public bool? HomePage { get; set; }
     public bool? LibraryHidden { get; set; }
     public string ObservationMethod { get; set; }

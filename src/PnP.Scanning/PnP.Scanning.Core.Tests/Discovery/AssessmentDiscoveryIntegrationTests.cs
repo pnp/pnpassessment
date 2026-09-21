@@ -56,6 +56,35 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
             Directory.GetFiles(folder, "*gap*.csv").Should().BeEmpty();
             using var csv = new CsvReader(new StreamReader(Path.Combine(folder, "discovery.csv")), CultureInfo.InvariantCulture);
             var rows = csv.GetRecords<ClassicPageDiscovery>().ToArray();
+            csv.HeaderRecord.Should().Equal(new[]
+            {
+                nameof(ClassicPageDiscovery.RecordKey),
+                nameof(ClassicPageDiscovery.RowType),
+                nameof(ClassicPageDiscovery.ScopeType),
+                nameof(ClassicPageDiscovery.ParentScopeKey),
+                nameof(ClassicPageDiscovery.Url),
+                nameof(ClassicPageDiscovery.SiteCollectionId),
+                nameof(ClassicPageDiscovery.WebId),
+                nameof(ClassicPageDiscovery.ListId),
+                nameof(ClassicPageDiscovery.FolderUniqueId),
+                nameof(ClassicPageDiscovery.FileUniqueId),
+                nameof(ClassicPageDiscovery.ListItemId),
+                nameof(ClassicPageDiscovery.HomePage),
+                nameof(ClassicPageDiscovery.LibraryHidden),
+                nameof(ClassicPageDiscovery.ObservationMethod),
+                nameof(ClassicPageDiscovery.DiscoveryStatus),
+                nameof(ClassicPageDiscovery.AssessmentStatus),
+                nameof(ClassicPageDiscovery.ExpectedChildCount),
+                nameof(ClassicPageDiscovery.ObservedChildCount),
+                nameof(ClassicPageDiscovery.ErrorStage),
+                nameof(ClassicPageDiscovery.ErrorCodes),
+                nameof(ClassicPageDiscovery.ErrorDetail),
+                nameof(ClassicPageDiscovery.EvidenceJson),
+                nameof(ClassicPageDiscovery.ObservedAtUtc),
+                nameof(ClassicPageDiscovery.ScanId),
+                nameof(ClassicPageDiscovery.SiteUrl),
+                nameof(ClassicPageDiscovery.WebUrl),
+            });
             rows.Should().OnlyContain(row => row.ScanId == scan);
             rows.Should().Contain(row => row.RowType == "Page");
             rows.Should().Contain(row => row.RowType == "Scope" && row.DiscoveryStatus == "Denied");
