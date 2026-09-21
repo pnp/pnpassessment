@@ -11,6 +11,18 @@ This csv file contains the physical ASPX inventory and acquisition evidence coll
 > [!NOTE]
 > A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` coverage rows. These rows identify parts of the requested scope with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records discovery and assessment gaps through Scope and Gap rows together with the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Summary evidence records `pageScope=HomePageOnly` for a scoped home-page scan and `pageScope=FullInventory` otherwise.
 
+## Summary coverage verdicts
+
+The `Summary` row stores the scan-wide coverage verdict in `DiscoveryStatus`. Verdict evaluation follows the order shown below, so uncertainty and incomplete coverage take precedence over successful scope classifications.
+
+Verdict | Condition
+--------|----------
+`Unknown` | No Scope rows were recorded, a coverage row remains `Pending` or `Unknown`, or an acquisition gap prevents the scanner from establishing the observed denominator or identity.
+`Incomplete` | A coverage row is `Denied`, `Failed`, `Partial` or `Cancelled`, or an expected child scope was not observed.
+`CompleteDeclaredSubset` | All recorded coverage succeeded and the assessment used an explicit site selection or `HomePageOnly` page selection.
+`CompleteTenantVerified` | All recorded coverage succeeded and `assessment:site-selection` records a completed `Tenant` enumeration.
+`CompleteAuthorizedSurface` | All recorded coverage succeeded while `assessment:site-selection` is absent or has an unrecognized scope type. Its verified denominator is the set of scopes recorded by the assessment.
+
 ## Columns
 
 The following columns are included:
@@ -32,7 +44,7 @@ FileName | File name of the discovered page.
 HomePage | True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
 ObservationMethod | API surface or adapter that observed the page or scope.
-DiscoveryStatus | Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on `RowType`. Summary verdicts are `CompleteTenantVerified`, `CompleteAuthorizedSurface`, `CompleteDeclaredSubset`, `Incomplete` or `Unknown`.
+DiscoveryStatus | Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on `RowType`. The Summary values and their conditions are defined in Summary coverage verdicts.
 AssessmentStatus | Page enrichment result: `Complete`, `NotSelected`, `NotApplicable` or `Failed`. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as `NotSelected`.
 ExpectedChildCount | Number of child scopes or objects expected when the source can provide a reliable count.
 ObservedChildCount | Number of child scopes or objects that were observed.
