@@ -4,7 +4,7 @@
 
 This csv file contains the physical ASPX inventory and acquisition evidence collected within the requested page scope. The existing assessment ScanId, database and report lifecycle own every row. A normal classic pages assessment uses the full physical inventory scope. With `--homepageonly`, discovery resolves only each web's configured welcome page so the scan remains a fast home-page assessment.
 
-`Url` identifies each physical page and includes its file name. Final page classification belongs to [classicpages.csv](csv-classicpages.md); discovery rows retain the physical identity, acquisition coverage and assessment disposition needed to explain which files did or did not produce classic-page results.
+`Url` identifies each physical page, while `FileName` provides its leaf name directly. Final page classification belongs to [classicpages.csv](csv-classicpages.md); discovery rows retain the physical identity, acquisition coverage and assessment disposition needed to explain which files did or did not produce classic-page results.
 
 `Page` rows represent physical ASPX files. `Scope` rows represent tenant, site, web, list, folder and API surfaces. `Reference` rows record Forms, Views and welcome-page references. `Pagination` rows record sanitized request-chain evidence. `Gap` rows retain acquisition gaps that are not owned by one scope. After post-scan processing, the `Summary` row records the scan-wide coverage verdict.
 
@@ -28,6 +28,7 @@ ListId | Id of the owning list or library when the row is list-backed.
 FolderUniqueId | Unique id of the owning or inspected folder when available.
 FileUniqueId | Unique id of the discovered file for Page rows when available.
 ListItemId | List item id of the discovered file when the page is list-backed.
+FileName | File name of the discovered page.
 HomePage | True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
 ObservationMethod | API surface or adapter that observed the page or scope.

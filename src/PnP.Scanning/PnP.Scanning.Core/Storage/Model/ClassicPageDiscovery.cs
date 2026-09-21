@@ -19,8 +19,6 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     public Guid? FolderUniqueId { get; set; }
     public Guid? FileUniqueId { get; set; }
     public int? ListItemId { get; set; }
-
-    [Ignore]
     public string FileName { get; set; }
 
     [Ignore]
