@@ -1,25 +1,5 @@
 namespace PnP.Scanning.Core.Discovery;
 
-internal interface IAspxReferenceAcquisitionProvider
-{
-    AspxReferenceCollector ReferenceCollector { get; }
-}
-
-internal sealed record AspxReferenceCandidate(
-    string SourceKind,
-    string SourceObjectId,
-    string AcquisitionMethod,
-    string ReferenceId,
-    string RawLocator,
-    string CanonicalRequestPath,
-    string MatchedAlias,
-    string Disposition,
-    string ReasonCode,
-    string LinkedFileUniqueId,
-    string ContentOrigin,
-    string PermissionContext,
-    IReadOnlyList<string> EvidenceRefs);
-
 /// <summary>
 /// Per-Web acquisition evidence buffered while SharePoint requests run. The authentic Classic
 /// assessment drains every category into assessment.db before the Web worker completes.

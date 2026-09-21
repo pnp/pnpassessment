@@ -1,7 +1,5 @@
 namespace PnP.Scanning.Core.Discovery;
 
-internal sealed record AspxAdmissionResult(bool IsAspx, string LeafName, string GapCode = null, string Detail = null);
-
 internal static class AspxAdmission
 {
     internal static AspxAdmissionResult Evaluate(RawDiscoveryRecord record)
