@@ -194,6 +194,8 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         var declaredScan = Guid.NewGuid();
         var homePageScan = Guid.NewGuid();
         var incompleteScan = Guid.NewGuid();
+        var missingSelectionScan = Guid.NewGuid();
+        var unrecognizedSelectionScan = Guid.NewGuid();
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         var pageSelection = Scope(homePageScan, "assessment:page-selection", "PageSelection", "Complete");
         pageSelection.ObservationMethod = "HomePageOnly";
@@ -208,12 +210,17 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
             Scope(homePageScan, "web:root", "Web", "Complete"),
             Scope(incompleteScan, "assessment:site-selection", "SiteSelection", "Complete"),
             Scope(incompleteScan, "web:root", "Web", "Denied"),
+            Scope(missingSelectionScan, "web:root", "Web", "Complete"),
+            Scope(unrecognizedSelectionScan, "assessment:site-selection", "AuthorizedSurface", "Complete"),
+            Scope(unrecognizedSelectionScan, "web:root", "Web", "Complete"),
         });
 
         (await writer.FinalizeScanAsync(completeScan)).Should().Be(DiscoveryVerdict.CompleteTenantVerified);
         (await writer.FinalizeScanAsync(declaredScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(homePageScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(incompleteScan)).Should().Be(DiscoveryVerdict.Incomplete);
+        (await writer.FinalizeScanAsync(missingSelectionScan)).Should().Be(DiscoveryVerdict.Unknown);
+        (await writer.FinalizeScanAsync(unrecognizedSelectionScan)).Should().Be(DiscoveryVerdict.Unknown);
 
         using var read = database.CreateContext();
         read.ClassicPageDiscoveries.Single(row =>

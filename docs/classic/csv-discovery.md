@@ -17,11 +17,10 @@ The `Summary` row stores the scan-wide coverage verdict in `DiscoveryStatus`. Ve
 
 Verdict | Condition
 --------|----------
-`Unknown` | No Scope rows were recorded, a coverage row remains `Pending` or `Unknown`, or an acquisition gap prevents the scanner from establishing the observed denominator or identity.
+`Unknown` | No Scope rows were recorded, `assessment:site-selection` is absent or unrecognized, a coverage row remains `Pending` or `Unknown`, or an acquisition gap prevents the scanner from establishing the observed denominator or identity.
 `Incomplete` | A coverage row is `Denied`, `Failed`, `Partial` or `Cancelled`, or an expected child scope was not observed.
 `CompleteDeclaredSubset` | All recorded coverage succeeded and the assessment used an explicit site selection or `HomePageOnly` page selection.
 `CompleteTenantVerified` | All recorded coverage succeeded and `assessment:site-selection` records a completed `Tenant` enumeration.
-`CompleteAuthorizedSurface` | All recorded coverage succeeded while `assessment:site-selection` is absent or has an unrecognized scope type. Its verified denominator is the set of scopes recorded by the assessment.
 
 ## Columns
 

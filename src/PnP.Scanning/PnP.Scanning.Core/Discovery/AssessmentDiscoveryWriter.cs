@@ -161,7 +161,8 @@ internal sealed class AssessmentDiscoveryWriter
                 .ToArray();
 
             DiscoveryVerdict verdict;
-            if (scopes.Length == 0 || statuses.Any(status => status is "Pending" or "Unknown") ||
+            if (scopes.Length == 0 || selection?.ScopeType is not ("Tenant" or "SiteSelection") ||
+                statuses.Any(status => status is "Pending" or "Unknown") ||
                 gapCodes.Any(DiscoveryGapCodes.ForcesUnknown))
             {
                 verdict = DiscoveryVerdict.Unknown;
@@ -175,13 +176,9 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 verdict = DiscoveryVerdict.CompleteDeclaredSubset;
             }
-            else if (selection?.ScopeType == "Tenant")
-            {
-                verdict = DiscoveryVerdict.CompleteTenantVerified;
-            }
             else
             {
-                verdict = DiscoveryVerdict.CompleteAuthorizedSurface;
+                verdict = DiscoveryVerdict.CompleteTenantVerified;
             }
 
             var pageCount = allRows.Count(row => row.RowType == "Page");
