@@ -112,6 +112,30 @@
 <td>Id of the library the page lives in</td>
 </tr>
 <tr>
+<td>SiteCollectionId</td>
+<td>Id of the site collection that owns the page</td>
+</tr>
+<tr>
+<td>WebId</td>
+<td>Id of the web that owns the page</td>
+</tr>
+<tr>
+<td>FileUniqueId</td>
+<td>Unique id of the physical page file</td>
+</tr>
+<tr>
+<td>ListItemId</td>
+<td>List item id of the page in its owning library</td>
+</tr>
+<tr>
+<td>DiscoveryStatus</td>
+<td>Physical discovery result for the page, normally <code>Discovered</code></td>
+</tr>
+<tr>
+<td>AssessmentStatus</td>
+<td>Page assessment result, such as <code>Complete</code> or <code>Failed</code></td>
+</tr>
+<tr>
 <td>ModifiedAt</td>
 <td>When the page was last modified</td>
 </tr>
@@ -121,7 +145,7 @@
 </tr>
 <tr>
 <td>HomePage</td>
-<td>True when this page is the web's home (welcome) page</td>
+<td>True when this page is the web's home (welcome) page, False when it is not, or empty when the web's welcome page could not be resolved</td>
 </tr>
 <tr>
 <td>UncustomizedHomePage</td>

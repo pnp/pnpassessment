@@ -1,0 +1,260 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html lang="en">
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>discovery.csv file details | Microsoft 365 Assessment Tool </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="discovery.csv file details | Microsoft 365 Assessment Tool ">
+    <meta name="generator" content="docfx 2.56.5.0">
+    <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
+    <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> 
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    <meta property="docfx:newtab" content="true">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <!--
+        <a class="navbar-brand" href="../index.html">
+          <img id="logo" class="svg" src="../logo.svg" alt="" >
+        </a>
+        -->
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <label class="glyphicon glyphicon-search" for="search-query"></label>
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+                  <div class="contribution-panel mobile-hide pull-right">
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/classic/csv-discovery.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                  </div>
+                    <h1 id="discoverycsv-file-details">discovery.csv file details</h1>
+
+<h2 id="summary">Summary</h2>
+<p>This csv file contains the physical ASPX inventory and acquisition evidence collected within the requested page scope. The existing assessment ScanId, database and report lifecycle own every row. A normal classic pages assessment uses the full physical inventory scope. With <code>--homepageonly</code>, discovery resolves only each web's configured welcome page so the scan remains a fast home-page assessment.</p>
+<p><code>Url</code> identifies each physical page, while <code>FileName</code> provides its leaf name directly. Final page classification belongs to <a href="csv-classicpages.html">classicpages.csv</a>; discovery rows retain the physical identity, acquisition coverage and assessment disposition needed to explain which files did or did not produce classic-page results.</p>
+<p><code>Page</code> rows represent physical ASPX files. <code>Scope</code> rows represent tenant, site, web, list, folder and API surfaces. <code>Reference</code> rows record Forms, Views and welcome-page references. <code>Pagination</code> rows record sanitized request-chain evidence. <code>Gap</code> rows retain acquisition gaps that are not owned by one scope. After post-scan processing, the <code>Summary</code> row records the scan-wide coverage verdict.</p>
+<div class="NOTE">
+<h5>Note</h5>
+<p>A finished assessment can contain <code>Denied</code>, <code>Failed</code>, <code>Partial</code> or <code>Unknown</code> coverage rows. These rows identify parts of the requested scope with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. <code>discovery.csv</code> records discovery and assessment gaps through Scope and Gap rows together with the <code>ErrorStage</code>, <code>ErrorCodes</code> and <code>ErrorDetail</code> columns. The Summary evidence records <code>pageScope=HomePageOnly</code> for a scoped home-page scan and <code>pageScope=FullInventory</code> otherwise.</p>
+</div>
+<h2 id="summary-coverage-verdicts">Summary coverage verdicts</h2>
+<p>The <code>Summary</code> row stores the scan-wide coverage verdict in <code>DiscoveryStatus</code>. Verdict evaluation follows the order shown below, so uncertainty and incomplete coverage take precedence over successful scope classifications.</p>
+<table>
+<thead>
+<tr>
+<th>Verdict</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Unknown</code></td>
+<td>No Scope rows were recorded, <code>assessment:site-selection</code> is absent or unrecognized, a coverage row remains <code>Pending</code> or <code>Unknown</code>, or an acquisition gap prevents the scanner from establishing the observed denominator or identity.</td>
+</tr>
+<tr>
+<td><code>Incomplete</code></td>
+<td>A coverage row is <code>Denied</code>, <code>Failed</code>, <code>Partial</code> or <code>Cancelled</code>, or an expected child scope was not observed.</td>
+</tr>
+<tr>
+<td><code>CompleteDeclaredSubset</code></td>
+<td>All recorded coverage succeeded and the assessment used an explicit site selection or <code>HomePageOnly</code> page selection.</td>
+</tr>
+<tr>
+<td><code>CompleteTenantVerified</code></td>
+<td>All recorded coverage succeeded and <code>assessment:site-selection</code> records a completed <code>Tenant</code> enumeration.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="columns">Columns</h2>
+<p>The following columns are included:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RecordKey</td>
+<td>Stable key for the page or discovery scope within the assessment.</td>
+</tr>
+<tr>
+<td>RowType</td>
+<td><code>Page</code>, <code>Scope</code>, <code>Reference</code>, <code>Pagination</code>, <code>Gap</code> or <code>Summary</code>.</td>
+</tr>
+<tr>
+<td>ScopeType</td>
+<td>Type of scope or object represented by the row, such as <code>Tenant</code>, <code>SiteCollection</code>, <code>PageSelection</code>, <code>Web</code>, <code>List</code>, <code>Folder</code>, <code>Surface</code> or <code>File</code>.</td>
+</tr>
+<tr>
+<td>ParentScopeKey</td>
+<td>Record key of the parent discovery scope.</td>
+</tr>
+<tr>
+<td>Url</td>
+<td>Server-relative page URL for a Page row. For a Scope row this is the inspected scope or endpoint.</td>
+</tr>
+<tr>
+<td>SiteCollectionId</td>
+<td>Id of the owning site collection when it could be resolved.</td>
+</tr>
+<tr>
+<td>WebId</td>
+<td>Id of the owning web when it could be resolved.</td>
+</tr>
+<tr>
+<td>ListId</td>
+<td>Id of the owning list or library when the row is list-backed.</td>
+</tr>
+<tr>
+<td>FolderUniqueId</td>
+<td>Unique id of the owning or inspected folder when available.</td>
+</tr>
+<tr>
+<td>FileUniqueId</td>
+<td>Unique id of the discovered file for Page rows when available.</td>
+</tr>
+<tr>
+<td>ListItemId</td>
+<td>List item id of the discovered file when the page is list-backed.</td>
+</tr>
+<tr>
+<td>FileName</td>
+<td>File name of the discovered page.</td>
+</tr>
+<tr>
+<td>HomePage</td>
+<td>True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.</td>
+</tr>
+<tr>
+<td>LibraryHidden</td>
+<td>True when the owning library is hidden, False when it is visible, or empty when this could not be determined.</td>
+</tr>
+<tr>
+<td>ObservationMethod</td>
+<td>API surface or adapter that observed the page or scope.</td>
+</tr>
+<tr>
+<td>DiscoveryStatus</td>
+<td>Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on <code>RowType</code>. The Summary values and their conditions are defined in Summary coverage verdicts.</td>
+</tr>
+<tr>
+<td>AssessmentStatus</td>
+<td>Page enrichment result: <code>Complete</code>, <code>NotSelected</code>, <code>NotApplicable</code> or <code>Failed</code>. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as <code>NotSelected</code>.</td>
+</tr>
+<tr>
+<td>ExpectedChildCount</td>
+<td>Number of child scopes or objects expected when the source can provide a reliable count.</td>
+</tr>
+<tr>
+<td>ObservedChildCount</td>
+<td>Number of child scopes or objects that were observed.</td>
+</tr>
+<tr>
+<td>ErrorStage</td>
+<td>Discovery or assessment stage that produced an error or coverage gap.</td>
+</tr>
+<tr>
+<td>ErrorCodes</td>
+<td>One or more error or coverage-gap codes.</td>
+</tr>
+<tr>
+<td>ErrorDetail</td>
+<td>Details associated with <code>ErrorCodes</code>.</td>
+</tr>
+<tr>
+<td>EvidenceJson</td>
+<td>Structured surface, reference, pagination or summary evidence. Continuation values are represented by hashes rather than raw tokens.</td>
+</tr>
+<tr>
+<td>ObservedAtUtc</td>
+<td>UTC timestamp at which the page or scope was recorded.</td>
+</tr>
+<tr>
+<td>ScanId</td>
+<td>Id of the assessment.</td>
+</tr>
+<tr>
+<td>SiteUrl</td>
+<td>Fully qualified site collection URL associated with the row.</td>
+</tr>
+<tr>
+<td>WebUrl</td>
+<td>Relative URL of the web associated with the row.</td>
+</tr>
+</tbody>
+</table>
+</article>
+          </div>
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              </nav>
+            </div>
+          </div>        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            <span>Microsoft 365 Assessment Tool<br>Generated by <strong><a href='https://dotnet.github.io/docfx' alt='Doc FX Website'>DocFX</a></strong> with <strong><a href='https://ovasquez.github.io/docfx-material' alt='DocFx Material Theme'>Material UI</a></strong></span>
+            
+          </div>
+        </div>
+      </footer>    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>  </body>
+</html>
