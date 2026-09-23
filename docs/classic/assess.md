@@ -27,6 +27,8 @@ Assess only the home page of each web, exporting web part properties | microsoft
 
 See the [requirements](requirements.md) page for the full list of classic page-scan arguments (`--exportwebpartproperties`, `--skipusageinformation`, `--skipuserinformation`, `--homepageonly`).
 
+`--homepageonly` applies to both discovery and page assessment. The tool resolves each web's configured welcome page directly and assesses that physical file, without enumerating every list, folder, form and view in the web. Omit `--homepageonly` when the report must include the complete physical ASPX inventory for the selected tenant or sites.
+
 ### Live status updates
 
 Once an assessment is launched you'd typically followup on it's status via the `Status` action. Below is a quick start, more details can be found in the [Microsoft 365 Assessment tool operations documentation](../using-the-assessment-tool/assess-operations.md#getting-a-live-status-overview-of-a-running-assessment).
@@ -43,6 +45,8 @@ Task | CLI
 -----|------
 Generate Power BI report (includes CSV export) in the default location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3
 Export the gathered data as CSV files in a custom location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --mode CsvOnly --path "c:\reports"
+
+The CSV export includes [discovery.csv](csv-discovery.md), which lists physical ASPX files discovered within the requested page scope, inspected scopes, sanitized acquisition evidence and the final coverage verdict. Use its Scope and Gap rows to identify denied, failed, partial or otherwise incomplete discovery. The existing [classicpages.csv](csv-classicpages.md) continues to contain the classic pages selected for page assessment and modernization analysis.
 
 [!INCLUDE [Clarify the --id parameter](./../fragments/clarify-id-parameter.md)]
 

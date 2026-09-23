@@ -41,7 +41,7 @@ Argument | Description
 `--skipusageinformation` | Skip collecting audit log usage statistics (ClassicPageViewed / ClassicPageCreated / ClassicPageEdited). When set, `classicpageauditusage.csv` is not generated. Use this to speed up the assessment when audit log data is not needed.
 `--auditlogwindowdays` | Number of days back to query the audit log (1–180, default 14). Requires the `AuditLogsQuery-SharePoint.Read.All` permission. Audit Standard retention is 180 days; Audit Premium (E5) retains up to 1 year.
 `--skipuserinformation` | Skip collecting page user information (e.g. the page's *Modified By*).
-`--homepageonly` | Only assess the home page of each web, rather than every classic page. Useful for a fast home-page modernization-readiness assessment.
+`--homepageonly` | Discover and assess only the configured home page of each web, rather than enumerating every physical ASPX file. Useful for a fast home-page modernization-readiness assessment. Omit this option when a complete physical ASPX inventory is required.
 
 > [!Note]
 > To learn more about starting an assessment checkout the Microsoft 365 Assessment tool [Start documentation](../using-the-assessment-tool/assess-start.md).

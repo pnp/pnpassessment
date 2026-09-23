@@ -628,20 +628,18 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
-
-                List<EnumeratedWeb> webs = new();
-
-                foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.Status == SiteWebStatus.Queued).ToListAsync())
-                {
-                    webs.Add(new EnumeratedWeb
-                    {
-                        WebUrl = web.WebUrl
-                    });
-                }
-
-                return webs;
+                return await WebsToRestartScanningAsync(dbContext, scanId, siteUrl);
             }
+        }
+
+        internal static Task<List<EnumeratedWeb>> WebsToRestartScanningAsync(ScanContext dbContext, Guid scanId, string siteUrl)
+        {
+            // Preserve the original enumeration's template when rebuilding the existing Web queue.
+            // Dropping it makes resumed Classic Web/site summaries differ from an uninterrupted scan.
+            return dbContext.Webs.AsNoTracking()
+                .Where(web => web.ScanId == scanId && web.SiteUrl == siteUrl && web.Status == SiteWebStatus.Queued)
+                .Select(web => new EnumeratedWeb { WebUrl = web.WebUrl, WebTemplate = web.Template })
+                .ToListAsync();
         }
 
         internal async Task StoreCacheResultsAsync(Guid scanId, Dictionary<string, string> cacheData)

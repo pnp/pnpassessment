@@ -18,12 +18,19 @@ namespace PnP.Scanning.Core.Storage
 
         public Guid ListId { get; set; }
 
+        public Guid? SiteCollectionId { get; set; }
+        public Guid? WebId { get; set; }
+        public Guid? FileUniqueId { get; set; }
+        public int? ListItemId { get; set; }
+        public string DiscoveryStatus { get; set; }
+        public string AssessmentStatus { get; set; }
+
         public DateTime ModifiedAt { get; set; }
 
         // Page transformation readiness enrichment (ported from the Modernization Scanner)
         public string Layout { get; set; }
 
-        public bool HomePage { get; set; }
+        public bool? HomePage { get; set; }
 
         public bool UncustomizedHomePage { get; set; }
 

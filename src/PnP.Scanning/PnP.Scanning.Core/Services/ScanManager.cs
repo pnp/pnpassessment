@@ -80,7 +80,8 @@ namespace PnP.Scanning.Core.Services
 
         internal static int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
 
-        internal async Task<Guid> StartScanAsync(StartRequest start, AuthenticationManager authenticationManager, List<string> siteCollectionList)
+        internal async Task<Guid> StartScanAsync(StartRequest start, AuthenticationManager authenticationManager, List<string> siteCollectionList,
+            IReadOnlyList<ClassicPageDiscovery> discoveryEvidence = null)
         {
             Log.Information("Starting the assessment job");
 
@@ -92,6 +93,20 @@ namespace PnP.Scanning.Core.Services
             Log.Information("Assessment id is {ScanId}", scanId);
 
             await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
+            if (discoveryEvidence != null)
+            {
+                foreach (var row in discoveryEvidence) row.ScanId = scanId;
+                await new PnP.Scanning.Core.Discovery.AssessmentDiscoveryWriter(scanId).WriteAsync(discoveryEvidence);
+            }
+            if (siteCollectionList.Count == 0)
+            {
+                // An authoritative empty selection is reportable without a synthetic first site.
+                await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Finished);
+                await StorageManager.SetPostScanStatusAsync(scanId, SiteWebStatus.Finished);
+                await StorageManager.SetScanStatusAsync(scanId, ScanStatus.Finished);
+                await StorageManager.EndScanAsync(scanId);
+                return scanId;
+            }
 
             // Setup cancellation token
             CancellationTokenSource cancellationTokenSource = new();
@@ -140,6 +155,9 @@ namespace PnP.Scanning.Core.Services
                     // The web scan failed, log accordingly
                     Log.Error(ex, "Preassessment for assessment {ScanId} failed. Error: {Error}", scanId, ex.Message);
                     await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Failed);
+                    if (options is ClassicOptions { Pages: true })
+                        await ClassicPageDiscoveryComponent.RecordScopeAsync(scanId, siteCollectionList[0], "/",
+                            "Web", "Failed", ex, stage: "PreScan");
                     
                     // Prescanning has become too important to continue scanning. When it fails then also fail the scan
                     throw;

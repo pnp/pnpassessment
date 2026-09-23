@@ -5,6 +5,7 @@ using PnP.Core.QueryModel;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Discovery;
 using System.Linq.Expressions;
 
 namespace PnP.Scanning.Core.Scanners
@@ -23,6 +24,12 @@ namespace PnP.Scanning.Core.Scanners
         internal async override Task ExecuteAsync()
         {
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+
+            // Persist existence and discovery failures before feature-dependent enrichment loads.
+            // Each existing TPL Web worker owns its own acquisition provider and PnP contexts.
+            var discoveredPages = Options.Pages
+                ? await ClassicPageDiscoveryComponent.ExecuteAsync(this).ConfigureAwait(false)
+                : null;
 
             // Define extra Web/Site data that we want to load when the context is inialized
             // This will not require extra server roundtrips
@@ -67,7 +74,7 @@ namespace PnP.Scanning.Core.Scanners
                                                                                                                                                w => w.MasterUrl });
             }
 
-            using (var context = await GetPnPContextAsync(options))
+            using (var context = await GetAssessmentContextAsync(options))
             using (var csomContext = GetClientContext(context))
             {
                 if (Options.Workflow)
@@ -103,7 +110,7 @@ namespace PnP.Scanning.Core.Scanners
                     Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
                     // Call the Page scan component
-                    await PageScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
+                    await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
 
                     Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
@@ -161,11 +168,33 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
+        private Task<PnPContext> GetAssessmentContextAsync(PnPContextOptions options)
+        {
+            if (!Options.Pages) return GetPnPContextAsync(options);
+            return ClassicAssessmentInitialization.ExecuteAsync(() => GetPnPContextAsync(options),
+                new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl,
+                ScanManager.GetCancellationTokenSource(ScanId).Token,
+                (attempt, error) => Logger.Warning(error,
+                    "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
+                    SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1));
+        }
+
         internal async override Task PreScanningAsync()
         {
             Logger.Information("Pre assessment work is starting");
 
-            await SendRequestWithClientTagAsync();
+            try
+            {
+                await SendRequestWithClientTagAsync();
+            }
+            catch (Exception ex) when (Options.Pages && !ScanManager.GetCancellationTokenSource(ScanId).IsCancellationRequested)
+            {
+                // Client-tag telemetry against the first site is not an admission gate for
+                // other authorized sites. Each scheduled Web worker records its own result.
+                await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, SiteUrl, WebUrl, "Web", "Failed", ex,
+                    stage: "PreScanClientTag");
+                Logger.Warning(ex, "Client tag preflight failed; continuing full ASPX discovery");
+            }
 
             if (Options.Workflow)
             {
@@ -179,6 +208,13 @@ namespace PnP.Scanning.Core.Scanners
         {
 
             Logger.Information("Post assessment work is starting");
+            if (Options.Pages)
+            {
+                var verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
+                    .ConfigureAwait(false);
+                Logger.Information("ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",
+                    ScanId, verdict);
+            }
             using (var dbContext = new ScanContext(ScanId))
             {
                 // T9: before aggregating webs into site collections, roll each web's per-page
@@ -349,6 +385,9 @@ namespace PnP.Scanning.Core.Scanners
 
         private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)
         {
+            // All Webs can fail before producing summaries. Keep their discovery/error rows
+            // reportable without a secondary NullReferenceException during post-scan rollup.
+            if (classicSiteCollection == null) return;
             // Get the unique list of sub web templates
             if (webTemplates.Count > 0)
             {

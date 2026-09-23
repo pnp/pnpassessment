@@ -1,0 +1,25 @@
+namespace PnP.Scanning.Core.Discovery;
+
+internal sealed record AspxPaginationPageReceipt(
+    string ReceiptVersion,
+    string CollectionScopeKey,
+    string AuthorityRevision,
+    string ActualEndpointHash,
+    string ActualMethod,
+    string ActualEndpoint,
+    string ActualSelect,
+    string ActualFilter,
+    int PageOrdinal,
+    string RequestTokenHash,
+    int ResponseItemCount,
+    string NextTokenHash,
+    string ResponseDigest,
+    int? HttpStatusCode,
+    string SemanticDetectorResult,
+    int AttemptCount,
+    int AttemptLimit,
+    string RequestId,
+    string CorrelationId,
+    string ErrorCode,
+    bool TerminalFlag,
+    DateTimeOffset ReceivedAtUtc);

@@ -5,6 +5,7 @@ using PnP.Core.QueryModel;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Scanners.WebPartMapping;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -55,7 +56,8 @@ namespace PnP.Scanning.Core.Scanners
         // The localized default home page resource (e.g. "Home") used to recognize an uncustomized STS#0 home page.
         private const string WikiHomePageResource = "$Resources:WikiPageHomePageName";
 
-        internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext)
+        internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext,
+            IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {
             var options = ((ClassicScanner)scannerBase).Options;
 
@@ -67,12 +69,13 @@ namespace PnP.Scanning.Core.Scanners
             bool webPublishingEnabled = FeatureEnabled(context.Web.Features, FeatureId_Web_Publishing);
 
             // The web's welcome page drives the HomePage flag and the optional HomePageOnly filter.
-            string welcomePage = await GetWelcomePageAsync(csomContext).ConfigureAwait(false);
+            var (welcomePage, welcomePageKnown) = await GetWelcomePageAsync(csomContext).ConfigureAwait(false);
 
             var discovery = new PageDiscovery
             {
                 ScannerBase = scannerBase,
                 WelcomePage = welcomePage,
+                WelcomePageKnown = welcomePageKnown,
                 HomePageOnly = options.HomePageOnly,
                 SkipUserInformation = options.SkipUserInformation,
                 Pages = pagesList,
@@ -80,7 +83,8 @@ namespace PnP.Scanning.Core.Scanners
                 EnrichmentInputs = enrichmentInputs,
             };
 
-            var lists = ScannerBase.CleanLoadedLists(context);
+            var lists = context.Web.Lists.AsRequested().ToList();
+            var discoveryWriter = new AssessmentDiscoveryWriter(scannerBase.ScanId);
 
             if (scannerBase.WebTemplate == "BLOG#0")
             {
@@ -98,37 +102,52 @@ namespace PnP.Scanning.Core.Scanners
                     }).ConfigureAwait(false);
                 }
             }
-            else if ((scannerBase.WebTemplate == "BLANKINTERNET#0" || scannerBase.WebTemplate == "ENTERWIKI#0" ||
-                      scannerBase.WebTemplate == "SRCHCEN#0" || scannerBase.WebTemplate == "CMSPUBLISHING#0") &&
-                     sitePublishingEnabled && webPublishingEnabled)
+            // The provider has already found the physical pages in the requested page scope. Do not
+            // rediscover selected libraries or gate their existence on publishing features/template.
+            foreach (var row in discoveredPages)
             {
-                await QueryPublishingPagesAsync(discovery, lists).ConfigureAwait(false);
-            }
-            else
-            {
-                // A team site can also have the publishing features enabled
-                if (sitePublishingEnabled && webPublishingEnabled)
+                // The discovery provider records a nullable value so an unavailable modeled call is
+                // not mistaken for false. Prefer the later CSOM read when it succeeded; it is also the
+                // value used by the page assessment and keeps --homepageonly from filtering every page
+                // merely because the discovery-specific WelcomePage read failed.
+                row.HomePage = ResolveHomePageState(row.Url, welcomePage, welcomePageKnown, row.HomePage);
+                if (options.HomePageOnly && row.HomePage != true)
                 {
-                    await QueryPublishingPagesAsync(discovery, lists).ConfigureAwait(false);
+                    row.AssessmentStatus = "NotSelected";
+                    continue;
                 }
-
-                // Check for the regular pages library
-                var sitePagesLibraries = lists.Where(l => l.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.WebPageLibrary);
-                if (sitePagesLibraries.Any())
+                var list = lists.FirstOrDefault(value => value.Id == row.ListId);
+                if (list == null || row.ListItemId == null)
                 {
-                    // Load regular pages
-                    foreach (var sitePagesLibrary in sitePagesLibraries)
+                    // Forms/Views and root files may not have a list item. Their physical
+                    // discovery is still valid; do not pretend that zero extracted WPs is a pass.
+                    row.AssessmentStatus = "NotApplicable";
+                    continue;
+                }
+                try
+                {
+                    var input = await LoadPhysicalPageAsync(list, row, welcomePage,
+                        options.SkipUserInformation, welcomePageKnown).ConfigureAwait(false);
+                    row.PageType = input.Page.PageType;
+                    row.HomePage = input.Page.HomePage;
+                    if (row.PageType == PublishingPage) AddPublishingPage(discovery, input);
+                    else AddSitePage(discovery, input);
+                    row.AssessmentStatus = row.PageType == ModernPage ? "NotApplicable" : "Complete";
+                }
+                catch (Exception ex)
+                {
+                    if (scannerBase.ScanManager.GetCancellationTokenSource(scannerBase.ScanId).IsCancellationRequested)
                     {
-                        await QueryListAsync(sitePagesLibrary, PageQuery(new List<string> { HtmlFileTypeField, WikiField, ClientSideApplicationIdField }), (IEnumerable<IListItem> listItems) =>
-                        {
-                            foreach (var listItem in listItems)
-                            {
-                                AddSitePage(discovery, sitePagesLibrary, listItem);
-                            }
-                        }).ConfigureAwait(false);
+                        throw;
                     }
+                    row.AssessmentStatus = "Failed";
+                    AssessmentWebDiscovery.AddError(row, "PageMetadata", AssessmentWebDiscovery.ErrorCode(ex),
+                        AssessmentWebDiscovery.ErrorDetail(ex));
+                    scannerBase.Logger.Warning(ex, "Page metadata assessment failed for {PageUrl}; retaining discovery", row.Url);
                 }
             }
+            // Commit one Web's assessment dispositions in a single EF transaction.
+            await discoveryWriter.UpdateExistingAsync(discoveredPages).ConfigureAwait(false);
 
             // Enrich the discovered classic pages with their web part inventory, mapping readiness, page
             // layout and (for the home page) the uncustomized-home-page verdict. Only web part / wiki /
@@ -146,7 +165,7 @@ namespace PnP.Scanning.Core.Scanners
 
                     webPartsList.AddRange(pageWebParts);
 
-                    if (input.Page.HomePage)
+                    if (input.Page.HomePage == true)
                     {
                         input.Page.UncustomizedHomePage = await DetermineUncustomizedHomePageAsync(
                             scannerBase, context, csomContext, input, pageWebParts,
@@ -155,6 +174,16 @@ namespace PnP.Scanning.Core.Scanners
                 }
                 catch (Exception ex)
                 {
+                    if (scannerBase.ScanManager.GetCancellationTokenSource(scannerBase.ScanId).IsCancellationRequested) throw;
+                    var discovered = discoveredPages.FirstOrDefault(row =>
+                        string.Equals(row.Url, input.Page.PageUrl, StringComparison.OrdinalIgnoreCase));
+                    if (discovered != null)
+                    {
+                        discovered.AssessmentStatus = "Failed";
+                        AssessmentWebDiscovery.AddError(discovered, "WebPartAssessment", AssessmentWebDiscovery.ErrorCode(ex),
+                            AssessmentWebDiscovery.ErrorDetail(ex));
+                        await discoveryWriter.WriteAsync(new[] { discovered }).ConfigureAwait(false);
+                    }
                     scannerBase.Logger.Warning(ex, "Failed to assess the web parts of classic page {PageUrl}; skipping its inventory", input.Page.PageUrl);
                 }
             }
@@ -166,6 +195,12 @@ namespace PnP.Scanning.Core.Scanners
 
             if (pagesList.Count > 0)
             {
+                foreach (var page in pagesList)
+                {
+                    var found = discoveredPages.FirstOrDefault(row => string.Equals(row.Url, page.PageUrl, StringComparison.OrdinalIgnoreCase));
+                    if (found == null) continue; // Blog posts are list items, not physical ASPX files.
+                    ApplyDiscoveryState(page, found);
+                }
                 await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
             }
 
@@ -210,8 +245,9 @@ namespace PnP.Scanning.Core.Scanners
         private static void AddBlogPage(PageDiscovery disc, IList blogList, IListItem listItem)
         {
             string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
+            var homePage = ResolveHomePageState(pageUrl, disc.WelcomePage, disc.WelcomePageKnown, null);
 
-            if (disc.HomePageOnly && !HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage))
+            if (disc.HomePageOnly && homePage != true)
             {
                 return;
             }
@@ -229,38 +265,87 @@ namespace PnP.Scanning.Core.Scanners
                 ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
                 ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
                 PageType = BlogPage,
-                HomePage = HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage),
+                HomePage = homePage,
                 RemediationCode = RemediationCodes.CP4.ToString(),
             });
 
             disc.RemediationCodes.Add(RemediationCodes.CP4.ToString());
         }
 
-        private static void AddSitePage(PageDiscovery disc, IList sitePagesLibrary, IListItem listItem)
+        // Kept independent of ScannerBase so the same SDK field selection and metadata projection
+        // can be replayed offline against the assessment database/report pipeline.
+        internal static async Task<PageEnrichmentInput> LoadPhysicalPageAsync(IList list, ClassicPageDiscovery row,
+            string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null)
         {
-            string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
+            if (row.ListId != list.Id || row.ListItemId == null || row.ListItemId <= 0)
+                throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
 
-            if (disc.HomePageOnly && !HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage))
+            // REST $select=* (IListItem.All) still omits computed fields such as FileRef,
+            // HTML_x0020_File_x0020_Type and ClientSideApplicationId. Reuse the assessment
+            // list-stream reader with explicit ViewFields, restricted to this discovered ID.
+            // Unlike selecting optional REST properties, missing ViewFields are omitted by
+            // SharePoint rather than failing classic libraries that lack a modern-only field.
+            IListItem item = null;
+            await QueryListAsync(list, PageQuery(new List<string> { WikiField, HtmlFileTypeField, ClientSideApplicationIdField },
+                filterOnASPXPages: false, itemId: row.ListItemId.Value, skipUserInformation: skipUserInformation), items =>
             {
-                return;
-            }
+                foreach (var candidate in items)
+                {
+                    if (candidate.Id != row.ListItemId.Value || item != null)
+                        throw new InvalidDataException("The requested physical page list item was not returned uniquely.");
+                    item = candidate;
+                }
+            }).ConfigureAwait(false);
+            if (item == null)
+                throw new InvalidDataException("The requested physical page list item was not returned.");
 
-            var pageToAdd = new ClassicPage
+            string pageUrl = ResolvePhysicalPageUrl(item.Values, row.Url);
+            var contentType = GetFieldValue(item, ContentTypeIdField, row.ContentTypeId);
+            bool isPublishing = SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(contentType);
+            var page = new ClassicPage
             {
-                ScanId = disc.ScannerBase.ScanId,
-                SiteUrl = disc.ScannerBase.SiteUrl,
-                WebUrl = disc.ScannerBase.WebUrl,
+                ScanId = row.ScanId,
+                SiteUrl = row.SiteUrl,
+                WebUrl = row.WebUrl,
                 PageUrl = pageUrl,
-                PageName = GetFieldValue(listItem, TitleField, "") != "" ? GetFieldValue(listItem, TitleField, "") : Path.GetFileNameWithoutExtension(pageUrl),
-                ListUrl = sitePagesLibrary.RootFolder.ServerRelativeUrl,
-                ListTitle = sitePagesLibrary.Title,
-                ListId = sitePagesLibrary.Id,
-                ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
-                PageType = GetPageType(listItem),
-                HomePage = HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage),
+                PageName = GetFieldValue(item, TitleField, "") != "" ? GetFieldValue(item, TitleField, "") : Path.GetFileNameWithoutExtension(pageUrl),
+                ListUrl = list.RootFolder.ServerRelativeUrl,
+                ListTitle = list.Title,
+                ListId = list.Id,
+                ModifiedAt = GetFieldValue<DateTime>(item, ModifiedField),
+                ModifiedBy = GetModifiedBy(item.Values, skipUserInformation),
+                PageType = isPublishing ? PublishingPage : GetPageType(item),
+                HomePage = ResolveHomePageState(pageUrl, welcomePage,
+                    welcomePageKnown ?? welcomePage != null, row.HomePage),
             };
 
+            return new PageEnrichmentInput
+            {
+                Page = page,
+                WikiFieldHtml = isPublishing ? null : GetFieldValue<string>(item, WikiField),
+                FileLeafRef = GetFieldValue(item, FileLeafRefField, ""),
+            };
+        }
+
+        internal static void ApplyDiscoveryState(ClassicPage page, ClassicPageDiscovery found)
+        {
+            page.SiteCollectionId = found.SiteCollectionId;
+            page.WebId = found.WebId;
+            page.FileUniqueId = found.FileUniqueId;
+            page.ListItemId = found.ListItemId;
+            page.HomePage = found.HomePage ?? page.HomePage;
+            page.DiscoveryStatus = found.DiscoveryStatus;
+            page.AssessmentStatus = found.AssessmentStatus;
+        }
+
+        internal static bool? ResolveHomePageState(string pageUrl, string welcomePage,
+            bool welcomePageKnown, bool? discoveredHomePage) => welcomePageKnown
+            ? HomePageDetector.IsHomePage(pageUrl, welcomePage)
+            : discoveredHomePage;
+
+        private static void AddSitePage(PageDiscovery disc, PageEnrichmentInput input)
+        {
+            var pageToAdd = input.Page;
             switch (pageToAdd.PageType)
             {
                 case WikiPage:
@@ -284,12 +369,7 @@ namespace PnP.Scanning.Core.Scanners
                 // Wiki and web part pages carry a web part inventory we can extract + map.
                 if (pageToAdd.PageType == WikiPage || pageToAdd.PageType == WebPartPage)
                 {
-                    disc.EnrichmentInputs.Add(new PageEnrichmentInput
-                    {
-                        Page = pageToAdd,
-                        WikiFieldHtml = GetFieldValue<string>(listItem, WikiField),
-                        FileLeafRef = GetFieldValue(listItem, FileLeafRefField, ""),
-                    });
+                    disc.EnrichmentInputs.Add(input);
                 }
             }
             else
@@ -298,59 +378,15 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private static async Task QueryPublishingPagesAsync(PageDiscovery disc, List<IList> lists)
+        private static void AddPublishingPage(PageDiscovery disc, PageEnrichmentInput input)
         {
-            var pagesLibrary = lists.FirstOrDefault(l => l.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.PublishingPagesLibrary);
-            if (pagesLibrary != null)
-            {
-                // Load publishing pages, this is a publishing portal
-                await QueryListAsync(pagesLibrary, PageQuery(new List<string> { }), (IEnumerable<IListItem> listItems) =>
-                {
-                    foreach (var listItem in listItems)
-                    {
-                        AddPublishingPage(disc, pagesLibrary, listItem);
-                    }
-                }).ConfigureAwait(false);
-            }
-        }
-
-        private static void AddPublishingPage(PageDiscovery disc, IList pagesLibrary, IListItem listItem)
-        {
-            string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
-
-            if (disc.HomePageOnly && !HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage))
-            {
-                return;
-            }
-
-            var pageToAdd = new ClassicPage
-            {
-                ScanId = disc.ScannerBase.ScanId,
-                SiteUrl = disc.ScannerBase.SiteUrl,
-                WebUrl = disc.ScannerBase.WebUrl,
-                PageUrl = pageUrl,
-                PageName = GetFieldValue(listItem, TitleField, "") != "" ? GetFieldValue(listItem, TitleField, "") : Path.GetFileNameWithoutExtension(pageUrl),
-                ListUrl = pagesLibrary.RootFolder.ServerRelativeUrl,
-                ListTitle = pagesLibrary.Title,
-                ListId = pagesLibrary.Id,
-                ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
-                PageType = PublishingPage,
-                HomePage = HomePageDetector.IsHomePage(pageUrl, disc.WelcomePage),
-                RemediationCode = RemediationCodes.CP3.ToString(),
-            };
-
-            disc.Pages.Add(pageToAdd);
-            // CP3 = Publishing page (matches pageToAdd.RemediationCode). Pre-T8 this added CP4 (Blog page),
+            input.Page.RemediationCode = RemediationCodes.CP3.ToString();
+            disc.Pages.Add(input.Page);
+            // CP3 = Publishing page (matches input.Page.RemediationCode). Pre-T8 this added CP4 (Blog page),
             // a copy-paste quirk that mislabeled a publishing web's aggregated remediation codes.
             disc.RemediationCodes.Add(RemediationCodes.CP3.ToString());
 
-            disc.EnrichmentInputs.Add(new PageEnrichmentInput
-            {
-                Page = pageToAdd,
-                WikiFieldHtml = null,
-                FileLeafRef = GetFieldValue(listItem, FileLeafRefField, ""),
-            });
+            disc.EnrichmentInputs.Add(input);
         }
 
         // Dispatches a discovered page to the right web part extractor. Web part / wiki / publishing
@@ -445,9 +481,9 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // Reads the web's welcome page (server-relative-from-web), used for the HomePage flag and the
-        // HomePageOnly filter. Returns an empty string when the property cannot be read so discovery
-        // continues (HomePageDetector defaults the empty welcome page to default.aspx).
-        private static async Task<string> GetWelcomePageAsync(ClientContext csomContext)
+        // HomePageOnly filter. Keep an unavailable read distinct from a successful empty value, because
+        // an empty WelcomePage legitimately means default.aspx while a failed read remains unknown.
+        private static async Task<(string WelcomePage, bool IsKnown)> GetWelcomePageAsync(ClientContext csomContext)
         {
             try
             {
@@ -455,11 +491,11 @@ namespace PnP.Scanning.Core.Scanners
                 csomContext.Load(rootFolder, f => f.WelcomePage);
                 await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
-                return rootFolder.WelcomePage ?? "";
+                return (rootFolder.WelcomePage ?? "", true);
             }
             catch
             {
-                return "";
+                return (null, false);
             }
         }
 
@@ -507,7 +543,8 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
-        private static string PageQuery(List<string> extraFields, bool filterOnASPXPages = true)
+        private static string PageQuery(List<string> extraFields, bool filterOnASPXPages = true,
+            int? itemId = null, bool skipUserInformation = false)
         {
             string extraViewFields = "";
             string filter = "";
@@ -520,7 +557,11 @@ namespace PnP.Scanning.Core.Scanners
                 }
             }
 
-            if (filterOnASPXPages)
+            if (itemId.HasValue)
+            {
+                filter = $"<Query><Where><Eq><FieldRef Name='ID' /><Value Type='Counter'>{itemId.Value}</Value></Eq></Where></Query>";
+            }
+            else if (filterOnASPXPages)
             {
                 filter = $@"
                           <Query>
@@ -536,12 +577,13 @@ namespace PnP.Scanning.Core.Scanners
             return $@"
                 <View Scope='RecursiveAll'>
                   <ViewFields>
+                    <FieldRef Name='ID' />
                     <FieldRef Name='{ContentTypeIdField}' />
                     <FieldRef Name='{FileRefField}' />
                     <FieldRef Name='{FileLeafRefField}' />
                     <FieldRef Name='{FileTypeField}' />
                     <FieldRef Name='{ModifiedField}' />
-                    <FieldRef Name='{ModifiedByField}' />
+                    {(skipUserInformation ? string.Empty : $"<FieldRef Name='{ModifiedByField}' />")}
                     <FieldRef Name='{CreatedField}' />
                     <FieldRef Name='{TitleField}' />
                     <FieldRef Name='{BSNField}' />
@@ -549,7 +591,7 @@ namespace PnP.Scanning.Core.Scanners
                   </ViewFields>
                   {filter}
                   <OrderBy Override='TRUE'><FieldRef Name= 'ID' Ascending= 'FALSE' /></OrderBy>
-                  <RowLimit Paged='TRUE'>1000</RowLimit>
+                  <RowLimit Paged='TRUE'>{(itemId.HasValue ? 2 : 1000)}</RowLimit>
                 </View>";
         }
 
@@ -567,7 +609,10 @@ namespace PnP.Scanning.Core.Scanners
         {
             if (fieldValues.ContainsKey(fieldName) && fieldValues[fieldName] != null)
             {
-                return (T)fieldValues[fieldName];
+                if (fieldValues[fieldName] is T typed) return typed;
+                if (typeof(T) == typeof(string))
+                    return (T)(object)Convert.ToString(fieldValues[fieldName], System.Globalization.CultureInfo.InvariantCulture);
+                return defaultValue;
             }
 
             return defaultValue;
@@ -578,6 +623,16 @@ namespace PnP.Scanning.Core.Scanners
             return GetPageType(listItem.Values);
         }
 
+        internal static string ResolvePhysicalPageUrl(IDictionary<string, object> fields, string discoveredUrl)
+        {
+            if (string.IsNullOrWhiteSpace(discoveredUrl) || !discoveredUrl.StartsWith('/'))
+                throw new InvalidDataException("Physical page assessment requires its discovered server-relative URL; ListItemId is not a URL.");
+            var fileRef = GetFieldValue(fields, FileRefField, string.Empty);
+            if (!string.IsNullOrWhiteSpace(fileRef) && !string.Equals(fileRef, discoveredUrl, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The list item's FileRef differs from the discovered file; its owner/identity must be resolved before assessment.");
+            return discoveredUrl;
+        }
+
         // Pure classification over the raw field values (no CSOM) so it is unit-testable.
         internal static string GetPageType(IDictionary<string, object> fieldValues)
         {
@@ -586,7 +641,8 @@ namespace PnP.Scanning.Core.Scanners
                 return WebPartPage;
             }
 
-            if (GetFieldValue(fieldValues, ClientSideApplicationIdField, string.Empty).Equals($"{{{FeatureId_Web_ModernPage}}}", StringComparison.InvariantCultureIgnoreCase))
+            if (Guid.TryParse(GetFieldValue(fieldValues, ClientSideApplicationIdField, string.Empty), out var clientApplicationId) &&
+                clientApplicationId == FeatureId_Web_ModernPage)
             {
                 return ModernPage;
             }
@@ -636,6 +692,8 @@ namespace PnP.Scanning.Core.Scanners
 
             public string WelcomePage { get; init; }
 
+            public bool WelcomePageKnown { get; init; }
+
             public bool HomePageOnly { get; init; }
 
             public bool SkipUserInformation { get; init; }
@@ -652,7 +710,7 @@ namespace PnP.Scanning.Core.Scanners
 
         // A discovered page plus the discovery-time field values the enrichment step needs (the wiki HTML
         // and the page leaf name), captured because the live list items are released as discovery pages.
-        private sealed class PageEnrichmentInput
+        internal sealed class PageEnrichmentInput
         {
             public ClassicPage Page { get; init; }
 

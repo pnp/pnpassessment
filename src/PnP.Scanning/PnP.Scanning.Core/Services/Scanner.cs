@@ -248,15 +248,16 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // 2. Build list of sites to scan
+                var discoveryEvidence = new List<PnP.Scanning.Core.Storage.ClassicPageDiscovery>();
                 List<string> sitesToScan = await siteEnumerationManager.EnumerateSiteCollectionsToScanAsync(request, authenticationManager, async (message) =>
                 {
                     await responseStream.WriteAsync(new StartStatus
                     {
                         Status = message
                     });
-                });
+                }, discoveryEvidence);
 
-                if (sitesToScan.Count == 0)
+                if (sitesToScan.Count == 0 && discoveryEvidence.Count == 0)
                 {
                     await responseStream.WriteAsync(new StartStatus
                     {
@@ -274,7 +275,7 @@ namespace PnP.Scanning.Core.Services
                     });
 
                     // 3. Start the scan
-                    var scanId = await scanManager.StartScanAsync(request, authenticationManager, sitesToScan);
+                    var scanId = await scanManager.StartScanAsync(request, authenticationManager, sitesToScan, discoveryEvidence);
 
                     await responseStream.WriteAsync(new StartStatus
                     {

@@ -291,7 +291,7 @@ namespace PnP.Scanning.Core.Services
                     case PageScanComponent.DelveBlogPage: delveBlogPageCount++; break;
                 }
 
-                if (page.HomePage)
+                if (page.HomePage == true)
                 {
                     homePageCount++;
                 }

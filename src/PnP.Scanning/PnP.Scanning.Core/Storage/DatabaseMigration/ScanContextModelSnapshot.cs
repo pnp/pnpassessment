@@ -503,7 +503,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("PageUrl")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("HomePage")
+                    b.Property<string>("AssessmentStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DiscoveryStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FileUniqueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("HomePage")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Layout")
@@ -511,6 +520,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<Guid>("ListId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("ListItemId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ListTitle")
                         .HasColumnType("TEXT");
@@ -536,10 +548,16 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("RemediationCode")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("SiteCollectionId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("UncustomizedHomePage")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("UnmappedWebParts")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("WebId")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("WebPartCount")
@@ -594,6 +612,104 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasKey("ScanId", "SiteUrl", "PageUrl");
 
                     b.ToTable("ClassicPageAuditUsages");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPageDiscovery", b =>
+                {
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AssessmentStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentTypeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DiscoveryStatus")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorCodes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorDetail")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EvidenceJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorStage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ExpectedChildCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FileName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FileUniqueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FolderUniqueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("HomePage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool?>("LibraryHidden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ListItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ObservationMethod")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ObservedChildCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PageType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ParentScopeKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RowType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ScopeType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SiteCollectionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("WebId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ScanId", "RecordKey");
+
+                    b.HasIndex("ScanId", "SiteUrl", "WebUrl");
+
+                    b.ToTable("ClassicPageDiscoveries");
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPageWebPart", b =>
@@ -1585,32 +1701,24 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 {
                     b.Property<Guid>("ScanId")
                         .HasColumnType("TEXT");
-
                     b.Property<string>("SiteUrl")
                         .HasColumnType("TEXT");
-
                     b.Property<string>("WebUrl")
                         .HasColumnType("TEXT");
-
                     b.Property<int>("Delay1")
                         .HasColumnType("INTEGER");
-
                     b.Property<int>("Delay2")
                         .HasColumnType("INTEGER");
-
                     b.Property<int>("Delay3")
                         .HasColumnType("INTEGER");
-
                     b.Property<string>("WebIdString")
                         .HasColumnType("TEXT");
-
                     b.HasKey("ScanId", "SiteUrl", "WebUrl");
-
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl")
                         .IsUnique();
-
                     b.ToTable("TestDelays");
                 });
+
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Web", b =>
                 {
