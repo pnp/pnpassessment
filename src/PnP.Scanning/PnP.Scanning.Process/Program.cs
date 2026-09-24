@@ -203,6 +203,7 @@ namespace PnP.Scanning.Process
                               options.DisableTelemetry = true;
                           });
                           services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
+                          PnP.Scanning.Core.Discovery.DiscoveryTestTrafficHandler.Register(services);
                           services.AddPnPCoreAuthentication();
                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 

@@ -1,4 +1,5 @@
 using PnP.Core.Auth;
+using PnP.Core.Services;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Services;
@@ -14,11 +15,12 @@ internal static class ClassicPageDiscoveryComponent
         // Use the existing assessment authentication, ScanId and scheduled Web scope.
         var auth = new ExternalAuthenticationProvider((_, scopes) =>
             scanner.ScanManager.GetScanAuthenticationManager(scanner.ScanId).GetAccessTokenAsync(scopes));
-        using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
+        using var factory = CreateClientFactory(scanner.PnPContextFactory, auth, scanner.ScanId, scanner.Options);
+        using var context = await factory.CreateContextAsync(new Uri($"{scanner.SiteUrl}{scanner.WebUrl}"), token)
+            .ConfigureAwait(false);
         var site = await context.Site.GetAsync(value => value.Id).ConfigureAwait(false);
         var web = await context.Web.GetAsync(value => value.Id, value => value.Url,
             value => value.ServerRelativeUrl).ConfigureAwait(false);
-        using var factory = new PnPContextSharePointAspxRestClientFactory(scanner.PnPContextFactory, auth, scanner.ScanId);
         using var provider = new SharePointLiveAspxDiscoveryProvider(new(
             "assessment:" + scanner.ScanId.ToString("D"), "scheduled-web", "classic-assessment",
             DiscoveryHash.Of("classic-assessment", scanner.ScanId.ToString("D"), site.Id.ToString("D"),
@@ -30,6 +32,10 @@ internal static class ClassicPageDiscoveryComponent
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }
+
+    internal static PnPContextSharePointAspxRestClientFactory CreateClientFactory(IPnPContextFactory contextFactory,
+        IAuthenticationProvider authenticationProvider, Guid scanId, ClassicOptions options) =>
+        new(contextFactory, authenticationProvider, scanId, options.DiscoveryTestTraffic);
 
     internal static Task RecordWebEnumerationScopeAsync(Guid scanId, string siteUrl,
         WebEnumerationResult enumeration, Exception error = null, AssessmentDiscoveryWriter writer = null)

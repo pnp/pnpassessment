@@ -80,10 +80,10 @@ namespace PnP.Scanning.Core.Services
                 try
                 {
                 using (var context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
-                                                                        new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                                        DiscoveryAuthentication(new ExternalAuthenticationProvider((resourceUri, scopes) =>
                                                                         {
                                                                             return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
-                                                                        }
+                                                                        }), classicOptions
                     )))
                 {
                     // Enumerate all site collections
@@ -198,10 +198,10 @@ namespace PnP.Scanning.Core.Services
             };
 
             using (var context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl), 
-                                                                    new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                                    DiscoveryAuthentication(new ExternalAuthenticationProvider((resourceUri, scopes) =>
                                                                     {
                                                                         return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
-                                                                    }),
+                                                                    }), options),
                                                                     contextOptions))
             {
                 if (options is ClassicOptions { Pages: true } || !context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
@@ -235,6 +235,10 @@ namespace PnP.Scanning.Core.Services
 
             return new(webUrlsToScan);
         }
+
+        internal static IAuthenticationProvider DiscoveryAuthentication(IAuthenticationProvider authenticationProvider, OptionsBase options) =>
+            DiscoveryTestTrafficHandler.ForDiscovery(authenticationProvider,
+                options is ClassicOptions { Pages: true, DiscoveryTestTraffic: true });
 
         /// <summary>
         /// Load csv file and return data

@@ -31,6 +31,9 @@
         /// <summary>Only assess the home page of each web.</summary>
         internal bool HomePageOnly { get; set; }
 
+        /// <summary>Append the controlled-test marker to all discovery requests in this scan.</summary>
+        internal bool DiscoveryTestTraffic { get; set; }
+
         /// <summary>Number of days back to query the audit log via Graph (1-180, default 14). Max 180 days (Audit Standard) / 1 year (Audit Premium).</summary>
         internal int AuditLogWindowDays { get; set; } = 14;
     }

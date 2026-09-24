@@ -80,6 +80,10 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         (options as ClassicOptions).HomePageOnly = bool.Parse(property.Value);
                     }
+                    else if (property.Property == Constants.StartClassicDiscoveryTestTraffic)
+                    {
+                        (options as ClassicOptions).DiscoveryTestTraffic = bool.Parse(property.Value);
+                    }
                     else if (property.Property == Constants.StartClassicAuditLogWindowDays)
                     {
                         if (int.TryParse(property.Value, out var days))

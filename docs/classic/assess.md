@@ -29,6 +29,28 @@ See the [requirements](requirements.md) page for the full list of classic page-s
 
 `--homepageonly` applies to both discovery and page assessment. The tool resolves each web's configured welcome page directly and assesses that physical file, without enumerating every list, folder, form and view in the web. Omit `--homepageonly` when the report must include the complete physical ASPX inventory for the selected tenant or sites.
 
+### Controlled discovery test traffic
+
+The existing Classic scan accepts the Boolean option `--discoverytesttraffic`. It defaults to
+`false`: omitting it or passing `--discoverytesttraffic false` leaves PnP Core's default
+User-Agent intact, without the `testtraffic-smr` marker. Use `--discoverytesttraffic true`
+(or the switch alone) only for controlled testing. It appends exactly one `testtraffic-smr`
+token after PnP Core's User-Agent; the `NONISV` identification and SDK version remain present.
+
+Enable or disable it on the existing start command, supplying your normal authentication
+arguments in place of the placeholders:
+
+```text
+microsoft365-assessment.exe start --mode Classic --classicinclude Pages --tenant <tenant-host> --applicationid <application-id> --authmode Interactive --discoverytesttraffic true
+microsoft365-assessment.exe start --mode Classic --classicinclude Pages --tenant <tenant-host> --applicationid <application-id> --authmode Interactive --discoverytesttraffic false
+```
+
+The setting applies to **all ASPX discovery requests in the selected scan**, including context
+initialization, site/web enumeration and metadata, modeled file and folder reads, and paginated requests.
+It is not a page allowlist and does not select or restrict pages. It does not mark another
+scan or unrelated requests (including page assessment and usage collection). It changes
+request identification only, not authentication, discovery results, coverage reasons or retries.
+
 ### Live status updates
 
 Once an assessment is launched you'd typically followup on it's status via the `Status` action. Below is a quick start, more details can be found in the [Microsoft 365 Assessment tool operations documentation](../using-the-assessment-tool/assess-operations.md#getting-a-live-status-overview-of-a-running-assessment).

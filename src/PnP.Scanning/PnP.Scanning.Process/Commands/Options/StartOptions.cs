@@ -42,6 +42,8 @@ namespace PnP.Scanning.Process.Commands
 
         public bool HomePageOnly { get; set; }
 
+        public bool DiscoveryTestTraffic { get; set; }
+
         public int AuditLogWindowDays { get; set; } = 14;
 
 #if DEBUG
