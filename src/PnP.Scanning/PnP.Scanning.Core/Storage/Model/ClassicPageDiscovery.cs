@@ -21,6 +21,10 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     public int? ListItemId { get; set; }
     public string FileName { get; set; }
 
+    public string AssetPurpose { get; set; } = "Unknown";
+    public string AssetPurposeStatus { get; set; } = "Unknown";
+    public string AssetPurposeReason { get; set; } = "NotEvaluated";
+
     [Ignore]
     public string PageType { get; set; }
 

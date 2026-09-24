@@ -212,6 +212,116 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.ItemRequests.Should().Be(0);
     }
 
+    [Fact]
+    public async Task Production_routing_keeps_layout_inventory_out_of_content_page_and_enrichment_inputs()
+    {
+        var scan = Guid.NewGuid();
+        var catalog = new MetadataFixture(scan, "_catalogs/masterpage/layout.aspx", new());
+        catalog.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
+        catalog.Row.PageType = SharePointLiveAspxDiscoveryProvider.InferPageType(catalog.Row.ContentTypeId);
+        AspxAssetPurpose.Apply(catalog.Row, catalog.Row.ContentTypeId);
+        var outside = new MetadataFixture(scan, "Custom/layout.aspx", new()
+        {
+            ["ContentTypeId"] = AspxAssetPurpose.LayoutContentType.ToLowerInvariant() + "00aabbccddeeff00112233445566778899",
+            ["WikiField"] = "<p>Layout must not be analyzed as a wiki</p>",
+        });
+        var publishing = new MetadataFixture(scan, "Pages/article.aspx", new()
+        {
+            ["ContentTypeId"] = PublishingContentType.ToLowerInvariant(),
+            ["Title"] = "Real publishing page",
+        });
+        var unknown = new MetadataFixture(scan, "_catalogs/masterpage/unknown.aspx", new() { ["BSN"] = "custom" });
+        unknown.Row.AssessmentStatus = "Unknown";
+        unknown.Row.ErrorDetail = "Earlier metadata unavailable";
+        var fixtures = new[] { catalog, outside, publishing, unknown };
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        await writer.WriteAsync(fixtures.Select(f => f.Row));
+        var discovery = new PageScanComponent.PageDiscovery
+        {
+            Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), SkipUserInformation = true,
+        };
+        foreach (var fixture in fixtures)
+            await PageScanComponent.RoutePhysicalPageAsync(discovery, fixture.Row, fixture.List);
+        await writer.UpdateExistingAsync(fixtures.Select(f => f.Row));
+
+        catalog.StreamRequests.Should().Be(0, "discovery already proved this is an asset");
+        outside.StreamRequests.Should().Be(1, "the metadata read supplies previously unavailable purpose evidence");
+        outside.Row.PageType.Should().NotBe("PublishingPage");
+        new[] { catalog.Row, outside.Row }.Should().OnlyContain(row =>
+            row.AssetPurpose == "PageLayout" && row.AssetPurposeStatus == "Confirmed" && row.AssessmentStatus == "ExcludedAsset");
+        discovery.Pages.Select(page => page.PageUrl).Should().BeEquivalentTo(publishing.Row.Url, unknown.Row.Url);
+        discovery.Pages.Single(page => page.PageUrl == publishing.Row.Url).PageType.Should().Be("PublishingPage");
+        discovery.EnrichmentInputs.Should().ContainSingle().Which.Page.PageUrl.Should().Be(publishing.Row.Url);
+        discovery.RemediationCodes.Should().BeEquivalentTo("CP3", "CP5");
+        discovery.ModernPageCounter.Should().Be(0);
+        unknown.Row.AssetPurpose.Should().Be("Unknown");
+        unknown.Row.AssetPurposeStatus.Should().Be("Unknown");
+        unknown.Row.AssetPurposeReason.Should().Contain("ContentTypeUnavailable");
+        unknown.Row.AssessmentStatus.Should().Be("Unknown");
+        unknown.Row.ErrorDetail.Should().Contain("Earlier metadata unavailable");
+        foreach (var page in discovery.Pages)
+            PageScanComponent.ApplyDiscoveryState(page, fixtures.Single(f => f.Row.Url == page.PageUrl).Row);
+        using (var db = database.CreateContext())
+        {
+            // Store the actual production routing output, not a prefiltered fixture table.
+            db.ClassicPages.AddRange(discovery.Pages);
+            db.ClassicWebSummaries.Add(new ClassicWebSummary
+            {
+                ScanId = scan, SiteUrl = Site, WebUrl = Web,
+                ClassicPublishingPages = discovery.Pages.Count(page => page.PageType == "PublishingPage"),
+            });
+            await db.SaveChangesAsync();
+            await StorageManager.PopulatePublishingSiteSummaryAsync(db, scan);
+            (await db.ClassicPublishingSiteSummaries.SingleAsync(row => row.ScanId == scan)).NumberOfPages.Should().Be(1);
+        }
+        var directory = Path.Combine(Path.GetTempPath(), "asset-routing-report-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            using var db = database.CreateContext();
+            await ReportManager.ExportClassicReportDataAsync(db, scan, directory, new CsvConfiguration(CultureInfo.InvariantCulture));
+            var pages = ReadCsv<ClassicPage>(directory, "classicpages.csv");
+            pages.Select(page => page.PageUrl).Should().BeEquivalentTo(publishing.Row.Url, unknown.Row.Url);
+            var inventory = ReadCsv<ClassicPageDiscovery>(directory, "discovery.csv");
+            inventory.Should().HaveCount(4);
+            inventory.Select(row => row.FileUniqueId).Should().BeEquivalentTo(fixtures.Select(f => f.Row.FileUniqueId));
+            inventory.Should().OnlyContain(row => row.SiteCollectionId == catalog.Row.SiteCollectionId && row.DiscoveryStatus == "Discovered");
+            inventory.Where(row => row.AssetPurpose == "PageLayout").Should().HaveCount(2)
+                .And.OnlyContain(row => row.AssetPurposeReason.Contains("PageLayoutContentType") && row.AssessmentStatus == "ExcludedAsset");
+            inventory.Single(row => row.Url == unknown.Row.Url).AssetPurposeReason.Should().Contain("ContentTypeUnavailable");
+            inventory.Single(row => row.Url == unknown.Row.Url).AssessmentStatus.Should().Be("Unknown");
+            (await writer.ReadPagesAsync(scan, Site, Web)).Should().HaveCount(4);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("Denied")]
+    [InlineData("Failed")]
+    [InlineData("Unknown")]
+    public async Task Confirmed_layout_is_excluded_even_without_list_identity_or_selection_and_preserves_failure(string status)
+    {
+        var fixture = new MetadataFixture(Guid.NewGuid(), "Custom/layout.aspx", new());
+        fixture.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
+        fixture.Row.ListItemId = null;
+        fixture.Row.AssessmentStatus = status;
+        fixture.Row.ErrorDetail = "Retained failure";
+        var discovery = new PageScanComponent.PageDiscovery
+        {
+            Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), HomePageOnly = true,
+        };
+        await PageScanComponent.RoutePhysicalPageAsync(discovery, fixture.Row, null);
+        (await PageScanComponent.LoadPhysicalPageAsync(null, fixture.Row, null, true)).Should().BeNull();
+        fixture.StreamRequests.Should().Be(0);
+        discovery.Pages.Should().BeEmpty();
+        discovery.EnrichmentInputs.Should().BeEmpty();
+        discovery.RemediationCodes.Should().BeEmpty();
+        discovery.ModernPageCounter.Should().Be(0);
+        fixture.Row.AssetPurpose.Should().Be("PageLayout");
+        fixture.Row.AssessmentStatus.Should().Be(status);
+        fixture.Row.ErrorDetail.Should().Be("Retained failure");
+    }
+
     private static T[] ReadCsv<T>(string directory, string name)
     {
         using var csv = new CsvReader(new StreamReader(Path.Combine(directory, name)), CultureInfo.InvariantCulture);

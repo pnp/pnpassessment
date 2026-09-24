@@ -810,7 +810,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         metadata != null && metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
     private static bool? MetadataBool(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
-    private static string InferPageType(string contentTypeId)
+    internal static string InferPageType(string contentTypeId)
     {
         if (string.IsNullOrWhiteSpace(contentTypeId)) return null;
         if (contentTypeId.StartsWith("0x0101009D1CB255DA76424F860D91F20E6C4118", StringComparison.OrdinalIgnoreCase))
@@ -824,9 +824,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         return "OtherAspxContentType";
     }
 
-    internal static bool IsPublishingPageContentType(string contentTypeId) => !string.IsNullOrWhiteSpace(contentTypeId) &&
-        (contentTypeId.StartsWith("0x010100C568DB52D9D0A14D9B2FDCC96666E9F2007948130EC3DB064584E219954237AF39", StringComparison.OrdinalIgnoreCase) ||
-         contentTypeId.StartsWith("0x01010007FF3E057FA8AB4AA42FCB67B453FFC1", StringComparison.OrdinalIgnoreCase));
+    internal static bool IsPublishingPageContentType(string contentTypeId) => AspxAssetPurpose.IsPublishingContentType(contentTypeId);
     private static IReadOnlyDictionary<string, string> WithMetadata(
         IReadOnlyDictionary<string, string> metadata, params (string Key, string Value)[] additions)
     {

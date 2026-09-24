@@ -214,6 +214,9 @@ namespace PnP.Scanning.Core.Storage
             #region Classic scanner
             modelBuilder.Entity<ClassicPageDiscovery>(entity =>
             {
+                entity.Property(e => e.AssetPurpose).IsRequired().HasDefaultValue("Unknown");
+                entity.Property(e => e.AssetPurposeStatus).IsRequired().HasDefaultValue("Unknown");
+                entity.Property(e => e.AssetPurposeReason).IsRequired().HasDefaultValue("NotEvaluated");
                 entity.HasKey(e => new { e.ScanId, e.RecordKey });
                 entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
                 entity.Property(e => e.RowType).IsRequired();

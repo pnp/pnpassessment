@@ -17,6 +17,9 @@ internal sealed class AssessmentDiscoveryWriter
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
     internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
+        => await SaveAsync(rows, false, cancellationToken).ConfigureAwait(false);
+
+    private async Task SaveAsync(IEnumerable<ClassicPageDiscovery> rows, bool existingOnly, CancellationToken cancellationToken)
     {
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -26,7 +29,10 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 var previous = await db.ClassicPageDiscoveries.FindAsync(
                     new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
-                if (previous == null) db.ClassicPageDiscoveries.Add(row);
+                if (previous == null)
+                {
+                    if (!existingOnly) db.ClassicPageDiscoveries.Add(row);
+                }
                 else
                 {
                     // Observing the same file through Forms/Views and raw files must not erase
@@ -38,7 +44,8 @@ internal sealed class AssessmentDiscoveryWriter
                         if (previous.ListId.HasValue && row.ListId.HasValue && previous.ListId != row.ListId) changed.Add("ListId");
                         if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");
                         if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage) changed.Add("HomePage");
-                        if (previous.ContentTypeId != null && row.ContentTypeId != null && previous.ContentTypeId != row.ContentTypeId) changed.Add("ContentTypeId");
+                        if (previous.ContentTypeId != null && row.ContentTypeId != null &&
+                            !string.Equals(previous.ContentTypeId, row.ContentTypeId, StringComparison.OrdinalIgnoreCase)) changed.Add("ContentTypeId");
                         if (changed.Count != 0)
                             AssessmentWebDiscovery.AddError(row, "DiscoveryMetadata", DiscoveryGapCodes.ChangedDuringScan,
                                 "Repeated file identity changed: " + string.Join(", ", changed));
@@ -49,7 +56,9 @@ internal sealed class AssessmentDiscoveryWriter
                         row.PageType ??= previous.PageType;
                         row.HomePage ??= previous.HomePage;
                         row.LibraryHidden ??= previous.LibraryHidden;
-                        row.AssessmentStatus ??= previous.AssessmentStatus;
+                        AspxAssetPurpose.Merge(previous, row);
+                        row.DiscoveryStatus = RetainFailure(previous.DiscoveryStatus, row.DiscoveryStatus);
+                        row.AssessmentStatus = RetainFailure(previous.AssessmentStatus, row.AssessmentStatus);
                     }
                     else if (row.RowType == "Reference")
                     {
@@ -85,6 +94,11 @@ internal sealed class AssessmentDiscoveryWriter
                     row.EvidenceJson ??= previous.EvidenceJson;
                     db.Entry(previous).CurrentValues.SetValues(row);
                 }
+                if (row.RowType == "Page" && AspxAssetPurpose.IsLayout(row))
+                {
+                    row.AssessmentStatus = RetainFailure(row.AssessmentStatus, "ExcludedAsset");
+                    if (previous != null) previous.AssessmentStatus = row.AssessmentStatus;
+                }
             }
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -102,16 +116,10 @@ internal sealed class AssessmentDiscoveryWriter
 
     internal async Task UpdateExistingAsync(IEnumerable<ClassicPageDiscovery> rows,
         CancellationToken cancellationToken = default)
-    {
-        await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            using var db = createContext();
-            db.ClassicPageDiscoveries.UpdateRange(rows);
-            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-        finally { WriteGate.Release(); }
-    }
+        => await SaveAsync(rows, true, cancellationToken).ConfigureAwait(false);
+
+    internal static string RetainFailure(string previous, string current) =>
+        previous is "Denied" or "Failed" or "Unknown" ? previous : current ?? previous;
 
     internal async Task<int> FailUnassessedPagesAsync(Guid scanId, string siteUrl, string webUrl,
         Exception error, string stage)
