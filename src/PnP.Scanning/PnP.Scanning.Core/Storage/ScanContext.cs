@@ -225,6 +225,8 @@ namespace PnP.Scanning.Core.Storage
 
             modelBuilder.Entity<ClassicPage>(entity =>
             {
+                entity.Property(e => e.LayoutReferenceStatus).IsRequired().HasDefaultValue("Unknown");
+                entity.Property(e => e.LayoutReferenceReason).IsRequired().HasDefaultValue("NotEvaluated");
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });
             });
 

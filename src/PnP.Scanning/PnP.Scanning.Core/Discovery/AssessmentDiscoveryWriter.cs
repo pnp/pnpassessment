@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Scanners;
 using System.Text.Json;
 
 namespace PnP.Scanning.Core.Discovery;
@@ -155,6 +156,7 @@ internal sealed class AssessmentDiscoveryWriter
             var allRows = await db.ClassicPageDiscoveries.AsNoTracking()
                 .Where(row => row.ScanId == scanId)
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
+            await PublishingLayoutReference.FinalizeAsync(db, scanId, allRows, cancellationToken).ConfigureAwait(false);
             var coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
             var scopes = coverageRows.Where(row => row.RowType == "Scope").ToArray();
             var selection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:site-selection");

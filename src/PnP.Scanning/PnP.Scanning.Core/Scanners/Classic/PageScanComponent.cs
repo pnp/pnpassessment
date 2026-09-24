@@ -265,7 +265,7 @@ namespace PnP.Scanning.Core.Scanners
             // Unlike selecting optional REST properties, missing ViewFields are omitted by
             // SharePoint rather than failing classic libraries that lack a modern-only field.
             IListItem item = null;
-            await QueryListAsync(list, PageQuery(new List<string> { WikiField, HtmlFileTypeField, ClientSideApplicationIdField },
+            await QueryListAsync(list, PageQuery(new List<string> { WikiField, HtmlFileTypeField, ClientSideApplicationIdField, PublishingLayoutReference.FieldName },
                 filterOnASPXPages: false, itemId: row.ListItemId.Value, skipUserInformation: skipUserInformation), items =>
             {
                 foreach (var candidate in items)
@@ -299,6 +299,8 @@ namespace PnP.Scanning.Core.Scanners
                 HomePage = ResolveHomePageState(pageUrl, welcomePage,
                     welcomePageKnown ?? welcomePage != null, row.HomePage),
             };
+
+            if (isPublishing) PublishingLayoutReference.Capture(page, item.Values);
 
             return new PageEnrichmentInput
             {
