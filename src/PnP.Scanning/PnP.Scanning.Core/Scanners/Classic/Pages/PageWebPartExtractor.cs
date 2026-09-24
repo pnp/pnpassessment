@@ -315,7 +315,7 @@ namespace PnP.Scanning.Core.Scanners
             return ToRows(page, entities, exportWebPartProperties);
         }
 
-        private static List<ClassicPageWebPart> ToRows(ClassicPage page, List<WebPartEntity> entities, bool exportWebPartProperties)
+        internal static List<ClassicPageWebPart> ToRows(ClassicPage page, List<WebPartEntity> entities, bool exportWebPartProperties)
         {
             var rows = new List<ClassicPageWebPart>();
             int index = 0;
