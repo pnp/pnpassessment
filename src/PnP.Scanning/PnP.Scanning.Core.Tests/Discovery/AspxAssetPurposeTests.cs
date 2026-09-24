@@ -169,12 +169,10 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
         await db.Database.ExecuteSqlInterpolatedAsync($@"INSERT INTO ClassicPageDiscoveries
             (ScanId, RecordKey, RowType, DiscoveryStatus, AssessmentStatus, ObservedAtUtc, SiteUrl, WebUrl, Url, PageType, ContentTypeId, ErrorDetail)
             VALUES ({scan}, 'page:historical', 'Page', 'Unknown', 'Failed', {DateTime.UtcNow}, {Site}, {Web}, {url}, 'PublishingPage', {AspxAssetPurpose.LayoutContentType}, 'historical failure')");
-        db.ClassicPages.Add(new ClassicPage
-        {
-            ScanId = scan, SiteUrl = Site, WebUrl = Web, PageUrl = url,
-            PageType = "PublishingPage", Layout = "HistoricalLayout", AssessmentStatus = "Failed", WebPartCount = 7,
-        });
-        await db.SaveChangesAsync();
+        // Use the historical schema, not the current EF model's newly added reference columns.
+        await db.Database.ExecuteSqlInterpolatedAsync($@"INSERT INTO ClassicPages
+            (ScanId, SiteUrl, WebUrl, PageUrl, ListId, PageType, Layout, AssessmentStatus, ModifiedAt, UncustomizedHomePage, WebPartCount, MappingPercentage)
+            VALUES ({scan}, {Site}, {Web}, {url}, {Guid.Empty}, 'PublishingPage', 'HistoricalLayout', 'Failed', {DateTime.MinValue}, 0, 7, 0)");
         db.ChangeTracker.Clear();
         await migrator.MigrateAsync();
 

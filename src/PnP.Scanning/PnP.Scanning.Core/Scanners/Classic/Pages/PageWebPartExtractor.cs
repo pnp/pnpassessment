@@ -257,12 +257,20 @@ namespace PnP.Scanning.Core.Scanners
             var webParts = csomContext.LoadQuery(limitedWPManager.WebParts.IncludeWithDefaultProperties(
                 wp => wp.Id, wp => wp.ZoneId, wp => wp.WebPart.ExportMode, wp => wp.WebPart.Title,
                 wp => wp.WebPart.ZoneIndex, wp => wp.WebPart.IsClosed, wp => wp.WebPart.Hidden, wp => wp.WebPart.Properties));
-            await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+            try
+            {
+                await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                PublishingLayoutReference.RecordFailure(page, ex);
+                throw;
+            }
 
             // Parity with the legacy PublishingAnalyzer: the recorded layout is the actual page layout name
             // (e.g. "ArticleLeft") read from the PublishingPageLayout field — not the transform engine's
             // PublishingPage_AutoDetect placeholder (which the legacy scanner discards for publishing pages).
-            page.Layout = GetPublishingPageLayoutName(listItem.FieldValues);
+            ApplyPublishingMetadata(page, listItem.FieldValues);
 
             // Export the web part XML for the parts that allow it (gives the most reliable type).
             var exportedXml = new Dictionary<Guid, ClientResult<string>>();
@@ -423,6 +431,12 @@ namespace PnP.Scanning.Core.Scanners
             }
 
             return "";
+        }
+
+        internal static void ApplyPublishingMetadata(ClassicPage page, IDictionary<string, object> fieldValues)
+        {
+            page.Layout = GetPublishingPageLayoutName(fieldValues);
+            PublishingLayoutReference.Capture(page, fieldValues);
         }
 
         private static bool HasAll(IDictionary<string, object> properties, params string[] keys)

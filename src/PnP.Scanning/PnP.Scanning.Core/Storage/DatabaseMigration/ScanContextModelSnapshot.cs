@@ -518,6 +518,21 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("Layout")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LayoutReferenceReason")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("NotEvaluated");
+
+                    b.Property<string>("LayoutReferenceStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<string>("LayoutUrl")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ListId")
                         .HasColumnType("TEXT");
 

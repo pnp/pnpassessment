@@ -30,6 +30,11 @@ namespace PnP.Scanning.Core.Storage
         // Page transformation readiness enrichment (ported from the Modernization Scanner)
         public string Layout { get; set; }
 
+        // Publishing-page reference evidence, independent of the friendly Layout name.
+        public string LayoutUrl { get; set; }
+        public string LayoutReferenceStatus { get; set; } = "Unknown";
+        public string LayoutReferenceReason { get; set; } = "NotEvaluated";
+
         public bool? HomePage { get; set; }
 
         public bool UncustomizedHomePage { get; set; }

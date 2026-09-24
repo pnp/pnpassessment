@@ -322,6 +322,61 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.Row.ErrorDetail.Should().Be("Retained failure");
     }
 
+    [Fact]
+    public async Task Native_metadata_acquires_url_field_without_extra_requests_or_changing_page_analysis_inputs()
+    {
+        var scan = Guid.NewGuid();
+        var url = Web + "/_catalogs/masterpage/Article Left.aspx";
+        var fixture = new MetadataFixture(scan, "subweb/Pages/article.aspx", new()
+        {
+            ["ContentTypeId"] = PublishingContentType,
+            ["PublishingPageLayout"] = new FieldUrlValue(Site + "/_catalogs/masterpage/Article Left.aspx", "ArticleLeft"),
+            ["WikiField"] = "<p>Not part of publishing Web Part analysis</p>",
+        });
+        fixture.Row.WebUrl = Web + "/subweb";
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        await writer.WriteAsync(new[] { fixture.Row });
+        var discovery = new PageScanComponent.PageDiscovery
+        {
+            Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), SkipUserInformation = true,
+        };
+        await PageScanComponent.RoutePhysicalPageAsync(discovery, fixture.Row, fixture.List);
+        var page = discovery.Pages.Should().ContainSingle().Subject;
+        page.LayoutUrl.Should().Be(Web + "/_catalogs/masterpage/Article%20Left.aspx");
+        page.LayoutReferenceReason.Should().Be("InventoryPending");
+        page.PageType.Should().Be("PublishingPage");
+        page.RemediationCode.Should().Be("CP3");
+        discovery.EnrichmentInputs.Should().ContainSingle().Which.WikiFieldHtml.Should().BeNull();
+        fixture.LastViewFields.Should().Contain("PublishingPageLayout");
+        fixture.ItemRequests.Should().Be(1);
+        fixture.StreamRequests.Should().Be(1);
+        fixture.AllProjectionRequests.Should().Be(0);
+        // The existing CSOM extraction supplies the friendly name, using the same page field.
+        PageWebPartExtractor.ApplyPublishingMetadata(page, new Dictionary<string, object>
+        {
+            ["PublishingPageLayout"] = new Microsoft.SharePoint.Client.FieldUrlValue { Url = url, Description = "ArticleLeft" },
+        });
+        PageScanComponent.ApplyDiscoveryState(page, fixture.Row);
+        using (var db = database.CreateContext())
+        {
+            await StorageManager.StorePageInformationAsync(db, new List<ClassicPage> { page });
+        }
+        // The catalog web completes later. This is only existing inventory, not a target request.
+        var asset = new MetadataFixture(scan, "_catalogs/masterpage/Article Left.aspx", new());
+        asset.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
+        AspxAssetPurpose.Apply(asset.Row, asset.Row.ContentTypeId);
+        await writer.WriteAsync(new[] { asset.Row });
+        await writer.FinalizeScanAsync(scan);
+        asset.ItemRequests.Should().Be(0);
+        fixture.ItemRequests.Should().Be(1);
+        using var read = database.CreateContext();
+        var stored = await read.ClassicPages.SingleAsync(row => row.ScanId == scan);
+        stored.Layout.Should().Be("ArticleLeft");
+        stored.LayoutReferenceStatus.Should().Be("Resolved");
+        stored.LayoutReferenceReason.Should().Be("ConfirmedLayoutAsset");
+        stored.PageType.Should().Be("PublishingPage");
+    }
+
     private static T[] ReadCsv<T>(string directory, string name)
     {
         using var csv = new CsvReader(new StreamReader(Path.Combine(directory, name)), CultureInfo.InvariantCulture);
