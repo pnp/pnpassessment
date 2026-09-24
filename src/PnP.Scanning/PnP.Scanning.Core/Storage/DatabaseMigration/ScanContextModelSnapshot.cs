@@ -625,6 +625,24 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("AssessmentStatus")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("AssetPurpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<string>("AssetPurposeReason")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("NotEvaluated");
+
+                    b.Property<string>("AssetPurposeStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Unknown");
+
                     b.Property<string>("ContentTypeId")
                         .HasColumnType("TEXT");
 

@@ -106,33 +106,10 @@ namespace PnP.Scanning.Core.Scanners
             // rediscover selected libraries or gate their existence on publishing features/template.
             foreach (var row in discoveredPages)
             {
-                // The discovery provider records a nullable value so an unavailable modeled call is
-                // not mistaken for false. Prefer the later CSOM read when it succeeded; it is also the
-                // value used by the page assessment and keeps --homepageonly from filtering every page
-                // merely because the discovery-specific WelcomePage read failed.
-                row.HomePage = ResolveHomePageState(row.Url, welcomePage, welcomePageKnown, row.HomePage);
-                if (options.HomePageOnly && row.HomePage != true)
-                {
-                    row.AssessmentStatus = "NotSelected";
-                    continue;
-                }
-                var list = lists.FirstOrDefault(value => value.Id == row.ListId);
-                if (list == null || row.ListItemId == null)
-                {
-                    // Forms/Views and root files may not have a list item. Their physical
-                    // discovery is still valid; do not pretend that zero extracted WPs is a pass.
-                    row.AssessmentStatus = "NotApplicable";
-                    continue;
-                }
                 try
                 {
-                    var input = await LoadPhysicalPageAsync(list, row, welcomePage,
-                        options.SkipUserInformation, welcomePageKnown).ConfigureAwait(false);
-                    row.PageType = input.Page.PageType;
-                    row.HomePage = input.Page.HomePage;
-                    if (row.PageType == PublishingPage) AddPublishingPage(discovery, input);
-                    else AddSitePage(discovery, input);
-                    row.AssessmentStatus = row.PageType == ModernPage ? "NotApplicable" : "Complete";
+                    await RoutePhysicalPageAsync(discovery, row,
+                        lists.FirstOrDefault(value => value.Id == row.ListId)).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -274,9 +251,11 @@ namespace PnP.Scanning.Core.Scanners
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
         // can be replayed offline against the assessment database/report pipeline.
+        // Returns null for a confirmed asset, including one confirmed by this metadata read.
         internal static async Task<PageEnrichmentInput> LoadPhysicalPageAsync(IList list, ClassicPageDiscovery row,
             string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null)
         {
+            if (ExcludeAsset(row)) return null;
             if (row.ListId != list.Id || row.ListItemId == null || row.ListItemId <= 0)
                 throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
 
@@ -301,6 +280,8 @@ namespace PnP.Scanning.Core.Scanners
 
             string pageUrl = ResolvePhysicalPageUrl(item.Values, row.Url);
             var contentType = GetFieldValue(item, ContentTypeIdField, row.ContentTypeId);
+            row.ContentTypeId = contentType;
+            if (ExcludeAsset(row)) return null;
             bool isPublishing = SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(contentType);
             var page = new ClassicPage
             {
@@ -325,6 +306,43 @@ namespace PnP.Scanning.Core.Scanners
                 WikiFieldHtml = isPublishing ? null : GetFieldValue<string>(item, WikiField),
                 FileLeafRef = GetFieldValue(item, FileLeafRefField, ""),
             };
+        }
+
+        // This is the production admission boundary, before remediation, enrichment, page storage
+        // and counters. Physical discovery rows (including assets and uncertainty) remain intact.
+        internal static async Task RoutePhysicalPageAsync(PageDiscovery discovery, ClassicPageDiscovery row, IList list)
+        {
+            if (ExcludeAsset(row)) return;
+            // Prefer a successful welcome-page read; unavailable metadata is not false.
+            row.HomePage = ResolveHomePageState(row.Url, discovery.WelcomePage, discovery.WelcomePageKnown, row.HomePage);
+            if (discovery.HomePageOnly && row.HomePage != true)
+            {
+                row.AssessmentStatus = AssessmentDiscoveryWriter.RetainFailure(row.AssessmentStatus, "NotSelected");
+                return;
+            }
+            if (list == null || row.ListItemId == null)
+            {
+                // Physical Forms/Views and root files need not have a list-item surface.
+                row.AssessmentStatus = AssessmentDiscoveryWriter.RetainFailure(row.AssessmentStatus, "NotApplicable");
+                return;
+            }
+            var input = await LoadPhysicalPageAsync(list, row, discovery.WelcomePage,
+                discovery.SkipUserInformation, discovery.WelcomePageKnown).ConfigureAwait(false);
+            if (input == null) return;
+            row.PageType = input.Page.PageType;
+            row.HomePage = input.Page.HomePage;
+            if (row.PageType == PublishingPage) AddPublishingPage(discovery, input);
+            else AddSitePage(discovery, input);
+            row.AssessmentStatus = AssessmentDiscoveryWriter.RetainFailure(row.AssessmentStatus,
+                row.PageType == ModernPage ? "NotApplicable" : "Complete");
+        }
+
+        private static bool ExcludeAsset(ClassicPageDiscovery row)
+        {
+            AspxAssetPurpose.Apply(row, row.ContentTypeId);
+            if (!AspxAssetPurpose.IsLayout(row)) return false;
+            row.AssessmentStatus = AssessmentDiscoveryWriter.RetainFailure(row.AssessmentStatus, "ExcludedAsset");
+            return true;
         }
 
         internal static void ApplyDiscoveryState(ClassicPage page, ClassicPageDiscovery found)
@@ -686,7 +704,7 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // Cross-cutting state threaded through the per-web page discovery branches.
-        private sealed class PageDiscovery
+        internal sealed class PageDiscovery
         {
             public ScannerBase ScannerBase { get; init; }
 
