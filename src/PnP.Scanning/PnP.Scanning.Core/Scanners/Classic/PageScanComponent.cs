@@ -135,10 +135,8 @@ namespace PnP.Scanning.Core.Scanners
             {
                 try
                 {
-                    var pageWebParts = await ExtractWebPartsAsync(csomContext, input, options.ExportWebPartProperties).ConfigureAwait(false);
-
-                    // Stamps IsMappable per web part + WebPartCount / MappingPercentage / UnmappedWebParts on the page.
-                    PageMappingCalculator.ApplyMapping(input.Page, pageWebParts, MappingManager);
+                    var pageWebParts = await ExtractAndMapWebPartsAsync(input,
+                        value => ExtractWebPartsAsync(csomContext, value, options.ExportWebPartProperties)).ConfigureAwait(false);
 
                     webPartsList.AddRange(pageWebParts);
 
@@ -186,14 +184,29 @@ namespace PnP.Scanning.Core.Scanners
                 await scannerBase.StorageManager.StorePageWebPartsAsync(scannerBase.ScanId, webPartsList);
             }
 
-            // Loop over the found pages and save the page summary information
+            var counts = CountPages(pagesList);
+            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, context, remediationCodes,
+                                                                   discovery.ModernPageCounter, counts.Wiki, counts.Blog, counts.WebPart, counts.Aspx, counts.Publishing);
+        }
+
+        // Replay only the live extraction boundary; mapping and its inputs remain production code.
+        internal static async Task<List<ClassicPageWebPart>> ExtractAndMapWebPartsAsync(PageEnrichmentInput input,
+            Func<PageEnrichmentInput, Task<List<ClassicPageWebPart>>> extract)
+        {
+            var webParts = await extract(input).ConfigureAwait(false);
+            PageMappingCalculator.ApplyMapping(input.Page, webParts, MappingManager);
+            return webParts;
+        }
+
+        internal static (int Wiki, int Blog, int WebPart, int Aspx, int Publishing) CountPages(IEnumerable<ClassicPage> pages)
+        {
             int wikiPageCounter = 0;
             int blogPageCounter = 0;
             int webPartPageCounter = 0;
             int aspxPageCounter = 0;
             int publishingPageCounter = 0;
 
-            foreach (var page in pagesList)
+            foreach (var page in pages)
             {
                 switch (page.PageType)
                 {
@@ -215,8 +228,7 @@ namespace PnP.Scanning.Core.Scanners
                 }
             }
 
-            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, context, remediationCodes,
-                                                                   discovery.ModernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
+            return (wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
         }
 
         private static void AddBlogPage(PageDiscovery disc, IList blogList, IListItem listItem)

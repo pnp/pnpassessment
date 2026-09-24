@@ -24,7 +24,7 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 /// This does not establish live SharePoint coverage or validate the SDK's HTTP serialization.
 /// </summary>
 [Trait("Category", "ClassicDiscoveryIntegration")]
-public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContextFixture>
+public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<ScanContextFixture>
 {
     private const string Site = "https://contoso.sharepoint.com/sites/replay";
     private const string Web = "/sites/replay";

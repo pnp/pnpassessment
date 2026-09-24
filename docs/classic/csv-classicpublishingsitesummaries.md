@@ -6,6 +6,8 @@ This csv file contains one row per **publishing portal** (site collection that h
 
 A site collection only appears in this file when it contains at least one publishing web — a web on a publishing template, or a web that carries at least one classic publishing page (publishing feature enabled on a non-publishing template).
 
+For new scans, `NumberOfPages` counts Publishing content pages, not standalone Page Layout assets. `UsedPageLayouts` contains their existing friendly `Layout` names, not an asset inventory or resolved-reference count. A content page with an unresolved layout reference still contributes to this report. Use `LayoutUrl` and reference evidence in [classicpages.csv](csv-classicpages.md) to relate a page to the physical layout inventory in [discovery.csv](csv-discovery.md). Historical summaries are not repaired on upgrade.
+
 ## Columns
 
 Column|Description
