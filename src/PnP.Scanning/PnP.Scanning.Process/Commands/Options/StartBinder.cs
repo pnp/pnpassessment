@@ -27,6 +27,7 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<bool> classicSkipUsageInformation;
         private readonly Option<bool> classicSkipUserInformation;
         private readonly Option<bool> classicHomePageOnly;
+        private readonly Option<bool> classicDiscoveryTestTraffic;
         private readonly Option<int> classicAuditLogWindowDays;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
@@ -42,6 +43,7 @@ namespace PnP.Scanning.Process.Commands
                            , Option<bool> classicSkipUsageInformationInput
                            , Option<bool> classicSkipUserInformationInput
                            , Option<bool> classicHomePageOnlyInput
+                           , Option<bool> classicDiscoveryTestTrafficInput
                            , Option<int> classicAuditLogWindowDaysInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
@@ -68,6 +70,7 @@ namespace PnP.Scanning.Process.Commands
             classicSkipUsageInformation = classicSkipUsageInformationInput;
             classicSkipUserInformation = classicSkipUserInformationInput;
             classicHomePageOnly = classicHomePageOnlyInput;
+            classicDiscoveryTestTraffic = classicDiscoveryTestTrafficInput;
             classicAuditLogWindowDays = classicAuditLogWindowDaysInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
@@ -96,6 +99,7 @@ namespace PnP.Scanning.Process.Commands
                 SkipUsageInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUsageInformation),
                 SkipUserInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUserInformation),
                 HomePageOnly = bindingContext.ParseResult.GetValueForOption(classicHomePageOnly),
+                DiscoveryTestTraffic = bindingContext.ParseResult.GetValueForOption(classicDiscoveryTestTraffic),
                 AuditLogWindowDays = bindingContext.ParseResult.GetValueForOption(classicAuditLogWindowDays),
 
 #if DEBUG

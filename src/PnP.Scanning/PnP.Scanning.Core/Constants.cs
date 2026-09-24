@@ -23,6 +23,7 @@
         internal const string StartClassicSkipUsageInformation = "skipusageinformation";
         internal const string StartClassicSkipUserInformation = "skipuserinformation";
         internal const string StartClassicHomePageOnly = "homepageonly";
+        internal const string StartClassicDiscoveryTestTraffic = "discoverytesttraffic";
         internal const string StartClassicAuditLogWindowDays = "auditlogwindowdays";
         internal const string StartTestNumberOfSites = "testnumberofsites";
 

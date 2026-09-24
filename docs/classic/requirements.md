@@ -41,6 +41,7 @@ Argument | Description
 `--skipusageinformation` | Skip collecting audit log usage statistics (ClassicPageViewed / ClassicPageCreated / ClassicPageEdited). When set, `classicpageauditusage.csv` is not generated. Use this to speed up the assessment when audit log data is not needed.
 `--auditlogwindowdays` | Number of days back to query the audit log (1–180, default 14). Requires the `AuditLogsQuery-SharePoint.Read.All` permission. Audit Standard retention is 180 days; Audit Premium (E5) retains up to 1 year.
 `--skipuserinformation` | Skip collecting page user information (e.g. the page's *Modified By*).
+`--discoverytesttraffic` | Off by default. For controlled testing only, append `testtraffic-smr` after the preserved PnP Core `NONISV` User-Agent on all discovery requests of this Classic page scan. Use `--discoverytesttraffic true` to enable or `--discoverytesttraffic false` to disable. This is not a page allowlist; see [examples and scope](assess.md#controlled-discovery-test-traffic).
 `--homepageonly` | Discover and assess only the configured home page of each web, rather than enumerating every physical ASPX file. Useful for a fast home-page modernization-readiness assessment. Omit this option when a complete physical ASPX inventory is required.
 
 > [!Note]
