@@ -42,7 +42,7 @@ internal static class ClassicPageDiscoveryComponent
                     using var stream = await file.GetContentAsync(true).ConfigureAwait(false);
                     using var reader = new StreamReader(stream);
                     return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
-                }))
+                }), scan.PublishingLayoutRuleVersion)
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }

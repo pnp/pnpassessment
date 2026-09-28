@@ -28,14 +28,17 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
     [InlineData("_catalogs/masterpage/layout.aspx", true, false)]
     [InlineData("Custom/layout.aspx", false, false)]
     [InlineData("Custom/layout.aspx", true, true)]
-    public void Layout_content_type_not_location_proves_an_asset(string path, bool descendant, bool lowerCase)
+    public async Task Own_type_not_content_type_or_location_proves_an_asset(string path, bool descendant, bool lowerCase)
     {
         var contentType = AspxAssetPurpose.LayoutContentType + (descendant ? "00AABBCCDDEEFF00112233445566778899" : "");
         if (lowerCase) contentType = contentType.ToLowerInvariant();
         var row = Row(Guid.NewGuid(), path, contentType);
+        row.AssetPurpose.Should().Be("Unknown", "ContentType alone is no longer layout authority");
+        await LayoutRoutingEvidence.InspectAsync(row);
+        AspxAssetPurpose.Apply(row, contentType, 1);
         row.AssetPurpose.Should().Be("PageLayout");
         row.AssetPurposeStatus.Should().Be("Confirmed");
-        row.AssetPurposeReason.Should().Be("PageLayoutContentType");
+        row.AssetPurposeReason.Should().Be("ConfirmedPublishingLayoutFamily");
         row.PageType.Should().NotBe("PublishingPage");
         SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(contentType).Should().BeFalse();
     }
@@ -43,11 +46,14 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
     [Theory]
     [InlineData("Pages/article.aspx", false, false)]
     [InlineData("_catalogs/masterpage/article.aspx", true, true)]
-    public void Actual_publishing_types_keep_their_page_family(string path, bool descendant, bool lowerCase)
+    public async Task Actual_publishing_types_keep_their_page_family(string path, bool descendant, bool lowerCase)
     {
         var contentType = AspxAssetPurpose.PublishingContentType + (descendant ? "00AABBCCDDEEFF00112233445566778899" : "");
         if (lowerCase) contentType = contentType.ToLowerInvariant();
         var row = Row(Guid.NewGuid(), path, contentType);
+        row.AssetPurpose.Should().Be("Unknown", "metadata cannot confirm purpose before type evidence");
+        await LayoutRoutingEvidence.InspectAsync(row, "Outside");
+        AspxAssetPurpose.Apply(row, contentType, 1);
         row.AssetPurpose.Should().Be("ContentPage");
         row.AssetPurposeStatus.Should().Be("Confirmed");
         row.PageType.Should().Be("PublishingPage");
@@ -64,7 +70,7 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
         var row = Row(Guid.NewGuid(), "_catalogs/masterpage/unknown.aspx", contentType);
         row.AssetPurpose.Should().Be("Unknown");
         row.AssetPurposeStatus.Should().Be("Unknown");
-        row.AssetPurposeReason.Should().Be(reason);
+        row.AssetPurposeReason.Should().Contain(reason);
         AspxAssetPurpose.IsLayout(row).Should().BeFalse();
     }
 
@@ -78,8 +84,10 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
     public async Task Reobservations_and_assessment_updates_retain_purpose_and_failure_evidence(string status, bool asset)
     {
         var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         var row = Row(scan, "_catalogs/masterpage/file.aspx", asset ? AspxAssetPurpose.LayoutContentType : null);
+        if (asset) await LayoutRoutingEvidence.InspectAsync(row);
         row.PageType = "WebPartPage"; // Independent page-family evidence must survive sparse updates.
         row.DiscoveryStatus = row.AssessmentStatus = status;
         row.ErrorStage = "Metadata";
@@ -112,8 +120,14 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
         {
             actual.AssetPurpose.Should().Be(asset ? "PageLayout" : "Unknown");
             actual.AssetPurposeStatus.Should().Be(asset ? "Confirmed" : "Unknown");
-            actual.AssetPurposeReason.Should().Contain("ContentTypeUnavailable");
-            if (asset) actual.AssetPurposeReason.Should().Contain("PageLayoutContentType");
+            if (asset)
+            {
+                actual.AssetPurposeReason.Should().Be("ConfirmedPublishingLayoutFamily");
+                actual.PublishingLayoutFamily.Should().Be("Member");
+                actual.PageTypeEvidenceJson.Should().Be(row.PageTypeEvidenceJson);
+                actual.ContentTypeId.Should().Be(row.ContentTypeId);
+            }
+            else actual.AssetPurposeReason.Should().Contain("ContentTypeUnavailable");
             actual.DiscoveryStatus.Should().Be(status);
             actual.AssessmentStatus.Should().Be(status);
             actual.ErrorStage.Should().Contain("Metadata");
@@ -132,6 +146,8 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
     {
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         var row = Row(Guid.NewGuid(), "Custom/layout.aspx", AspxAssetPurpose.LayoutContentType);
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, row.ScanId);
+        await LayoutRoutingEvidence.InspectAsync(row);
         await writer.WriteAsync(new[] { row });
         var repeat = Row(row.ScanId, "Custom/layout.aspx", row.ContentTypeId.ToLowerInvariant(), row.FileUniqueId);
         await writer.WriteAsync(new[] { repeat });
@@ -145,14 +161,21 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
     {
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         var row = Row(Guid.NewGuid(), "Custom/layout.aspx", AspxAssetPurpose.LayoutContentType);
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, row.ScanId);
+        await LayoutRoutingEvidence.InspectAsync(row);
+        row.PageType = "PublishingPage";
         await writer.WriteAsync(new[] { row });
         var update = Row(row.ScanId, "Custom/layout.aspx", null, row.FileUniqueId);
+        update.PageType = "PublishingPage";
         update.AssessmentStatus = "Complete";
         await writer.UpdateExistingAsync(new[] { update });
         var stored = (await writer.ReadPagesAsync(row.ScanId, Site, Web)).Single();
         stored.AssetPurpose.Should().Be("PageLayout");
         stored.AssetPurposeStatus.Should().Be("Confirmed");
         stored.AssessmentStatus.Should().Be("ExcludedAsset");
+        stored.PageType.Should().BeNull();
+        await writer.WriteAsync(new[] { update });
+        (await writer.ReadPagesAsync(row.ScanId, Site, Web)).Single().PageType.Should().BeNull();
     }
 
     [Fact]
@@ -197,6 +220,38 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
             column.Table == "ClassicPageDiscoveries" && !column.IsNullable && column.DefaultValue != null);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Missing")]
+    [InlineData("Incomplete")]
+    [InlineData("Outside")]
+    public async Task Sticky_content_type_confirmation_is_not_type_evidence_on_new_scan_merges(string type)
+    {
+        var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        var row = Row(scan, "Custom/layout.aspx", AspxAssetPurpose.LayoutContentType);
+        await LayoutRoutingEvidence.InspectAsync(row, type);
+        row.AssetPurpose = "PageLayout";
+        row.AssetPurposeStatus = "Confirmed";
+        row.AssetPurposeReason = "PageLayoutContentType";
+        row.AssessmentStatus = "ExcludedAsset";
+        await writer.WriteAsync(new[] { row });
+        for (int i = 0; i < 2; i++)
+        {
+            var stale = Row(scan, "Custom/layout.aspx", AspxAssetPurpose.PublishingContentType, row.FileUniqueId);
+            stale.AssetPurpose = i == 0 ? "PageLayout" : "ContentPage";
+            stale.AssetPurposeStatus = "Confirmed";
+            await writer.UpdateExistingAsync(new[] { stale });
+        }
+        var stored = (await writer.ReadPagesAsync(scan, Site, Web)).Single();
+        stored.PublishingLayoutFamily.Should().Be(type == "Outside" ? "NonMember" : "Unknown");
+        stored.AssetPurpose.Should().Be(type == "Outside" ? "ContentPage" : "Unknown");
+        stored.AssetPurposeStatus.Should().Be(type == "Outside" ? "Confirmed" : "Unknown");
+        stored.AssessmentStatus.Should().NotBe("ExcludedAsset");
+        stored.PageTypeEvidenceJson.Should().Be(row.PageTypeEvidenceJson);
+    }
+
     private static ClassicPageDiscovery Row(Guid scan, string path, string contentType, Guid? fileId = null)
     {
         var id = fileId ?? Guid.NewGuid();
@@ -204,6 +259,6 @@ public sealed class AspxAssetPurposeTests : IClassFixture<ScanContextFixture>
             Web + "/" + path, true, "synthetic", SiteCollectionId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
             ContentTypeId: contentType, PageType: SharePointLiveAspxDiscoveryProvider.InferPageType(contentType));
         return AssessmentWebDiscovery.Page(scan, Site, Web,
-            new("files", null, DiscoveryScopeKind.Folder, DiscoverySourceKind.RawListLibraryFiles, Web, "synthetic"), record);
+            new("files", null, DiscoveryScopeKind.Folder, DiscoverySourceKind.RawListLibraryFiles, Web, "synthetic"), record, 1);
     }
 }

@@ -16,15 +16,17 @@ internal sealed class AssessmentWebDiscovery
     private readonly string webUrl;
     private readonly AssessmentDiscoveryWriter writer;
     private readonly Func<ClassicPageDiscovery, CancellationToken, Task> inspectType;
+    private readonly int ruleVersion;
 
     internal AssessmentWebDiscovery(Guid scanId, string siteUrl, string webUrl, AssessmentDiscoveryWriter writer,
-        Func<ClassicPageDiscovery, CancellationToken, Task> inspectType = null)
+        Func<ClassicPageDiscovery, CancellationToken, Task> inspectType = null, int ruleVersion = 0)
     {
         this.scanId = scanId;
         this.siteUrl = siteUrl;
         this.webUrl = webUrl;
         this.writer = writer;
         this.inspectType = inspectType;
+        this.ruleVersion = ruleVersion;
     }
 
     internal async Task RunAsync(IAspxDiscoveryProvider provider, CancellationToken cancellationToken)
@@ -160,7 +162,7 @@ internal sealed class AssessmentWebDiscovery
                         AddError(scopeRow, "ReadFiles", admission.GapCode, admission.Detail);
                         continue;
                     }
-                    pages.Add(Page(scanId, siteUrl, webUrl, scope, record));
+                    pages.Add(Page(scanId, siteUrl, webUrl, scope, record, ruleVersion));
                 }
                 // Storage failures are deliberately outside the request exception handlers.
                 // A failed commit must fail the worker rather than be misreported as an API gap.
@@ -172,6 +174,7 @@ internal sealed class AssessmentWebDiscovery
                     foreach (var page in pages)
                     {
                         await inspectType(page, cancellationToken).ConfigureAwait(false);
+                        AspxAssetPurpose.Apply(page, page.ContentTypeId, ruleVersion);
                         await writer.UpdateExistingAsync(new[] { page }, cancellationToken).ConfigureAwait(false);
                     }
                 }
@@ -202,7 +205,7 @@ internal sealed class AssessmentWebDiscovery
     };
 
     internal static ClassicPageDiscovery Page(Guid scanId, string siteUrl, string webUrl,
-        DiscoveryScopeRegistration scope, RawDiscoveryRecord record)
+        DiscoveryScopeRegistration scope, RawDiscoveryRecord record, int ruleVersion = 0)
     {
         var fileId = Guid.TryParse(record.FileUniqueId, out var parsed) && parsed != Guid.Empty ? parsed : (Guid?)null;
         var siteIdentity = record.SiteCollectionId?.ToString("D") ?? siteUrl.ToLowerInvariant();
@@ -220,7 +223,7 @@ internal sealed class AssessmentWebDiscovery
             LibraryHidden = record.LibraryHidden, ObservationMethod = record.ObservationMethod ?? scope.SourceKind?.ToString(),
             DiscoveryStatus = "Discovered", ObservedAtUtc = DateTime.UtcNow,
         };
-        AspxAssetPurpose.Apply(row, record.ContentTypeId);
+        AspxAssetPurpose.Apply(row, record.ContentTypeId, ruleVersion);
         return row;
     }
 

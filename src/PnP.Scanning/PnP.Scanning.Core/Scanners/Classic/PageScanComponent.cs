@@ -71,9 +71,13 @@ namespace PnP.Scanning.Core.Scanners
             // The web's welcome page drives the HomePage flag and the optional HomePageOnly filter.
             var (welcomePage, welcomePageKnown) = await GetWelcomePageAsync(csomContext).ConfigureAwait(false);
 
+            using var scanContext = new ScanContext(scannerBase.ScanId);
+            var ruleVersion = await AssessmentDiscoveryWriter.ReadRuleVersionAsync(scanContext, scannerBase.ScanId).ConfigureAwait(false);
+
             var discovery = new PageDiscovery
             {
                 ScannerBase = scannerBase,
+                PublishingLayoutRuleVersion = ruleVersion,
                 WelcomePage = welcomePage,
                 WelcomePageKnown = welcomePageKnown,
                 HomePageOnly = options.HomePageOnly,
@@ -263,11 +267,11 @@ namespace PnP.Scanning.Core.Scanners
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
         // can be replayed offline against the assessment database/report pipeline.
-        // Returns null for a confirmed asset, including one confirmed by this metadata read.
+        // Returns null for a confirmed asset under the recorded scan authority.
         internal static async Task<PageEnrichmentInput> LoadPhysicalPageAsync(IList list, ClassicPageDiscovery row,
-            string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null)
+            string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null, int ruleVersion = 0)
         {
-            if (ExcludeAsset(row)) return null;
+            if (ExcludeAsset(row, ruleVersion)) return null;
             if (row.ListId != list.Id || row.ListItemId == null || row.ListItemId <= 0)
                 throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
 
@@ -293,7 +297,7 @@ namespace PnP.Scanning.Core.Scanners
             string pageUrl = ResolvePhysicalPageUrl(item.Values, row.Url);
             var contentType = GetFieldValue(item, ContentTypeIdField, row.ContentTypeId);
             row.ContentTypeId = contentType;
-            if (ExcludeAsset(row)) return null;
+            if (ExcludeAsset(row, ruleVersion)) return null;
             bool isPublishing = SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(contentType);
             var page = new ClassicPage
             {
@@ -326,7 +330,7 @@ namespace PnP.Scanning.Core.Scanners
         // and counters. Physical discovery rows (including assets and uncertainty) remain intact.
         internal static async Task RoutePhysicalPageAsync(PageDiscovery discovery, ClassicPageDiscovery row, IList list)
         {
-            if (ExcludeAsset(row)) return;
+            if (ExcludeAsset(row, discovery.PublishingLayoutRuleVersion)) return;
             // Prefer a successful welcome-page read; unavailable metadata is not false.
             row.HomePage = ResolveHomePageState(row.Url, discovery.WelcomePage, discovery.WelcomePageKnown, row.HomePage);
             if (discovery.HomePageOnly && row.HomePage != true)
@@ -341,7 +345,7 @@ namespace PnP.Scanning.Core.Scanners
                 return;
             }
             var input = await LoadPhysicalPageAsync(list, row, discovery.WelcomePage,
-                discovery.SkipUserInformation, discovery.WelcomePageKnown).ConfigureAwait(false);
+                discovery.SkipUserInformation, discovery.WelcomePageKnown, discovery.PublishingLayoutRuleVersion).ConfigureAwait(false);
             if (input == null) return;
             row.PageType = input.Page.PageType;
             row.HomePage = input.Page.HomePage;
@@ -351,10 +355,10 @@ namespace PnP.Scanning.Core.Scanners
                 row.PageType == ModernPage ? "NotApplicable" : "Complete");
         }
 
-        private static bool ExcludeAsset(ClassicPageDiscovery row)
+        private static bool ExcludeAsset(ClassicPageDiscovery row, int ruleVersion)
         {
-            AspxAssetPurpose.Apply(row, row.ContentTypeId);
-            if (!AspxAssetPurpose.IsLayout(row)) return false;
+            AspxAssetPurpose.Apply(row, row.ContentTypeId, ruleVersion);
+            if (!AspxAssetPurpose.IsLayout(row, ruleVersion)) return false;
             row.AssessmentStatus = AssessmentDiscoveryWriter.RetainFailure(row.AssessmentStatus, "ExcludedAsset");
             return true;
         }
@@ -720,6 +724,8 @@ namespace PnP.Scanning.Core.Scanners
         // Cross-cutting state threaded through the per-web page discovery branches.
         internal sealed class PageDiscovery
         {
+            public int PublishingLayoutRuleVersion { get; init; }
+
             public ScannerBase ScannerBase { get; init; }
 
             public string WelcomePage { get; init; }

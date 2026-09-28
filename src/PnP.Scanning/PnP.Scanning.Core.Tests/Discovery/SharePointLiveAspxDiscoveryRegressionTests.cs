@@ -16,6 +16,74 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
 
     public SharePointLiveAspxDiscoveryRegressionTests(ScanContextFixture database) => this.database = database;
 
+    [Theory]
+    [InlineData("Root")]
+    [InlineData("Direct")]
+    [InlineData("Indirect")]
+    public async Task Root_file_is_inspected_and_excluded_before_no_item_or_selection_routing(string type)
+    {
+        var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
+        var siteUrl = new Uri("https://contoso.sharepoint.com/sites/a");
+        using var factory = new RootTraversalFactory(siteUrl);
+        using var provider = Provider(factory, siteUrl, Guid.NewGuid(), Guid.NewGuid());
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        int sourceReads = 0;
+        await new AssessmentWebDiscovery(scan, siteUrl.AbsoluteUri, "/", writer, async (row, _) =>
+        {
+            (await writer.ReadPagesAsync(scan, siteUrl.AbsoluteUri, "/")).Should().Contain(value => value.RecordKey == row.RecordKey);
+            row.ListItemId.Should().BeNull();
+            row.ContentTypeId.Should().BeNull();
+            sourceReads++;
+            await LayoutRoutingEvidence.InspectAsync(row, type);
+        }, 1).RunAsync(provider, default);
+        sourceReads.Should().Be(1);
+        var physical = (await writer.ReadPagesAsync(scan, siteUrl.AbsoluteUri, "/")).Single();
+        var discovery = new PageScanComponent.PageDiscovery
+        {
+            PublishingLayoutRuleVersion = 1, HomePageOnly = true,
+            Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(),
+        };
+        await PageScanComponent.RoutePhysicalPageAsync(discovery, physical, null);
+        physical.Url.Should().Be("/sites/a/default.aspx");
+        physical.PublishingLayoutFamily.Should().Be("Member");
+        physical.PageType.Should().NotBe("PublishingPage");
+        physical.AssessmentStatus.Should().Be("ExcludedAsset");
+        discovery.Pages.Should().BeEmpty();
+        discovery.EnrichmentInputs.Should().BeEmpty();
+        discovery.RemediationCodes.Should().BeEmpty();
+        discovery.ModernPageCounter.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("Root", false)]
+    [InlineData("Indirect", false)]
+    [InlineData("Outside", true)]
+    [InlineData(null, true)]
+    public async Task Discovery_publishing_projection_is_subordinate_only_to_confirmed_own_type(string type, bool publishing)
+    {
+        var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        var scope = new DiscoveryScopeRegistration("files", null, DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.RawListLibraryFiles, "/sites/a", "test");
+        var raw = new RawDiscoveryRecord("file", Guid.NewGuid().ToString(), "files", "file.aspx",
+            "/sites/a/file.aspx", true, "test", ContentTypeId: AspxAssetPurpose.PublishingContentType,
+            PageType: SharePointLiveAspxDiscoveryProvider.InferPageType(AspxAssetPurpose.PublishingContentType));
+        var row = AssessmentWebDiscovery.Page(scan, "https://contoso.sharepoint.com/sites/a", "/", scope, raw, 1);
+        await writer.WriteAsync(new[] { row });
+        await LayoutRoutingEvidence.InspectAsync(row, type);
+        await writer.UpdateExistingAsync(new[] { row });
+        // Repeat a stale metadata projection twice, after the authoritative source observation.
+        for (int i = 0; i < 2; i++)
+            await writer.WriteAsync(new[] { AssessmentWebDiscovery.Page(scan, row.SiteUrl, "/", scope, raw, 1) });
+        var retained = (await writer.ReadPagesAsync(scan, row.SiteUrl, "/")).Single();
+        (retained.PageType == "PublishingPage").Should().Be(publishing);
+        retained.AssetPurpose.Should().Be(type == null ? "Unknown" : publishing ? "ContentPage" : "PageLayout");
+        retained.PageTypeEvidenceJson.Should().Be(row.PageTypeEvidenceJson);
+        retained.ContentTypeId.Should().Be(raw.ContentTypeId);
+    }
+
     [Fact]
     public async Task Web_root_records_retain_known_site_and_web_identity()
     {

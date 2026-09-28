@@ -216,6 +216,7 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
     public async Task Production_routing_keeps_layout_inventory_out_of_content_page_and_enrichment_inputs()
     {
         var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
         var catalog = new MetadataFixture(scan, "_catalogs/masterpage/layout.aspx", new());
         catalog.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
         catalog.Row.PageType = SharePointLiveAspxDiscoveryProvider.InferPageType(catalog.Row.ContentTypeId);
@@ -234,10 +235,15 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
         unknown.Row.AssessmentStatus = "Unknown";
         unknown.Row.ErrorDetail = "Earlier metadata unavailable";
         var fixtures = new[] { catalog, outside, publishing, unknown };
+        await LayoutRoutingEvidence.InspectAsync(catalog.Row);
+        await LayoutRoutingEvidence.InspectAsync(outside.Row, "Indirect");
+        await LayoutRoutingEvidence.InspectAsync(publishing.Row, "TemplateRedirectionPage");
+        await LayoutRoutingEvidence.InspectAsync(unknown.Row, null);
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(fixtures.Select(f => f.Row));
         var discovery = new PageScanComponent.PageDiscovery
         {
+            PublishingLayoutRuleVersion = 1,
             Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), SkipUserInformation = true,
         };
         foreach (var fixture in fixtures)
@@ -245,7 +251,7 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
         await writer.UpdateExistingAsync(fixtures.Select(f => f.Row));
 
         catalog.StreamRequests.Should().Be(0, "discovery already proved this is an asset");
-        outside.StreamRequests.Should().Be(1, "the metadata read supplies previously unavailable purpose evidence");
+        outside.StreamRequests.Should().Be(0, "the file's source evidence precedes all list-item metadata reads");
         outside.Row.PageType.Should().NotBe("PublishingPage");
         new[] { catalog.Row, outside.Row }.Should().OnlyContain(row =>
             row.AssetPurpose == "PageLayout" && row.AssetPurposeStatus == "Confirmed" && row.AssessmentStatus == "ExcludedAsset");
@@ -287,7 +293,7 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
             inventory.Select(row => row.FileUniqueId).Should().BeEquivalentTo(fixtures.Select(f => f.Row.FileUniqueId));
             inventory.Should().OnlyContain(row => row.SiteCollectionId == catalog.Row.SiteCollectionId && row.DiscoveryStatus == "Discovered");
             inventory.Where(row => row.AssetPurpose == "PageLayout").Should().HaveCount(2)
-                .And.OnlyContain(row => row.AssetPurposeReason.Contains("PageLayoutContentType") && row.AssessmentStatus == "ExcludedAsset");
+                .And.OnlyContain(row => row.AssetPurposeReason.Contains("ConfirmedPublishingLayoutFamily") && row.AssessmentStatus == "ExcludedAsset");
             inventory.Single(row => row.Url == unknown.Row.Url).AssetPurposeReason.Should().Contain("ContentTypeUnavailable");
             inventory.Single(row => row.Url == unknown.Row.Url).AssessmentStatus.Should().Be("Unknown");
             (await writer.ReadPagesAsync(scan, Site, Web)).Should().HaveCount(4);
@@ -302,16 +308,17 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
     public async Task Confirmed_layout_is_excluded_even_without_list_identity_or_selection_and_preserves_failure(string status)
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Custom/layout.aspx", new());
-        fixture.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
+        await LayoutRoutingEvidence.InspectAsync(fixture.Row);
         fixture.Row.ListItemId = null;
         fixture.Row.AssessmentStatus = status;
         fixture.Row.ErrorDetail = "Retained failure";
         var discovery = new PageScanComponent.PageDiscovery
         {
+            PublishingLayoutRuleVersion = 1,
             Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), HomePageOnly = true,
         };
         await PageScanComponent.RoutePhysicalPageAsync(discovery, fixture.Row, null);
-        (await PageScanComponent.LoadPhysicalPageAsync(null, fixture.Row, null, true)).Should().BeNull();
+        (await PageScanComponent.LoadPhysicalPageAsync(null, fixture.Row, null, true, ruleVersion: 1)).Should().BeNull();
         fixture.StreamRequests.Should().Be(0);
         discovery.Pages.Should().BeEmpty();
         discovery.EnrichmentInputs.Should().BeEmpty();
