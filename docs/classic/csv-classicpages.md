@@ -29,7 +29,7 @@ AssessmentStatus | Page assessment result, such as `Complete` or `Failed`
 ModifiedAt | When the page was last modified
 Layout | The detected page layout (e.g. a wiki `TwoColumns`, a web part page `FullPageVertical`, or the publishing page layout name such as `ArticleLeft`)
 LayoutUrl | Known server-relative URL from the Publishing page's `PublishingPageLayout` URL field, normalized as an escaped path (for example spaces become `%20`). Empty when no usable URL was acquired; never derived from `Layout`
-LayoutReferenceStatus | `Resolved` when existing inventory confirms the layout asset; `Unresolved` for missing/unusable reference metadata or an unconfirmed target. `Unknown` is the unevaluated default for historical rows and non-Publishing pages
+LayoutReferenceStatus | For rule version `1`, `Resolved` when existing inventory confirms the target's PublishingLayoutPage CLR-family membership; `Unresolved` for missing/unusable reference metadata or an unconfirmed/non-family target. `Unknown` is the unevaluated default for historical rows and non-Publishing pages
 LayoutReferenceReason | Explicit reference evidence or unresolved reason, described below. Independent of page discovery/assessment status
 HomePage | True when this page is the web's home (welcome) page, False when it is not, or empty when the web's welcome page could not be resolved
 UncustomizedHomePage | True when this home page is still the default, uncustomized home page (only meaningful when `HomePage` is true)
@@ -42,17 +42,19 @@ ScanId | Id of the assessment
 SiteUrl | Fully qualified site collection URL
 WebUrl | Relative URL of this web
 
-## Relating Publishing pages to layout assets
+## Relating Publishing pages to layout handlers
 
 Match `LayoutUrl` to a `RowType=Page` row's `Url` in [discovery.csv](csv-discovery.md), within the same `ScanId` and `SiteUrl` (case-insensitive, ignoring a trailing site URL slash). Available `SiteCollectionId` values must not conflict. Do **not** require equal `WebUrl`, `WebId`, `ListId` or `FileUniqueId`: a subweb page can use its site collection's catalog layout. The discovery row retains the asset's own physical identities and acquisition evidence.
 
-Compare paths case-insensitively after the same normalization: same-origin absolute URLs become server-relative, dot segments are normalized, and path segments are decoded once and percent-encoded canonically. Spaces and `%20` therefore match; `%2520` remains distinct from `%20`. Web-relative names, foreign origins, malformed escapes, encoded separators, backslashes, repeated slashes and URLs containing query strings or fragments are unusable rather than guessed. `Layout` is a friendly description, not a URL or a join key. No catalog-path heuristic supplies missing asset-purpose evidence.
+Compare paths case-insensitively after the same normalization: same-origin absolute URLs become server-relative, dot segments are normalized, and path segments are decoded once and percent-encoded canonically. Spaces and `%20` therefore match; `%2520` remains distinct from `%20`. Web-relative names, foreign origins, malformed escapes, encoded separators, backslashes, repeated slashes and URLs containing query strings or fragments are unusable rather than guessed. `Layout` is a friendly description, not a URL or a join key.
 
-Resolution runs at scan finalization after all web workers have stored their discovery inventory, not while a particular web is being processed. A known URL is retained even when unresolved. There are no new target-discovery requests. Interrupted scans can retain `Unresolved` / `InventoryPending`; absence from the acquired inventory is not proof that a file does not exist.
+For scans with recorded `Scans.PublishingLayoutRuleVersion = 1`, a unique target must satisfy the shared `PublishingLayoutTypeEvidence.IsConfirmedMember` predicate: `RowType=Page`, `PageTypeEvidenceOrigin=DeclaredSource`, `PageTypeSourceStatus=Available`, `PageTypeResolutionStatus=Resolved` and `PublishingLayoutFamily=Member`. These are source-declared type/ancestry results, **not** observed runtime handlers. Inspect `DeclaredPageType`, `ResolvedPageType`, `PageTypeReason` and `PageTypeEvidenceJson` in discovery.csv for the supported identity binding, ancestry provenance and acquisition evidence. ContentType, `AssetPurpose`, catalog location and layout selection cannot replace this proof. A confirmed root/direct/indirect family member can resolve outside the catalog and without Page Layout ContentType. A selected layout with proven non-family type remains an unresolved family relationship; selection alone does not make it a PublishingLayoutPage handler.
+
+Resolution runs at scan finalization after all web workers have stored their discovery inventory, not while a particular web is being processed. A known URL is retained even when unresolved. There are no new target-discovery requests, reference-driven source fetches or layout-body analysis. Interrupted new scans can retain `Unresolved` / `InventoryPending`; their recorded authority is preserved through restart. Absence from the acquired inventory is not proof that a file does not exist. Version `0`, missing scan authority and unsupported rule versions do not finalize references, including legacy `InventoryPending` rows; no historical result is repaired.
 
 Reason | Meaning
 ------ | -------
-`ConfirmedLayoutAsset` | A unique same-scan, same-site physical row has the existing `PageLayout` / `Confirmed` asset-purpose decision and no retained Denied/Failed/Unknown discovery or assessment status
+`ConfirmedPublishingLayoutFamily` | A unique same-scan, same-site independently discovered physical target satisfies the shared confirmed-family predicate, without retained Denied/Failed/Unknown discovery, assessment or type-source evidence
 `InventoryPending` | Reference acquired; scan-wide relationship evaluation has not yet run
 `ReferenceMetadataMissing` | The page URL field was absent or null
 `ReferenceMetadataUnusable` | The field was not a supported native URL value or its URL could not be normalized safely; the description is never used to invent a URL
@@ -60,10 +62,14 @@ Reason | Meaning
 `ReferenceMetadataConflict` | Repeated acquisition supplied different layout URLs; the earlier known URL and uncertainty are retained
 `TargetNotDiscovered` | No matching physical inventory row in this scan/site; the reference URL remains known
 `TargetAmbiguous` | Multiple eligible physical inventory rows share the locator; no target is guessed
-`TargetPurposeUnavailable` | The target lacks confirmed asset-purpose metadata; inspect its `AssetPurposeReason` in discovery.csv
-`TargetNotLayoutAsset` | The target has a confirmed purpose other than Page Layout
+`TargetNotPublishingLayoutFamily` | Available, resolved source-declared evidence proves that the selected target is outside the CLR family
+`TargetTypeFamilyUnknown` | Target identity/ancestry has not proved membership or non-membership; inspect `PageTypeReason` and observation JSON in discovery.csv
+`TargetTypeEvidenceUnavailable` | The target lacks the required source-declared evidence origin
+`TargetTypeSourceDenied`, `TargetTypeSourceFailed`, `TargetTypeSourceUnknown`, `TargetTypeSourceUnavailable` | Target source acquisition is unavailable or unconfirmed; later successful observations cannot erase retained evidence
 `TargetDiscoveryDenied`, `TargetDiscoveryFailed`, `TargetDiscoveryUnknown`, `TargetDiscoveryUnavailable` | Target discovery does not establish a successful relationship
-`TargetAssessmentDenied`, `TargetAssessmentFailed`, `TargetAssessmentUnknown` | Target assessment retains unavailable evidence, even if its purpose was confirmed
+`TargetAssessmentDenied`, `TargetAssessmentFailed`, `TargetAssessmentUnknown` | Target assessment retains unavailable evidence, even if its type family was confirmed
 `NotEvaluated` | Safe migration/model default; no reference evaluation has been recorded
 
 Acquisition reasons can be semicolon-separated when more than one observation is retained. Reference resolution never rewrites target acquisition states/reasons, content-page classification, `Layout`, Web Part counts or analysis results. The additive database migration defaults `LayoutUrl` to null and reference status/reason to `Unknown` / `NotEvaluated`. Previously stored or resumed historical results are not repaired or backfilled.
+
+Historical reports may still contain `ConfirmedLayoutAsset`, `TargetPurposeUnavailable` or `TargetNotLayoutAsset` from the former ContentType-derived purpose rule. These are retained historical values, not proof of the corrected CLR-family relationship. No schema additions are needed for the revised reference rule.
