@@ -115,7 +115,7 @@ public sealed class ClassicLayoutUpgradeTests
             await ReportManager.ExportClassicReportDataAsync(read, scan, directory, new CsvConfiguration(CultureInfo.InvariantCulture));
             ReadCsv<ClassicPage>("classicpages.csv").Should().BeEquivalentTo(pages);
             var exported = ReadCsv<ClassicPageDiscovery>("discovery.csv");
-            exported.Should().BeEquivalentTo(inventory, config => config.Excluding(row => row.PageType).Excluding(row => row.ContentTypeId));
+            exported.Should().BeEquivalentTo(inventory, config => config.Excluding(row => row.PageType));
             ReadCsv<ClassicPageWebPart>("classicpagewebparts.csv").Should().BeEquivalentTo(await read.ClassicPageWebParts.ToListAsync());
             ReadCsv<ClassicWebSummary>("classicwebsummaries.csv").Should().BeEquivalentTo(await read.ClassicWebSummaries.ToListAsync());
             ReadCsv<ClassicPublishingSiteSummary>("classicpublishingsitesummaries.csv").Should().BeEquivalentTo(await read.ClassicPublishingSiteSummaries.ToListAsync());

@@ -15,13 +15,16 @@ internal sealed class AssessmentWebDiscovery
     private readonly string siteUrl;
     private readonly string webUrl;
     private readonly AssessmentDiscoveryWriter writer;
+    private readonly Func<ClassicPageDiscovery, CancellationToken, Task> inspectType;
 
-    internal AssessmentWebDiscovery(Guid scanId, string siteUrl, string webUrl, AssessmentDiscoveryWriter writer)
+    internal AssessmentWebDiscovery(Guid scanId, string siteUrl, string webUrl, AssessmentDiscoveryWriter writer,
+        Func<ClassicPageDiscovery, CancellationToken, Task> inspectType = null)
     {
         this.scanId = scanId;
         this.siteUrl = siteUrl;
         this.webUrl = webUrl;
         this.writer = writer;
+        this.inspectType = inspectType;
     }
 
     internal async Task RunAsync(IAspxDiscoveryProvider provider, CancellationToken cancellationToken)
@@ -162,6 +165,16 @@ internal sealed class AssessmentWebDiscovery
                 // Storage failures are deliberately outside the request exception handlers.
                 // A failed commit must fail the worker rather than be misreported as an API gap.
                 await writer.WriteAsync(pages, cancellationToken).ConfigureAwait(false);
+                // Existence is durable before source acquisition. This includes raw files without
+                // list items, and does not admit any page to body/Web Part assessment.
+                if (inspectType != null)
+                {
+                    foreach (var page in pages)
+                    {
+                        await inspectType(page, cancellationToken).ConfigureAwait(false);
+                        await writer.UpdateExistingAsync(new[] { page }, cancellationToken).ConfigureAwait(false);
+                    }
+                }
                 AddError(scopeRow, "ReadFiles", batch.GapCode, batch.GapDetail);
                 if (!string.IsNullOrWhiteSpace(batch.NextCheckpoint) && !checkpoints.Add(batch.NextCheckpoint)) break;
                 if (batch.IsTerminal)

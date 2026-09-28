@@ -10,6 +10,8 @@ This csv file contains the physical ASPX inventory and acquisition evidence coll
 
 ## File purpose versus content pages
 
+The type-evidence fields below are independent of the existing purpose fields. This source-evidence foundation does not change content-page admission or layout-reference resolution: those consumers still use their existing purpose predicates. Do not interpret a ContentType-based purpose or a resolved layout selection as CLR-family evidence.
+
 A physical ASPX is not necessarily a content page. `AssetPurpose`, `AssetPurposeStatus` and `AssetPurposeReason` describe file purpose independently of page-family evidence and runtime classification. For Page rows:
 
 Purpose | Status | Evidence
@@ -25,6 +27,62 @@ Purpose confirmation does not imply successful acquisition or assessment. Existi
 The persisted contract is the `ClassicPageDiscoveries` table's `AssetPurpose`, `AssetPurposeStatus` and `AssetPurposeReason`, exported under the same names. Use `ScanId` plus site identity (`SiteUrl`, and `SiteCollectionId` when available) and the Page row's server-relative `Url` to associate a file with other same-scan, same-site results. `RecordKey`, `FileUniqueId`, `WebId`, `ListId` and `ListItemId` remain physical discovery identities; catalog assets may belong to a different web from a referring page. Purpose does not establish a reference relationship by itself.
 
 Added columns default to `Unknown`, `Unknown`, `NotEvaluated` in existing databases and on non-file evidence rows. Upgrades do not repair historical classifications, assessment values or reports. Interpret purpose only on Page rows with evaluated evidence.
+
+## Source-declared PublishingLayoutPage family evidence
+
+For scans with `Scans.PublishingLayoutRuleVersion = 1`, the Classic discovery worker downloads each independently discovered physical ASPX file through its existing assessment PnP context, including files without list items. The row is committed before the download. `GetFileByServerRelativeUrlAsync` obtains its `UniqueId`; a changed discovered identity fails the source read. PnP Core 1.18.0 `IFile.GetContentAsync(true)` downloads by UniqueId through `/_layouts/15/download.aspx` on .NET (the browser implementation uses the file `$value` endpoint). This is the file content stream, not navigation to the rendered ASPX. There is no layout-reference-driven fetch, page execution, handler observation or combined page/layout body analysis. Inspection reads only the leading ASP.NET directives; it does not analyze Web Parts or the page body.
+
+`@Page Inherits` supplies a declared type, not a runtime observation. Exactly one leading Page directive is required; whitespace, a BOM, other leading directives and ASP.NET server comments are supported. Attributes must be quoted. Missing, duplicate or malformed Page directives/attributes remain Unknown. `CodeFile`/`Src` compilation, inline type definitions and runtime handler delegation are not ancestry evidence.
+
+### Authoritative evidence and identity binding
+
+The rule has two fixed identity anchors:
+
+- `Microsoft.SharePoint.Publishing.PublishingLayoutPage` in `Microsoft.SharePoint.Publishing, Version=15.0.0.0` or `16.0.0.0`, `Culture=neutral, PublicKeyToken=71e9bce111e9429c`. These exact root identities define the supported family, not a name prefix or a hard-coded subclass list. Evidence provenance is `WellKnownPublishingLayoutIdentity:v1`.
+- `System.Object, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089` terminates a proven outside-family chain. Provenance is `WellKnownSystemObjectIdentity:v1`. Merely failing to reach the publishing anchor is **not** proof of non-membership.
+
+Additional direct/indirect subclass and outside-family proof comes from ECMA-335 `TypeDefinition.BaseType` metadata in operator-supplied copies of the assemblies deployed for the assessed pages. Configure the existing scanner process's `appsettings.json` (or its standard .NET configuration providers), for example:
+
+```json
+{
+  "PublishingLayoutTypeEvidence": {
+    "Assemblies": [
+      "C:/assessment-evidence/Deployed.Pages.dll",
+      "C:/assessment-evidence/Deployed.BasePages.dll"
+    ]
+  }
+}
+```
+
+No assembly is loaded/executed, no file is fetched from SharePoint because it is an assembly reference, and no new CLI is required. Supply matching deployed artifacts and their required base assemblies, not arbitrary same-named binaries. The operator is responsible for deployment correspondence; metadata inspection is not signature verification or remote runtime attestation. The scanner reads each configured file once at new-scan creation, records its full assembly identity and SHA-256 of those same bytes, and freezes the extracted graph in `Scans.PublishingLayoutTypeCatalogJson`. Local file paths and code bodies are not persisted. A missing or invalid artifact is recorded in the catalog's `Errors` and copied to observation evidence; it does not fabricate a type. With no configuration, only the fixed identity anchors are available. The frozen snapshot makes restart independent of subsequently changed files or configuration.
+
+Binding requires a simple fully assembly-qualified Inherits identity: type name, assembly name, Version, Culture and PublicKeyToken (including explicit `null` for unsigned assemblies). `AssemblyName` canonicalizes the assembly string; matching is otherwise exact and case-sensitive, with no version unification, probing, aliases or binding redirects. Every base edge must bind exactly to a definition in the snapshot or a fixed anchor. A base `TypeReference` supplies its own `AssemblyReference` identity; a local `TypeDefinition` uses the containing assembly identity. Bare/partially qualified names, unsupported versions, nested/generic types, `TypeSpec` bases, multi-module resolution and forwarded types remain unresolved rather than guessed. Cycles, duplicate identity definitions with conflicting bases, incomplete chains and conflicting observations remain Unknown with reasons. A complete chain reaching the publishing anchor proves `Member`; one reaching the Object anchor without that family proves `NonMember`. Other terminal definitions do not prove non-membership.
+
+ContentType (including descendants), catalog paths, layout selection, similar class names and changes to `HttpContext.Current.Handler` never enter this resolver. A TemplateRedirectionPage's selection/delegation cannot replace the outer file's Inherits declaration; resolving that declared type needs its own authoritative chain like any other non-anchor type.
+
+### Shared persistence and scan-version contract
+
+`ClassicPageDiscoveries` and native `discovery.csv` use identical field names:
+
+Field | Values and meaning
+------|-------------------
+`ContentTypeId` | Retained original metadata, now explicitly exported; not CLR evidence.
+`DeclaredPageType` | Inherits value; distinct declarations from repeated observations are newline-separated. Null if none could be parsed. Raw ambiguous directives remain in observation JSON.
+`ResolvedPageType` | Canonical assembly-qualified declared identity when the anchor/definition is available, even if its ancestry is incomplete. Null for unresolved or conflicting identities.
+`PageTypeEvidenceOrigin` | `None` for unevaluated rows; `DeclaredSource` for source-acquisition/inspection evidence. Neither value claims runtime observation.
+`PageTypeSourceStatus` | `Available`, `Denied`, `Failed`, or `Unknown`. Available source can still have unresolved type evidence. Missing source is Unknown; an empty downloaded file is Available but has `SourceUnavailable` and Unknown resolution.
+`PageTypeResolutionStatus` | `Resolved` only for proven membership/non-membership; otherwise `Unknown`.
+`PublishingLayoutFamily` | `Member`, `NonMember`, or `Unknown`; separate from `PageType`, purpose, discovery status and assessment disposition.
+`PageTypeReason` | Distinct semicolon-separated reason codes; default `NotEvaluated`.
+`PageTypeEvidenceJson` | Retained array of observations: `Declaration`, `ResolvedIdentity`, `SourceHash`, `SourceStatus`, `ResolutionStatus`, `Decision`, `Reason`, `Ancestry`, `CatalogErrors`, `DirectiveEvidence`. Each ancestry edge has `Identity`, `BaseIdentity`, `Provenance`. ECMA-335 provenance includes full assembly identity and artifact SHA-256. `SourceHash` hashes the decoded source text as UTF-8 (not the original download bytes). No page body is retained.
+
+Reasons include `RootOrProvenSubclass`, `ProvenOutsideFamily`, `SourceUnavailable`, `PageDirectiveMissing`, `AmbiguousPageDirective`, `AmbiguousPageAttribute`, `MalformedPageDirective`, `InheritsMissing`, `DynamicCompilationUnsupported`, `UnresolvedIdentity`, `IncompleteAncestry`, `ConflictingAncestry`, `AncestryCycle`, `ConflictingTypeObservations`, `DirectiveInspectionTimedOut`, and `SourceDenied:<error-code>` / `SourceFailed:<error-code>`. An HTTP or acquisition exception does not remove the file or convert it into an empty result.
+
+`PublishingLayoutTypeEvidence.IsConfirmedMember(row)` is the shared positive predicate: Page row, DeclaredSource origin, Available source, Resolved resolution and Member family. Consumers must first check the scan's recorded rule version; do not use AssetPurpose or ContentType as a substitute. NonMember is not proof of content-page purpose. Unknown is never a positive layout or content-page confirmation.
+
+Only `StorageManager.LaunchNewScanAsync` initializes rule version `1` and captures the catalog. CLR/EF defaults and the additive migration give existing scans version `0` and a null catalog. Discovery reads the recorded scan on every worker; `ForScan` enables inspection only for version `1`, not version `0` or an unsupported future version. Restart and consolidation do not assign a new authority or reopen assembly files. There is no backfill of existing discovery rows, classifications, references, analyses or reports. Routing/reference consumers must keep the original authority for historical scans, including resumed scans.
+
+New discovery fields default to null, `None`, `Unknown` and `NotEvaluated`; non-file coverage rows do not receive source evidence. Repeated acquisitions accumulate distinct observations. A retained Unknown/Denied/Failed observation is not replaced by a later successful one; contradictory identities/decisions force Unknown. Source status precedence is Denied, Failed, Unknown, Available, with all individual states/reasons retained in JSON. Assessment-only writer updates preserve the history. Coverage failures and their unknown counts remain independent of family membership and cannot become Complete/Empty/zero on reobservation.
 
 > [!NOTE]
 > A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` coverage rows. These rows identify parts of the requested scope with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records discovery and assessment gaps through Scope and Gap rows together with the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Summary evidence records `pageScope=HomePageOnly` for a scoped home-page scan and `pageScope=FullInventory` otherwise.
@@ -61,6 +119,15 @@ FileName | File name of the discovered page.
 AssetPurpose | `PageLayout`, `ContentPage` or `Unknown`; file purpose, not runtime or page-family classification.
 AssetPurposeStatus | `Confirmed` or `Unknown`; confidence in the purpose decision, not acquisition success.
 AssetPurposeReason | Semicolon-separated purpose evidence codes described above; `NotEvaluated` for historical/default rows without an evaluation.
+ContentTypeId | Retained content-type identifier; metadata only, not type-family proof.
+DeclaredPageType | Source-declared Inherits value(s), as specified in the shared contract above.
+ResolvedPageType | Canonical assembly-qualified identity, or empty when unresolved/conflicting.
+PageTypeEvidenceOrigin | `None` or `DeclaredSource`; never a runtime observation.
+PageTypeSourceStatus | Source acquisition state, independent of type resolution.
+PageTypeResolutionStatus | `Resolved` or `Unknown`.
+PublishingLayoutFamily | `Member`, `NonMember` or `Unknown` for the narrow PublishingLayoutPage family.
+PageTypeReason | Retained type/acquisition reason codes.
+PageTypeEvidenceJson | Source-declared observation history and authoritative ancestry provenance.
 HomePage | True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
 ObservationMethod | API surface or adapter that observed the page or scope.
