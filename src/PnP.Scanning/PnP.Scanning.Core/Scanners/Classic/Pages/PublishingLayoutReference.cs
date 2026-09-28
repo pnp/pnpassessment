@@ -99,8 +99,11 @@ internal static class PublishingLayoutReference
     internal static async Task FinalizeAsync(ScanContext db, Guid scanId,
         IReadOnlyList<ClassicPageDiscovery> inventory, CancellationToken cancellationToken)
     {
-        // Only references captured by this scan are pending. Migration defaults and historical
-        // results are not backfilled or repaired, including when an old assessment is resumed.
+        // InventoryPending also exists in historical scans. The stored authority, not the
+        // reference state or this executable's version, permits corrected finalization.
+        var ruleVersion = await AssessmentDiscoveryWriter.ReadRuleVersionAsync(db, scanId, cancellationToken).ConfigureAwait(false);
+        if (ruleVersion != PublishingLayoutTypeCatalog.CurrentRuleVersion) return;
+
         var pages = await db.ClassicPages.Where(page => page.ScanId == scanId &&
             page.PageType == PageScanComponent.PublishingPage && page.LayoutReferenceStatus == "Unresolved" &&
             page.LayoutReferenceReason == Pending).ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -108,12 +111,18 @@ internal static class PublishingLayoutReference
             .ToLookup(row => Key(row.SiteUrl, NormalizeUrl(row.Url, row.SiteUrl)), StringComparer.OrdinalIgnoreCase);
         foreach (var page in pages)
         {
-            var matches = targets[Key(page.SiteUrl, page.LayoutUrl)].Where(row =>
+            var url = NormalizeUrl(page.LayoutUrl, page.SiteUrl);
+            if (url == null)
+            {
+                page.LayoutReferenceReason = page.LayoutUrl == null ? "ReferenceMetadataMissing" : "ReferenceMetadataUnusable";
+                continue;
+            }
+            var matches = targets[Key(page.SiteUrl, url)].Where(row =>
                 !page.SiteCollectionId.HasValue || !row.SiteCollectionId.HasValue ||
                 page.SiteCollectionId == row.SiteCollectionId).ToArray();
             var reason = matches.Length == 0 ? "TargetNotDiscovered" :
                 matches.Length != 1 ? "TargetAmbiguous" : TargetReason(matches[0]);
-            page.LayoutReferenceStatus = reason == "ConfirmedLayoutAsset" ? "Resolved" : "Unresolved";
+            page.LayoutReferenceStatus = reason == "ConfirmedPublishingLayoutFamily" ? "Resolved" : "Unresolved";
             page.LayoutReferenceReason = reason;
         }
         // The caller saves this together with scan finalization, after every Web worker has finished.
@@ -126,7 +135,11 @@ internal static class PublishingLayoutReference
         if (row.DiscoveryStatus is "Denied" or "Failed" or "Unknown") return "TargetDiscovery" + row.DiscoveryStatus;
         if (row.AssessmentStatus is "Denied" or "Failed" or "Unknown") return "TargetAssessment" + row.AssessmentStatus;
         if (row.DiscoveryStatus != "Discovered") return "TargetDiscoveryUnavailable";
-        if (row.AssetPurposeStatus != "Confirmed") return "TargetPurposeUnavailable";
-        return AspxAssetPurpose.IsLayout(row) ? "ConfirmedLayoutAsset" : "TargetNotLayoutAsset";
+        if (row.PageTypeSourceStatus is "Denied" or "Failed" or "Unknown") return "TargetTypeSource" + row.PageTypeSourceStatus;
+        if (row.PageTypeSourceStatus != "Available") return "TargetTypeSourceUnavailable";
+        if (PublishingLayoutTypeEvidence.IsConfirmedMember(row)) return "ConfirmedPublishingLayoutFamily";
+        if (row.PageTypeEvidenceOrigin != "DeclaredSource") return "TargetTypeEvidenceUnavailable";
+        return row.PageTypeResolutionStatus == "Resolved" && row.PublishingLayoutFamily == "NonMember"
+            ? "TargetNotPublishingLayoutFamily" : "TargetTypeFamilyUnknown";
     }
 }

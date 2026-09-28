@@ -333,6 +333,7 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
     public async Task Native_metadata_acquires_url_field_without_extra_requests_or_changing_page_analysis_inputs()
     {
         var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
         var url = Web + "/_catalogs/masterpage/Article Left.aspx";
         var fixture = new MetadataFixture(scan, "subweb/Pages/article.aspx", new()
         {
@@ -341,10 +342,12 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
             ["WikiField"] = "<p>Not part of publishing Web Part analysis</p>",
         });
         fixture.Row.WebUrl = Web + "/subweb";
+        await LayoutRoutingEvidence.InspectAsync(fixture.Row, "TemplateRedirectionPage");
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(new[] { fixture.Row });
         var discovery = new PageScanComponent.PageDiscovery
         {
+            PublishingLayoutRuleVersion = 1,
             Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), SkipUserInformation = true,
         };
         await PageScanComponent.RoutePhysicalPageAsync(discovery, fixture.Row, fixture.List);
@@ -371,16 +374,17 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
         // The catalog web completes later. This is only existing inventory, not a target request.
         var asset = new MetadataFixture(scan, "_catalogs/masterpage/Article Left.aspx", new());
         asset.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
-        AspxAssetPurpose.Apply(asset.Row, asset.Row.ContentTypeId);
+        await LayoutRoutingEvidence.InspectAsync(asset.Row);
         await writer.WriteAsync(new[] { asset.Row });
         await writer.FinalizeScanAsync(scan);
         asset.ItemRequests.Should().Be(0);
+        asset.StreamRequests.Should().Be(0);
         fixture.ItemRequests.Should().Be(1);
         using var read = database.CreateContext();
         var stored = await read.ClassicPages.SingleAsync(row => row.ScanId == scan);
         stored.Layout.Should().Be("ArticleLeft");
         stored.LayoutReferenceStatus.Should().Be("Resolved");
-        stored.LayoutReferenceReason.Should().Be("ConfirmedLayoutAsset");
+        stored.LayoutReferenceReason.Should().Be("ConfirmedPublishingLayoutFamily");
         stored.PageType.Should().Be("PublishingPage");
     }
 

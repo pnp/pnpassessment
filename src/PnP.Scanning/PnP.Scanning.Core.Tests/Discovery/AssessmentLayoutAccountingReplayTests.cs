@@ -14,12 +14,12 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 public sealed partial class AssessmentPageMetadataReplayTests
 {
     [Theory]
-    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset", "Root")]
-    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset", "Direct")]
-    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset", "Indirect")]
+    [InlineData("resolved", "Resolved", "ConfirmedPublishingLayoutFamily", "Root")]
+    [InlineData("resolved", "Resolved", "ConfirmedPublishingLayoutFamily", "Direct")]
+    [InlineData("resolved", "Resolved", "ConfirmedPublishingLayoutFamily", "Indirect")]
     [InlineData("absent", "Unresolved", "TargetNotDiscovered", "Root")]
     [InlineData("unknownTarget", "Unresolved", "TargetAssessmentUnknown", "Root")]
-    [InlineData("unknownPurpose", "Unresolved", "TargetPurposeUnavailable", "Root")]
+    [InlineData("unknownPurpose", "Unresolved", "TargetTypeSourceUnknown", "Root")]
     [InlineData("missingMetadata", "Unresolved", "ReferenceMetadataMissing", "Root")]
     [InlineData("unusableMetadata", "Unresolved", "ReferenceMetadataUnusable", "Root")]
     [InlineData("deniedReference", "Unresolved", "ReferenceMetadataDenied", "Root")]
@@ -162,7 +162,11 @@ public sealed partial class AssessmentPageMetadataReplayTests
             SiteUrl = Site, WebUrl = Web, DiscoveryStatus = "Denied", ErrorCodes = "HTTP403",
             ErrorDetail = "Retained enumeration denial", ObservedAtUtc = DateTime.UtcNow,
         } });
+        var metadataRequests = fixtures.Select(fixture => fixture.StreamRequests).ToArray();
         await writer.FinalizeScanAsync(scan);
+        fixtures.Select(fixture => fixture.StreamRequests).Should().Equal(metadataRequests,
+            "reference finalization must not fetch the target or repeat page metadata acquisition");
+        publishing.Row.PageTypeEvidenceJson.Should().Be(envelopeEvidence);
 
         var directory = Path.Combine(Path.GetTempPath(), "layout-accounting-replay-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -264,6 +268,7 @@ public sealed partial class AssessmentPageMetadataReplayTests
                 target.ScanId.Should().Be(scan);
                 target.SiteUrl.Should().Be(publishing.Row.SiteUrl);
                 target.WebUrl.Should().NotBe(publishing.Row.WebUrl);
+                PublishingLayoutTypeEvidence.IsConfirmedMember(target).Should().BeTrue();
             }
             if (scenario == "deniedReference")
                 physical.Single(row => row.Url == publishing.Row.Url).ErrorDetail.Should().Contain("Retained reference denial");
