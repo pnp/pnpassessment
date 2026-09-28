@@ -41,7 +41,8 @@ internal sealed class AssessmentDiscoveryWriter
                     if (row.RowType == "Page")
                     {
                         var changed = new List<string>();
-                        if (!string.Equals(previous.Url, row.Url, StringComparison.OrdinalIgnoreCase)) changed.Add("Url");
+                        if (previous.Url != null && row.Url != null &&
+                            !string.Equals(previous.Url, row.Url, StringComparison.OrdinalIgnoreCase)) changed.Add("Url");
                         if (previous.ListId.HasValue && row.ListId.HasValue && previous.ListId != row.ListId) changed.Add("ListId");
                         if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");
                         if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage) changed.Add("HomePage");
@@ -50,6 +51,13 @@ internal sealed class AssessmentDiscoveryWriter
                         if (changed.Count != 0)
                             AssessmentWebDiscovery.AddError(row, "DiscoveryMetadata", DiscoveryGapCodes.ChangedDuringScan,
                                 "Repeated file identity changed: " + string.Join(", ", changed));
+                        row.Url ??= previous.Url;
+                        row.SiteUrl ??= previous.SiteUrl;
+                        row.WebUrl ??= previous.WebUrl;
+                        row.FileName ??= previous.FileName;
+                        row.FileUniqueId ??= previous.FileUniqueId;
+                        row.SiteCollectionId ??= previous.SiteCollectionId;
+                        row.WebId ??= previous.WebId;
                         row.ListId ??= previous.ListId;
                         row.FolderUniqueId ??= previous.FolderUniqueId;
                         row.ListItemId ??= previous.ListItemId;
@@ -58,6 +66,7 @@ internal sealed class AssessmentDiscoveryWriter
                         row.HomePage ??= previous.HomePage;
                         row.LibraryHidden ??= previous.LibraryHidden;
                         AspxAssetPurpose.Merge(previous, row);
+                        PublishingLayoutTypeEvidence.Merge(previous, row);
                         row.DiscoveryStatus = RetainFailure(previous.DiscoveryStatus, row.DiscoveryStatus);
                         row.AssessmentStatus = RetainFailure(previous.AssessmentStatus, row.AssessmentStatus);
                     }
@@ -88,6 +97,13 @@ internal sealed class AssessmentDiscoveryWriter
                         // A later successful visit cannot erase a retained denied/failed/unknown surface.
                         row.DiscoveryStatus = previous.DiscoveryStatus;
                         row.EvidenceJson = previous.EvidenceJson;
+                    }
+                    if (row.RowType != "Page" && previous.DiscoveryStatus is "Denied" or "Failed" or "Unknown")
+                    {
+                        row.DiscoveryStatus = previous.DiscoveryStatus;
+                        row.ExpectedChildCount = previous.ExpectedChildCount;
+                        row.ObservedChildCount = previous.ObservedChildCount;
+                        row.EvidenceJson = previous.EvidenceJson ?? row.EvidenceJson;
                     }
                     row.ErrorStage = Join(previous.ErrorStage, row.ErrorStage);
                     row.ErrorCodes = Join(previous.ErrorCodes, row.ErrorCodes);

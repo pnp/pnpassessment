@@ -28,8 +28,16 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     [Ignore]
     public string PageType { get; set; }
 
-    [Ignore]
     public string ContentTypeId { get; set; }
+
+    public string DeclaredPageType { get; set; }
+    public string ResolvedPageType { get; set; }
+    public string PageTypeEvidenceOrigin { get; set; } = "None";
+    public string PageTypeSourceStatus { get; set; } = "Unknown";
+    public string PageTypeResolutionStatus { get; set; } = "Unknown";
+    public string PublishingLayoutFamily { get; set; } = "Unknown";
+    public string PageTypeReason { get; set; } = "NotEvaluated";
+    public string PageTypeEvidenceJson { get; set; }
 
     public bool? HomePage { get; set; }
     public bool? LibraryHidden { get; set; }

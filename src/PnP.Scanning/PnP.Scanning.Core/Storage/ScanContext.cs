@@ -212,8 +212,14 @@ namespace PnP.Scanning.Core.Storage
             #endregion
 
             #region Classic scanner
+            modelBuilder.Entity<Scan>().Property(e => e.PublishingLayoutRuleVersion).HasDefaultValue(0);
             modelBuilder.Entity<ClassicPageDiscovery>(entity =>
             {
+                entity.Property(e => e.PageTypeEvidenceOrigin).IsRequired().HasDefaultValue("None");
+                entity.Property(e => e.PageTypeSourceStatus).IsRequired().HasDefaultValue("Unknown");
+                entity.Property(e => e.PageTypeResolutionStatus).IsRequired().HasDefaultValue("Unknown");
+                entity.Property(e => e.PublishingLayoutFamily).IsRequired().HasDefaultValue("Unknown");
+                entity.Property(e => e.PageTypeReason).IsRequired().HasDefaultValue("NotEvaluated");
                 entity.Property(e => e.AssetPurpose).IsRequired().HasDefaultValue("Unknown");
                 entity.Property(e => e.AssetPurposeStatus).IsRequired().HasDefaultValue("Unknown");
                 entity.Property(e => e.AssetPurposeReason).IsRequired().HasDefaultValue("NotEvaluated");

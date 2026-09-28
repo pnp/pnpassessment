@@ -2,6 +2,7 @@ using PnP.Core.Auth;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace PnP.Scanning.Core.Scanners;
 
@@ -26,7 +27,22 @@ internal static class ClassicPageDiscoveryComponent
                 ? AspxDiscoveryIntent.HomePageOnly : AspxDiscoveryIntent.FullInventory), factory,
             new AspxWebAcquisitionContext(site.Id, new Uri(scanner.SiteUrl), web.Id, web.Url,
                 web.ServerRelativeUrl, scanner.WebTemplate));
-        await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer)
+        using var db = new ScanContext(scanner.ScanId);
+        var scan = await db.Scans.AsNoTracking().SingleAsync(value => value.ScanId == scanner.ScanId, token).ConfigureAwait(false);
+        await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer,
+            PublishingLayoutTypeEvidence.ForScan(scan, async (physical, ct) =>
+                {
+                    if (string.IsNullOrWhiteSpace(physical.Url)) return null;
+                    ct.ThrowIfCancellationRequested();
+                    var file = await context.Web.GetFileByServerRelativeUrlAsync(physical.Url, value => value.UniqueId).ConfigureAwait(false);
+                    if (physical.FileUniqueId.HasValue && physical.FileUniqueId != file.UniqueId)
+                        throw new InvalidDataException("SourceFileIdentityChanged");
+                    // PnP Core downloads the file by UniqueId (download.aspx on .NET),
+                    // not by navigating to the physical ASPX as a rendered page.
+                    using var stream = await file.GetContentAsync(true).ConfigureAwait(false);
+                    using var reader = new StreamReader(stream);
+                    return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+                }))
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }

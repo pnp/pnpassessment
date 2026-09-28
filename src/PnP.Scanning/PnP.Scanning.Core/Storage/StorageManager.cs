@@ -1,6 +1,8 @@
 ﻿using EFCore.BulkExtensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using PnP.Scanning.Core.Discovery;
 using PnP.Core;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Scanners;
@@ -20,9 +22,11 @@ namespace PnP.Scanning.Core.Storage
     {
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly IDataProtector passwordProtector;
+        private readonly IConfiguration configuration;
 
-        public StorageManager(IDataProtectionProvider provider)
+        public StorageManager(IDataProtectionProvider provider, IConfiguration configuration = null)
         {
+            this.configuration = configuration;
             dataProtectionProvider = provider;
             passwordProtector = dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose);
         }
@@ -57,6 +61,10 @@ namespace PnP.Scanning.Core.Storage
                     CLICertFile = start.CertFile,
                     CLICertFilePassword = !string.IsNullOrEmpty(start.CertPassword) ? passwordProtector.Protect(start.CertPassword) : start.CertPassword,
                     CLIThreads = start.Threads,
+                    PublishingLayoutRuleVersion = PublishingLayoutTypeCatalog.CurrentRuleVersion,
+                    PublishingLayoutTypeCatalogJson = PublishingLayoutTypeCatalog.Capture(
+                        configuration?.GetSection("PublishingLayoutTypeEvidence:Assemblies").GetChildren()
+                            .Select(value => value.Value) ?? Array.Empty<string>()).ToJson(),
                 });
 
                 await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");

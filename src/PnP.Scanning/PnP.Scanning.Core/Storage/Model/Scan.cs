@@ -19,6 +19,11 @@ namespace PnP.Scanning.Core.Storage
 
         public string Version { get; set; }
 
+        // Zero is historical authority. Only LaunchNewScanAsync initializes the current rule.
+        public int PublishingLayoutRuleVersion { get; set; }
+
+        public string PublishingLayoutTypeCatalogJson { get; set; }
+
         public string CLIMode { get; set; }
 
         public string CLITenant { get; set; }
