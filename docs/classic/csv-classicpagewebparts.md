@@ -4,7 +4,7 @@
 
 This csv file contains one row for every web part found on the assessed classic pages. It is the detailed inventory behind the `WebPartCount` / `MappingPercentage` columns of [classicpages.csv](csv-classicpages.md).
 
-Confirmed Page Layout assets are excluded before content-page extraction in new scans. Their bodies and Web Parts are not combined with a referring Publishing page's analysis. The assets remain in [discovery.csv](csv-discovery.md); upgrading a database leaves historical Web Part rows unchanged.
+For scans with recorded `PublishingLayoutRuleVersion = 1`, confirmed source-declared `PublishingLayoutPage`-family files are excluded before content-page extraction. ContentType or layout selection alone does not cause exclusion. Their bodies and Web Parts are not combined with a referring Publishing page's analysis. The files remain in [discovery.csv](csv-discovery.md); upgrading a database leaves historical Web Part rows unchanged.
 
 ## Columns
 

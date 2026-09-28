@@ -16,7 +16,7 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Storage;
 
-public sealed class ClassicLayoutUpgradeTests
+public sealed partial class ClassicLayoutUpgradeTests
 {
     [Fact]
     public async Task Pre_layout_database_upgrades_and_exports_without_repairing_any_historical_column()

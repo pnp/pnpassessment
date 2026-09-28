@@ -1,5 +1,7 @@
 # PublishingLayoutPage reference regression coverage
 
+For the later combined source/routing/reference verification and current suite result, see [family verification](layout-family-verification.md). Results below describe this reference revision's historical run.
+
 ## Scope and authority
 
 `PublishingLayoutReference.FinalizeAsync`, called by `AssessmentDiscoveryWriter.FinalizeScanAsync` in the existing post-scan phase, reads the stored `Scans.PublishingLayoutRuleVersion`. Only version 1 evaluates pending references. Version 0, absent authority and unsupported versions leave references untouched, including historical `InventoryPending` rows. No schema changes or migration edits are needed.

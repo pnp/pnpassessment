@@ -396,7 +396,7 @@ public sealed partial class AssessmentPageMetadataReplayTests : IClassFixture<Sc
 
     private sealed class MetadataFixture
     {
-        public ClassicPageDiscovery Row { get; }
+        public ClassicPageDiscovery Row { get; set; }
         public IList List { get; }
         public int? ReturnedId { get; init; } = 1;
         public int ItemRequests { get; private set; }

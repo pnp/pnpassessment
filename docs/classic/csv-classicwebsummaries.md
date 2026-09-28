@@ -4,7 +4,7 @@
 
 This csv file contains one row per assessed web with roll-up information. It is shared by all classic assessment components; this page documents the columns relevant to the classic **pages** assessment (page counts and page-modernization-readiness roll-ups). The page-readiness columns are computed only over pages that actually carry web parts.
 
-For new scans, confirmed Page Layout assets contribute neither page counts (including `ClassicPublishingPages`) nor readiness statistics. They remain physical files in [discovery.csv](csv-discovery.md), whose inventory count is not a content-page count. Upgrading a database does not recalculate historical summaries.
+For scans with recorded `PublishingLayoutRuleVersion = 1`, confirmed source-declared `PublishingLayoutPage`-family files contribute neither page counts (including `ClassicPublishingPages`) nor readiness statistics. ContentType or layout selection alone does not cause exclusion. The files remain physical inventory in [discovery.csv](csv-discovery.md), whose inventory count is not a content-page count. Upgrading a database does not recalculate historical summaries.
 
 ## Columns
 

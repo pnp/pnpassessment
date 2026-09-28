@@ -1,5 +1,7 @@
 # PublishingLayoutPage admission regression coverage
 
+For the later combined source/routing/reference verification and current suite result, see [family verification](layout-family-verification.md). Results below describe this admission revision's historical run.
+
 ## Scope
 
 Version 1 admission uses `PublishingLayoutTypeEvidence.IsConfirmedMember`, not ContentType or a sticky purpose flag. The scan version is read from storage by discovery, the discovery writer and page routing, including after restart. Source inspection precedes list-item admission, including root/catalog files without list items. Merges combine source observations before deriving purpose and suppressing a confirmed member's `PublishingPage` projection. A derived `ExcludedAsset` disposition without current proof returns to pending routing; retained Denied/Failed/Unknown evidence is not cleared.
