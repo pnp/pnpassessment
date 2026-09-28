@@ -27,8 +27,8 @@ internal sealed record AspxAssetPurpose(string Purpose, string Status, string Re
     private static bool IsFamily(string id, string parent) =>
         !string.IsNullOrWhiteSpace(id) && id.StartsWith(parent, StringComparison.OrdinalIgnoreCase);
 
-    // Historical purpose predicate, also retained by the separate reference-resolution consumer.
-    // Admission must pass the scan version to the overload below.
+    // Historical purpose predicate. Admission must pass the scan version to the overload below;
+    // corrected reference resolution uses PublishingLayoutTypeEvidence.IsConfirmedMember directly.
     internal static bool IsLayout(ClassicPageDiscovery row) =>
         row.AssetPurpose == "PageLayout" && row.AssetPurposeStatus == "Confirmed";
 
