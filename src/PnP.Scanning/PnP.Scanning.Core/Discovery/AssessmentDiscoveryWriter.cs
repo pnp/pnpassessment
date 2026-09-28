@@ -26,8 +26,14 @@ internal sealed class AssessmentDiscoveryWriter
         try
         {
             using var db = createContext();
+            var versions = new Dictionary<Guid, int>();
             foreach (var row in rows)
             {
+                if (!versions.TryGetValue(row.ScanId, out var ruleVersion))
+                {
+                    ruleVersion = await ReadRuleVersionAsync(db, row.ScanId, cancellationToken).ConfigureAwait(false);
+                    versions.Add(row.ScanId, ruleVersion);
+                }
                 var previous = await db.ClassicPageDiscoveries.FindAsync(
                     new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
                 if (previous == null)
@@ -65,8 +71,8 @@ internal sealed class AssessmentDiscoveryWriter
                         row.PageType ??= previous.PageType;
                         row.HomePage ??= previous.HomePage;
                         row.LibraryHidden ??= previous.LibraryHidden;
-                        AspxAssetPurpose.Merge(previous, row);
                         PublishingLayoutTypeEvidence.Merge(previous, row);
+                        AspxAssetPurpose.Merge(previous, row, ruleVersion);
                         row.DiscoveryStatus = RetainFailure(previous.DiscoveryStatus, row.DiscoveryStatus);
                         row.AssessmentStatus = RetainFailure(previous.AssessmentStatus, row.AssessmentStatus);
                     }
@@ -111,10 +117,13 @@ internal sealed class AssessmentDiscoveryWriter
                     row.EvidenceJson ??= previous.EvidenceJson;
                     db.Entry(previous).CurrentValues.SetValues(row);
                 }
-                if (row.RowType == "Page" && AspxAssetPurpose.IsLayout(row))
+                if (row.RowType == "Page")
                 {
-                    row.AssessmentStatus = RetainFailure(row.AssessmentStatus, "ExcludedAsset");
-                    if (previous != null) previous.AssessmentStatus = row.AssessmentStatus;
+                    if (ruleVersion == PublishingLayoutTypeCatalog.CurrentRuleVersion)
+                        AspxAssetPurpose.Apply(row, row.ContentTypeId, ruleVersion);
+                    if (AspxAssetPurpose.IsLayout(row, ruleVersion))
+                        row.AssessmentStatus = RetainFailure(row.AssessmentStatus, "ExcludedAsset");
+                    if (previous != null) db.Entry(previous).CurrentValues.SetValues(row);
                 }
             }
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -130,6 +139,10 @@ internal sealed class AssessmentDiscoveryWriter
             row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page")
             .OrderBy(row => row.RecordKey).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    internal static Task<int> ReadRuleVersionAsync(ScanContext db, Guid scanId, CancellationToken token = default) =>
+        db.Scans.AsNoTracking().Where(scan => scan.ScanId == scanId)
+            .Select(scan => scan.PublishingLayoutRuleVersion).SingleOrDefaultAsync(token);
 
     internal async Task UpdateExistingAsync(IEnumerable<ClassicPageDiscovery> rows,
         CancellationToken cancellationToken = default)

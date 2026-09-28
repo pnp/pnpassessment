@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.Extensions.Configuration;
 using PnP.Scanning.Core.Discovery;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Storage.DatabaseMigration;
@@ -102,10 +103,35 @@ public sealed class PublishingLayoutTypeUpgradeTests
             var row = new ClassicPageDiscovery { RowType = "Page" };
             await inspect(row, default);
             PublishingLayoutTypeEvidence.IsConfirmedMember(row).Should().BeTrue();
+            var routing = new PageScanComponent.PageDiscovery
+            {
+                PublishingLayoutRuleVersion = await AssessmentDiscoveryWriter.ReadRuleVersionAsync(db, scan),
+                Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(),
+            };
+            await PageScanComponent.RoutePhysicalPageAsync(routing, row, null);
+            row.AssessmentStatus.Should().Be("ExcludedAsset", "a restarted new scan retains CLR-family admission");
+            routing.Pages.Should().BeEmpty();
+            routing.EnrichmentInputs.Should().BeEmpty();
             (await db.ClassicPageDiscoveries.SingleAsync()).DiscoveryStatus.Should().Be("Denied");
             // A recorded historical authority is also preserved by the exact restart path.
             authority.PublishingLayoutRuleVersion = 0;
             authority.PublishingLayoutTypeCatalogJson = null;
+            db.ClassicPages.Add(new ClassicPage
+            {
+                ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/history", WebUrl = "/sites/history",
+                PageUrl = "/sites/history/handler.aspx", PageType = "PublishingPage", Layout = "HistoricalLayout",
+                LayoutUrl = "/sites/history/layout.aspx", LayoutReferenceStatus = "Resolved", LayoutReferenceReason = "ConfirmedLayoutAsset",
+                WebPartCount = 7, AssessmentStatus = "Failed",
+            });
+            db.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
+            {
+                ScanId = scan, RecordKey = "page:historical", RowType = "Page",
+                SiteUrl = "https://contoso.sharepoint.com/sites/history", WebUrl = "/sites/history",
+                Url = "/sites/history/handler.aspx", PageType = "PublishingPage",
+                ContentTypeId = AspxAssetPurpose.LayoutContentType, AssetPurpose = "PageLayout",
+                AssetPurposeStatus = "Confirmed", AssetPurposeReason = "PageLayoutContentType",
+                DiscoveryStatus = "Denied", AssessmentStatus = "Failed", ErrorDetail = "Original failure",
+            });
             await db.SaveChangesAsync();
         }
         await storage.ConsolidatedScanToEnableRestartAsync(scan);
@@ -113,5 +139,26 @@ public sealed class PublishingLayoutTypeUpgradeTests
         using var read = new ScanContext(scan);
         (await read.Scans.SingleAsync()).PublishingLayoutRuleVersion.Should().Be(0);
         (await read.Scans.SingleAsync()).PublishingLayoutTypeCatalogJson.Should().BeNull();
+        var legacy = new ClassicPageDiscovery { RowType = "Page" };
+        await PublishingLayoutTypeEvidence.AcquireAsync(legacy, (_, _) => Task.FromResult(Source(Root)), new(), default);
+        await PageScanComponent.RoutePhysicalPageAsync(new PageScanComponent.PageDiscovery
+        {
+            PublishingLayoutRuleVersion = await AssessmentDiscoveryWriter.ReadRuleVersionAsync(read, scan),
+            Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(),
+        }, legacy, null);
+        legacy.AssessmentStatus.Should().Be("NotApplicable", "legacy authority is not silently upgraded on restart");
+        await new AssessmentDiscoveryWriter(scan).FinalizeScanAsync(scan);
+        var historical = await read.ClassicPages.AsNoTracking().SingleAsync();
+        historical.PageType.Should().Be("PublishingPage");
+        historical.Layout.Should().Be("HistoricalLayout");
+        historical.LayoutUrl.Should().Be("/sites/history/layout.aspx");
+        historical.WebPartCount.Should().Be(7);
+        historical.AssessmentStatus.Should().Be("Failed");
+        var retained = await read.ClassicPageDiscoveries.AsNoTracking().SingleAsync(value => value.RowType == "Page");
+        retained.PageType.Should().Be("PublishingPage");
+        retained.AssetPurposeReason.Should().Be("PageLayoutContentType");
+        retained.PageTypeEvidenceOrigin.Should().Be("None");
+        retained.DiscoveryStatus.Should().Be("Denied");
+        retained.AssessmentStatus.Should().Be("Failed");
     }
 }

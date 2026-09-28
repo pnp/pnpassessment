@@ -33,6 +33,11 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
         {
             ScanId = scan, PublishingLayoutRuleVersion = 1, PublishingLayoutTypeCatalogJson = catalog.ToJson(),
         };
+        using (var setup = database.CreateContext())
+        {
+            setup.Scans.Add(authority);
+            await setup.SaveChangesAsync();
+        }
         await new AssessmentWebDiscovery(scan, Site, "/", Writer(),
             PublishingLayoutTypeEvidence.ForScan(authority, async (physical, _) =>
             {
@@ -46,16 +51,20 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
                     "Missing.aspx" => null,
                     _ => Source(Identity("Indirect")),
                 };
-            })).RunAsync(provider, default);
+            }), authority.PublishingLayoutRuleVersion).RunAsync(provider, default);
         acquired.Should().BeEquivalentTo(provider.Files.Select(value => value.PhysicalLocator));
         var rows = await Writer().ReadPagesAsync(scan, Site, "/");
         rows.Should().HaveCount(4).And.OnlyContain(row => row.ListItemId == null && row.DiscoveryStatus == "Discovered");
         rows.Single(row => row.FileName == "Indirect.aspx").PublishingLayoutFamily.Should().Be("Member");
+        rows.Single(row => row.FileName == "Indirect.aspx").AssessmentStatus.Should().Be("ExcludedAsset");
         foreach (var status in new[] { "Denied", "Failed", "Unknown" })
         {
             var row = rows.Single(row => row.PageTypeSourceStatus == status);
             row.PublishingLayoutFamily.Should().Be("Unknown");
             row.PageTypeReason.Should().NotBe("NotEvaluated");
+            row.AssetPurpose.Should().Be("Unknown");
+            row.AssetPurposeStatus.Should().Be("Unknown");
+            row.AssessmentStatus.Should().NotBe("ExcludedAsset", "Page Layout ContentType is not enough");
         }
         using var db = database.CreateContext();
         var original = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
@@ -85,6 +94,7 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
     public async Task Reobservation_and_metadata_updates_retain_failures_and_all_type_observations(string status)
     {
         var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
         var first = Page(scan);
         first.FileUniqueId = Guid.NewGuid();
         first.SiteCollectionId = Guid.NewGuid();
@@ -113,6 +123,8 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
         row.PageTypeSourceStatus.Should().Be(status);
         row.PageTypeResolutionStatus.Should().Be("Unknown");
         row.PublishingLayoutFamily.Should().Be("Unknown");
+        row.AssetPurpose.Should().Be("Unknown");
+        row.AssetPurposeStatus.Should().Be("Unknown");
         row.PageTypeReason.Should().Contain(status == "Unknown" ? "SourceUnavailable" : "Source" + status);
         row.ErrorDetail.Should().Be("Original evidence");
         row.FileUniqueId.Should().Be(first.FileUniqueId);
@@ -127,6 +139,7 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
     public async Task Conflicting_declarations_cannot_keep_a_confirmed_decision()
     {
         var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
         foreach (var identity in new[] { Root, PublishingLayoutTypeCatalog.ObjectIdentity })
         {
             var row = Page(scan);
@@ -135,6 +148,9 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
         }
         var retained = (await Writer().ReadPagesAsync(scan, Site, "/")).Single();
         retained.PublishingLayoutFamily.Should().Be("Unknown");
+        retained.AssetPurpose.Should().Be("Unknown");
+        retained.AssetPurposeStatus.Should().Be("Unknown");
+        retained.AssessmentStatus.Should().BeNull("conflicting type proof cannot retain the earlier derived exclusion");
         retained.PageTypeReason.Should().Contain("ConflictingTypeObservations");
         retained.DeclaredPageType.Should().Contain(Root).And.Contain(PublishingLayoutTypeCatalog.ObjectIdentity);
         retained.ResolvedPageType.Should().BeNull();
@@ -148,6 +164,7 @@ public sealed class PublishingLayoutTypePersistenceTests : IClassFixture<ScanCon
     public async Task Coverage_failure_and_unknown_counts_do_not_become_success_or_zero(string status)
     {
         var scan = Guid.NewGuid();
+        using (var setup = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(setup, scan);
         await Writer().WriteAsync(new[] { new ClassicPageDiscovery
         {
             ScanId = scan, RecordKey = "scope:files", RowType = "Scope", ScopeType = "Folder",

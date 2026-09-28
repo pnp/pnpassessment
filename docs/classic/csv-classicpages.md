@@ -4,7 +4,9 @@
 
 This csv file contains one row for every classic page (wiki, web part, publishing, blog or ASPX page) that was discovered and assessed, including its page-modernization-readiness columns.
 
-Confirmed Page Layout assets are physical inventory in [discovery.csv](csv-discovery.md), not content pages in this report. Publishing content pages retain their existing classification, friendly `Layout` name and Web Part analysis. A layout reference does not cause the layout body to be loaded or combined with the page body.
+For scans with recorded `PublishingLayoutRuleVersion = 1`, only confirmed source-declared members of the `Microsoft.SharePoint.Publishing.PublishingLayoutPage` CLR family are excluded as layout handlers. They remain physical inventory in [discovery.csv](csv-discovery.md), not content pages in this report. ContentType alone does not exclude a file; unresolved ancestry retains Unknown purpose while preserving existing eligible page assessment. The gate precedes metadata loading, enrichment and counters, rather than filtering this CSV or publishing summaries. Version `0` scans retain their original authority and historical stored results remain unchanged and exportable.
+
+Publishing content-page envelopes, including `TemplateRedirectionPage`, retain their physical identity, existing classification, friendly `Layout` name, known `LayoutUrl` and Web Part analysis. Selection of or delegation to a separate layout handler (including a later `HttpContext.Current.Handler` change) does not replace the outer physical file's type evidence. A layout reference does not cause the layout body to be loaded or combined with the page body. Reference resolution below is separate from the admission predicate.
 
 ## Columns
 

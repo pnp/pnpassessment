@@ -14,15 +14,17 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 public sealed partial class AssessmentPageMetadataReplayTests
 {
     [Theory]
-    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset")]
-    [InlineData("absent", "Unresolved", "TargetNotDiscovered")]
-    [InlineData("unknownTarget", "Unresolved", "TargetAssessmentUnknown")]
-    [InlineData("unknownPurpose", "Unresolved", "TargetPurposeUnavailable")]
-    [InlineData("missingMetadata", "Unresolved", "ReferenceMetadataMissing")]
-    [InlineData("unusableMetadata", "Unresolved", "ReferenceMetadataUnusable")]
-    [InlineData("deniedReference", "Unresolved", "ReferenceMetadataDenied")]
+    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset", "Root")]
+    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset", "Direct")]
+    [InlineData("resolved", "Resolved", "ConfirmedLayoutAsset", "Indirect")]
+    [InlineData("absent", "Unresolved", "TargetNotDiscovered", "Root")]
+    [InlineData("unknownTarget", "Unresolved", "TargetAssessmentUnknown", "Root")]
+    [InlineData("unknownPurpose", "Unresolved", "TargetPurposeUnavailable", "Root")]
+    [InlineData("missingMetadata", "Unresolved", "ReferenceMetadataMissing", "Root")]
+    [InlineData("unusableMetadata", "Unresolved", "ReferenceMetadataUnusable", "Root")]
+    [InlineData("deniedReference", "Unresolved", "ReferenceMetadataDenied", "Root")]
     public async Task Layout_inventory_routes_through_analysis_storage_rollups_and_native_reports(
-        string scenario, string referenceStatus, string referenceReason)
+        string scenario, string referenceStatus, string referenceReason, string layoutType)
     {
         const string layoutUrl = Web + "/_catalogs/masterpage/Article.aspx";
         const string unknownUrl = Web + "/_catalogs/masterpage/unknown.aspx";
@@ -30,6 +32,7 @@ public sealed partial class AssessmentPageMetadataReplayTests
         const string contentEditor = "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
         const string scriptEditor = "Microsoft.SharePoint.WebPartPages.ScriptEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
         var scan = Guid.NewGuid();
+        using (var db = database.CreateContext()) await LayoutRoutingEvidence.RecordAuthorityAsync(db, scan);
         string referenceUrl = scenario switch
         {
             "absent" => absentUrl,
@@ -56,20 +59,32 @@ public sealed partial class AssessmentPageMetadataReplayTests
         catalog.Row.ContentTypeId = AspxAssetPurpose.LayoutContentType;
         catalog.Row.PageType = SharePointLiveAspxDiscoveryProvider.InferPageType(catalog.Row.ContentTypeId);
         AspxAssetPurpose.Apply(catalog.Row, catalog.Row.ContentTypeId);
+        catalog.Row.PageType = "PublishingPage"; // A stale metadata projection cannot survive confirmed type evidence.
+        catalog.Row.ListId = null;
+        catalog.Row.ListItemId = null;
         var outside = new MetadataFixture(scan, "Custom/layout.aspx", new()
         {
-            ["ContentTypeId"] = AspxAssetPurpose.LayoutContentType.ToLowerInvariant() + "00aabbccddeeff00112233445566778899",
+            ["ContentTypeId"] = PublishingContentType,
             ["WikiField"] = "<p>Layout body must never enter content analysis</p>",
         });
+        outside.Row.ContentTypeId = PublishingContentType;
+        outside.Row.PageType = "PublishingPage";
         outside.Row.AssessmentStatus = "Failed";
         AssessmentWebDiscovery.AddError(outside.Row, "PageMetadata", "MetadataFailed", "Retained asset failure");
         var unknown = new MetadataFixture(scan, "_catalogs/masterpage/unknown.aspx", new() { ["BSN"] = "custom" });
         unknown.Row.AssessmentStatus = scenario == "unknownPurpose" ? "Pending" : "Unknown";
         unknown.Row.ErrorDetail = "Content type unavailable; not proof of a layout";
         var fixtures = new[] { publishing, catalog, outside, unknown };
+        await LayoutRoutingEvidence.InspectAsync(catalog.Row, layoutType);
+        await LayoutRoutingEvidence.InspectAsync(outside.Row, "Indirect");
+        await LayoutRoutingEvidence.InspectAsync(publishing.Row, "TemplateRedirectionPage",
+            "<script runat='server'>HttpContext.Current.Handler = new PublishingLayoutPage();</script>");
+        await LayoutRoutingEvidence.InspectAsync(unknown.Row, null);
+        var envelopeEvidence = publishing.Row.PageTypeEvidenceJson;
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         var routed = new PageScanComponent.PageDiscovery
         {
+            PublishingLayoutRuleVersion = 1,
             Pages = new(), EnrichmentInputs = new(), RemediationCodes = new(), SkipUserInformation = true,
         };
 
@@ -86,7 +101,7 @@ public sealed partial class AssessmentPageMetadataReplayTests
         routed.RemediationCodes.Should().BeEquivalentTo("CP3", "CP5");
         routed.ModernPageCounter.Should().Be(0);
         catalog.StreamRequests.Should().Be(0);
-        outside.StreamRequests.Should().Be(1);
+        outside.StreamRequests.Should().Be(0);
         new[] { catalog.Row, outside.Row }.Should().OnlyContain(row => row.PageType != "PublishingPage");
 
         var extractionCalls = new List<string>();
@@ -115,6 +130,8 @@ public sealed partial class AssessmentPageMetadataReplayTests
             }));
         }
         extractionCalls.Should().BeEquivalentTo(publishing.Row.Url);
+        publishing.Row.PageTypeEvidenceJson.Should().Be(envelopeEvidence, "layout reference and delegated handlers do not replace physical type evidence");
+        publishing.Row.DeclaredPageType.Should().Contain("TemplateRedirectionPage");
         await writer.UpdateExistingAsync(fixtures.Select(fixture => fixture.Row));
         foreach (var page in routed.Pages)
             PageScanComponent.ApplyDiscoveryState(page, fixtures.Single(fixture => fixture.Row.Url == page.PageUrl).Row);
@@ -220,10 +237,14 @@ public sealed partial class AssessmentPageMetadataReplayTests
                 physicalRow.ListItemId.Should().Be(fixture.Row.ListItemId);
                 physicalRow.FileUniqueId.Should().Be(fixture.Row.FileUniqueId);
                 physicalRow.Url.Should().Be(fixture.Row.Url);
+                (physicalRow.ContentTypeId ?? "").Should().Be(fixture.Row.ContentTypeId ?? "");
+                physicalRow.PageTypeEvidenceJson.Should().Be(fixture.Row.PageTypeEvidenceJson);
+                (physicalRow.DeclaredPageType ?? "").Should().Be(fixture.Row.DeclaredPageType ?? "");
             }
             physical.Should().OnlyContain(row => row.DiscoveryStatus == "Discovered");
             physical.Where(row => row.AssetPurpose == "PageLayout").Should().HaveCount(2)
-                .And.OnlyContain(row => row.AssetPurposeStatus == "Confirmed" && row.AssetPurposeReason.Contains("PageLayoutContentType"));
+                .And.OnlyContain(row => row.AssetPurposeStatus == "Confirmed" && row.AssetPurposeReason.Contains("ConfirmedPublishingLayoutFamily") &&
+                    row.PageTypeEvidenceOrigin == "DeclaredSource" && row.PublishingLayoutFamily == "Member");
             physical.Single(row => row.Url == layoutUrl).AssessmentStatus.Should().Be("ExcludedAsset");
             physical.Single(row => row.Url == outside.Row.Url).AssessmentStatus.Should().Be("Failed");
             physical.Single(row => row.Url == outside.Row.Url).ErrorDetail.Should().Contain("Retained asset failure");
