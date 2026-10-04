@@ -19,13 +19,18 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
 
     public AspxAcquisitionEvidenceTests(ScanContextFixture database) => this.database = database;
 
-    [Fact]
-    public void Direct_rest_requests_use_the_required_test_traffic_user_agent()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Direct_rest_requests_preserve_the_sdk_user_agent_with_opt_in_test_traffic(bool? enabled)
     {
-        using var request = PnPContextSharePointAspxRestClient.CreateGetRequest(
-            new Uri("https://contoso.sharepoint.com/_api/web"));
+        using var fixture = new DiscoveryTransportFixture();
+        using var factory = fixture.CreateFactory(enabled);
+        var client = await factory.GetAsync(DiscoveryTransportFixture.WebUrl);
+        await client.GetPageAsync(new Uri(DiscoveryTransportFixture.WebUrl, "/_api/web/lists"));
 
-        request.Headers.UserAgent.ToString().Should().Be("testtraffic-smr");
+        fixture.AssertHeaders(enabled ?? false);
     }
 
     [Fact]

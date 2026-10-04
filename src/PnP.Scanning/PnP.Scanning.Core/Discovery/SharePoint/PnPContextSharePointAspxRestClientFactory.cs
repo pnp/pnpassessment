@@ -10,10 +10,11 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
     private readonly Dictionary<string, ISharePointAspxRestClient> clients = new(StringComparer.OrdinalIgnoreCase);
 
     internal PnPContextSharePointAspxRestClientFactory(IPnPContextFactory contextFactory,
-        IAuthenticationProvider authenticationProvider, Guid? scanId = null)
+        IAuthenticationProvider authenticationProvider, Guid? scanId = null, bool discoveryTestTraffic = false)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        this.authenticationProvider = authenticationProvider ?? throw new ArgumentNullException(nameof(authenticationProvider));
+        ArgumentNullException.ThrowIfNull(authenticationProvider);
+        this.authenticationProvider = DiscoveryTestTrafficHandler.ForDiscovery(authenticationProvider, discoveryTestTraffic);
         this.scanId = scanId;
     }
 
@@ -22,14 +23,19 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
     {
         var key = webUrl.AbsoluteUri.TrimEnd('/');
         if (clients.TryGetValue(key, out var existing)) return existing;
-        var contextOptions = new PnPContextOptions();
-        if (scanId.HasValue)
-            contextOptions.Properties = new Dictionary<string, object> { [Constants.PnPContextPropertyScanId] = scanId.Value };
-        var context = await contextFactory.CreateAsync(webUrl, authenticationProvider, cancellationToken,
-            contextOptions).ConfigureAwait(false);
+        var context = await CreateContextAsync(webUrl, cancellationToken).ConfigureAwait(false);
         var client = new PnPContextSharePointAspxRestClient(context);
         clients.Add(key, client);
         return client;
+    }
+
+    internal async Task<PnPContext> CreateContextAsync(Uri webUrl, CancellationToken cancellationToken)
+    {
+        var contextOptions = new PnPContextOptions();
+        if (scanId.HasValue)
+            contextOptions.Properties = new Dictionary<string, object> { [Constants.PnPContextPropertyScanId] = scanId.Value };
+        return await contextFactory.CreateAsync(webUrl, authenticationProvider, cancellationToken,
+            contextOptions).ConfigureAwait(false);
     }
 
     public void Dispose()

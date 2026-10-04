@@ -23,6 +23,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\PnP.Scanning.Core\PnP.Scanning.Core.csproj" />
+		<ProjectReference Include="..\PnP.Scanning.Process\PnP.Scanning.Process.csproj" />
 	</ItemGroup>
 
 </Project>

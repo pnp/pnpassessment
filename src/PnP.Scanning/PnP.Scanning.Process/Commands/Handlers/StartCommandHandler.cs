@@ -39,6 +39,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> classicSkipUsageInformationOption;
         private Option<bool> classicSkipUserInformationOption;
         private Option<bool> classicHomePageOnlyOption;
+        private Option<bool> classicDiscoveryTestTrafficOption;
         private Option<int> classicAuditLogWindowDaysOption;
 
 #if DEBUG
@@ -297,6 +298,11 @@ namespace PnP.Scanning.Process.Commands
                 "Only assess the home page of each web during classic page assessment");
             cmd.AddOption(classicHomePageOnlyOption);
 
+            classicDiscoveryTestTrafficOption = CreateClassicFlagOption(
+                Constants.StartClassicDiscoveryTestTraffic,
+                "Append the controlled-test traffic marker to all discovery requests in this Classic scan (default: false)");
+            cmd.AddOption(classicDiscoveryTestTrafficOption);
+
             classicAuditLogWindowDaysOption = CreateClassicIntOption(
                 Constants.StartClassicAuditLogWindowDays,
                 "Number of days back to query the audit log via Microsoft Graph (1-180, default 14). Requires AuditLogsQuery-SharePoint.Read.All app permission. Retention: 180 days (Audit Standard) / 1 year (Audit Premium/E5).",
@@ -432,6 +438,7 @@ namespace PnP.Scanning.Process.Commands
                     classicSkipUsageInformationOption,
                     classicSkipUserInformationOption,
                     classicHomePageOnlyOption,
+                    classicDiscoveryTestTrafficOption,
                     classicAuditLogWindowDaysOption,
                 };
                 var modeResult = result.FindResultFor(modeOption);
@@ -460,6 +467,7 @@ namespace PnP.Scanning.Process.Commands
                                               , classicSkipUsageInformationOption
                                               , classicSkipUserInformationOption
                                               , classicHomePageOnlyOption
+                                              , classicDiscoveryTestTrafficOption
                                               , classicAuditLogWindowDaysOption
 #if DEBUG
                                               , testNumberOfSitesOption
@@ -642,7 +650,8 @@ namespace PnP.Scanning.Process.Commands
                         arguments.SkipUsageInformation,
                         arguments.SkipUserInformation,
                         arguments.HomePageOnly,
-                        arguments.AuditLogWindowDays);
+                        arguments.AuditLogWindowDays,
+                        arguments.DiscoveryTestTraffic);
                 }
 
 #if DEBUG
