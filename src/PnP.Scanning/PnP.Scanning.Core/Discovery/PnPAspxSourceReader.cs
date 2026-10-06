@@ -18,6 +18,11 @@ internal static class PnPAspxSourceReader
             AspxFileIdentity.Present(discovery.Identity.WebId) && discovery.Identity.WebId != webId)
             return AspxSourceReadResult.Unavailable(discovery, AspxSourceTransportState.NotAttempted,
                 "DiscoveryIdentityOutsideScheduledSiteWeb");
+        var webPath = context.Web.IsPropertyAvailable(value => value.ServerRelativeUrl) ? context.Web.ServerRelativeUrl : null;
+        if (string.IsNullOrWhiteSpace(webPath))
+            return AspxSourceReadResult.Unavailable(discovery, AspxSourceTransportState.NotAttempted, "ScheduledWebPathNotReturned");
+        if (!WithinScheduledWeb(discovery.Identity.Url, webPath))
+            return AspxSourceReadResult.Unavailable(discovery, AspxSourceTransportState.NotAttempted, "DiscoveryPathOutsideScheduledWeb");
         var identity = discovery.Identity;
         long? expectedLength = null;
         try
@@ -50,6 +55,9 @@ internal static class PnPAspxSourceReader
                 discovery.Identity.ListId != identity.ListId)
                 return AspxSourceReadResult.Unavailable(discovery, AspxSourceTransportState.Failed,
                     "SourceListIdentityChanged", identity, version, expectedLength);
+            if (!WithinScheduledWeb(identity.Url, webPath))
+                return AspxSourceReadResult.Unavailable(discovery, AspxSourceTransportState.NotAttempted,
+                    "SourcePathOutsideScheduledWeb", identity, version, expectedLength);
             return await AspxSourceReader.ReadAsync(discovery, identity, version, async ct =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -67,5 +75,16 @@ internal static class PnPAspxSourceReader
                 AssessmentWebDiscovery.ErrorCode(ex) + ":" + ex.Message, identity, version, expectedLength,
                 AspxSourceReader.HttpStatus(ex));
         }
+    }
+
+    private static bool WithinScheduledWeb(string path, string webPath)
+    {
+        // Treat these as literal server-relative locators, never as navigation or redirect URLs.
+        // Checking the boundary after unescaping also rejects encoded traversal/separator aliases.
+        if (path == null || !path.StartsWith('/') || path.StartsWith("//", StringComparison.Ordinal)) return false;
+        var decoded = Uri.UnescapeDataString(path);
+        if (decoded.Contains('\\') || decoded.Split('/').Any(part => part is "." or "..")) return false;
+        var root = Uri.UnescapeDataString(webPath).TrimEnd('/');
+        return root.Length == 0 || decoded.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
     }
 }

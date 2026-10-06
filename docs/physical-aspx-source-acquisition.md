@@ -34,6 +34,11 @@ or missing raw identity strings, remain in a copied discovery snapshot.
 
 Source identity and discovery identity are separate. The PnP adapter checks the
 scheduled Site/Web and rejects a changed File UniqueId before download. A
+literal server-relative discovery path must be inside the recorded scheduled
+Web path; sibling-prefix aliases, encoded traversal and a returned source path
+outside that Web are not downloaded. A missing scheduled Web path is
+not-attempted, not evidence that the file is absent. References/redirect URLs
+do not expand that boundary. A
 renamed file with the same tuple can retain its original discovery name/path
 and its newly observed source name/path. Available list/item metadata is retained
 without accessing `ListItemAllFields` or making item admission a prerequisite.
