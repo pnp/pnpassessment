@@ -11,6 +11,7 @@ namespace PnP.Scanning.Core.Storage;
 internal sealed class ClassicPageDiscovery : BaseScanResult
 {
     private readonly List<AspxSourceReadResult> sourceReads = new();
+    private readonly List<PageBaseTypeProjection> pageBaseTypeProjections = new();
 
     // Transient consumer boundary only. Durable raw-source mapping belongs to persistence/export.
     // These properties must not become an EF schema or native CSV change.
@@ -21,6 +22,11 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     public IReadOnlyList<AspxSourceReadResult> SourceReads => sourceReads.AsReadOnly();
 
     internal void RecordSourceRead(AspxSourceReadResult result) => sourceReads.Add(result);
+
+    [NotMapped, Ignore]
+    public IReadOnlyList<PageBaseTypeProjection> PageBaseTypeProjections => pageBaseTypeProjections.AsReadOnly();
+
+    internal void RecordBaseTypeProjection(PageBaseTypeProjection result) => pageBaseTypeProjections.Add(result);
 
     public string RecordKey { get; set; }
     public string RowType { get; set; }

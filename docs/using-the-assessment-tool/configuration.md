@@ -79,3 +79,14 @@ The Microsoft 365 Assessment tool process accepts commands by listening on local
 ## Disabling telemetry
 
 When using the Microsoft 365 Assessment tool basic telemetry information is sent to Microsoft. This information is used to understand how the tool is being used which helps us improve the Microsoft 365 Assessment tool going forward. If you however prefer to not sent and telemetry information then that's possible by adding an environment variable named `PNP_DISABLETELEMETRY` with a value of `true`. After restarting the Microsoft 365 Assessment tool no telemetry data will be sent anymore.
+
+## Supplied Page base-type evidence contract
+
+The source parser exposes a minimal `PageInherits:PagesPageBaseTypeEvidence`
+contract through the existing configuration mechanism. It accepts supplied
+effective `pages.pageBaseType`, provenance, exact physical-file applicability
+and configuration knowledge; it does not fetch or evaluate deployment
+configuration. See [Page declarations and default base types](../page-directive-base-type-projection.md)
+for the synthetic settings example, precedence, uncertainty and scan-frozen
+consumer boundary. This in-memory parser contract does not by itself add
+durable scan settings or new CSV columns.
