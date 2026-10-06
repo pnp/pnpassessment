@@ -65,6 +65,8 @@ namespace PnP.Scanning.Core.Storage
                     PublishingLayoutTypeCatalogJson = PublishingLayoutTypeCatalog.Capture(
                         configuration?.GetSection("PublishingLayoutTypeEvidence:Assemblies").GetChildren()
                             .Select(value => value.Value) ?? Array.Empty<string>()).ToJson(),
+                    PageSourceEvidenceVersion = ClassicSourceEvidence.CurrentVersion,
+                    PageBaseTypeConfigurationJson = PageBaseTypeConfiguration.Capture(configuration).ToJson(),
                 });
 
                 await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");

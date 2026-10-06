@@ -1,5 +1,11 @@
 # Page declarations and default base types
 
+The native persistence consumer is documented in
+[native Page source evidence and CSV](page-source-persistence-and-csv.md).
+It freezes configuration at new-scan initialization and maps these transient
+contracts to durable observations without changing the independent family/
+default/Handler semantics below.
+
 This is a source-evidence contract for Classic assessment, not an ASP.NET
 compiler, deployment-configuration reader, CLR registry or request Handler
 observation. It reuses the [physical ASPX acquisition boundary](physical-aspx-source-acquisition.md).
@@ -152,11 +158,10 @@ version-zero callbacks acquire source without inventing projection authority.
 This change supplies the parser/configuration/projection consumer boundary.
 `ClassicPageDiscovery.PageBaseTypeProjections`, like `SourceReads`, is
 explicitly excluded from EF and CSV. It does not introduce an unmigrated schema
-or automatically enable durable configuration/default fields in the CLI.
-Scan initialization, durable configuration/source mapping, database reopening
-and new CSV columns are the persistence consumer's responsibility. Schema
-changes at that boundary require matching migrations; no historical migration
-is changed here.
+or make parser result objects an EF entity. The subsequent native persistence
+consumer now owns scan initialization, frozen configuration/source mapping,
+database reopening and appended CSV columns through its matching migration.
+No historical migration is changed by the parser or that consumer.
 
 The old decoded-text family API remains available, with its legacy decoded-text
 UTF-8 `SourceHash` and inherited reasons. New optional parse-status/reason

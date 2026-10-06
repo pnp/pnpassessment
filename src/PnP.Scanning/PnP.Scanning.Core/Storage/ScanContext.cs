@@ -82,9 +82,10 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Alerts> Alerts { get; set; }
 
-#if DEBUG
+        // The inherited migrations already contain this table. Keep the model stable in Release
+        // as well as Debug so scaffolding CP1 cannot accidentally drop historical test data.
+        // Collection/execution of the debug scanner remains conditional elsewhere.
         internal DbSet<TestDelay> TestDelays { get; set; }
-#endif
 
         internal string DbPath { get; }
 
@@ -213,6 +214,7 @@ namespace PnP.Scanning.Core.Storage
 
             #region Classic scanner
             modelBuilder.Entity<Scan>().Property(e => e.PublishingLayoutRuleVersion).HasDefaultValue(0);
+            modelBuilder.Entity<Scan>().Property(e => e.PageSourceEvidenceVersion).HasDefaultValue(0);
             modelBuilder.Entity<ClassicPageDiscovery>(entity =>
             {
                 entity.Property(e => e.PageTypeEvidenceOrigin).IsRequired().HasDefaultValue("None");
@@ -320,12 +322,10 @@ namespace PnP.Scanning.Core.Storage
             });
             #endregion
 
-#if DEBUG
             modelBuilder.Entity<TestDelay>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
             });
-#endif
 
             base.OnModelCreating(modelBuilder);
         }

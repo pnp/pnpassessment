@@ -32,7 +32,7 @@ internal static class ClassicPageDiscoveryComponent
         using var db = new ScanContext(scanner.ScanId);
         var scan = await db.Scans.AsNoTracking().SingleAsync(value => value.ScanId == scanner.ScanId, token).ConfigureAwait(false);
         await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer,
-            AspxSourceAcquisition.ForScan(scan, (physical, ct) =>
+            AspxSourceAcquisition.ForAssessmentScan(scan, (physical, ct) =>
                 PnPAspxSourceReader.ReadAsync(context, site.Id, web.Id, physical, ct)), scan.PublishingLayoutRuleVersion)
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
