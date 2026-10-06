@@ -19,8 +19,10 @@ reopening an assessment database.
 
 A resolved physical identity consists of Site collection ID, Web ID and File
 UniqueId. URLs and names may change; list/item identity is optional. A URL is not
-a unique physical identity. Unresolved discovery rows have observation keys,
-not manufactured File UniqueIds. Original discovery values, including invalid
+a unique physical identity. Discovery rows without a File UniqueId have observation keys,
+not manufactured File UniqueIds. Rows with an observed File UniqueId retain
+the inherited scoped inventory key for sparse reobservation compatibility; that
+key does not assert resolution of missing Site/Web IDs. Original discovery values, including invalid
 or missing raw identity strings, remain in a copied discovery snapshot.
 
 Source identity and discovery identity are separate. The PnP adapter checks the

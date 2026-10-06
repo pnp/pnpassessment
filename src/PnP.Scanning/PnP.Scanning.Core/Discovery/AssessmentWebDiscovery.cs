@@ -215,7 +215,9 @@ internal sealed class AssessmentWebDiscovery
         var row = new ClassicPageDiscovery
         {
             ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
-            RecordKey = fileId.HasValue && AspxFileIdentity.Present(record.SiteCollectionId) && AspxFileIdentity.Present(record.WebId)
+            // Keep inherited scoped inventory keys for an observed File UniqueId, including
+            // sparse reobservations. This key does not assert that missing Site/Web IDs are resolved.
+            RecordKey = fileId.HasValue
                 ? "page:" + DiscoveryHash.Of(siteIdentity, webIdentity, fileId.Value.ToString("D")) :
                 // This is an unresolved discovery-observation key, not a physical-file identity.
                 // Keep distinct raw records at one URL rather than conflating them by their path.

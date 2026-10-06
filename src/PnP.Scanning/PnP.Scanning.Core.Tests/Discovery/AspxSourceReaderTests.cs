@@ -155,6 +155,24 @@ public sealed class AspxSourceReaderTests
         a.PhysicalIdentity.FileUniqueId.Should().Be(b.PhysicalIdentity.FileUniqueId);
     }
 
+    [Fact]
+    public async Task Sparse_hierarchy_metadata_keeps_the_inherited_inventory_key_without_claiming_resolved_identity()
+    {
+        var one = Row(Record() with { SiteCollectionId = null, WebId = null,
+            Metadata = new Dictionary<string, string> { ["surface"] = "first" } });
+        var two = Row(Record() with { SiteCollectionId = null, WebId = null,
+            Metadata = new Dictionary<string, string> { ["surface"] = "second" } });
+        one.RecordKey.Should().Be(two.RecordKey, "the observed File UniqueId remains scoped to the same assessment Web");
+        one.DiscoveryObservation.Identity.State.Should().Be(AspxIdentityState.Unresolved);
+        var first = await Capture(Encoding.UTF8.GetBytes(Text), one);
+        var second = await Capture(Encoding.UTF8.GetBytes(Text), two);
+        first.PhysicalIdentity.SamePhysicalFile(second.PhysicalIdentity).Should().BeFalse("inventory keys are not full identity proofs");
+        first.Discovery.DiscoveryRecord.Metadata["surface"].Should().Be("first");
+        second.Discovery.DiscoveryRecord.Metadata["surface"].Should().Be("second");
+        first.IsReliableSource.Should().BeFalse();
+        second.IsReliableSource.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
