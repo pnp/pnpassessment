@@ -1,4 +1,6 @@
 using CsvHelper.Configuration.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
+using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Storage;
 
@@ -8,6 +10,18 @@ namespace PnP.Scanning.Core.Storage;
 /// </summary>
 internal sealed class ClassicPageDiscovery : BaseScanResult
 {
+    private readonly List<AspxSourceReadResult> sourceReads = new();
+
+    // Transient consumer boundary only. Durable raw-source mapping belongs to persistence/export.
+    // These properties must not become an EF schema or native CSV change.
+    [NotMapped, Ignore]
+    public AspxFileObservation DiscoveryObservation { get; set; }
+
+    [NotMapped, Ignore]
+    public IReadOnlyList<AspxSourceReadResult> SourceReads => sourceReads.AsReadOnly();
+
+    internal void RecordSourceRead(AspxSourceReadResult result) => sourceReads.Add(result);
+
     public string RecordKey { get; set; }
     public string RowType { get; set; }
     public string ScopeType { get; set; }

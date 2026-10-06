@@ -17,6 +17,7 @@ internal sealed class AssessmentWebDiscovery
     private readonly AssessmentDiscoveryWriter writer;
     private readonly Func<ClassicPageDiscovery, CancellationToken, Task> inspectType;
     private readonly int ruleVersion;
+    private static long unresolvedObservationSequence;
 
     internal AssessmentWebDiscovery(Guid scanId, string siteUrl, string webUrl, AssessmentDiscoveryWriter writer,
         Func<ClassicPageDiscovery, CancellationToken, Task> inspectType = null, int ruleVersion = 0)
@@ -207,22 +208,32 @@ internal sealed class AssessmentWebDiscovery
     internal static ClassicPageDiscovery Page(Guid scanId, string siteUrl, string webUrl,
         DiscoveryScopeRegistration scope, RawDiscoveryRecord record, int ruleVersion = 0)
     {
+        var observedAtUtc = DateTime.UtcNow;
         var fileId = Guid.TryParse(record.FileUniqueId, out var parsed) && parsed != Guid.Empty ? parsed : (Guid?)null;
         var siteIdentity = record.SiteCollectionId?.ToString("D") ?? siteUrl.ToLowerInvariant();
         var webIdentity = record.WebId?.ToString("D") ?? webUrl.ToLowerInvariant();
         var row = new ClassicPageDiscovery
         {
             ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
-            RecordKey = "page:" + DiscoveryHash.Of(siteIdentity, webIdentity,
-                fileId?.ToString("D") ?? record.PhysicalLocator?.ToLowerInvariant() ?? record.SourceObjectId),
+            // Keep inherited scoped inventory keys for an observed File UniqueId, including
+            // sparse reobservations. This key does not assert that missing Site/Web IDs are resolved.
+            RecordKey = fileId.HasValue
+                ? "page:" + DiscoveryHash.Of(siteIdentity, webIdentity, fileId.Value.ToString("D")) :
+                // This is an unresolved discovery-observation key, not a physical-file identity.
+                // Keep distinct raw records at one URL rather than conflating them by their path.
+                "page:unresolved:" + DiscoveryHash.Of(siteIdentity, webIdentity, scope.ScopeKey,
+                    record.SourceObjectId, JsonSerializer.Serialize(record), observedAtUtc.Ticks.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                    Interlocked.Increment(ref unresolvedObservationSequence).ToString(System.Globalization.CultureInfo.InvariantCulture)),
             RowType = "Page", ScopeType = "File", ParentScopeKey = "scope:" + scope.ScopeKey,
             Url = record.PhysicalLocator, FileName = record.FileName, FileUniqueId = fileId,
             SiteCollectionId = record.SiteCollectionId, WebId = record.WebId, ListId = record.ListId,
             FolderUniqueId = record.FolderUniqueId, ListItemId = record.ListItemId,
             HomePage = record.HomePage, PageType = record.PageType, ContentTypeId = record.ContentTypeId,
             LibraryHidden = record.LibraryHidden, ObservationMethod = record.ObservationMethod ?? scope.SourceKind?.ToString(),
-            DiscoveryStatus = "Discovered", ObservedAtUtc = DateTime.UtcNow,
+            DiscoveryStatus = "Discovered", ObservedAtUtc = observedAtUtc,
         };
+        row.DiscoveryObservation = AspxFileObservation.FromDiscovery(row, record);
         AspxAssetPurpose.Apply(row, record.ContentTypeId, ruleVersion);
         return row;
     }
