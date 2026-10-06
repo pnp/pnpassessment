@@ -96,6 +96,11 @@ payloads, decode failure, empty responses or prefixes. A no-Inherits directive
 retains the inherited `Unknown`/`InheritsMissing` family behavior; declared and
 default base-type projection is a separate parser consumer.
 
+The shared [Page declaration and default projection contract](page-directive-base-type-projection.md)
+consumes this result without changing acquisition states or treating a usable
+prefix as a verified physical source. Its optional frozen configuration
+evidence is separate from family proof.
+
 A source failure adds a per-file observation, does not erase another successful
 facet, does not change successful file enumeration into a whole-page skip, and
 does not prevent unrelated discovered files from being processed. Database

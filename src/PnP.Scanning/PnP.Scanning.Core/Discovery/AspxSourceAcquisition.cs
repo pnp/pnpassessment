@@ -9,7 +9,12 @@ namespace PnP.Scanning.Core.Discovery;
 internal static class AspxSourceAcquisition
 {
     internal static Func<ClassicPageDiscovery, CancellationToken, Task> ForScan(Scan scan,
-        Func<ClassicPageDiscovery, CancellationToken, Task<AspxSourceReadResult>> readSource)
+        Func<ClassicPageDiscovery, CancellationToken, Task<AspxSourceReadResult>> readSource) =>
+        ForScan(scan, readSource, null);
+
+    internal static Func<ClassicPageDiscovery, CancellationToken, Task> ForScan(Scan scan,
+        Func<ClassicPageDiscovery, CancellationToken, Task<AspxSourceReadResult>> readSource,
+        PageBaseTypeConfiguration configuration)
     {
         var catalog = scan.PublishingLayoutRuleVersion == PublishingLayoutTypeCatalog.CurrentRuleVersion
             ? PublishingLayoutTypeCatalog.FromJson(scan.PublishingLayoutTypeCatalogJson) : null;
@@ -33,7 +38,13 @@ internal static class AspxSourceAcquisition
             }
             token.ThrowIfCancellationRequested();
             row.RecordSourceRead(result);
-            if (catalog != null) PublishingLayoutTypeEvidence.ApplySourceRead(row, result, catalog);
+            if (catalog != null)
+            {
+                var projection = PageBaseTypeProjection.Inspect(result, configuration);
+                row.RecordBaseTypeProjection(projection);
+                // Parse once. Defaults never feed the inherited declaration/family predicate.
+                PublishingLayoutTypeEvidence.ApplySourceRead(row, result, catalog, projection.Parse);
+            }
         };
     }
 }
