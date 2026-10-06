@@ -168,8 +168,9 @@ three AddColumn operations:
 There is no repair/backfill, table drop/rename, catalog or historical migration
 regeneration. The inherited `TestDelays` table stays mapped in Release and Debug
 to prevent an unrelated scaffolded drop; debug-scanner collection/execution
-remains conditional elsewhere. A Process design-time factory avoids CLI startup/
-version checks for subsequent tooling. Core project, Process startup and
+remains conditional elsewhere. A Process design-time factory and `EF.IsDesignTime`
+startup guard avoid CLI version checks/authentication/scanner startup during EF
+tooling (EF 8 probes the entry point even with a factory). Core project, Process startup and
 `Storage/DatabaseMigration` output conventions remain unchanged.
 
 Use temporary **local** dotnet-ef **8.0.3**, never a global tool. Review operations
