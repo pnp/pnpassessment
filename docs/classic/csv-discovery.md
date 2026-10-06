@@ -4,7 +4,7 @@
 
 This csv file contains the physical ASPX inventory and acquisition evidence collected within the requested page scope. The existing assessment ScanId, database and report lifecycle own every row. A normal classic pages assessment uses the full physical inventory scope. With `--homepageonly`, discovery resolves only each web's configured welcome page so the scan remains a fast home-page assessment.
 
-`Url` identifies each physical page, while `FileName` provides its leaf name directly. Final page classification belongs to [classicpages.csv](csv-classicpages.md); discovery rows retain the physical identity, acquisition coverage and assessment disposition needed to explain which files did or did not produce classic-page results.
+`Url` locates a physical page, while `FileName` provides its leaf name directly. Neither is a unique physical identity: use the observed Site/Web/File UniqueId tuple and retain identity uncertainty. Final page classification belongs to [classicpages.csv](csv-classicpages.md); discovery rows retain the physical identity, acquisition coverage and assessment disposition needed to explain which files did or did not produce classic-page results.
 
 `Page` rows represent physical ASPX files. `Scope` rows represent tenant, site, web, list, folder and API surfaces. `Reference` rows record Forms, Views and welcome-page references. `Pagination` rows record sanitized request-chain evidence. `Gap` rows retain acquisition gaps that are not owned by one scope. After post-scan processing, the `Summary` row records the scan-wide coverage verdict.
 
@@ -110,6 +110,11 @@ this same native writer. See [native Page source evidence and CSV](../page-sourc
 for the appended headers, UTC precision, null/empty/unavailable distinctions,
 sensitive embedded bytes, backup and rollback. There is no separate exporter
 or extra discovery row type.
+
+For a result-reading guide, independent state examples, integrated fixture
+boundaries and safe rollback, see [physical Page source evidence](page-source-evidence.md).
+The [Linux offline test recipe](../contributing/page-source-offline-tests.md)
+includes the exact runtime-host, read-only dependency and per-project output setup.
 
 Column|Description
 ------|-----------
