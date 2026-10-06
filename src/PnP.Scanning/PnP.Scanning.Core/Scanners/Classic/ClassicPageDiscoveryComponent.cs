@@ -32,19 +32,8 @@ internal static class ClassicPageDiscoveryComponent
         using var db = new ScanContext(scanner.ScanId);
         var scan = await db.Scans.AsNoTracking().SingleAsync(value => value.ScanId == scanner.ScanId, token).ConfigureAwait(false);
         await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer,
-            PublishingLayoutTypeEvidence.ForScan(scan, async (physical, ct) =>
-                {
-                    if (string.IsNullOrWhiteSpace(physical.Url)) return null;
-                    ct.ThrowIfCancellationRequested();
-                    var file = await context.Web.GetFileByServerRelativeUrlAsync(physical.Url, value => value.UniqueId).ConfigureAwait(false);
-                    if (physical.FileUniqueId.HasValue && physical.FileUniqueId != file.UniqueId)
-                        throw new InvalidDataException("SourceFileIdentityChanged");
-                    // PnP Core downloads the file by UniqueId (download.aspx on .NET),
-                    // not by navigating to the physical ASPX as a rendered page.
-                    using var stream = await file.GetContentAsync(true).ConfigureAwait(false);
-                    using var reader = new StreamReader(stream);
-                    return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
-                }), scan.PublishingLayoutRuleVersion)
+            AspxSourceAcquisition.ForScan(scan, (physical, ct) =>
+                PnPAspxSourceReader.ReadAsync(context, site.Id, web.Id, physical, ct)), scan.PublishingLayoutRuleVersion)
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }

@@ -16,7 +16,8 @@ internal static class PublishingLayoutTypeEvidence
 
     internal sealed record Observation(string Declaration, string ResolvedIdentity, string SourceHash,
         string SourceStatus, string ResolutionStatus, string Decision, string Reason,
-        PublishingLayoutTypeCatalog.TypeEdge[] Ancestry, string[] CatalogErrors, string DirectiveEvidence = null);
+        PublishingLayoutTypeCatalog.TypeEdge[] Ancestry, string[] CatalogErrors, string DirectiveEvidence = null,
+        string SourceHashKind = AspxSourceReadResult.LegacySourceHashKind);
 
     internal static bool IsConfirmedMember(ClassicPageDiscovery row) => row.RowType == "Page" &&
         row.PageTypeEvidenceOrigin == "DeclaredSource" && row.PageTypeSourceStatus == "Available" &&
@@ -101,6 +102,33 @@ internal static class PublishingLayoutTypeEvidence
         var result = catalog.Resolve(bound);
         return new(declaration, result.Chain.Length == 0 ? null : bound, hash, "Available", result.Status,
             result.Decision, result.Reason, result.Chain, catalog.Errors.ToArray(), directiveEvidence);
+    }
+
+    internal static void ApplySourceRead(ClassicPageDiscovery row, AspxSourceReadResult result,
+        PublishingLayoutTypeCatalog catalog)
+    {
+        Observation observation;
+        if (result.IsReliableSource)
+        {
+            try { observation = Inspect(result.DecodedText, catalog); }
+            catch (RegexMatchTimeoutException)
+            {
+                observation = new(null, null, result.LegacySourceHash, "Available", "Unknown", "Unknown",
+                    "DirectiveInspectionTimedOut", Array.Empty<PublishingLayoutTypeCatalog.TypeEdge>(), catalog.Errors.ToArray());
+            }
+        }
+        else
+        {
+            var denied = result.TransportState == AspxSourceTransportState.Denied ||
+                result.ContentState is AspxSourceContentState.LoginShell or AspxSourceContentState.SemanticDenied;
+            var status = denied ? "Denied" : result.TransportState == AspxSourceTransportState.Failed ? "Failed" : "Unknown";
+            observation = new(null, null, result.LegacySourceHash, status, "Unknown", "Unknown",
+                "Source" + status + ":" + string.Join(';', result.TransportReason, result.ContentReason,
+                    result.Decoding.Reason, result.PhysicalIdentity.Reason, result.IdentityComparisonReason),
+                Array.Empty<PublishingLayoutTypeCatalog.TypeEdge>(), catalog.Errors.ToArray());
+        }
+        // Use the same conservative family merge as the legacy decoded-text API.
+        Apply(row, Read(row).Append(observation));
     }
 
     internal static void Merge(ClassicPageDiscovery previous, ClassicPageDiscovery current) =>
