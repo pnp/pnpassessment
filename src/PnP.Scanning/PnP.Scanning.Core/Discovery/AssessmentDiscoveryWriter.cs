@@ -27,15 +27,20 @@ internal sealed class AssessmentDiscoveryWriter
         {
             using var db = createContext();
             var versions = new Dictionary<Guid, int>();
+            var sourceVersions = new Dictionary<Guid, int>();
             foreach (var row in rows)
             {
                 if (!versions.TryGetValue(row.ScanId, out var ruleVersion))
                 {
                     ruleVersion = await ReadRuleVersionAsync(db, row.ScanId, cancellationToken).ConfigureAwait(false);
                     versions.Add(row.ScanId, ruleVersion);
+                    sourceVersions.Add(row.ScanId, await db.Scans.AsNoTracking().Where(scan => scan.ScanId == row.ScanId)
+                        .Select(scan => scan.PageSourceEvidenceVersion).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false));
                 }
                 var previous = await db.ClassicPageDiscoveries.FindAsync(
                     new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
+                if (row.RowType == "Page" && (previous != null || !existingOnly))
+                    ClassicSourceEvidence.Merge(previous, row, sourceVersions[row.ScanId] == ClassicSourceEvidence.CurrentVersion);
                 if (previous == null)
                 {
                     if (!existingOnly) db.ClassicPageDiscoveries.Add(row);
@@ -143,6 +148,15 @@ internal sealed class AssessmentDiscoveryWriter
     internal static Task<int> ReadRuleVersionAsync(ScanContext db, Guid scanId, CancellationToken token = default) =>
         db.Scans.AsNoTracking().Where(scan => scan.ScanId == scanId)
             .Select(scan => scan.PublishingLayoutRuleVersion).SingleOrDefaultAsync(token);
+
+    internal async Task<byte[]> ReadSourceArtifactAsync(Guid scanId, string recordKey, string observationId,
+        CancellationToken cancellationToken = default)
+    {
+        using var db = createContext();
+        var row = await db.ClassicPageDiscoveries.AsNoTracking().SingleOrDefaultAsync(value =>
+            value.ScanId == scanId && value.RecordKey == recordKey, cancellationToken).ConfigureAwait(false);
+        return row?.ReadSourceEvidence().Reads.SingleOrDefault(value => value.ObservationId == observationId)?.RetrieveBytes();
+    }
 
     internal async Task UpdateExistingAsync(IEnumerable<ClassicPageDiscovery> rows,
         CancellationToken cancellationToken = default)

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using PnP.Core.Auth.Services.Builder.Configuration;
 using PnP.Core.Services.Builder.Configuration;
 using PnP.Scanning.Core.Authentication;
@@ -26,6 +27,10 @@ namespace PnP.Scanning.Process
     {
         internal static async Task Main(string[] args)
         {
+            // EF 8 probes the startup entry point even when a design-time factory is present.
+            // Tooling must not run CLI version checks, authentication or scanner startup.
+            if (EF.IsDesignTime) return;
+
             bool isCliProcess = true;
 
             if (args.Length > 0 && args[0].Equals("scanner", StringComparison.OrdinalIgnoreCase))

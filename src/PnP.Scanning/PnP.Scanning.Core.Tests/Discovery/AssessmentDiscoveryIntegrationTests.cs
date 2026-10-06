@@ -56,6 +56,8 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
             Directory.GetFiles(folder, "*gap*.csv").Should().BeEmpty();
             using var csv = new CsvReader(new StreamReader(Path.Combine(folder, "discovery.csv")), CultureInfo.InvariantCulture);
             var rows = csv.GetRecords<ClassicPageDiscovery>().ToArray();
+            // Retain exact equality for every original header in order and strengthen it with
+            // the separately hand-listed additive CP1 contract; no original row assertion changes.
             csv.HeaderRecord.Should().Equal(new[]
             {
                 nameof(ClassicPageDiscovery.RecordKey),
@@ -97,7 +99,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
                 nameof(ClassicPageDiscovery.ScanId),
                 nameof(ClassicPageDiscovery.SiteUrl),
                 nameof(ClassicPageDiscovery.WebUrl),
-            });
+            }.Concat(PnP.Scanning.Core.Tests.Storage.PageSourceCsvTests.AddedHeaders));
             rows.Should().OnlyContain(row => row.ScanId == scan);
             rows.Should().Contain(row => row.RowType == "Page");
             rows.Should().Contain(row => row.RowType == "Scope" && row.DiscoveryStatus == "Denied");

@@ -768,6 +768,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("SiteUrl")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SourceEvidenceJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Url")
                         .HasColumnType("TEXT");
 
@@ -1263,6 +1266,14 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("PageBaseTypeConfigurationJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PageSourceEvidenceVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("PostScanStatus")
                         .HasColumnType("INTEGER");

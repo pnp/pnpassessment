@@ -104,6 +104,13 @@ Verdict | Condition
 
 The following columns are included:
 
+The original columns and their order remain unchanged. CP1 appends physical-source,
+byte/digest, declaration/default, configuration and independent state fields through
+this same native writer. See [native Page source evidence and CSV](../page-source-persistence-and-csv.md)
+for the appended headers, UTC precision, null/empty/unavailable distinctions,
+sensitive embedded bytes, backup and rollback. There is no separate exporter
+or extra discovery row type.
+
 Column|Description
 ------|-----------
 RecordKey | Stable key for the page or discovery scope within the assessment.

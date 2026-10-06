@@ -401,6 +401,7 @@ namespace PnP.Scanning.Core.Services
             using (var writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))
             using (var csv = new CsvWriter(writer, config))
             {
+                csv.Context.RegisterClassMap(new ClassicPageDiscoveryMap(config.CultureInfo));
                 await csv.WriteRecordsAsync(dbContext.ClassicPageDiscoveries.AsNoTracking()
                     .Where(row => row.ScanId == scanId).OrderBy(row => row.RowType).ThenBy(row => row.RecordKey)
                     .AsAsyncEnumerable());

@@ -14,7 +14,18 @@ internal static class AspxSourceAcquisition
 
     internal static Func<ClassicPageDiscovery, CancellationToken, Task> ForScan(Scan scan,
         Func<ClassicPageDiscovery, CancellationToken, Task<AspxSourceReadResult>> readSource,
-        PageBaseTypeConfiguration configuration)
+        PageBaseTypeConfiguration configuration) => Create(scan, readSource, configuration,
+            scan.PublishingLayoutRuleVersion == PublishingLayoutTypeCatalog.CurrentRuleVersion);
+
+    /// <summary>Production restart uses only the recorded scan contract, never current mutable settings.</summary>
+    internal static Func<ClassicPageDiscovery, CancellationToken, Task> ForAssessmentScan(Scan scan,
+        Func<ClassicPageDiscovery, CancellationToken, Task<AspxSourceReadResult>> readSource) =>
+        Create(scan, readSource, PageBaseTypeConfiguration.FromJson(scan.PageBaseTypeConfigurationJson),
+            scan.PageSourceEvidenceVersion == ClassicSourceEvidence.CurrentVersion);
+
+    private static Func<ClassicPageDiscovery, CancellationToken, Task> Create(Scan scan,
+        Func<ClassicPageDiscovery, CancellationToken, Task<AspxSourceReadResult>> readSource,
+        PageBaseTypeConfiguration configuration, bool projectBaseType)
     {
         var catalog = scan.PublishingLayoutRuleVersion == PublishingLayoutTypeCatalog.CurrentRuleVersion
             ? PublishingLayoutTypeCatalog.FromJson(scan.PublishingLayoutTypeCatalogJson) : null;
@@ -38,12 +49,13 @@ internal static class AspxSourceAcquisition
             }
             token.ThrowIfCancellationRequested();
             row.RecordSourceRead(result);
+            var projection = projectBaseType ? PageBaseTypeProjection.Inspect(result, configuration) : null;
+            if (projection != null) row.RecordBaseTypeProjection(projection);
             if (catalog != null)
             {
-                var projection = PageBaseTypeProjection.Inspect(result, configuration);
-                row.RecordBaseTypeProjection(projection);
                 // Parse once. Defaults never feed the inherited declaration/family predicate.
-                PublishingLayoutTypeEvidence.ApplySourceRead(row, result, catalog, projection.Parse);
+                PublishingLayoutTypeEvidence.ApplySourceRead(row, result, catalog,
+                    projection?.Parse ?? PageDirectiveParser.Parse(result.DecodedText));
             }
         };
     }

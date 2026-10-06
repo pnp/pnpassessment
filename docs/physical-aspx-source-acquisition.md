@@ -5,15 +5,22 @@ scheduled Web context and PnP file-download capability. It does not navigate to 
 ASPX URL as a rendered page, create another scanner, or require a list item to
 read a discovered physical file.
 
+For the subsequent native persistence consumer, scan-version gating, reopen/
+retrieval and appended CSV fields, see
+[native Page source evidence and CSV](page-source-persistence-and-csv.md).
+The reusable acquisition properties below remain transient; the writer owns
+their separate versioned durable mapping.
+
 `AssessmentWebDiscovery` commits discovered existence before the acquisition
 callback. `AspxSourceAcquisition` returns each reusable `AspxSourceReadResult` to
 that callback's row and adapts reliable results to the inherited
 `PublishingLayoutTypeEvidence` API. The old decoded-text API is still available.
 This boundary is in memory: `DiscoveryObservation` and `SourceReads` are
 explicitly excluded from EF and CSV. Durable byte/observation storage and new
-export columns require a separate persistence consumer and matching migrations
-for any schema change. This implementation does not claim byte retrieval after
-reopening an assessment database.
+export columns belong to the separate native writer consumer and its matching
+migration, not the reader itself. Reopen/retrieval guarantees now come from that
+[durable consumer](page-source-persistence-and-csv.md); the reusable in-memory
+reader alone does not provide them.
 
 ## Identity and observations
 

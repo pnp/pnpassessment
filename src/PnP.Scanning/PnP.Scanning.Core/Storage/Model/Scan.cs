@@ -24,6 +24,12 @@ namespace PnP.Scanning.Core.Storage
 
         public string PublishingLayoutTypeCatalogJson { get; set; }
 
+        // Zero means CP1 evidence was not enabled for this scan, including inherited scans.
+        // Only new-scan initialization freezes the current contract and configuration snapshot.
+        public int PageSourceEvidenceVersion { get; set; }
+
+        public string PageBaseTypeConfigurationJson { get; set; }
+
         public string CLIMode { get; set; }
 
         public string CLITenant { get; set; }
