@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Scanners;
+using IgnoreAttribute = CsvHelper.Configuration.Attributes.IgnoreAttribute;
 
 namespace PnP.Scanning.Core.Storage
 {
@@ -44,6 +45,13 @@ namespace PnP.Scanning.Core.Storage
         public string UnmappedWebParts { get; set; }
 
         public string RemediationCode { get; set; }
+
+        // The declared ASPX type, or a short ERROR value when source acquisition/parsing failed.
+        public string PageHandler { get; set; }
+
+        // Provenance stays in SQLite. The page CSV exposes only the PageHandler display value.
+        [Ignore]
+        public string PageHandlerEvidenceJson { get; set; }
 
         public bool AddToDatabase()
         {

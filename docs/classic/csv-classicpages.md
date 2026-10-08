@@ -34,3 +34,25 @@ RemediationCode | The remediation code for this page type (`CP1`-`CP5`)
 ScanId | Id of the assessment
 SiteUrl | Fully qualified site collection URL
 WebUrl | Relative URL of this web
+PageHandler | Full CLR type explicitly declared by this ASPX file's `@Page Inherits`, or a short `ERROR: <Status> (<Code>)` value when its source could not be read or parsed
+
+`PageHandler` is appended after the existing columns. For example, a declared wiki page can
+contain `Microsoft.SharePoint.WebPartPages.WikiEditPage`; a denied download can contain
+`ERROR: ReadFailed (HTTP 403)`, and an empty declaration can contain
+`ERROR: ParseFailed (EmptyInherits)`. Custom type names are retained. An assembly-qualified
+declaration is normalized to the full type name while its original value stays in the database.
+
+Handler extraction runs on the existing page analysis results. It does not expand discovery
+or make every discovered file an assessed classic page. The parser reads original ASPX markup
+and does not need a ListItem, but the analysis pipeline still determines which records enter
+this CSV. The existing `PageType` classification and counts continue to use their original rules.
+
+An empty Handler means no explicit declaration, an inapplicable record such as a virtual blog
+post, or no evidence in a historical assessment. Default base-type assumptions are not emitted
+as declarations. SQLite's `ClassicPages.PageHandlerEvidenceJson` retains the original declaration,
+default base type and source, read/parse status, source-file provenance and detailed errors.
+This evidence field is not included in the CSV.
+
+The declared type is separate from a publishing page's referenced Layout Handler and from
+the Handler actually observed while serving a request. A source that cannot establish its
+complete declaration, including unconfirmed ghosted/setup markup, retains an unavailable reason.

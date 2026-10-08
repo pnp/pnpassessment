@@ -22,6 +22,68 @@ namespace PnP.Scanning.Core.Tests.Storage
         private const string OldLocation = "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\";
 
         [Fact]
+        public void ClassicTemplate_PageHandler_IsTextAndSupportsLegacyCsv()
+        {
+            using var pbit = typeof(ReportManager).Assembly.GetManifestResourceStream(
+                "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit");
+            pbit.Should().NotBeNull();
+            using var document = JsonDocument.Parse(ReadDataModelSchema(pbit));
+            var pages = document.RootElement.GetProperty("model").GetProperty("tables").EnumerateArray()
+                .Single(table => table.GetProperty("name").GetString() == "classicpages");
+            var columns = pages.GetProperty("columns").EnumerateArray().ToArray();
+            columns.Single(column => column.GetProperty("name").GetString() == "PageHandler")
+                .GetProperty("dataType").GetString().Should().Be("string");
+            columns.Should().NotContain(column => column.GetProperty("name").GetString() == "PageHandlerEvidenceJson");
+            string expression = string.Join("\n", pages.GetProperty("partitions")[0].GetProperty("source")
+                .GetProperty("expression").EnumerateArray().Select(line => line.GetString()));
+            expression.Should().Contain("Table.HasColumns(#\"Promoted Headers\", \"PageHandler\")");
+            expression.Should().Contain("each null, type nullable text");
+            expression.Should().Contain("{\"PageHandler\", type text}");
+            expression.Should().Contain("Encoding=65001");
+            expression.Should().Contain("QuoteStyle.Csv");
+            expression.Should().Contain("Table.SelectColumns(#\"Added Custom\"");
+        }
+
+        [Fact]
+        public void ClassicTemplate_Pages_BindsHandlerInTheTableAndSlicer()
+        {
+            using var pbit = typeof(ReportManager).Assembly.GetManifestResourceStream(
+                "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit");
+            using var archive = new ZipArchive(pbit, ZipArchiveMode.Read);
+            var pageEntry = archive.Entries.Single(entry =>
+            {
+                if (!entry.FullName.StartsWith("Report/definition/pages/") || !entry.FullName.EndsWith("/page.json"))
+                    return false;
+                using var stream = entry.Open();
+                using var page = JsonDocument.Parse(stream);
+                return page.RootElement.GetProperty("displayName").GetString() == "Pages";
+            });
+            string visualPrefix = pageEntry.FullName[..^"page.json".Length] + "visuals/";
+            bool table = false, slicer = false;
+            foreach (var entry in archive.Entries.Where(entry =>
+                entry.FullName.StartsWith(visualPrefix) && entry.FullName.EndsWith("/visual.json")))
+            {
+                using var stream = entry.Open();
+                using var config = JsonDocument.Parse(stream);
+                var single = config.RootElement.GetProperty("visual");
+                string kind = single.GetProperty("visualType").GetString();
+                if (kind is not ("tableEx" or "slicer")) continue;
+                var values = single.GetProperty("query").GetProperty("queryState").GetProperty("Values")
+                    .GetProperty("projections").EnumerateArray()
+                    .Select(value => value.GetProperty("queryRef").GetString()).ToArray();
+                if (!values.Contains("classicpages.PageHandler")) continue;
+                if (kind == "tableEx")
+                {
+                    table = true;
+                    values.Should().Contain("classicpages.PageType");
+                }
+                else slicer = true;
+            }
+            table.Should().BeTrue("the exported Handler must be visible in the page detail table");
+            slicer.Should().BeTrue("the same Handler values, including errors, must be filterable");
+        }
+
+        [Fact]
         public void ClassicTemplate_PropertiesValue_IsText()
         {
             const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
@@ -44,6 +106,38 @@ namespace PnP.Scanning.Core.Tests.Storage
                 .Select(line => line.GetString()));
             expression.Should().Contain("{\"Value\", type text}");
             expression.Should().NotContain("{\"Value\", type logical}");
+        }
+
+        [Fact]
+        public void RewriteDataLocationsInPbit_ShippedClassicTemplate_UsesTheExportDirectory()
+        {
+            var dir = NewTempDir();
+            try
+            {
+                string path = Path.Combine(dir, "ClassicAssessmentReport.pbit");
+                using (var source = typeof(ReportManager).Assembly.GetManifestResourceStream(
+                    "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit"))
+                using (var target = File.Create(path))
+                {
+                    source.Should().NotBeNull();
+                    source.CopyTo(target);
+                }
+
+                ReportManager.RewriteDataLocationsInPbit(path, ",", OldLocation, ",");
+
+                string schema = ReadDataModelSchema(path);
+                string prefix = dir.Replace("\\", "\\\\") + "\\\\";
+                schema.Should().NotContain("q:\\\\github");
+                schema.Should().Contain(prefix + "classicpages.csv");
+                schema.Should().Contain(prefix + "properties.csv");
+                using var archive = ZipFile.OpenRead(path);
+                archive.Entries.Should().Contain(entry =>
+                    entry.FullName.StartsWith("Report/definition/pages/") && entry.FullName.EndsWith("/page.json"));
+            }
+            finally
+            {
+                DeleteTempDir(dir);
+            }
         }
 
         [Fact]
