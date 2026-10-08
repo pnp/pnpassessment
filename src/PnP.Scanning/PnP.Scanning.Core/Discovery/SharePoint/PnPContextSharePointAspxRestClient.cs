@@ -8,8 +8,6 @@ namespace PnP.Scanning.Core.Discovery;
 
 internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestClient
 {
-    internal const string AcquisitionUserAgent = "testtraffic-smr";
-
     private readonly PnPContext context;
 
     internal PnPContextSharePointAspxRestClient(PnPContext context) =>
@@ -35,7 +33,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     {
         var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
         request.Headers.Accept.ParseAdd("application/json;odata=nometadata");
-        request.Headers.UserAgent.ParseAdd(AcquisitionUserAgent);
+        // Let the PnP Core REST client apply its default or configured User-Agent.
         return request;
     }
 

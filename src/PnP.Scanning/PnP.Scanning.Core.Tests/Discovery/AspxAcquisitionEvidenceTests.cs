@@ -1,6 +1,8 @@
 using FluentAssertions;
 using CsvHelper;
 using CsvHelper.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using PnP.Core.Services;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -19,13 +21,32 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
 
     public AspxAcquisitionEvidenceTests(ScanContextFixture database) => this.database = database;
 
-    [Fact]
-    public void Direct_rest_requests_use_the_required_test_traffic_user_agent()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("ContosoAssessment/1.0")]
+    public async Task Direct_rest_requests_preserve_the_PnP_Core_user_agent(string configuredUserAgent)
     {
+        using var transport = new RecordingHttpHandler();
+        var services = new ServiceCollection();
+        services.AddPnPCore(options =>
+        {
+            options.DisableTelemetry = true;
+            options.HttpRequests.UserAgent = configuredUserAgent;
+        }, configureSharePointRest: builder =>
+            builder.ConfigurePrimaryHttpMessageHandler(() => transport));
+        using var serviceProvider = services.BuildServiceProvider();
+        using var httpClient = serviceProvider.GetRequiredService<SharePointRestClient>().Client;
+        var expectedUserAgent = httpClient.DefaultRequestHeaders.UserAgent.ToString();
         using var request = PnPContextSharePointAspxRestClient.CreateGetRequest(
             new Uri("https://contoso.sharepoint.com/_api/web"));
 
-        request.Headers.UserAgent.ToString().Should().Be("testtraffic-smr");
+        using var response = await httpClient.SendAsync(request);
+
+        transport.UserAgent.Should().Be(expectedUserAgent).And.NotContain("testtraffic-smr");
+        if (configuredUserAgent == null)
+            transport.UserAgent.Should().StartWith("NONISV|SharePointPnP|PnPCoreSDK/");
+        else
+            transport.UserAgent.Should().Be(configuredUserAgent);
     }
 
     [Fact]
@@ -299,6 +320,21 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         AspxPaginationContract.TokenHash(request), 1, AspxPaginationContract.TokenHash(next), new string('b', 64),
         200, SharePointSemanticDetectorResults.None, 1, 1, "request", "correlation", null, terminal,
         DateTimeOffset.Parse("2026-09-12T12:00:00Z"));
+
+    private sealed class RecordingHttpHandler : HttpMessageHandler
+    {
+        internal string UserAgent { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            UserAgent = request.Headers.UserAgent.ToString();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":[]}", Encoding.UTF8, "application/json"),
+            });
+        }
+    }
 
     private sealed class EvidenceProvider : IAspxDiscoveryProvider, IAspxReferenceAcquisitionProvider
     {
