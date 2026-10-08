@@ -201,6 +201,10 @@ namespace PnP.Scanning.Core.Scanners
                     if (found == null) continue; // Blog posts are list items, not physical ASPX files.
                     ApplyDiscoveryState(page, found);
                 }
+                // Handler enrichment consumes only the analysis records that will be persisted.
+                await PageHandlerEnricher.EnrichAsync(pagesList,
+                    (page, cancellationToken) => PnPCorePageSourceReader.ReadAsync(context, page, cancellationToken),
+                    scannerBase.ScanManager.GetCancellationTokenSource(scannerBase.ScanId).Token).ConfigureAwait(false);
                 await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
             }
 

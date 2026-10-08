@@ -539,6 +539,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PageHandler")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageHandlerEvidenceJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PageName")
                         .HasColumnType("TEXT");
 

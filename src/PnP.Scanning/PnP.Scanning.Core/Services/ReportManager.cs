@@ -442,6 +442,7 @@ namespace PnP.Scanning.Core.Services
             {
                 using (var csv = new CsvWriter(writer, config))
                 {
+                    csv.Context.RegisterClassMap<ClassicPageMap>();
                     await csv.WriteRecordsAsync(dbContext.ClassicPages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
@@ -622,6 +623,40 @@ namespace PnP.Scanning.Core.Services
             // Delete the exported DataModelSchema file
             File.Delete(destinationPath);
             File.Delete(copiedFile);
+        }
+
+        // Preserve the pre-Handler export order, including inherited identity fields at the end.
+        // Evidence is deliberately excluded; only the display value is appended to the page CSV.
+        private sealed class ClassicPageMap : ClassMap<ClassicPage>
+        {
+            public ClassicPageMap()
+            {
+                Map(page => page.PageUrl).Index(0);
+                Map(page => page.PageName).Index(1);
+                Map(page => page.PageType).Index(2);
+                Map(page => page.ListUrl).Index(3);
+                Map(page => page.ListTitle).Index(4);
+                Map(page => page.ListId).Index(5);
+                Map(page => page.SiteCollectionId).Index(6);
+                Map(page => page.WebId).Index(7);
+                Map(page => page.FileUniqueId).Index(8);
+                Map(page => page.ListItemId).Index(9);
+                Map(page => page.DiscoveryStatus).Index(10);
+                Map(page => page.AssessmentStatus).Index(11);
+                Map(page => page.ModifiedAt).Index(12);
+                Map(page => page.Layout).Index(13);
+                Map(page => page.HomePage).Index(14);
+                Map(page => page.UncustomizedHomePage).Index(15);
+                Map(page => page.ModifiedBy).Index(16);
+                Map(page => page.WebPartCount).Index(17);
+                Map(page => page.MappingPercentage).Index(18);
+                Map(page => page.UnmappedWebParts).Index(19);
+                Map(page => page.RemediationCode).Index(20);
+                Map(page => page.ScanId).Index(21);
+                Map(page => page.SiteUrl).Index(22);
+                Map(page => page.WebUrl).Index(23);
+                Map(page => page.PageHandler).Index(24);
+            }
         }
 
         // WebUrl is always "/" for audit usage rows (the web is not resolved during post-scan collection)
