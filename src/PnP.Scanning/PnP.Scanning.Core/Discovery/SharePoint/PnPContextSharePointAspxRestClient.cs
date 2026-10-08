@@ -33,7 +33,6 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     {
         var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
         request.Headers.Accept.ParseAdd("application/json;odata=nometadata");
-        // Let the PnP Core REST client apply its default or configured User-Agent.
         return request;
     }
 

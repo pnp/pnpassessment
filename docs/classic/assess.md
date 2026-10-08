@@ -29,8 +29,6 @@ See the [requirements](requirements.md) page for the full list of classic page-s
 
 `--homepageonly` applies to both discovery and page assessment. The tool resolves each web's configured welcome page directly and assesses that physical file, without enumerating every list, folder, form and view in the web. Omit `--homepageonly` when the report must include the complete physical ASPX inventory for the selected tenant or sites.
 
-Classic page discovery requests use the standard PnP Core SDK User-Agent (`NONISV|SharePointPnP|PnPCoreSDK/<version>`) by default. If you customize the User-Agent through PnP Core HTTP configuration, discovery requests use that value as well.
-
 ### Live status updates
 
 Once an assessment is launched you'd typically followup on it's status via the `Status` action. Below is a quick start, more details can be found in the [Microsoft 365 Assessment tool operations documentation](../using-the-assessment-tool/assess-operations.md#getting-a-live-status-overview-of-a-running-assessment).
