@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts;
 
-internal enum AcquisitionStatus { Complete, Partial, Denied, NotAttempted, Failed }
+internal enum AcquisitionStatus { Complete, Partial, Denied, NotAttempted, Failed, Unknown, NotReturned }
 internal enum PhaseKind { Pipeline, Collection, Analysis }
 
 /// <summary>Collector output: facts and original bytes, without an analysis projection.</summary>
@@ -13,7 +13,7 @@ internal sealed record CollectedObservation(
     string? AcquisitionError = null);
 
 internal sealed record CollectionRecord(
-    CollectedObservation Observation, VersionedJson Checkpoint, int? ExpectedRecords = null);
+    CollectedObservation? Observation, VersionedJson Checkpoint, int? ExpectedRecords = null);
 
 /// <summary>Detached source data. Byte access returns a copy and never exposes a tracked entity.</summary>
 internal sealed class SourceArtifact

@@ -188,6 +188,7 @@ message ReportRequest {
 	string Mode = 2;
 	string Path = 3;
 	string Delimiter = 4;
+	string AnalysisRunId = 5;
 }
 
 message ReportStatus {

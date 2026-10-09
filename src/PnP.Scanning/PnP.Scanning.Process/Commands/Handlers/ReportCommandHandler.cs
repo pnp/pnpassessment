@@ -20,6 +20,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<Delimiter> delimiterOption;
         private Option<string> exportPathOption;
         private Option<bool> openGeneratedReportOption;
+        private Option<Guid> analysisRunIdOption;
 
         internal ReportCommandHandler(ScannerManager processManagerInstance)
         {
@@ -34,6 +35,8 @@ namespace PnP.Scanning.Process.Commands
                 IsRequired = false,
             };
             cmd.AddOption(scanIdOption);
+            analysisRunIdOption = new("--analysis-run-id", "Select a completed Classic Page analysis run");
+            cmd.AddOption(analysisRunIdOption);
 
             modeOption = new(
                 name: $"--{Constants.ReportMode}",
@@ -79,17 +82,20 @@ namespace PnP.Scanning.Process.Commands
             //{                               
             //});
 
-            cmd.SetHandler(async (Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open) =>
-                            {
-                                await HandleStartAsync(scanId, mode, delimiter, path, open);
-                            },
-                            scanIdOption, modeOption, delimiterOption, exportPathOption, openGeneratedReportOption);
+            cmd.SetHandler(async context =>
+            {
+                var parse = context.ParseResult;
+                context.ExitCode = await HandleStartAsync(parse.GetValueForOption(scanIdOption), parse.GetValueForOption(modeOption),
+                    parse.GetValueForOption(delimiterOption), parse.GetValueForOption(exportPathOption),
+                    parse.GetValueForOption(openGeneratedReportOption), parse.GetValueForOption(analysisRunIdOption));
+            });
 
             return cmd;
         }
 
-        private async Task HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open)
+        private async Task<int> HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open, Guid analysisRunId)
         {
+            var failed = false;
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Creating reports...", async ctx =>
             {
                 // Setup client to talk to scanner
@@ -107,7 +113,8 @@ namespace PnP.Scanning.Process.Commands
                     Id = scanId.ToString(),
                     Mode = mode.ToString(),
                     Delimiter = delimChar,
-                    Path = path
+                    Path = path,
+                    AnalysisRunId = analysisRunId == Guid.Empty ? "" : analysisRunId.ToString()
                 });
 
                 string finalReportPath = "";
@@ -116,6 +123,7 @@ namespace PnP.Scanning.Process.Commands
                 {
                     if (message.Type == Constants.MessageError)
                     {
+                        failed = true;
                         AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
                     }
                     else if (message.Type == Constants.MessageWarning)
@@ -138,7 +146,7 @@ namespace PnP.Scanning.Process.Commands
 
                 AnsiConsole.WriteLine();
 
-                if (!string.IsNullOrEmpty(finalReportPath) && open)
+                if (!failed && !string.IsNullOrEmpty(finalReportPath) && open)
                 {
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
@@ -167,6 +175,7 @@ namespace PnP.Scanning.Process.Commands
                 }
 
             });
+            return failed ? 1 : 0;
         }
     }
 }

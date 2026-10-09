@@ -46,8 +46,10 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         var parameters = ParseParameters(request.ParametersJson);
         collector.ValidateParameters?.Invoke(parameters);
         var analyzer = analysisParameters == null ? null : registry.GetAnalyzer(request.Module, ruleVersion, collector.InputVersion);
+        if (analyzer?.PinParameters != null) analysisParameters = analyzer.PinParameters(analysisParameters!);
         analyzer?.ValidateParameters?.Invoke(analysisParameters!);
         var options = request.CollectionOptions?.Clone() ?? throw new ArgumentException("Collection options are required.");
+        collector.ValidateOptions?.Invoke(options);
         ValidateThreads(options.Threads);
 
         await scheduling.WaitAsync(token);
@@ -97,6 +99,7 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         var snapshot = await store.OpenSnapshotAsync(assessmentId, snapshotId, token);
         var analyzer = registry.GetAnalyzer(snapshot.ModuleKey, request.RuleVersion, snapshot.InputVersion);
         var parameters = ParseParameters(request.ParametersJson);
+        if (analyzer.PinParameters != null) parameters = analyzer.PinParameters(parameters);
         analyzer.ValidateParameters?.Invoke(parameters);
         var threads = request.Threads == 0 ? (await store.LatestRootAsync(assessmentId, token))?.Threads ?? 1 : request.Threads;
         ValidateThreads(threads);
@@ -230,12 +233,16 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
                 var savedOptions = new VersionedJson(root.CollectionOptionsJson!).Value.GetString()!;
                 var options = collectionEnvironment.Restore(JsonParser.Default.Parse<StartRequest>(savedOptions));
                 options.Threads = root.Threads;
-                var context = new CollectionContext(options, new VersionedJson(root.ParametersJson),
-                    phase.CheckpointJson == null ? null : new VersionedJson(phase.CheckpointJson), collectionEnvironment);
                 var writer = store.SnapshotWriter(root.AssessmentId, root.SnapshotId, phase.RunId);
+                var journal = store.CollectionJournal(root.AssessmentId, root.SnapshotId, phase.RunId);
+                var context = new CollectionContext(options, new VersionedJson(root.ParametersJson),
+                    phase.CheckpointJson == null ? null : new VersionedJson(phase.CheckpointJson), collectionEnvironment,
+                    root.AssessmentId, journal);
                 await foreach (var record in module.CollectAsync(context, token).WithCancellation(token))
                     await writer.CommitAsync(record, token);
                 token.ThrowIfCancellationRequested();
+                if (module is ICollectionSnapshotValidator validator)
+                    await validator.ValidateAsync(journal, token);
                 await writer.SealAsync(token);
             }
             if (root.Kind != PhaseKind.Collection)
@@ -247,10 +254,18 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
                 if (!module.ModuleKey.Equals(registration.ModuleKey, StringComparison.OrdinalIgnoreCase) || module.RuleVersion != registration.RuleVersion)
                     throw new InvalidOperationException("Analysis implementation differs from its registered contract.");
                 var phase = await store.PrepareAnalysisChildAsync(root, token);
+                if (phase.Status != ScanStatus.Finished)
+                {
                 await store.SetRunningAsync(root.AssessmentId, root.RunId, phase.RunId, token);
                 await new AnalysisExecutor().ExecuteAsync(module, store.SnapshotReader(root.AssessmentId, root.SnapshotId),
                     store.ResultWriter(root.AssessmentId, phase.RunId), new VersionedJson(root.AnalysisParametersJson), root.Threads, token);
+                if (module is IAnalysisFinalizer finalizer)
+                    await finalizer.FinalizeAsync(store.SnapshotReader(root.AssessmentId, root.SnapshotId),
+                        store.ResultReader(root.AssessmentId, phase.RunId), store.ReportWriter(root.AssessmentId, phase.RunId),
+                        new VersionedJson(root.AnalysisParametersJson), token);
                 await store.FinishAnalysisAsync(root.AssessmentId, phase.RunId, token);
+                }
+                else await store.OpenSnapshotAsync(root.AssessmentId, root.SnapshotId, token);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }

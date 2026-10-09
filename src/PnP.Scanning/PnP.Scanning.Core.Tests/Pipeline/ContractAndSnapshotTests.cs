@@ -21,8 +21,14 @@ public sealed class ContractAndSnapshotTests
     [Fact]
     public void T28_Analysis_signatures_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
+        // Reused page parsers/mapping models are pure domain code. Include their IL and signatures
+        // in the audit rather than allowing an uninspected namespace exception.
+        bool PurePageType(Type type) => type.Namespace == "PnP.Scanning.Core.Scanners.WebPartMapping" ||
+            type.Namespace == "PnP.Scanning.Core.Scanners" && new[] { "WikiContentParser", "WikiContentParseResult", "WikiWebPartPlaceholder", "HomePageDetector", "PageLayoutDetector", "SiteType" }.Contains(type.Name.Split('+')[0]) ||
+            type.Namespace == "PnP.Scanning.Core.Discovery" && new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(type.Name);
         var types = typeof(AnalysisExecutor).Assembly.GetTypes().Where(x =>
-            x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) == true).ToArray();
+            x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) == true ||
+            x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) == true || PurePageType(x) || x.DeclaringType != null && PurePageType(x.DeclaringType)).ToArray();
         var referenced = types.SelectMany(x => x.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
             .Select(f => f.FieldType).Concat(x.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
             .SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType))))
@@ -42,7 +48,7 @@ public sealed class ContractAndSnapshotTests
             Assert.False(name.StartsWith("Microsoft.AspNetCore.DataProtection", StringComparison.Ordinal), name);
             if (name.StartsWith("PnP.Scanning.Core.", StringComparison.Ordinal))
                 Assert.True(name.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) ||
-                    name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal), name);
+                    name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) || PurePageType(type) || type.DeclaringType != null && PurePageType(type.DeclaringType), name);
         }
         Assert.DoesNotContain(typeof(ISnapshotReader).GetMethods(), x => x.Name.Contains("Write", StringComparison.Ordinal));
         Assert.DoesNotContain(typeof(IAnalysisModule).GetMethods().SelectMany(x => x.GetParameters()),

@@ -1192,6 +1192,29 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("AnalysisRuns", (string)null);
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.ClassicPageReportRow", b =>
+                {
+                    b.Property<Guid>("AnalysisRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RowKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AnalysisRunId", "Kind", "RowKey");
+
+                    b.ToTable("ClassicPageReportRows", (string)null);
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", b =>
                 {
                     b.Property<Guid>("RunId")
@@ -2179,6 +2202,15 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .WithOne()
                         .HasForeignKey("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", "AnalysisRunId", "SnapshotId")
                         .HasPrincipalKey("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", "RunId", "SnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.ClassicPageReportRow", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", null)
+                        .WithMany()
+                        .HasForeignKey("AnalysisRunId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

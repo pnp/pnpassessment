@@ -39,6 +39,12 @@ internal sealed class CollectionEnvironment(
         if (string.IsNullOrWhiteSpace(copy.TenantId) && !string.IsNullOrWhiteSpace(copy.Tenant))
             copy.TenantId = (await AuthenticationManager.GetAzureADTenantIdAsync(copy.Tenant)).ToString();
         cancellationToken.ThrowIfCancellationRequested();
-        return new(AuthenticationManager.Create(copy, protectionProvider()), contextFactory(), siteEnumeration());
+        var authentication = AuthenticationManager.Create(copy, protectionProvider());
+        authentication.SetCollectionDeviceCodeCallback(result =>
+        {
+            Serilog.Log.Information("Collection authentication: {Message}", result.Message);
+            return Task.CompletedTask;
+        });
+        return new(authentication, contextFactory(), siteEnumeration());
     }
 }

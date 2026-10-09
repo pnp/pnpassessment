@@ -24,6 +24,8 @@ internal sealed partial class PipelineStore
                 CLIThreads = root.Threads,
             });
             db.SourceSnapshots.Add(snapshot);
+            db.Properties.AddRange(protectedOptions.Properties.Select(x => new Property
+            { ScanId = snapshot.AssessmentId, Name = x.Property, Type = x.Type, Value = x.Value }));
             db.PhaseRuns.Add(root);
             if (collectionChild != null) db.PhaseRuns.Add(collectionChild);
             return Task.FromResult(true);
@@ -130,9 +132,20 @@ internal sealed partial class PipelineStore
             var count = await db.AnalysisResults.CountAsync(x => x.AnalysisRunId == analysisRunId, token);
             if (count != manifest.Members.Count || phase.CompletedRecords != count)
                 throw new SnapshotIntegrityException("Analysis has uncommitted source records and cannot finish.");
+            string? reportDigest = null;
+            if (phase.ModuleKey == "classicpage")
+            {
+                var checkpoint = new VersionedJson(phase.CheckpointJson!).Value;
+                if (!checkpoint.TryGetProperty("reportDigest", out var digest))
+                    throw new SnapshotIntegrityException("Classic Page analysis has not published its report projections.");
+                reportDigest = digest.GetString();
+                var rows = await db.ClassicPageReportRows.Where(x => x.AnalysisRunId == analysisRunId).ToListAsync(token);
+                if (rows.Count == 0 || AnalysisReportDigest.Compute(rows.Select(x => new AnalysisReportRow(x.Kind, x.RowKey, x.Ordinal, new VersionedJson(x.PayloadJson)))) != reportDigest)
+                    throw new SnapshotIntegrityException("Published report digest differs from its checkpoint.");
+            }
             phase.Status = ScanStatus.Finished;
             phase.EndedAtUtc = DateTime.UtcNow;
-            phase.CheckpointJson = VersionedJson.From(new { stage = "Finished", snapshotId = phase.SnapshotId, committedResults = count }).Json;
+            phase.CheckpointJson = VersionedJson.From(new { stage = "Finished", snapshotId = phase.SnapshotId, committedResults = count, reportDigest }).Json;
             await UpdateParentAsync(db, phase);
             return true;
         }, token);

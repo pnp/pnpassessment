@@ -221,7 +221,7 @@ namespace PnP.Scanning.Process
                           services.AddSingleton<StorageManager>();
                           services.AddSingleton(new PipelineStore(StorageManager.GetScannerFolder()));
                           services.AddSingleton<IHostedService, LegacyAssessmentRecovery>();
-                          services.AddSingleton(new ModuleRegistry());
+                          services.AddSingleton(PnP.Scanning.Core.Pipeline.Collection.ClassicPageModule.Registry());
                           services.AddSingleton<ICollectionEnvironment>(provider => new CollectionEnvironment(
                               () => provider.GetRequiredService<IDataProtectionProvider>(),
                               () => provider.GetRequiredService<PnP.Core.Services.IPnPContextFactory>(),

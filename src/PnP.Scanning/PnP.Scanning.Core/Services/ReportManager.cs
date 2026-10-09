@@ -522,7 +522,7 @@ namespace PnP.Scanning.Core.Services
             return exportPath;
         }
 
-        private static void PersistPBitFromResource(string pbitIdentifier, string pbitFile)
+        internal static void PersistPBitFromResource(string pbitIdentifier, string pbitFile)
         {
             File.WriteAllBytes(pbitFile, LoadResourceBytes(pbitIdentifier));
         }

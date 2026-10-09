@@ -5,11 +5,11 @@ using PnP.Scanning.Core.Pipeline.Contracts;
 namespace PnP.Scanning.Core.Pipeline.Orchestration;
 
 internal sealed record CollectionRegistration(string ModuleKey, string InputVersion,
-    Func<ICollectionModule> Create, Action<VersionedJson>? ValidateParameters = null);
+    Func<ICollectionModule> Create, Action<VersionedJson>? ValidateParameters = null, Action<PnP.Scanning.Core.Services.StartRequest>? ValidateOptions = null);
 
 internal sealed record AnalysisRegistration(string ModuleKey, string RuleVersion,
     IReadOnlyCollection<string> InputVersions, Func<IAnalysisModule> Create,
-    Action<VersionedJson>? ValidateParameters = null);
+    Action<VersionedJson>? ValidateParameters = null, Func<VersionedJson, VersionedJson>? PinParameters = null);
 
 /// <summary>Immutable host composition. Fixtures are registered by the test host, never by production.</summary>
 internal sealed class ModuleRegistry

@@ -228,95 +228,10 @@ namespace PnP.Scanning.Core.Scanners
                 // populated during the scan, so it runs after the web-level rollups above.
                 await StorageManager.PopulatePublishingSiteSummaryAsync(dbContext, ScanId);
 
-                // Iterate over the sites to populate the classic site collection overview table
-                string lastSiteUrl = null;
-                HashSet<string> webTemplates = null;
-                HashSet<string> remediationCodes = null;
-                ClassicSiteSummary classicSiteCollection = null;
-                
-                foreach (var web in dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId).OrderBy(p => p.SiteUrl).ThenBy(p => p.WebUrl))
-                {
-                    if (lastSiteUrl == null || lastSiteUrl != web.SiteUrl)
-                    {
-                        // We're starting to process a new site collection, so store the previous one
-                        if (lastSiteUrl != null)
-                        {
-                            AddClassicSiteCollection(dbContext, webTemplates, remediationCodes, classicSiteCollection);
-                        }
-
-                        // Initialize variables for the new site collection
-                        classicSiteCollection = new ClassicSiteSummary
-                        {
-                            ScanId = ScanId,
-                            SiteUrl = web.SiteUrl,
-                        };
-
-                        lastSiteUrl = web.SiteUrl;
-                        webTemplates = new HashSet<string>();
-                        remediationCodes = new HashSet<string>();
-                    }
-
-                    if (web.WebUrl != "/")
-                    {
-                        // We're processing a subweb
-                        classicSiteCollection.SubWebCount++;
-
-                        // Check the sub web depth
-                        int depth = CountCharsUsingForeachSpan(web.WebUrl, '/');
-                        if (depth > classicSiteCollection.SubWebDepth)
-                        {
-                            classicSiteCollection.SubWebDepth = depth;
-                        }
-
-                        // maintain list of unique sub web templates
-                        webTemplates.Add(web.Template);
-
-                        if (web.LastItemUserModifiedDate > classicSiteCollection.LastItemUserModifiedDate)
-                        {
-                            classicSiteCollection.LastItemUserModifiedDate = web.LastItemUserModifiedDate;
-                        }
-                    }
-                    else
-                    {
-                        classicSiteCollection.RootWebTemplate = web.Template;
-                        classicSiteCollection.LastItemUserModifiedDate = web.LastItemUserModifiedDate;
-                    }
-
-                    classicSiteCollection.ClassicLists += web.ClassicLists;
-                    classicSiteCollection.ModernLists += web.ModernLists;
-                    
-                    classicSiteCollection.ClassicPages += web.ClassicPages;
-                    classicSiteCollection.ModernPages += web.ModernPages;
-                    classicSiteCollection.ClassicWikiPages += web.ClassicWikiPages;
-                    classicSiteCollection.ClassicASPXPages += web.ClassicASPXPages;
-                    classicSiteCollection.ClassicBlogPages += web.ClassicBlogPages;
-                    classicSiteCollection.ClassicWebPartPages += web.ClassicWebPartPages;
-                    classicSiteCollection.ClassicPublishingPages += web.ClassicPublishingPages;
-
-                    // T9: page transformation readiness rollups. The count columns sum directly; the
-                    // AvgMappingPercentage field is used here as a running SUM of page percentages
-                    // (web.AvgMappingPercentage x web.PagesWithWebParts reconstructs each web's exact
-                    // page-percentage sum because the web average is stored unrounded) and is normalized
-                    // to the site-wide weighted mean in AddClassicSiteCollection.
-                    classicSiteCollection.PagesWithWebParts += web.PagesWithWebParts;
-                    classicSiteCollection.MappableWebPartPages += web.MappableWebPartPages;
-                    classicSiteCollection.UnmappedWebPartPages += web.UnmappedWebPartPages;
-                    classicSiteCollection.UncustomizedHomePages += web.UncustomizedHomePages;
-                    classicSiteCollection.AvgMappingPercentage += web.AvgMappingPercentage * web.PagesWithWebParts;
-
-                    classicSiteCollection.ClassicWorkflows += web.ClassicWorkflows;
-
-                    classicSiteCollection.ClassicInfoPathForms += web.ClassicInfoPathForms;
-
-                    classicSiteCollection.ClassicExtensibilities += web.ClassicExtensibilities;
-                    classicSiteCollection.SharePointAddIns += web.SharePointAddIns;
-                    classicSiteCollection.AzureACSPrincipals += web.AzureACSPrincipals;
-
-                    AggregateRemediationCodes(remediationCodes, web.AggregatedRemediationCodes);
-                }
-
-                // Store the last site collection
-                AddClassicSiteCollection(dbContext, webTemplates, remediationCodes, classicSiteCollection);
+                dbContext.ClassicSiteSummaries.AddRange(ClassicPageSummaryBuilder.Sites(ScanId,
+                    dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId).ToList()
+                        .Select(Pipeline.Contracts.ClassicPageSourceJson.Convert<Pipeline.Contracts.ClassicWebSummaryRow>))
+                    .Select(Pipeline.Contracts.ClassicPageSourceJson.Convert<ClassicSiteSummary>));
 
                 // Persist the changes
                 await dbContext.SaveChangesAsync();
@@ -383,88 +298,7 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Post assessment work done");
         }
 
-        private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)
-        {
-            // All Webs can fail before producing summaries. Keep their discovery/error rows
-            // reportable without a secondary NullReferenceException during post-scan rollup.
-            if (classicSiteCollection == null) return;
-            // Get the unique list of sub web templates
-            if (webTemplates.Count > 0)
-            {
-                classicSiteCollection.SubWebTemplates = string.Join(",", webTemplates);
-            }
+        internal static SiteType GetSiteType(string webTemplate) => ClassicSiteRules.GetSiteType(webTemplate);
 
-            if (remediationCodes.Count > 0)
-            {
-                classicSiteCollection.AggregatedRemediationCodes = string.Join(",", remediationCodes);
-            }
-
-            // T9: normalize the accumulated page-percentage sum into the site-wide weighted mean.
-            if (classicSiteCollection.PagesWithWebParts > 0)
-            {
-                classicSiteCollection.AvgMappingPercentage /= classicSiteCollection.PagesWithWebParts;
-            }
-
-            // Persist the previously collected site collection data
-            dbContext.ClassicSiteSummaries.Add(classicSiteCollection);
-        }
-
-        internal static SiteType GetSiteType(string webTemplate)
-        {
-            return webTemplate.ToUpper() switch
-            {
-                // Modern Communication site or Topic Center
-                "SITEPAGEPUBLISHING#0" => SiteType.Communication,
-                // Modern team site without group
-                "STS#3" => SiteType.Modern,
-                // Modern team site with group
-                "GROUP#0" => SiteType.Modern,
-                // Microsoft Syntex Content Center
-                "CONTENTCTR#0" => SiteType.Modern,
-                // Site linked to Team channel, version 1
-                "TEAMCHANNEL#0" => SiteType.Modern,
-                // Site linked to Team channel, version 2
-                "TEAMCHANNEL#1" => SiteType.Modern,
-                // Tenant Admin Center site
-                "TENANTADMIN#0" => SiteType.Modern,
-                // Publishing portal
-                "BLANKINTERNETCONTAINER#0" => SiteType.Publishing,
-                // Publishing site
-                "CMSPUBLISHING#0" => SiteType.Publishing,
-                // Publishing site
-                "BLANKINTERNET#0" => SiteType.Publishing,
-                // Publishing site with workflow
-                "BLANKINTERNET#2" => SiteType.Publishing,
-                // Blog
-                "BLOG#0" => SiteType.Blog,
-                // Everything else
-                _ => SiteType.Classic,
-            };
-        }
-
-        private static void AggregateRemediationCodes(HashSet<string> remediationCodes, string input)
-        {
-            var split = input?.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (split != null)
-            {
-                foreach (var code in split)
-                {
-                    remediationCodes.Add(code);
-                }
-            }
-        }
-
-        private static int CountCharsUsingForeachSpan(string source, char toFind)
-        {
-            int count = 0;
-            foreach (var c in source.AsSpan())
-            {
-                if (c == toFind)
-                {
-                    count++;
-                }
-            }
-            return count;
-        }
     }
 }

@@ -385,6 +385,17 @@ namespace PnP.Scanning.Core.Services
 
                 Log.Information("Report data export started for assessment {ScanId}", scanId);
 
+                if (await pipeline.OwnsAssessmentAsync(scanId, context.CancellationToken))
+                {
+                    Guid? runId = string.IsNullOrEmpty(request.AnalysisRunId) ? null : Guid.TryParse(request.AnalysisRunId, out var parsed)
+                        ? parsed : throw new ArgumentException("A valid analysis run ID is required.");
+                    var exported = await ClassicPageReportExporter.ExportAsync(services.GetRequiredService<PnP.Scanning.Core.Storage.Pipeline.PipelineStore>(),
+                        scanId, runId, request.Path, request.Delimiter, request.Mode == ReportMode.PowerBI.ToString(), context.CancellationToken);
+                    await responseStream.WriteAsync(new ReportStatus { Status = $"Classic Page analysis {exported.RunId} exported", ReportPath = exported.Path });
+                    return;
+                }
+                if (!string.IsNullOrEmpty(request.AnalysisRunId)) throw new NotSupportedException("Legacy assessments do not have analysis run IDs.");
+
                 var dataExportPath = await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
 
                 await responseStream.WriteAsync(new ReportStatus
