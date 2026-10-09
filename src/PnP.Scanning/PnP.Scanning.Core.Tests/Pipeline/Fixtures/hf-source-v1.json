@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "moduleKey": "hf-fixture",
+  "inputVersion": "fixture/v1",
+  "records": [
+    { "id": "00000000-0000-0000-0000-000000000001", "identity": "fixture:bytes", "revision": "r1", "status": "Complete", "rawHex": "00010203ff", "error": null },
+    { "id": "00000000-0000-0000-0000-000000000002", "identity": "fixture:empty", "revision": "r1", "status": "Complete", "rawHex": "", "error": null },
+    { "id": "00000000-0000-0000-0000-000000000003", "identity": "fixture:partial", "revision": "r2", "status": "Partial", "rawHex": "1020", "error": "read stopped after two bytes" },
+    { "id": "00000000-0000-0000-0000-000000000004", "identity": "fixture:denied", "revision": "r3", "status": "Denied", "rawHex": null, "error": "403 fixture" },
+    { "id": "00000000-0000-0000-0000-000000000005", "identity": "fixture:not-attempted", "revision": null, "status": "NotAttempted", "rawHex": null, "error": "not attempted in this scope" },
+    { "id": "00000000-0000-0000-0000-000000000006", "identity": "fixture:failed", "revision": "r4", "status": "Failed", "rawHex": null, "error": "settled fixture acquisition error" }
+  ]
+}

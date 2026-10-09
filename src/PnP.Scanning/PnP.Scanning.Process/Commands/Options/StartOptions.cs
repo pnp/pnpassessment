@@ -5,6 +5,10 @@ namespace PnP.Scanning.Process.Commands
 {
     internal class StartOptions
     {
+        public string Module { get; set; }
+        public string RuleVersion { get; set; }
+        public string ParametersJson { get; set; }
+        public string AnalysisParametersJson { get; set; }
         public Mode Mode { get; set; }
 
         public string Tenant { get; set; }

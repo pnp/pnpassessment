@@ -2,7 +2,9 @@
 using Grpc.Core;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Pipeline.Orchestration;
 using Serilog;
 using System.Runtime.InteropServices;
 
@@ -13,41 +15,63 @@ namespace PnP.Scanning.Core.Services
     /// </summary>
     internal sealed class Scanner : PnPScanner.PnPScannerBase
     {        
-        private readonly ScanManager scanManager;
-        private readonly SiteEnumerationManager siteEnumerationManager;
-        private readonly ReportManager reportManager;
-        private readonly TelemetryManager telemetryManager;
+        private readonly Lazy<ScanManager> legacyScanManager;
+        private readonly IServiceProvider services;
+        private readonly PipelineCoordinator pipeline;
+        private ScanManager scanManager => legacyScanManager.Value;
+        private SiteEnumerationManager siteEnumerationManager => services.GetRequiredService<SiteEnumerationManager>();
+        private ReportManager reportManager => services.GetRequiredService<ReportManager>();
+        private TelemetryManager telemetryManager => services.GetRequiredService<TelemetryManager>();
         private readonly IHost kestrelWebServer;
-        private readonly IDataProtectionProvider dataProtectionProvider;
+        private IDataProtectionProvider dataProtectionProvider => services.GetRequiredService<IDataProtectionProvider>();
 
-        public Scanner(ScanManager siteScanManager, SiteEnumerationManager siteEnumeration, ReportManager reports, TelemetryManager telemetry, IHost host, IDataProtectionProvider provider)
+        public Scanner(PipelineCoordinator coordinator, IHost host, IServiceProvider serviceProvider)
         {
-            // Kestrel
             kestrelWebServer = host;
-            // Scan manager
-            scanManager = siteScanManager;
-            // Site enumeration
-            siteEnumerationManager = siteEnumeration;
-            // Report manager
-            reportManager = reports;
-            // Telemetry manager
-            telemetryManager = telemetry;
-            // Data Protection Manager
-            dataProtectionProvider = provider;
+            services = serviceProvider;
+            pipeline = coordinator;
+            legacyScanManager = new Lazy<ScanManager>(() => services.GetRequiredService<ScanManager>());
         }
 
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
         {
             Log.Information("Status {Message} received", request.Message);
             // Don't send telemetry event here as status is called automatically in a loop from the CLI
-            return await scanManager.GetScanStatusAsync();
+            var reply = await pipeline.StatusAsync(context.CancellationToken);
+            if (legacyScanManager.IsValueCreated) reply.Status.AddRange((await scanManager.GetScanStatusAsync()).Status);
+            return reply;
         }
 
         public override async Task<ListReply> List(ListRequest request, ServerCallContext context)
         {
             Log.Information("List request received");
-            await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.List);
-            return await scanManager.GetScanListAsync(request);
+            var reply = await pipeline.ListAsync(request, context.CancellationToken);
+            bool all = !request.Running && !request.Paused && !request.Finished && !request.Terminated;
+            var legacy = await ScanEnumerationManager.EnumerateScansFromDiskAsync(null,
+                all || request.Running, all || request.Paused, all || request.Finished, all || request.Terminated);
+            reply.Status.AddRange(legacy.Status);
+            if (legacyScanManager.IsValueCreated) await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.List);
+            return reply;
+        }
+
+        public override Task<PhaseReply> Collect(CollectRequest request, ServerCallContext context) =>
+            PipelineCallAsync(() => pipeline.CollectAsync(request, context.CancellationToken));
+
+        public override Task<PhaseReply> Analyze(AnalyzeRequest request, ServerCallContext context) =>
+            PipelineCallAsync(() => pipeline.AnalyzeAsync(request, context.CancellationToken));
+
+        public override Task<PhaseReply> StartPipeline(StartPipelineRequest request, ServerCallContext context) =>
+            PipelineCallAsync(() => pipeline.StartPipelineAsync(request, context.CancellationToken));
+
+        private static async Task<PhaseReply> PipelineCallAsync(Func<Task<PhaseReply>> action)
+        {
+            try { return await action(); }
+            catch (ArgumentException ex) { throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message)); }
+            catch (System.Text.Json.JsonException ex) { throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message)); }
+            catch (KeyNotFoundException ex) { throw new RpcException(new Status(StatusCode.NotFound, ex.Message)); }
+            catch (NotSupportedException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
+            catch (InvalidOperationException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
+            catch (Pipeline.Contracts.SnapshotIntegrityException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
         }
 
         public override async Task Pause(PauseRequest request, IServerStreamWriter<PauseStatus> responseStream, ServerCallContext context)
@@ -62,6 +86,19 @@ namespace PnP.Scanning.Core.Services
             }
             else
             {
+                if (request.All || await pipeline.OwnsAssessmentAsync(scanId, context.CancellationToken))
+                {
+                    try
+                    {
+                        await pipeline.PauseAsync(scanId, request.All, context.CancellationToken);
+                        await responseStream.WriteAsync(new PauseStatus { Status = "Pipeline phases paused at committed checkpoints" });
+                    }
+                    catch (Exception ex)
+                    {
+                        await responseStream.WriteAsync(new PauseStatus { Status = ex.Message, Type = Constants.MessageError });
+                    }
+                    if (!request.All || !legacyScanManager.IsValueCreated) return;
+                }
                 // check if the passed scan id is valid one
                 if (!request.All && !scanManager.ScanExists(scanId))
                 {
@@ -166,6 +203,21 @@ namespace PnP.Scanning.Core.Services
                 return;
             }
 
+            if (await pipeline.OwnsAssessmentAsync(scanId, context.CancellationToken))
+            {
+                try
+                {
+                    Guid? runId = string.IsNullOrWhiteSpace(request.RunId) ? null : Guid.Parse(request.RunId);
+                    var ticket = await pipeline.RestartAsync(scanId, request.Threads, runId, context.CancellationToken);
+                    await responseStream.WriteAsync(new RestartStatus { Status = $"Pipeline run {ticket.RunId} resumed with snapshot {ticket.SnapshotId} and rule {ticket.RuleVersion}" });
+                }
+                catch (Exception ex)
+                {
+                    await responseStream.WriteAsync(new RestartStatus { Status = ex.Message, Type = Constants.MessageError });
+                }
+                return;
+            }
+
             if (scanManager.ScanExists(scanId))
             {
                 await responseStream.WriteAsync(new RestartStatus
@@ -209,14 +261,26 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
+            if (!string.IsNullOrWhiteSpace(request.Id))
+            {
+                if (!Guid.TryParse(request.Id, out var id)) throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid assessment ID."));
+                if (await pipeline.OwnsAssessmentAsync(id, context.CancellationToken))
+                    await pipeline.TerminateAsync(id, context.CancellationToken);
+                else
+                {
+                    if (!scanManager.ScanExists(id)) throw new RpcException(new Status(StatusCode.NotFound, "Assessment is not running."));
+                    scanManager.CancelScan(id, false);
+                    await scanManager.SetPausingStatusAsync(id, false, Storage.ScanStatus.Terminated);
+                }
+                return new Empty();
+            }
             // Run the stop in a separate thread so that the GRPc client still gets a response
             _ = Task.Run(async () =>
             {
-                await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.Stop);
+                await pipeline.StopAsync(CancellationToken.None);
+                if (legacyScanManager.IsValueCreated) await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.Stop);
                 await kestrelWebServer.StopAsync();
             });
             return new Empty();
@@ -226,7 +290,7 @@ namespace PnP.Scanning.Core.Services
         public async override Task<PingReply> Ping(Empty request, ServerCallContext context)
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId };
+            return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId, SupportsPipeline = true };
         }
 
         public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
@@ -236,7 +300,7 @@ namespace PnP.Scanning.Core.Services
                 Log.Information("Starting Microsoft 365 Assessment");
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "Starting the Microsoft 365 Assessment"
+                    Status = "Starting the Microsoft 365 Assessment (legacy)"
                 });
 
                 // 1. Handle auth

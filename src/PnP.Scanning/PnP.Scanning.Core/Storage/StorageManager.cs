@@ -684,6 +684,9 @@ namespace PnP.Scanning.Core.Storage
         }
 
         internal async Task<ScanResultFromDatabase> GetScanResultAsync(Guid scanId)
+            => await ReadScanResultFromDiskAsync(scanId);
+
+        internal static async Task<ScanResultFromDatabase> ReadScanResultFromDiskAsync(Guid scanId)
         {
             try
             {

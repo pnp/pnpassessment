@@ -35,11 +35,14 @@ namespace PnP.Scanning.Process.Commands
             // Add some columns
             table.AddColumn(new TableColumn("Id").Centered());
             table.AddColumn(new TableColumn("Mode").Centered());
+            table.AddColumn("Path / phase");
             table.AddColumn(new TableColumn("Status").Centered());
             table.AddColumn(new TableColumn("Progress").Centered());
             table.AddColumn(new TableColumn("Retries").Centered());
             table.AddColumn(new TableColumn("Session start").Centered());
             table.AddColumn(new TableColumn("Session duration").Centered());
+            table.AddColumn("Snapshot / run / analysis");
+            table.AddColumn("Errors");
 
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Live running Microsoft 365 Assessment status. Press [yellow]ESC[/] to exit");
@@ -87,6 +90,8 @@ namespace PnP.Scanning.Process.Commands
                                         status = new Markup($"{item.Status}");
                                         procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
                                     }
+                                    if (item.ExecutionPath == "pipeline")
+                                        procent = new Markup($"{item.RecordsCompleted}/{item.RecordsTotal} records");
 
                                     //if (item.RetryingRequestAt.ToDateTime() != DateTime.MinValue)
                                     //{
@@ -104,11 +109,14 @@ namespace PnP.Scanning.Process.Commands
 
                                     table.AddRow(new Markup($"{item.Id}"),
                                                  new Markup($"{item.Mode}"),
+                                                 new Markup(Markup.Escape($"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
                                                  status,
                                                  procent,
                                                  throttling,
                                                  new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
-                                                 new Markup(item.Duration.ToTimeSpan().ToString(@"dd\:hh\:mm\:ss")));
+                                                 new Markup(item.Duration.ToTimeSpan().ToString(@"dd\:hh\:mm\:ss")),
+                                                 new Markup(Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
+                                                 new Markup(Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}")));
                                 }
                             }
                             else

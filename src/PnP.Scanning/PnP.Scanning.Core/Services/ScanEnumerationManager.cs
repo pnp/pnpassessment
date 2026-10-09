@@ -29,9 +29,13 @@ namespace PnP.Scanning.Core.Services
                 if (File.Exists(Path.Combine(scan, StorageManager.DbName)))
                 {
                     // Get status from the scan database
-                    var scanResultFromDatabase = await storageManager.GetScanResultAsync(scanId);
+                    var scanResultFromDatabase = await StorageManager.ReadScanResultFromDiskAsync(scanId);
                     if (scanResultFromDatabase != null)
                     {
+                        // Pipeline phases have their own rows, counters and recovery. Do not pass them
+                        // to legacy termination, restart or web cleanup paths.
+                        if (scanResultFromDatabase.Mode?.StartsWith("Pipeline:", StringComparison.Ordinal) == true) continue;
+                        scanResult.ExecutionPath = "legacy";
                         scanResult.Status = scanResultFromDatabase.Status.ToString();
                         scanResult.Mode = scanResultFromDatabase.Mode;
                         scanResult.ScanStarted = Timestamp.FromDateTime(scanResultFromDatabase.StartDate);
