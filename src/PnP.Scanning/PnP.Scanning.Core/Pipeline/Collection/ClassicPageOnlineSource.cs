@@ -256,10 +256,20 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         { ViewXml = query, RenderOptions = RenderListDataOptionsFlags.ListData, Paging = paging });
         token.ThrowIfCancellationRequested();
         return new(site, web, list.Id, list.Title, list.RootFolder.ServerRelativeUrl,
-            list.Items.AsRequested().Select(x => Fields(x.Values)).ToArray(),
+            list.Items.AsRequested().Select(ItemFields).ToArray(),
             response.TryGetValue("NextHref", out var next) ? next?.ToString()?.TrimStart('?') : null, SourceReadState.Complete);
     }
     internal static Dictionary<string, SourceField> Fields(IDictionary<string, object> fields) => fields.ToDictionary(x => x.Key, x => Field(x.Value), StringComparer.Ordinal);
+    internal static Dictionary<string, SourceField> ItemFields(IListItem item)
+    {
+        var fields = Fields(item.Values);
+        // RenderListDataAsStream puts ID in the modeled Id property and deliberately omits it
+        // from Values. Persist that returned identity along with the detached field values.
+        if (fields.TryGetValue("ID", out var existing) && existing.ToValue() is int fieldId && fieldId != item.Id)
+            throw new InvalidDataException("The list item's modeled ID differs from its returned ID field.");
+        fields["ID"] = SourceField.Of("Int32", item.Id);
+        return fields;
+    }
     private static SourceField Field(object? value) => value switch
     {
         null => SourceField.Of("Null", null),
