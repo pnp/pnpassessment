@@ -1,10 +1,13 @@
 # Collection and analysis foundation (H-F)
 
 H-F provides the shared execution and storage foundation for independently collecting
-source evidence and analyzing an explicitly selected snapshot. Existing assessment
-modules still use the `legacy` start path. Production registers no fixture module.
-ASPX collection, decoding, Handler rules and module report projections are subsequent
-C1–C3/A1–A4 work; passing H-F does not accept those business checkpoints or T26.
+source evidence and analyzing an explicitly selected snapshot. Classic Pages now uses
+this foundation through the production `classicpage` module; the remaining assessment
+modes retain their `legacy` start path. Production registers no fixture module.
+The [Classic Pages implementation](classicpage-collection-analysis.md) documents its
+online collection, offline analysis and run-scoped report projections. ASPX file-body
+downloads, decoding and Handler rules remain subsequent C1–C3/A1–A4 work; passing H-F
+does not accept those business checkpoints or T26.
 
 The planning definition is pinned by SHA-256
 `446e75af6788aac73c3cb93d6cc51abec4a600b43bc9efa49a9b8500f43f2bee`.
@@ -64,6 +67,7 @@ the original rule implementation. The test host alone registers `hf-fixture`.
 | `collect --module <key> <collection options>` | `Collect` | Creates an assessment and collects/seals its snapshot |
 | `analyze --id <assessment> --snapshot-id <snapshot> [--rule-version <version>]` | `Analyze` | Creates a new analysis run using exactly this sealed input |
 | `start --module <key> <collection options>` | `StartPipeline` | Collects, seals, then analyzes through the same stage services |
+| `start --mode classicpage <collection options>` | `StartPipeline` | Runs the production Classic Pages collector, offline analyzer and report finalizer |
 | `start --mode <legacy mode> <legacy options>` | Existing `Start` | Preserves the existing assessment workflow and labels it `legacy` |
 
 Collection reuses existing tenant, scope, authentication, thread and Classic options.
@@ -143,7 +147,10 @@ that historical column on `Scans` and its migration without using it at runtime.
 The historical `TestDelays` table is mapped in both Debug and Release to prevent an
 EF migration generated under Release from dropping old data. Existing Classic
 discovery, PageType selection, report files, CSV column order and counts are exercised
-against before/after exports. Report/PBIT code and assets are unchanged by H-F.
+against before/after exports. Report/PBIT code and assets are unchanged by H-F itself.
+The production Classic Pages integration adds the `ClassicPageRunReports` migration
+and selected-run report export while retaining the existing CSV column contracts and
+Classic PBIT asset. See its implementation document for that additional scope.
 
 ## Reproducible acceptance
 

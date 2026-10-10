@@ -1,6 +1,6 @@
 # Classic Pages collection and offline analysis
 
-This change builds on H-F (#168, `823e852`). It registers a production `classicpage` module, splits the existing Classic page implementation, and leaves the other scanners on their existing paths. It does not add ASPX file-body downloads, Handler analysis, or the publishing-layout rules from #166/#167.
+PR #168 includes both the [H-F foundation](collection-analysis-foundation.md), originally introduced at `823e852`, and this production `classicpage` integration. It splits the existing Classic page implementation and leaves the other scanners on their existing paths. It does not add ASPX file-body downloads, Handler analysis, or the publishing-layout rules from #166/#167.
 
 ## Commands
 
