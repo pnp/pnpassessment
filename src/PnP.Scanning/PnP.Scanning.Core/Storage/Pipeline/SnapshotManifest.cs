@@ -17,7 +17,7 @@ internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Gu
     internal static string Digest(string text) => Digest(Encoding.UTF8.GetBytes(text));
 
     internal static SnapshotManifest Build(SourceSnapshotRow snapshot,
-        IEnumerable<SourceObservationRow> observations, IEnumerable<SourceArtifactRow> artifacts)
+        IEnumerable<SourceObservationRow> observations, IEnumerable<SourceArtifactRow> artifacts, bool artifactsVerified = false)
     {
         if (snapshot.FormatVersion != 1) throw new SnapshotIntegrityException("Unsupported snapshot format version.");
         ValidatePayload(snapshot.ScopeJson, "snapshot scope");
@@ -32,7 +32,7 @@ internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Gu
             if (!byId.Remove(observation.ArtifactId, out var artifact) ||
                 artifact.ObservationId != observation.ObservationId || artifact.SnapshotId != snapshot.SnapshotId)
                 throw new SnapshotIntegrityException($"Missing or incorrectly owned artifact for {observation.ObservationId}.");
-            ValidateArtifact(artifact, observation.AcquisitionStatus);
+            if (!artifactsVerified) ValidateArtifact(artifact, observation.AcquisitionStatus);
             members.Add(new(observation.ObservationId, observation.SourceIdentity, observation.SourceRevision,
                 observation.AcquisitionStatus, observation.MetadataJson, observation.AcquisitionError,
                 artifact.ArtifactId, artifact.Length, artifact.Sha256));

@@ -11,6 +11,8 @@ internal sealed class AnalysisExecutor
         IAnalysisResultWriter writer, VersionedJson parameters, int threads, CancellationToken cancellationToken)
     {
         var snapshot = await reader.OpenAsync(cancellationToken);
+        if (module is IAnalysisSnapshotPreparation preparation)
+            await preparation.PrepareAsync(reader, cancellationToken);
         var completed = await writer.GetCompletedObservationIdsAsync(cancellationToken);
         if (completed.Any(id => !snapshot.ObservationIds.Contains(id)))
             throw new SnapshotIntegrityException("Committed results reference a record outside the selected snapshot.");

@@ -445,7 +445,7 @@ namespace PnP.Scanning.Process.Commands
                     result.ErrorMessage = "--module requires a non-empty module key";
                     return;
                 }
-                if (collectOnly || !string.IsNullOrWhiteSpace(module)) return;
+                if (collectOnly || result.GetValueForOption(modeOption) == Mode.ClassicPage || !string.IsNullOrWhiteSpace(module)) return;
                 if (string.IsNullOrWhiteSpace(result.GetValueForOption(tenantOption)))
                     result.ErrorMessage = $"Option '--{Constants.StartTenant}' is required for legacy start";
                 else if (result.GetValueForOption(applicationIdOption) == Guid.Empty)
@@ -462,6 +462,15 @@ namespace PnP.Scanning.Process.Commands
             // argument order.
             cmd.AddValidator(result =>
             {
+                if (result.GetValueForOption(modeOption) == Mode.ClassicPage)
+                {
+                    var module = result.GetValueForOption(moduleOption);
+                    if (!string.IsNullOrWhiteSpace(module) && !module.Equals("classicpage", StringComparison.OrdinalIgnoreCase))
+                    { result.ErrorMessage = "--mode classicpage requires the classicpage module."; return; }
+                    var include = result.GetValueForOption(classicIncludeOption);
+                    if (include?.Any(x => x != ClassicComponent.Pages) == true)
+                    { result.ErrorMessage = "--mode classicpage only supports the Pages component."; return; }
+                }
                 var classicOnlyOptions = new Option[]
                 {
                     classicExportWebPartPropertiesOption,
@@ -472,7 +481,7 @@ namespace PnP.Scanning.Process.Commands
                 };
                 var modeResult = result.FindResultFor(modeOption);
                 var mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
-                if (mode == Mode.Classic)
+                if (mode is Mode.Classic or Mode.ClassicPage)
                     return;
                 foreach (var opt in classicOnlyOptions)
                 {
@@ -505,7 +514,7 @@ namespace PnP.Scanning.Process.Commands
             cmd.SetHandler(async context =>
             {
                 var arguments = startBinder.Bind(context.BindingContext);
-                if (collectOnly || !string.IsNullOrWhiteSpace(arguments.Module))
+                if (collectOnly || arguments.Mode == Mode.ClassicPage || !string.IsNullOrWhiteSpace(arguments.Module))
                 {
                     context.ExitCode = await PipelineCommandHandler.RunCollectionAsync(processManager,
                         CreatePipelineRequest(arguments), collectOnly, arguments.RuleVersion, arguments.AnalysisParametersJson);
@@ -531,16 +540,17 @@ namespace PnP.Scanning.Process.Commands
                 CertPassword = arguments.CertPassword ?? "", Threads = arguments.Threads,
                 AdminCenterUrl = configurationOptions?.AdminCenterUrl ?? "", MySiteHostUrl = configurationOptions?.MySiteHostUrl ?? "",
             };
-            if (arguments.Mode == Mode.Classic)
+            if (arguments.Mode is Mode.Classic or Mode.ClassicPage)
             {
-                var components = arguments.ClassicInclude is { Count: > 0 } ? arguments.ClassicInclude :
+                var components = arguments.ClassicInclude is { Count: > 0 } ? arguments.ClassicInclude : arguments.Mode == Mode.ClassicPage
+                    ? new List<ClassicComponent> { ClassicComponent.Pages } :
                     Enum.GetValues<ClassicComponent>().Where(x => !AssessmentAvailability.IsRetired(x) &&
                         x != ClassicComponent.AzureACS && x != ClassicComponent.SharePointAddIns).ToList();
                 ClassicStartRequestBuilder.AddClassicProperties(options, components,
                     arguments.ExportWebPartProperties, arguments.SkipUsageInformation, arguments.SkipUserInformation,
                     arguments.HomePageOnly, arguments.AuditLogWindowDays);
             }
-            return new CollectRequest { Module = arguments.Module ?? arguments.Mode.ToString(),
+            return new CollectRequest { Module = arguments.Module ?? (arguments.Mode == Mode.ClassicPage ? "classicpage" : arguments.Mode.ToString()),
                 CollectionOptions = options, ParametersJson = arguments.ParametersJson ?? VersionedJson.Empty.Json };
         }
 

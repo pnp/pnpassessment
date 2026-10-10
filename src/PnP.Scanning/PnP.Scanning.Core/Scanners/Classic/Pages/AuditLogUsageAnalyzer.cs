@@ -489,7 +489,7 @@ namespace PnP.Scanning.Core.Scanners
             return (output, null);
         }
 
-        private static async Task<HttpResponseMessage> SendWithRetryAsync(
+        internal static async Task<HttpResponseMessage> SendWithRetryAsync(
             HttpClient client, Func<HttpRequestMessage> requestFactory,
             Func<CancellationToken, Task<string>> tokenProvider, CancellationToken ct)
         {

@@ -18,3 +18,26 @@ internal interface IAnalysisResultWriter
     Task<IReadOnlySet<Guid>> GetCompletedObservationIdsAsync(CancellationToken cancellationToken);
     Task WriteAsync(AnalysisResult result, CancellationToken cancellationToken);
 }
+
+internal interface IAnalysisResultReader
+{
+    Task<IReadOnlyList<AnalysisResult>> ReadAsync(CancellationToken cancellationToken);
+}
+
+internal interface IAnalysisSnapshotPreparation
+{
+    Task PrepareAsync(ISnapshotReader snapshot, CancellationToken cancellationToken);
+}
+
+internal sealed record AnalysisReportRow(string Kind, string Key, int Ordinal, VersionedJson Payload);
+
+internal interface IAnalysisReportWriter
+{
+    Task PublishAsync(IReadOnlyList<AnalysisReportRow> rows, CancellationToken cancellationToken);
+}
+
+internal interface IAnalysisFinalizer
+{
+    Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results,
+        IAnalysisReportWriter reports, VersionedJson parameters, CancellationToken cancellationToken);
+}

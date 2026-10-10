@@ -29,6 +29,7 @@ namespace PnP.Scanning.Core.Storage
         internal DbSet<Pipeline.PhaseRunRow> PhaseRuns { get; set; }
         internal DbSet<Pipeline.AnalysisRunRow> AnalysisRuns { get; set; }
         internal DbSet<Pipeline.AnalysisResultRow> AnalysisResults { get; set; }
+        internal DbSet<Pipeline.ClassicPageReportRow> ClassicPageReportRows { get; set; }
 
         // PER SCAN COMPONENT: add new tables needed to store the data for the scan component
         internal DbSet<SyntexList> SyntexLists { get; set; }

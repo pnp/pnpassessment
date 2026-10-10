@@ -92,10 +92,25 @@ internal sealed class AnalysisResultRow
     public DateTime CommittedAtUtc { get; set; }
 }
 
+internal sealed class ClassicPageReportRow
+{
+    public Guid AnalysisRunId { get; set; }
+    public string Kind { get; set; } = null!;
+    public string RowKey { get; set; } = null!;
+    public int Ordinal { get; set; }
+    public string PayloadJson { get; set; } = null!;
+}
+
 internal static class PipelineModel
 {
     internal static void Configure(ModelBuilder model)
     {
+        model.Entity<ClassicPageReportRow>(e =>
+        {
+            e.ToTable("ClassicPageReportRows");
+            e.HasKey(x => new { x.AnalysisRunId, x.Kind, x.RowKey });
+            e.HasOne<AnalysisRunRow>().WithMany().HasForeignKey(x => x.AnalysisRunId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<SourceSnapshotRow>(e =>
         {
             e.ToTable("SourceSnapshots");
