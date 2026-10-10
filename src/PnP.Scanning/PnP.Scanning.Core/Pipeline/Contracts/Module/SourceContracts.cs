@@ -21,15 +21,13 @@ internal sealed class SourceArtifact
 {
     private readonly byte[]? bytes;
 
-    internal SourceArtifact(Guid artifactId, long? length, string? sha256, byte[]? bytes)
+    internal SourceArtifact(long? length, string? sha256, byte[]? bytes)
     {
-        ArtifactId = artifactId;
         Length = length;
         Sha256 = sha256;
         this.bytes = bytes?.ToArray();
     }
 
-    public Guid ArtifactId { get; }
     public long? Length { get; }
     public string? Sha256 { get; }
     public byte[]? GetBytes() => bytes?.ToArray();

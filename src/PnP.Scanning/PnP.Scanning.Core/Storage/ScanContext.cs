@@ -25,7 +25,6 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Pipeline.SourceSnapshotRow> SourceSnapshots { get; set; }
         internal DbSet<Pipeline.SourceObservationRow> SourceObservations { get; set; }
-        internal DbSet<Pipeline.SourceArtifactRow> SourceArtifacts { get; set; }
         internal DbSet<Pipeline.PhaseRunRow> PhaseRuns { get; set; }
         internal DbSet<Pipeline.AnalysisRunRow> AnalysisRuns { get; set; }
         internal DbSet<Pipeline.AnalysisResultRow> AnalysisResults { get; set; }

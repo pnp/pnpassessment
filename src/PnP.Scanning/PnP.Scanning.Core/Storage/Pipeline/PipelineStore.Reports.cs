@@ -20,28 +20,28 @@ internal sealed partial class PipelineStore
         public async Task<IReadOnlyList<CollectedObservation>> ReadCommittedAsync(CancellationToken cancellationToken, bool metadataOnly = false)
         {
             using var db = store.CreateContext(assessmentId);
-            var rows = await db.SourceObservations.AsNoTracking().Where(x => x.SnapshotId == snapshotId)
-                .OrderBy(x => x.SourceIdentity).ToListAsync(cancellationToken);
-            var query = db.SourceArtifacts.AsNoTracking().Where(x => x.SnapshotId == snapshotId);
-            var artifacts = await (metadataOnly ? query.Select(x => new SourceArtifactRow { ArtifactId = x.ArtifactId, SnapshotId = x.SnapshotId,
-                ObservationId = x.ObservationId, Length = x.Length, Sha256 = x.Sha256 }) : query).ToDictionaryAsync(x => x.ArtifactId, cancellationToken);
+            var query = db.SourceObservations.AsNoTracking().Where(x => x.SnapshotId == snapshotId);
+            if (metadataOnly) query = query.Select(x => new SourceObservationRow
+            {
+                ObservationId = x.ObservationId, SnapshotId = x.SnapshotId, SourceIdentity = x.SourceIdentity,
+                SourceRevision = x.SourceRevision, AcquisitionStatus = x.AcquisitionStatus, MetadataJson = x.MetadataJson,
+                AcquisitionError = x.AcquisitionError, Length = x.Length, Sha256 = x.Sha256,
+            });
+            var rows = await query.OrderBy(x => x.SourceIdentity).ToListAsync(cancellationToken);
             return rows.Select(x =>
             {
-                if (!artifacts.TryGetValue(x.ArtifactId, out var artifact) || artifact.ObservationId != x.ObservationId)
-                    throw new SnapshotIntegrityException("Collection receipt has an invalid artifact reference.");
-                if (!metadataOnly) SnapshotManifest.ValidateArtifact(artifact, x.AcquisitionStatus);
+                if (!metadataOnly) SnapshotManifest.ValidateContent(x);
                 return new CollectedObservation(x.ObservationId, x.SourceIdentity, x.SourceRevision, x.AcquisitionStatus,
-                    new VersionedJson(x.MetadataJson), artifact.RawBytes?.ToArray(), x.AcquisitionError);
+                    new VersionedJson(x.MetadataJson), x.RawBytes?.ToArray(), x.AcquisitionError);
             }).ToArray();
         }
         public async Task<CollectedObservation> ReadAsync(Guid observationId, CancellationToken cancellationToken)
         {
             using var db = store.CreateContext(assessmentId);
             var row = await db.SourceObservations.AsNoTracking().SingleAsync(x => x.SnapshotId == snapshotId && x.ObservationId == observationId, cancellationToken);
-            var artifact = await db.SourceArtifacts.AsNoTracking().SingleAsync(x => x.ArtifactId == row.ArtifactId && x.ObservationId == observationId && x.SnapshotId == snapshotId, cancellationToken);
-            SnapshotManifest.ValidateArtifact(artifact, row.AcquisitionStatus);
+            SnapshotManifest.ValidateContent(row);
             return new(row.ObservationId, row.SourceIdentity, row.SourceRevision, row.AcquisitionStatus,
-                new VersionedJson(row.MetadataJson), artifact.RawBytes?.ToArray(), row.AcquisitionError);
+                new VersionedJson(row.MetadataJson), row.RawBytes?.ToArray(), row.AcquisitionError);
         }
     }
 

@@ -52,7 +52,6 @@ public sealed class LifecycleAndReanalysisTests
         {
             Assert.False((await db.SourceSnapshots.SingleAsync()).IsSealed);
             Assert.Equal(1, await db.SourceObservations.CountAsync());
-            Assert.Equal(1, await db.SourceArtifacts.CountAsync());
             Assert.Equal(0, await db.AnalysisRuns.CountAsync());
             Assert.Equal(0, await db.AnalysisResults.CountAsync());
             Assert.Equal(ScanStatus.Terminated, (await db.Scans.SingleAsync()).Status);
@@ -138,7 +137,7 @@ public sealed class LifecycleAndReanalysisTests
             Assert.Equal(1, phase.CompletedRecords);
             Assert.Equal(1, new VersionedJson(phase.CheckpointJson!).Value.GetProperty("nextIndex").GetInt32());
             Assert.False((await db.SourceSnapshots.SingleAsync()).IsSealed);
-            Assert.Equal(1, await db.SourceArtifacts.CountAsync());
+            Assert.Equal(1, await db.SourceObservations.CountAsync());
         }
         control.Release();
         await coordinator.RestartAsync(id);
@@ -220,9 +219,9 @@ public sealed class LifecycleAndReanalysisTests
         await control.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
         using (var db = data.Store.CreateContext(id))
         {
-            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceArtifacts_sealed_UPDATE");
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceObservations_sealed_UPDATE");
             var observation = FixedSource.Read()[1].ObservationId;
-            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET Length = Length + 1 WHERE ObservationId = {observation}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET Length = Length + 1 WHERE ObservationId = {observation}");
         }
         control.Release();
         Assert.Equal(ScanStatus.Terminated, await coordinator.WaitForCompletionAsync(id));

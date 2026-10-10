@@ -30,27 +30,21 @@ internal sealed partial class PipelineStore
         var previous = await db.SourceObservations.SingleOrDefaultAsync(x => x.ObservationId == item.ObservationId, token);
         if (previous != null)
         {
-            var previousArtifact = await db.SourceArtifacts.SingleAsync(x => x.ArtifactId == previous.ArtifactId, token);
             if (previous.SnapshotId != snapshotId || previous.SourceIdentity != item.SourceIdentity ||
                 previous.SourceRevision != item.SourceRevision || previous.AcquisitionStatus != item.AcquisitionStatus ||
                 previous.MetadataJson != item.Metadata.Json || previous.AcquisitionError != item.AcquisitionError ||
-                !SameBytes(previousArtifact.RawBytes, item.RawBytes))
+                !SameBytes(previous.RawBytes, item.RawBytes))
                 throw new SnapshotIntegrityException("Replay attempted to replace an existing source observation.");
-            SnapshotManifest.ValidateArtifact(previousArtifact, previous.AcquisitionStatus);
+            SnapshotManifest.ValidateContent(previous);
         }
         else
         {
-            var artifactId = Guid.NewGuid();
             var bytes = item.RawBytes?.ToArray();
             db.SourceObservations.Add(new()
             {
                 ObservationId = item.ObservationId, SnapshotId = snapshotId, SourceIdentity = item.SourceIdentity,
                 SourceRevision = item.SourceRevision, AcquisitionStatus = item.AcquisitionStatus,
-                MetadataJson = item.Metadata.Json, AcquisitionError = item.AcquisitionError, ArtifactId = artifactId,
-            });
-            db.SourceArtifacts.Add(new()
-            {
-                ArtifactId = artifactId, ObservationId = item.ObservationId, SnapshotId = snapshotId,
+                MetadataJson = item.Metadata.Json, AcquisitionError = item.AcquisitionError,
                 RawBytes = bytes, Length = bytes?.LongLength, Sha256 = bytes == null ? null : SnapshotManifest.Digest(bytes),
             });
             run.CompletedRecords++;
@@ -64,7 +58,7 @@ internal sealed partial class PipelineStore
             }
             await UpdateParentAsync(db, run, error, item.ObservationId);
         }
-        // Source, artifact, progress and the opaque collector checkpoint are one transaction.
+        // Source facts, content, progress and the collector checkpoint are one transaction.
         run.CheckpointJson = record.Checkpoint.Json;
         return true;
     }, token);
@@ -77,9 +71,8 @@ internal sealed partial class PipelineStore
             if (run.Kind != PhaseKind.Collection || run.SnapshotId != snapshotId || run.Status != ScanStatus.Running)
                 throw new InvalidOperationException("Only a running collection phase can seal its snapshot.");
             if (snapshot.IsSealed) return (await ValidateSnapshotAsync(db, snapshot, token)).Info();
-            var observations = await db.SourceObservations.AsNoTracking().Where(x => x.SnapshotId == snapshotId).ToListAsync(token);
-            var artifacts = await ReadAndValidateArtifactsAsync(db, snapshotId, observations, token);
-            var manifest = SnapshotManifest.Build(snapshot, observations, artifacts, artifactsVerified: true);
+            var observations = await ReadAndValidateObservationsAsync(db, snapshotId, token);
+            var manifest = SnapshotManifest.Build(snapshot, observations, contentVerified: true);
             if (run.CompletedRecords != observations.Count || (run.TotalRecords > 0 && run.TotalRecords != observations.Count))
                 throw new SnapshotIntegrityException("Collection progress does not match committed snapshot membership.");
             snapshot.ManifestJson = manifest.Serialize();
@@ -123,11 +116,10 @@ internal sealed partial class PipelineStore
             throw new SnapshotIntegrityException("Analysis requires an explicitly selected, sealed snapshot.");
         if (SnapshotManifest.Digest(snapshot.ManifestJson) != snapshot.ManifestDigest)
             throw new SnapshotIntegrityException("Snapshot manifest SHA-256 mismatch.");
-        var observations = await db.SourceObservations.AsNoTracking().Where(x => x.SnapshotId == snapshot.SnapshotId).ToListAsync(token);
-        var artifacts = await ReadAndValidateArtifactsAsync(db, snapshot.SnapshotId, observations, token);
-        var actual = SnapshotManifest.Build(snapshot, observations, artifacts, artifactsVerified: true);
+        var observations = await ReadAndValidateObservationsAsync(db, snapshot.SnapshotId, token);
+        var actual = SnapshotManifest.Build(snapshot, observations, contentVerified: true);
         if (actual.Serialize() != snapshot.ManifestJson || actual.MemberIds() != snapshot.MemberIdsJson)
-            throw new SnapshotIntegrityException("Snapshot membership, identity, revision or artifact reference differs from its sealed manifest.");
+            throw new SnapshotIntegrityException("Snapshot membership, identity, revision or content differs from its sealed manifest.");
         return actual;
     }
 
@@ -151,31 +143,28 @@ internal sealed partial class PipelineStore
             throw new SnapshotIntegrityException("Requested observation is not a member of the selected snapshot.");
         var observation = await db.SourceObservations.AsNoTracking().SingleOrDefaultAsync(x => x.ObservationId == observationId, token)
             ?? throw new SnapshotIntegrityException($"Missing source observation {observationId}.");
-        var artifact = await db.SourceArtifacts.AsNoTracking().SingleOrDefaultAsync(x => x.ArtifactId == observation.ArtifactId, token)
-            ?? throw new SnapshotIntegrityException($"Missing source artifact {observation.ArtifactId}.");
         // Validate the whole envelope and this record against the previously sealed member mapping.
-        var actual = SnapshotManifest.Build(snapshot, [observation], [artifact]);
+        var actual = SnapshotManifest.Build(snapshot, [observation]);
         if (manifest.FormatVersion != snapshot.FormatVersion || manifest.AssessmentId != snapshot.AssessmentId || manifest.SnapshotId != snapshot.SnapshotId ||
             manifest.ModuleKey != snapshot.ModuleKey || manifest.InputVersion != snapshot.InputVersion || manifest.ScopeJson != snapshot.ScopeJson ||
             actual.Members.Single() != expected)
             throw new SnapshotIntegrityException($"Source observation differs from sealed input: {observationId}.");
         return new(observationId, snapshot.SnapshotId, observation.SourceIdentity, observation.SourceRevision, observation.AcquisitionStatus,
-            new VersionedJson(observation.MetadataJson), new SourceArtifact(artifact.ArtifactId, artifact.Length, artifact.Sha256, artifact.RawBytes),
+            new VersionedJson(observation.MetadataJson), new SourceArtifact(observation.Length, observation.Sha256, observation.RawBytes),
             observation.AcquisitionError);
     }
 
-    private static async Task<List<SourceArtifactRow>> ReadAndValidateArtifactsAsync(ScanContext db, Guid snapshotId,
-        IReadOnlyList<SourceObservationRow> observations, CancellationToken token)
+    private static async Task<List<SourceObservationRow>> ReadAndValidateObservationsAsync(ScanContext db, Guid snapshotId, CancellationToken token)
     {
-        var statuses = observations.ToDictionary(x => x.ObservationId, x => x.AcquisitionStatus);
-        var metadata = new List<SourceArtifactRow>();
-        await foreach (var artifact in db.SourceArtifacts.AsNoTracking().Where(x => x.SnapshotId == snapshotId).AsAsyncEnumerable().WithCancellation(token))
+        var observations = new List<SourceObservationRow>();
+        await foreach (var observation in db.SourceObservations.AsNoTracking().Where(x => x.SnapshotId == snapshotId).AsAsyncEnumerable().WithCancellation(token))
         {
-            SnapshotManifest.ValidateArtifact(artifact, statuses.GetValueOrDefault(artifact.ObservationId, AcquisitionStatus.Unknown));
-            metadata.Add(new SourceArtifactRow { ArtifactId = artifact.ArtifactId, SnapshotId = artifact.SnapshotId,
-                ObservationId = artifact.ObservationId, Length = artifact.Length, Sha256 = artifact.Sha256 });
+            SnapshotManifest.ValidateContent(observation);
+            // The manifest needs only metadata; release each BLOB after checking its saved length and digest.
+            observation.RawBytes = null;
+            observations.Add(observation);
         }
-        return metadata;
+        return observations;
     }
 
     private static bool SameBytes(byte[]? first, byte[]? second) =>

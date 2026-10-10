@@ -267,11 +267,11 @@ public sealed class NativePipelineTests
         var results = await db.AnalysisResults.AsNoTracking().OrderBy(x => x.AnalysisRunId).ThenBy(x => x.ObservationId).ToListAsync();
         Assert.Equal(12, results.Count);
         Assert.Equal(8, results.Count(x => x.Outcome == AnalysisOutcome.Unknown));
-        var artifacts = await db.SourceArtifacts.AsNoTracking().OrderBy(x => x.ObservationId).ToListAsync();
+        var observations = await db.SourceObservations.AsNoTracking().OrderBy(x => x.ObservationId).ToListAsync();
         foreach (var expected in FixedSource.Read())
         {
-            var artifact = artifacts.Single(x => x.ObservationId == expected.ObservationId);
-            Assert.Equal(expected.RawBytes, artifact.RawBytes);
+            var observation = observations.Single(x => x.ObservationId == expected.ObservationId);
+            Assert.Equal(expected.RawBytes, observation.RawBytes);
             foreach (var result in results.Where(x => x.ObservationId == expected.ObservationId))
             {
                 var value = new VersionedJson(result.PayloadJson).Value;

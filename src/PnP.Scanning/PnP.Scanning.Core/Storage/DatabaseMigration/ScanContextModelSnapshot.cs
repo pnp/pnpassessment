@@ -1308,35 +1308,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("PhaseRuns", (string)null);
                 });
 
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceArtifactRow", b =>
-                {
-                    b.Property<Guid>("ArtifactId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("Length")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("ObservationId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<byte[]>("RawBytes")
-                        .HasColumnType("BLOB");
-
-                    b.Property<string>("Sha256")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("SnapshotId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ArtifactId");
-
-                    b.HasIndex("ObservationId", "SnapshotId")
-                        .IsUnique();
-
-                    b.ToTable("SourceArtifacts", (string)null);
-                });
-
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceObservationRow", b =>
                 {
                     b.Property<Guid>("ObservationId")
@@ -1350,11 +1321,17 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("ArtifactId")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("Length")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MetadataJson")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("RawBytes")
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("Sha256")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("SnapshotId")
@@ -2226,16 +2203,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .WithMany()
                         .HasForeignKey("SnapshotId", "AssessmentId")
                         .HasPrincipalKey("SnapshotId", "AssessmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceArtifactRow", b =>
-                {
-                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.SourceObservationRow", null)
-                        .WithMany()
-                        .HasForeignKey("ObservationId", "SnapshotId")
-                        .HasPrincipalKey("ObservationId", "SnapshotId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

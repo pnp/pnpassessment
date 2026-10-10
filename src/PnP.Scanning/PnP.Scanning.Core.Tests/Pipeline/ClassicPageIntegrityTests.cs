@@ -27,9 +27,9 @@ public sealed class ClassicPageIntegrityTests
         using var db = data.Store.CreateContext(id);
         var corruptedPayload = "{}";
         await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE ClassicPageReportRows SET PayloadJson = {corruptedPayload}"));
-        var artifact = await db.SourceArtifacts.FirstAsync(x => x.Length > 0);
-        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceArtifacts_sealed_UPDATE");
-        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET RawBytes = X'01' WHERE ArtifactId = {artifact.ArtifactId}");
+        var observation = await db.SourceObservations.FirstAsync(x => x.Length > 0);
+        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceObservations_sealed_UPDATE");
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET RawBytes = X'01' WHERE ObservationId = {observation.ObservationId}");
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => coordinator.AnalyzeAsync(new() { Id = ticket.AssessmentId, SnapshotId = ticket.SnapshotId }));
         var path = System.IO.Path.Combine(data.DirectoryPath, "corrupt-report");
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => ClassicPageReportExporter.ExportAsync(data.Store, id, null, path, ",", false, default));
@@ -47,14 +47,14 @@ public sealed class ClassicPageIntegrityTests
         var records = new List<SourceRecord>(); foreach (var member in manifest.ObservationIds) records.Add(await reader.ReadAsync(member, default));
         var pageIndex = records.FindIndex(x => ClassicPageSourceJson.Kind(x) == "Page"); var original = records[pageIndex];
         var input = ClassicPageSourceJson.Read<ClassicPageItemSource>(original.Artifact.GetBytes()) with { ListId = Guid.NewGuid() };
-        records[pageIndex] = original with { Artifact = new SourceArtifact(Guid.NewGuid(), null, null, ClassicPageSourceJson.Bytes(input)) };
+        records[pageIndex] = original with { Artifact = new SourceArtifact(null, null, ClassicPageSourceJson.Bytes(input)) };
         async IAsyncEnumerable<SourceRecord> Read() { foreach (var record in records) { yield return record; await Task.CompletedTask; } }
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => ClassicPageInputIndex.CreateAsync(Read(), default));
         records[pageIndex] = original;
         var scopeIndex = records.FindIndex(x => ClassicPageSourceJson.Kind(x) == "Scope"); var scopeRecord = records[scopeIndex];
         var scope = ClassicPageSourceJson.Read<ClassicPageScopeSource>(scopeRecord.Artifact.GetBytes());
         scope = scope with { Options = scope.Options with { SkipUsageInformation = false } };
-        records[scopeIndex] = scopeRecord with { Artifact = new SourceArtifact(Guid.NewGuid(), null, null, ClassicPageSourceJson.Bytes(scope)) };
+        records[scopeIndex] = scopeRecord with { Artifact = new SourceArtifact(null, null, ClassicPageSourceJson.Bytes(scope)) };
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => ClassicPageInputIndex.CreateAsync(Read(), default));
     }
 

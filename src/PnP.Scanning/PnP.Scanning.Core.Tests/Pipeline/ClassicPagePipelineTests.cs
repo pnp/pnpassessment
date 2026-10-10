@@ -90,7 +90,7 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
         using var db = data.Store.CreateContext(id);
         Assert.Equal(0, await db.AnalysisResults.CountAsync());
-        var before = await db.SourceArtifacts.AsNoTracking().OrderBy(x => x.ArtifactId).Select(x => new { x.ArtifactId, x.Sha256, x.Length }).ToArrayAsync();
+        var before = await db.SourceObservations.AsNoTracking().OrderBy(x => x.ObservationId).Select(x => new { x.ObservationId, x.Sha256, x.Length }).ToArrayAsync();
         fixture.Revision = "later"; environment.ForbidRestore = true;
         var reopened = new PipelineStore(data.DirectoryPath);
         var offline = new PipelineCoordinator(reopened, ClassicPageModule.Registry((_, _) => throw new InvalidOperationException("Online source must not be opened")), environment);
@@ -102,7 +102,7 @@ public sealed class ClassicPagePipelineTests
         }
         var first = await Analyze(); var second = await Analyze(); Assert.NotEqual(first.AnalysisRunId, second.AnalysisRunId);
         var count = await db.SourceObservations.CountAsync(); Assert.Equal(count * 2, await db.AnalysisResults.CountAsync());
-        var after = await db.SourceArtifacts.AsNoTracking().OrderBy(x => x.ArtifactId).Select(x => new { x.ArtifactId, x.Sha256, x.Length }).ToArrayAsync();
+        var after = await db.SourceObservations.AsNoTracking().OrderBy(x => x.ObservationId).Select(x => new { x.ObservationId, x.Sha256, x.Length }).ToArrayAsync();
         Assert.Equal(before, after); Assert.Equal(1, fixture.Calls["sites"]);
         var a = await ClassicPageReportExporter.ExportAsync(reopened, id, Guid.Parse(first.AnalysisRunId), System.IO.Path.Combine(data.DirectoryPath, "a"), ",", false, default);
         var b = await ClassicPageReportExporter.ExportAsync(reopened, id, Guid.Parse(second.AnalysisRunId), System.IO.Path.Combine(data.DirectoryPath, "b"), ",", false, default);

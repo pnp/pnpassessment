@@ -9,7 +9,7 @@ namespace PnP.Scanning.Core.Storage.Pipeline;
 
 internal sealed record ManifestMember(Guid ObservationId, string SourceIdentity, string? SourceRevision,
     AcquisitionStatus AcquisitionStatus, string MetadataJson, string? AcquisitionError,
-    Guid ArtifactId, long? Length, string? Sha256);
+    long? Length, string? Sha256);
 
 internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Guid SnapshotId,
     string ModuleKey, string InputVersion, string ScopeJson, IReadOnlyList<ManifestMember> Members)
@@ -18,40 +18,36 @@ internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Gu
     internal static string Digest(string text) => Digest(Encoding.UTF8.GetBytes(text));
 
     internal static SnapshotManifest Build(SourceSnapshotRow snapshot,
-        IEnumerable<SourceObservationRow> observations, IEnumerable<SourceArtifactRow> artifacts, bool artifactsVerified = false)
+        IEnumerable<SourceObservationRow> observations, bool contentVerified = false)
     {
         if (snapshot.FormatVersion != 1) throw new SnapshotIntegrityException("Unsupported snapshot format version.");
         ValidatePayload(snapshot.ScopeJson, "snapshot scope");
-        var byId = artifacts.ToDictionary(x => x.ArtifactId);
         var members = new List<ManifestMember>();
         foreach (var observation in observations.OrderBy(x => x.ObservationId))
         {
             if (observation.SnapshotId != snapshot.SnapshotId || observation.ObservationId == Guid.Empty ||
-                string.IsNullOrWhiteSpace(observation.SourceIdentity) || !Enum.IsDefined(observation.AcquisitionStatus))
+                string.IsNullOrWhiteSpace(observation.SourceIdentity) ||
+                !Enum.IsDefined(observation.AcquisitionStatus))
                 throw new SnapshotIntegrityException($"Invalid source identity for {observation.ObservationId}.");
             ValidatePayload(observation.MetadataJson, $"source metadata {observation.ObservationId}");
-            if (!byId.Remove(observation.ArtifactId, out var artifact) ||
-                artifact.ObservationId != observation.ObservationId || artifact.SnapshotId != snapshot.SnapshotId)
-                throw new SnapshotIntegrityException($"Missing or incorrectly owned artifact for {observation.ObservationId}.");
-            if (!artifactsVerified) ValidateArtifact(artifact, observation.AcquisitionStatus);
+            if (!contentVerified) ValidateContent(observation);
             members.Add(new(observation.ObservationId, observation.SourceIdentity, observation.SourceRevision,
                 observation.AcquisitionStatus, observation.MetadataJson, observation.AcquisitionError,
-                artifact.ArtifactId, artifact.Length, artifact.Sha256));
+                observation.Length, observation.Sha256));
         }
-        if (byId.Count != 0) throw new SnapshotIntegrityException("Snapshot contains unreferenced artifacts.");
         return new(snapshot.FormatVersion, snapshot.AssessmentId, snapshot.SnapshotId,
             snapshot.ModuleKey, snapshot.InputVersion, snapshot.ScopeJson, members);
     }
 
-    internal static void ValidateArtifact(SourceArtifactRow artifact, AcquisitionStatus status)
+    internal static void ValidateContent(SourceObservationRow observation)
     {
-        if (artifact.RawBytes == null)
+        if (observation.RawBytes == null)
         {
-            if (artifact.Length != null || artifact.Sha256 != null || status == AcquisitionStatus.Complete)
-                throw new SnapshotIntegrityException($"NULL artifact has inconsistent acquisition, length or digest: {artifact.ArtifactId}.");
+            if (observation.Length != null || observation.Sha256 != null || observation.AcquisitionStatus == AcquisitionStatus.Complete)
+                throw new SnapshotIntegrityException($"NULL source content has inconsistent acquisition, length or digest: {observation.ObservationId}.");
         }
-        else if (artifact.Length != artifact.RawBytes.LongLength || artifact.Sha256 != Digest(artifact.RawBytes))
-            throw new SnapshotIntegrityException($"Artifact length or SHA-256 mismatch: {artifact.ArtifactId}.");
+        else if (observation.Length != observation.RawBytes.LongLength || observation.Sha256 != Digest(observation.RawBytes))
+            throw new SnapshotIntegrityException($"Source content length or SHA-256 mismatch: {observation.ObservationId}.");
     }
 
     private static void ValidatePayload(string json, string description)

@@ -126,7 +126,6 @@ public sealed class ContractAndSnapshotTests
         Assert.Equal(info.ManifestDigest, (await reader.OpenAsync(default)).ManifestDigest);
         using var db = reopened.CreateContext(seed.Assessment);
         Assert.Equal(6, await db.SourceObservations.CountAsync());
-        Assert.Equal(6, await db.SourceArtifacts.CountAsync());
         Assert.Equal(6, await db.AnalysisResults.CountAsync());
     }
 
@@ -160,14 +159,14 @@ public sealed class ContractAndSnapshotTests
             Assert.Equal(expected.RawBytes == null ? null : FixedSource.Digest(expected.RawBytes), actual.Artifact.Sha256);
         }
         using var db = reopened.CreateContext(seed.Assessment);
-        Assert.Equal(1, await db.SourceArtifacts.CountAsync(x => x.Length == 0 && x.RawBytes != null));
-        Assert.Equal(3, await db.SourceArtifacts.CountAsync(x => x.RawBytes == null && x.Length == null && x.Sha256 == null));
+        Assert.Equal(1, await db.SourceObservations.CountAsync(x => x.Length == 0 && x.RawBytes != null));
+        Assert.Equal(3, await db.SourceObservations.CountAsync(x => x.RawBytes == null && x.Length == null && x.Sha256 == null));
         Assert.Equal(4, (await db.PhaseRuns.SingleAsync(x => x.RunId == seed.Run)).ErrorCount);
     }
 
     [Theory]
     [InlineData("missing")]
-    [InlineData("reference")]
+    [InlineData("null-content")]
     [InlineData("owner")]
     [InlineData("length")]
     [InlineData("digest")]
@@ -183,20 +182,19 @@ public sealed class ContractAndSnapshotTests
             switch (fault)
             {
                 case "missing":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM SourceArtifacts WHERE ObservationId = {id}"); break;
-                case "reference":
-                    var other = (await db.SourceArtifacts.SingleAsync(x => x.ObservationId == FixedSource.Read()[1].ObservationId)).ArtifactId;
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET ArtifactId = {other} WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM SourceObservations WHERE ObservationId = {id}"); break;
+                case "null-content":
+                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET RawBytes = NULL WHERE ObservationId = {id}"); break;
                 case "owner":
                     await db.Database.OpenConnectionAsync();
                     await db.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF");
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET ObservationId = {Guid.NewGuid()} WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET SnapshotId = {Guid.NewGuid()} WHERE ObservationId = {id}"); break;
                 case "length":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET Length = Length + 1 WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET Length = Length + 1 WHERE ObservationId = {id}"); break;
                 case "digest":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET Sha256 = 'incorrect' WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET Sha256 = 'incorrect' WHERE ObservationId = {id}"); break;
                 case "bytes":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET RawBytes = X'ffffffff00' WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET RawBytes = X'ffffffff00' WHERE ObservationId = {id}"); break;
                 case "schema":
                     await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET MetadataJson = '{{\"schemaVersion\":0,\"value\":{{}}}}' WHERE ObservationId = {id}"); break;
             }
@@ -215,7 +213,7 @@ public sealed class ContractAndSnapshotTests
     {
         using var data = new StoreCase("pipeline-transaction");
         var seed = await data.UnsealedAsync([]);
-        var interceptor = new FailArtifactCommitOnce();
+        var interceptor = new FailSourceCommitOnce();
         var store = new PipelineStore(data.DirectoryPath, id => new ScanContext(new DbContextOptionsBuilder<ScanContext>()
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = data.Store.DatabasePath(id), Pooling = false }.ToString())
             .AddInterceptors(interceptor).Options));
@@ -225,7 +223,6 @@ public sealed class ContractAndSnapshotTests
         using (var db = data.Store.CreateContext(seed.Assessment))
         {
             Assert.Equal(0, await db.SourceObservations.CountAsync());
-            Assert.Equal(0, await db.SourceArtifacts.CountAsync());
             var phase = await db.PhaseRuns.SingleAsync();
             Assert.Equal(0, phase.CompletedRecords);
             Assert.Null(phase.CheckpointJson);
@@ -235,13 +232,13 @@ public sealed class ContractAndSnapshotTests
         Assert.Single((await store.OpenSnapshotAsync(seed.Assessment, seed.Snapshot)).ObservationIds);
     }
 
-    private sealed class FailArtifactCommitOnce : DbTransactionInterceptor
+    private sealed class FailSourceCommitOnce : DbTransactionInterceptor
     {
         private bool failed;
         public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
             TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
         {
-            if (!failed && eventData.Context is ScanContext context && context.SourceArtifacts.Local.Count > 0)
+            if (!failed && eventData.Context is ScanContext context && context.SourceObservations.Local.Count > 0)
             {
                 failed = true;
                 throw new IOException("fixture interruption after SQL writes and before transaction commit");
@@ -259,7 +256,8 @@ public sealed class ContractAndSnapshotTests
         using var db = data.Store.CreateContext(seed.Assessment);
         foreach (var sql in new[]
         {
-            "UPDATE SourceArtifacts SET RawBytes = NULL", "DELETE FROM SourceArtifacts",
+            "UPDATE SourceObservations SET RawBytes = NULL", "UPDATE SourceObservations SET Length = 0",
+            "UPDATE SourceObservations SET Sha256 = 'replacement'",
             "UPDATE SourceObservations SET SourceRevision = 'replacement'", "DELETE FROM SourceObservations",
             "UPDATE SourceSnapshots SET IsSealed = 0", "DELETE FROM SourceSnapshots",
         }) await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlRawAsync(sql));
@@ -278,8 +276,8 @@ public sealed class ContractAndSnapshotTests
         await seed.Writer.SealAsync(default);
         using (var db = data.Store.CreateContext(seed.Assessment))
         {
-            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceArtifacts_sealed_UPDATE");
-            await db.Database.ExecuteSqlRawAsync("UPDATE SourceArtifacts SET Length = Length + 1 WHERE RawBytes IS NOT NULL");
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceObservations_sealed_UPDATE");
+            await db.Database.ExecuteSqlRawAsync("UPDATE SourceObservations SET Length = Length + 1 WHERE RawBytes IS NOT NULL");
         }
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => coordinator.AnalyzeAsync(request));
         using var read = data.Store.CreateContext(seed.Assessment);

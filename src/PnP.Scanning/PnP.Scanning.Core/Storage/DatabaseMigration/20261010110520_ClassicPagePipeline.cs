@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     /// <inheritdoc />
-    public partial class CollectionAnalysisFoundation : Migration
+    public partial class ClassicPagePipeline : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -98,7 +98,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     AcquisitionStatus = table.Column<string>(type: "TEXT", nullable: false),
                     MetadataJson = table.Column<string>(type: "TEXT", nullable: false),
                     AcquisitionError = table.Column<string>(type: "TEXT", nullable: true),
-                    ArtifactId = table.Column<Guid>(type: "TEXT", nullable: false)
+                    RawBytes = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    Length = table.Column<long>(type: "INTEGER", nullable: true),
+                    Sha256 = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -137,28 +139,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 });
 
             migrationBuilder.CreateTable(
-                name: "SourceArtifacts",
-                columns: table => new
-                {
-                    ArtifactId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    SnapshotId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    ObservationId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    RawBytes = table.Column<byte[]>(type: "BLOB", nullable: true),
-                    Length = table.Column<long>(type: "INTEGER", nullable: true),
-                    Sha256 = table.Column<string>(type: "TEXT", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SourceArtifacts", x => x.ArtifactId);
-                    table.ForeignKey(
-                        name: "FK_SourceArtifacts_SourceObservations_ObservationId_SnapshotId",
-                        columns: x => new { x.ObservationId, x.SnapshotId },
-                        principalTable: "SourceObservations",
-                        principalColumns: new[] { "ObservationId", "SnapshotId" },
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "AnalysisResults",
                 columns: table => new
                 {
@@ -184,6 +164,27 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         columns: x => new { x.ObservationId, x.SnapshotId },
                         principalTable: "SourceObservations",
                         principalColumns: new[] { "ObservationId", "SnapshotId" },
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClassicPageReportRows",
+                columns: table => new
+                {
+                    AnalysisRunId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Kind = table.Column<string>(type: "TEXT", nullable: false),
+                    RowKey = table.Column<string>(type: "TEXT", nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    PayloadJson = table.Column<string>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClassicPageReportRows", x => new { x.AnalysisRunId, x.Kind, x.RowKey });
+                    table.ForeignKey(
+                        name: "FK_ClassicPageReportRows_AnalysisRuns_AnalysisRunId",
+                        column: x => x.AnalysisRunId,
+                        principalTable: "AnalysisRuns",
+                        principalColumn: "AnalysisRunId",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -213,12 +214,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 columns: new[] { "SnapshotId", "AssessmentId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_SourceArtifacts_ObservationId_SnapshotId",
-                table: "SourceArtifacts",
-                columns: new[] { "ObservationId", "SnapshotId" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_SourceObservations_SnapshotId_SourceIdentity",
                 table: "SourceObservations",
                 columns: new[] { "SnapshotId", "SourceIdentity" },
@@ -230,20 +225,17 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 column: "AssessmentId");
 
             // Defense at the storage boundary, in addition to the separate module capabilities.
-            foreach (var table in new[] { "SourceObservations", "SourceArtifacts" })
+            foreach (var operation in new[] { "INSERT", "UPDATE", "DELETE" })
             {
-                foreach (var operation in new[] { "INSERT", "UPDATE", "DELETE" })
-                {
-                    var reference = operation == "DELETE" ? "OLD" : "NEW";
-                    var condition = $"EXISTS (SELECT 1 FROM SourceSnapshots WHERE SnapshotId = {reference}.SnapshotId AND IsSealed = 1)";
-                    if (operation == "UPDATE")
-                        condition += " OR EXISTS (SELECT 1 FROM SourceSnapshots WHERE SnapshotId = OLD.SnapshotId AND IsSealed = 1)";
-                    migrationBuilder.Sql($"""
-                        CREATE TRIGGER Pipeline_{table}_sealed_{operation} BEFORE {operation} ON {table}
-                        WHEN {condition}
-                        BEGIN SELECT RAISE(ABORT, 'sealed source data is immutable'); END;
-                        """);
-                }
+                var reference = operation == "DELETE" ? "OLD" : "NEW";
+                var condition = $"EXISTS (SELECT 1 FROM SourceSnapshots WHERE SnapshotId = {reference}.SnapshotId AND IsSealed = 1)";
+                if (operation == "UPDATE")
+                    condition += " OR EXISTS (SELECT 1 FROM SourceSnapshots WHERE SnapshotId = OLD.SnapshotId AND IsSealed = 1)";
+                migrationBuilder.Sql($"""
+                    CREATE TRIGGER Pipeline_SourceObservations_sealed_{operation} BEFORE {operation} ON SourceObservations
+                    WHEN {condition}
+                    BEGIN SELECT RAISE(ABORT, 'sealed source data is immutable'); END;
+                    """);
             }
             foreach (var operation in new[] { "UPDATE", "DELETE" })
             {
@@ -274,6 +266,17 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     OR OLD.CollectionOptionsJson IS NOT NEW.CollectionOptionsJson
                 BEGIN SELECT RAISE(ABORT, 'phase input and parameters are fixed at enqueue'); END;
                 """);
+            foreach (var operation in new[] { "UPDATE", "DELETE" })
+                migrationBuilder.Sql($"""
+                    CREATE TRIGGER ClassicPage_ReportRows_immutable_{operation} BEFORE {operation} ON ClassicPageReportRows
+                    BEGIN SELECT RAISE(ABORT, 'published report rows are immutable'); END;
+                    """);
+            migrationBuilder.Sql("""
+                CREATE TRIGGER ClassicPage_ReportRows_running_analysis BEFORE INSERT ON ClassicPageReportRows
+                WHEN NOT EXISTS (SELECT 1 FROM PhaseRuns WHERE RunId = NEW.AnalysisRunId AND Kind = 'Analysis' AND Status = 2)
+                BEGIN SELECT RAISE(ABORT, 'report publication requires a running analysis'); END;
+                """);
+
         }
 
         /// <inheritdoc />
@@ -283,13 +286,13 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 name: "AnalysisResults");
 
             migrationBuilder.DropTable(
-                name: "SourceArtifacts");
-
-            migrationBuilder.DropTable(
-                name: "AnalysisRuns");
+                name: "ClassicPageReportRows");
 
             migrationBuilder.DropTable(
                 name: "SourceObservations");
+
+            migrationBuilder.DropTable(
+                name: "AnalysisRuns");
 
             migrationBuilder.DropTable(
                 name: "PhaseRuns");

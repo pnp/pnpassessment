@@ -39,7 +39,7 @@ public sealed class CompatibilityTests
         using var pipelineRead = data.Store.CreateContext(pipeline.Assessment);
         Assert.Equal(ScanStatus.Running, (await pipelineRead.Scans.SingleAsync()).Status);
         Assert.Equal(ScanStatus.Running, (await pipelineRead.PhaseRuns.SingleAsync()).Status);
-        Assert.Equal(6, await pipelineRead.SourceArtifacts.CountAsync());
+        Assert.Equal(6, await pipelineRead.SourceObservations.CountAsync());
     }
 
     [Theory]
@@ -107,12 +107,11 @@ public sealed class CompatibilityTests
         Assert.Equal("Classic", (await read.Scans.SingleAsync()).CLIMode);
         Assert.Equal(0, await read.SourceSnapshots.CountAsync());
         Assert.Equal(0, await read.SourceObservations.CountAsync());
-        Assert.Equal(0, await read.SourceArtifacts.CountAsync());
         Assert.Equal(0, await read.PhaseRuns.CountAsync());
         Assert.DoesNotContain(read.Model.GetEntityTypes().SelectMany(x => x.GetProperties()), x => x.Name == "PublishingLayoutRuleVersion");
         var migrations = (await read.Database.GetAppliedMigrationsAsync()).ToArray();
         Assert.Contains(MainMigration, migrations);
-        Assert.Contains("20261009082224_CollectionAnalysisFoundation", migrations);
+        Assert.Contains("20261010110520_ClassicPagePipeline", migrations);
         Assert.Contains("20220325101514_v0.2.0", migrations);
         if (historicalColumns)
         {

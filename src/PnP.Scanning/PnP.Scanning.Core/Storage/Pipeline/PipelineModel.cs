@@ -29,14 +29,6 @@ internal sealed class SourceObservationRow
     public AcquisitionStatus AcquisitionStatus { get; set; }
     public string MetadataJson { get; set; } = null!;
     public string? AcquisitionError { get; set; }
-    public Guid ArtifactId { get; set; }
-}
-
-internal sealed class SourceArtifactRow
-{
-    public Guid ArtifactId { get; set; }
-    public Guid SnapshotId { get; set; }
-    public Guid ObservationId { get; set; }
     public byte[]? RawBytes { get; set; }
     public long? Length { get; set; }
     public string? Sha256 { get; set; }
@@ -126,14 +118,6 @@ internal static class PipelineModel
             e.HasIndex(x => new { x.SnapshotId, x.SourceIdentity }).IsUnique();
             e.Property(x => x.AcquisitionStatus).HasConversion<string>();
             e.HasOne<SourceSnapshotRow>().WithMany().HasForeignKey(x => x.SnapshotId).OnDelete(DeleteBehavior.Restrict);
-        });
-        model.Entity<SourceArtifactRow>(e =>
-        {
-            e.ToTable("SourceArtifacts");
-            e.HasKey(x => x.ArtifactId);
-            e.HasIndex(x => new { x.ObservationId, x.SnapshotId }).IsUnique();
-            e.HasOne<SourceObservationRow>().WithMany().HasForeignKey(x => new { x.ObservationId, x.SnapshotId })
-                .HasPrincipalKey(x => new { x.ObservationId, x.SnapshotId }).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<PhaseRunRow>(e =>
         {

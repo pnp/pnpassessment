@@ -142,7 +142,7 @@ internal sealed class ClassicPageCollectionModule(Func<CollectionContext, Cancel
                 if (ClassicPageSourceJson.Kind(header) is not ("Scope" or "Web" or "Discovery" or "Page" or "AuditPage" or "AuditChunk")) continue;
                 var record = await journal.ReadAsync(header.ObservationId, cancellationToken);
                 yield return new(record.ObservationId, Guid.Empty, record.SourceIdentity, record.SourceRevision, record.AcquisitionStatus,
-                    record.Metadata, new SourceArtifact(Guid.Empty, record.RawBytes?.LongLength, null, record.RawBytes), record.AcquisitionError);
+                    record.Metadata, new SourceArtifact(record.RawBytes?.LongLength, null, record.RawBytes), record.AcquisitionError);
             }
         }
         await ClassicPageInputIndex.CreateAsync(Records(), cancellationToken);
