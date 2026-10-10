@@ -111,11 +111,8 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                     Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
                     provider, operation, "folder_not_found", provider + ":" + operation,
                     DateTimeOffset.UtcNow);
-            var folders = folder.Folders.Select(child => new SharePointModeledFolder(
-                child.UniqueId.ToString("D"), child.Name, child.ServerRelativeUrl)).ToArray();
-            var files = folder.Files.Select(file => new SharePointModeledFile(
-                file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
-                file.CustomizedPageStatus.ToString())).ToArray();
+            var folders = FolderFacts(folder.Folders);
+            var files = FileFacts(folder.Files);
             var outcome = folders.Length == 0 && files.Length == 0
                 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete;
             return new(outcome, folder.UniqueId.ToString("D"), folder.ServerRelativeUrl, folders, files,
@@ -135,6 +132,18 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 provider + ":" + operation + ":" + ex.GetType().Name, DateTimeOffset.UtcNow);
         }
     }
+
+    // SDK collections implement IQueryable: projecting them directly invokes the remote
+    // query provider, which does not support changing the element type. Capture the
+    // already requested members without issuing another query or losing their identity.
+    internal static SharePointModeledFolder[] FolderFacts(IFolderCollection folders) =>
+        folders.AsRequested().Select(child => new SharePointModeledFolder(
+            child.UniqueId.ToString("D"), child.Name, child.ServerRelativeUrl)).ToArray();
+
+    internal static SharePointModeledFile[] FileFacts(IFileCollection files) =>
+        files.AsRequested().Select(file => new SharePointModeledFile(
+            file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
+            file.CustomizedPageStatus.ToString())).ToArray();
 
     public void Dispose() => context.Dispose();
 
