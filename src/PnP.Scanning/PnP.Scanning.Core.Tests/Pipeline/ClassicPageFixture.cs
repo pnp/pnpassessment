@@ -1,7 +1,13 @@
 #nullable enable
 using System.Collections.Concurrent;
-using PnP.Scanning.Core.Pipeline.Collection;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Audit;
+using PnP.Scanning.Core.Pipeline.Contracts.List;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+using PnP.Scanning.Core.Pipeline.Contracts.Site;
+using PnP.Scanning.Core.Pipeline.Contracts.Web;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;

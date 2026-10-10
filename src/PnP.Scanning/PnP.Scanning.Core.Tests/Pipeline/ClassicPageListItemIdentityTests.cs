@@ -1,8 +1,8 @@
 using System.Reflection;
 using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
-using PnP.Scanning.Core.Pipeline.Collection;
 using Xunit;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 

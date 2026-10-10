@@ -2,10 +2,10 @@
 using Microsoft.AspNetCore.DataProtection;
 using PnP.Core.Services;
 using PnP.Scanning.Core;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
-using PnP.Scanning.Core.Pipeline.Contracts;
 using PnP.Scanning.Process.Services;
 using Spectre.Console;
 using System.CommandLine;

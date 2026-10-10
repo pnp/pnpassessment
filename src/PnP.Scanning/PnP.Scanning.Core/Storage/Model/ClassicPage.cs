@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Storage

@@ -3,7 +3,7 @@ using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core.Admin.Model.SharePoint;
 using PnP.Core.Model.SharePoint;
-using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;

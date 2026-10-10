@@ -1,8 +1,9 @@
 #nullable enable
 using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Collection;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;

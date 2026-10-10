@@ -11,7 +11,7 @@
 	  <None Remove="Scanners\AddInsACS\AddInsACSAssessmentReport.pbit" />
 	  <None Remove="Scanners\Alerts\AlertsAssessmentReport.pbit" />
 	  <None Remove="Scanners\Classic\ClassicAssessmentReport.pbit" />
-	  <None Remove="Pipeline\Analysis\WebPartMapping\webpartmapping.xml" />
+	  <None Remove="Pipeline\Analysis\Page\WebPartMapping\webpartmapping.xml" />
 	  <None Remove="Scanners\InfoPath\InfoPathAssessmentReport.pbit" />
 	  <None Remove="Scanners\Syntex\SyntexAssessmentReport.pbit" />
 	  <None Remove="Scanners\Test\TestReport.pbit" />
@@ -24,7 +24,9 @@
 	  <EmbeddedResource Include="Scanners\AddInsACS\AddInsACSAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Alerts\AlertsAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Classic\ClassicAssessmentReport.pbit" />
-	  <EmbeddedResource Include="Pipeline\Analysis\WebPartMapping\webpartmapping.xml" />
+	  <EmbeddedResource Include="Pipeline\Analysis\Page\WebPartMapping\webpartmapping.xml">
+	    <LogicalName>PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping.webpartmapping.xml</LogicalName>
+	  </EmbeddedResource>
 	  <EmbeddedResource Include="Scanners\InfoPath\InfoPathAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Syntex\SyntexAssessmentReport.pbit" />
 	  <EmbeddedResource Include="Scanners\Test\TestReport.pbit" />

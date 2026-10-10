@@ -1,7 +1,8 @@
 #nullable enable
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 

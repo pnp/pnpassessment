@@ -5,7 +5,6 @@ using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using PnP.Scanning.Core.Pipeline.Contracts;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;

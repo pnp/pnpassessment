@@ -3,7 +3,9 @@ using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
-using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.Site;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+using PnP.Scanning.Core.Pipeline.Contracts.Web;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Discovery;
@@ -229,10 +231,10 @@ namespace PnP.Scanning.Core.Scanners
                 // populated during the scan, so it runs after the web-level rollups above.
                 await StorageManager.PopulatePublishingSiteSummaryAsync(dbContext, ScanId);
 
-                dbContext.ClassicSiteSummaries.AddRange(ClassicPageSummaryBuilder.Sites(ScanId,
+                dbContext.ClassicSiteSummaries.AddRange(ClassicSiteSummaryBuilder.Build(ScanId,
                     dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId).ToList()
-                        .Select(Pipeline.Contracts.ClassicPageSourceJson.Convert<Pipeline.Contracts.ClassicWebSummaryRow>))
-                    .Select(Pipeline.Contracts.ClassicPageSourceJson.Convert<ClassicSiteSummary>));
+                        .Select(Pipeline.Contracts.Shared.ClassicPageSourceJson.Convert<Pipeline.Contracts.Web.ClassicWebSummaryRow>))
+                    .Select(Pipeline.Contracts.Shared.ClassicPageSourceJson.Convert<ClassicSiteSummary>));
 
                 // Persist the changes
                 await dbContext.SaveChangesAsync();

@@ -3,7 +3,8 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;

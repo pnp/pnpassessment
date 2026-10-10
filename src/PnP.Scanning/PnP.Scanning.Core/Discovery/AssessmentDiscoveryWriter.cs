@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
+using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Storage;
-using PnP.Scanning.Core.Pipeline.Analysis;
 using System.Text.Json;
 
 namespace PnP.Scanning.Core.Discovery;
@@ -99,8 +101,8 @@ internal sealed class AssessmentDiscoveryWriter
             var allRows = await db.ClassicPageDiscoveries.AsNoTracking()
                 .Where(row => row.ScanId == scanId)
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
-            var current = Pipeline.Contracts.ClassicPageSourceJson.Convert<ClassicPageDiscovery>(ClassicPageCoverage.Create(scanId,
-                allRows.Select(Pipeline.Contracts.ClassicPageSourceJson.Convert<Pipeline.Contracts.ClassicPageDiscoveryRow>).ToArray(), DateTime.UtcNow));
+            var current = Pipeline.Contracts.Shared.ClassicPageSourceJson.Convert<ClassicPageDiscovery>(ClassicPageCoverage.Create(scanId,
+                allRows.Select(Pipeline.Contracts.Shared.ClassicPageSourceJson.Convert<Pipeline.Contracts.Page.ClassicPageDiscoveryRow>).ToArray(), DateTime.UtcNow));
             var verdict = Enum.Parse<DiscoveryVerdict>(current.DiscoveryStatus);
             var summary = await db.ClassicPageDiscoveries.FindAsync(
                 new object[] { scanId, "summary:coverage" }, cancellationToken).ConfigureAwait(false);

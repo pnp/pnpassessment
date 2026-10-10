@@ -1,12 +1,14 @@
 ﻿using EFCore.BulkExtensions;
-using PnP.Scanning.Core.Pipeline.Analysis;
-using PnP.Scanning.Core.Pipeline.Collection;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core;
 using PnP.Core.Services;
+using PnP.Scanning.Core.Pipeline.Analysis.Audit;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
+using PnP.Scanning.Core.Pipeline.Analysis.Site;
+using PnP.Scanning.Core.Pipeline.Collection.Audit.Legacy;
 using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 using PnP.Scanning.Core.Services;
 using Serilog;
 

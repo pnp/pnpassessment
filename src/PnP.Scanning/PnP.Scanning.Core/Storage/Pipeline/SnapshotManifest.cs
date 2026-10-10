@@ -2,7 +2,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 

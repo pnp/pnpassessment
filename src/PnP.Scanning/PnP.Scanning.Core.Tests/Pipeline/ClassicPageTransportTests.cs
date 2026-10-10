@@ -2,8 +2,13 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using PnP.Scanning.Core.Pipeline.Collection;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Collection.Audit;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
+using PnP.Scanning.Core.Pipeline.Collection.Page;
+using PnP.Scanning.Core.Pipeline.Collection.Shared;
+using PnP.Scanning.Core.Pipeline.Contracts.Audit;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Discovery;
 using Xunit;

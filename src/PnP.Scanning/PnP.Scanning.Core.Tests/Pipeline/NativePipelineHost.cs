@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using AuthenticationManager = PnP.Scanning.Core.Authentication.AuthenticationManager;
-using PnP.Scanning.Core.Pipeline.Collection;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage.Pipeline;

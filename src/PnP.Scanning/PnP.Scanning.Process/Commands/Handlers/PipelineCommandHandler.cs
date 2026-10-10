@@ -1,6 +1,6 @@
 using Google.Protobuf;
 using Grpc.Core;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
 using System.CommandLine;

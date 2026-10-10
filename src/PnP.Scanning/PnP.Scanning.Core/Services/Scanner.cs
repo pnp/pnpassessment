@@ -71,7 +71,7 @@ namespace PnP.Scanning.Core.Services
             catch (KeyNotFoundException ex) { throw new RpcException(new Status(StatusCode.NotFound, ex.Message)); }
             catch (NotSupportedException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
             catch (InvalidOperationException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
-            catch (Pipeline.Contracts.SnapshotIntegrityException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
+            catch (Pipeline.Contracts.Module.SnapshotIntegrityException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
         }
 
         public override async Task Pause(PauseRequest request, IServerStreamWriter<PauseStatus> responseStream, ServerCallContext context)

@@ -1,5 +1,5 @@
 ﻿using FluentAssertions;
-using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;

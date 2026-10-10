@@ -1,6 +1,6 @@
 #nullable enable
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
