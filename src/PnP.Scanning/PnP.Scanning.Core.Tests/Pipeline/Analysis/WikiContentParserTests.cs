@@ -1,9 +1,9 @@
 ﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners.Pages
+namespace PnP.Scanning.Core.Tests.Pipeline.Analysis
 {
     /// <summary>
     /// T5 — the pure (no CSOM) wiki-HTML parser. These tests feed it captured <c>WikiField</c> HTML and

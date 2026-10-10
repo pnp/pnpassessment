@@ -1,6 +1,6 @@
 ﻿using System.Xml.Serialization;
 
-namespace PnP.Scanning.Core.Scanners.WebPartMapping
+namespace PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping
 {
     /// <summary>
     /// Loads the embedded <c>webpartmapping.xml</c> and answers whether a given classic web part
@@ -14,7 +14,7 @@ namespace PnP.Scanning.Core.Scanners.WebPartMapping
         // Fully qualified name of the embedded webpartmapping.xml resource. Folder separators map to
         // dots off the assembly's default namespace (PnP.Scanning.Core), mirroring how the Workflow
         // scanner references its embedded sp2013wfmodel.xml.
-        private const string EmbeddedMappingResource = "PnP.Scanning.Core.Scanners.Classic.WebPartMapping.webpartmapping.xml";
+        private const string EmbeddedMappingResource = "PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping.webpartmapping.xml";
 
         // Web parts whose community mappings are dropped when loading the embedded model: we are not
         // sure the community mapping will be used, matching the legacy behaviour where these were

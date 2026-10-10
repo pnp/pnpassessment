@@ -1,4 +1,4 @@
-﻿namespace PnP.Scanning.Core.Scanners
+﻿namespace PnP.Scanning.Core.Pipeline.Analysis
 {
     internal enum SiteType
     {

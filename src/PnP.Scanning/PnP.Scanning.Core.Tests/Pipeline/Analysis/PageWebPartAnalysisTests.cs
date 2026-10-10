@@ -1,19 +1,14 @@
 ﻿using System.Collections.Generic;
 using FluentAssertions;
 using Microsoft.SharePoint.Client;
-using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Collection;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners.Pages
+namespace PnP.Scanning.Core.Tests.Pipeline.Analysis
 {
-    /// <summary>
-    /// T5b — the CSOM-free sub-logic the publishing-page (and web-part-page) extraction relies on:
-    /// determining a web part's type from its exported XML or, when it cannot be exported, from its
-    /// property signature. The <c>LimitedWebPartManager</c> round-trip in
-    /// <c>PageWebPartExtractor.ExtractFromPublishingPageAsync</c> is CSOM-only and is exercised by the
-    /// integration test (T15), not here.
-    /// </summary>
-    public class PageWebPartExtractorTests
+    /// <summary>Tests web part type inference and layout names from captured field values.</summary>
+    public class PageWebPartAnalysisTests
     {
         [Theory]
         // ScriptEditor is detected purely by the presence of a "Content" property.
@@ -32,7 +27,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
                 properties.Add(name, "value");
             }
 
-            var type = PageWebPartExtractor.GetTypeFromProperties(properties);
+            var type = PageWebPartAnalysis.GetTypeFromProperties(properties);
 
             type.Should().Contain(expectedTypeFragment);
         }
@@ -45,7 +40,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
                 { "SomeRandomProperty", "value" },
             };
 
-            var type = PageWebPartExtractor.GetTypeFromProperties(properties);
+            var type = PageWebPartAnalysis.GetTypeFromProperties(properties);
 
             type.Should().Be("Unsupported Web Part Type");
         }
@@ -63,7 +58,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
               </webPart>
             </webParts>";
 
-            var type = PageWebPartExtractor.GetTypeFromXml(v3Xml);
+            var type = PageWebPartAnalysis.GetTypeFromXml(v3Xml);
 
             type.Should().Be("Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c");
         }
@@ -78,7 +73,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
               <TypeName>Microsoft.SharePoint.WebPartPages.ContentEditorWebPart</TypeName>
             </WebPart>";
 
-            var type = PageWebPartExtractor.GetTypeFromXml(v2Xml);
+            var type = PageWebPartAnalysis.GetTypeFromXml(v2Xml);
 
             type.Should().Be("Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c");
         }
@@ -88,10 +83,10 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         [InlineData("")]
         public void GetTypeFromXml_EmptyXml_ReturnsUnknown(string xml)
         {
-            PageWebPartExtractor.GetTypeFromXml(xml).Should().Be("Unknown");
+            PageWebPartAnalysis.GetTypeFromXml(xml).Should().Be("Unknown");
         }
 
-        // --- T7: publishing page layout name (parity with the legacy PublishingAnalyzer) -----------------
+        // Publishing layout names come from the captured URL field description.
 
         [Fact]
         public void GetPublishingPageLayoutName_UrlFieldDescription_ReturnsLayoutName()
@@ -103,7 +98,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
                 { "PublishingPageLayout", new FieldUrlValue { Url = "/_catalogs/masterpage/ArticleLeft.aspx", Description = "ArticleLeft" } },
             };
 
-            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().Be("ArticleLeft");
+            PageLayoutDetector.GetPublishingPageLayoutName(ClassicPageOnlineSource.Fields(fieldValues)).Should().Be("ArticleLeft");
         }
 
         [Fact]
@@ -114,7 +109,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
                 { "SomeOtherField", "value" },
             };
 
-            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+            PageLayoutDetector.GetPublishingPageLayoutName(ClassicPageOnlineSource.Fields(fieldValues)).Should().BeEmpty();
         }
 
         [Fact]
@@ -125,7 +120,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
                 { "PublishingPageLayout", null },
             };
 
-            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+            PageLayoutDetector.GetPublishingPageLayoutName(ClassicPageOnlineSource.Fields(fieldValues)).Should().BeEmpty();
         }
 
         [Fact]
@@ -137,13 +132,13 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
                 { "PublishingPageLayout", new FieldUrlValue { Url = "/_catalogs/masterpage/ArticleLeft.aspx", Description = "" } },
             };
 
-            PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+            PageLayoutDetector.GetPublishingPageLayoutName(ClassicPageOnlineSource.Fields(fieldValues)).Should().BeEmpty();
         }
 
         [Fact]
         public void GetPublishingPageLayoutName_NullFieldValues_ReturnsEmpty()
         {
-            PageWebPartExtractor.GetPublishingPageLayoutName(null).Should().BeEmpty();
+            PageLayoutDetector.GetPublishingPageLayoutName(null).Should().BeEmpty();
         }
     }
 }

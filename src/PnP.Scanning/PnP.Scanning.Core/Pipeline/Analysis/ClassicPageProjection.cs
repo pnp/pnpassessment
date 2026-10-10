@@ -5,8 +5,7 @@ using ClassicPageWebPart = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageWebPa
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PnP.Scanning.Core.Pipeline.Contracts;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 
 
 namespace PnP.Scanning.Core.Pipeline.Analysis;
@@ -21,7 +20,7 @@ internal static class ClassicPageProjection
     {
         // The analysis mutates only a detached projection, never the source facts.
         var row = JsonSerializer.Deserialize<ClassicPageDiscovery>(JsonSerializer.Serialize(discovered))!;
-        row.HomePage = web.WelcomePageState.Succeeded ? HomePageDetector.IsHomePage(row.Url, web.WelcomePage) : row.HomePage;
+        row.HomePage = HomePageDetector.ResolveHomePageState(row.Url, web.WelcomePage, web.WelcomePageState.Succeeded, row.HomePage);
         if (options.HomePageOnly && row.HomePage != true)
         { row.AssessmentStatus = "NotSelected"; return new(null, [], row, false); }
         if (row.ListId == null || row.ListItemId == null)
@@ -47,7 +46,7 @@ internal static class ClassicPageProjection
             PageName = !string.IsNullOrEmpty(name) ? name : Path.GetFileNameWithoutExtension(url),
             ListId = source.ListId ?? Guid.Empty, ListTitle = source.ListTitle, ListUrl = source.ListUrl,
             ModifiedAt = source.Fields.TryGetValue("Modified", out var modified) && modified.ToValue() is DateTime date ? date : default,
-            ModifiedBy = options.SkipUserInformation ? null : ModifiedBy(source.Fields), PageType = type, HomePage = row.HomePage,
+            ModifiedBy = ModifiedBy(source.Fields, options.SkipUserInformation), PageType = type, HomePage = row.HomePage,
             SiteCollectionId = row.SiteCollectionId, WebId = row.WebId, FileUniqueId = row.FileUniqueId, ListItemId = row.ListItemId,
             DiscoveryStatus = row.DiscoveryStatus, AssessmentStatus = row.AssessmentStatus,
             RemediationCode = type switch { ClassicPageRules.WebPartPage => "CP1", ClassicPageRules.WikiPage => "CP2",
@@ -101,8 +100,9 @@ internal static class ClassicPageProjection
             source.Fields.GetValueOrDefault("WikiField")?.Text,
             parts.Select(x => new WebPartEntity { Type = x.WebPartType }).ToArray(), source.ContentTypeDisplayFormTemplateName);
     }
-    internal static string? ModifiedBy(Dictionary<string, SourceField> fields)
+    internal static string? ModifiedBy(Dictionary<string, SourceField> fields, bool skipUserInformation = false)
     {
+        if (skipUserInformation) return null;
         if (!fields.TryGetValue("Editor", out var field) || field.Type != "User" || field.Value.ValueKind != JsonValueKind.Object) return null;
         var email = field.Value.TryGetProperty("Email", out var e) ? e.GetString() : null;
         return !string.IsNullOrEmpty(email) ? email : field.Value.TryGetProperty("LookupValue", out var lookup) ? lookup.GetString() : null;

@@ -10,6 +10,7 @@ using PnP.Core.QueryModel;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Pipeline.Contracts;
+using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -198,12 +199,9 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         if (page.ListId == null || page.ListItemId == null) return EmptyPage(web, page, SourceReadState.NotAttempted);
         var list = pnp.Web.Lists.AsRequested().FirstOrDefault(x => x.Id == page.ListId);
         if (list == null) return EmptyPage(web, page, new("NotReturned", "The discovered owning list was not returned."));
-        var batch = await LoadBatchAsync(list, PageScanComponent.PageQuery(new() { "WikiField", "HTML_x0020_File_x0020_Type", "ClientSideApplicationId" },
-            false, page.ListItemId.Value, skipUsers), null, token);
-        if (batch.Items.Length != 1 || !batch.Items[0].TryGetValue("ID", out var id) || id.Text != page.ListItemId.Value.ToString())
-            return EmptyPage(web, page, new("NotReturned", "The discovered list item was not returned uniquely."));
-        var fields = batch.Items[0];
-        ClassicPageRules.ResolvePhysicalPageUrl(fields.ToDictionary(x => x.Key, x => x.Value.ToValue()), page.Url);
+        var metadata = await ReadPageMetadataAsync(list, page, skipUsers, token);
+        if (!metadata.MetadataState.Succeeded) return metadata;
+        var fields = metadata.Fields;
         var type = SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(fields.GetValueOrDefault("ContentTypeId")?.Text ?? page.ContentTypeId)
             ? ClassicPageRules.PublishingPage : ClassicPageRules.GetPageType(fields.ToDictionary(x => x.Key, x => x.Value.ToValue()));
         var properties = new Dictionary<string, SourceField>();
@@ -233,8 +231,29 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             catch (Exception error) when (!token.IsCancellationRequested) { fallback = Failure(error); }
         }
         token.ThrowIfCancellationRequested();
-        return new(web.SiteUrl, web.WebUrl, page.RecordKey, list.Id, list.Title, list.RootFolder.ServerRelativeUrl, fields,
-            properties, parts, SourceReadState.Complete, partsState, display, fallback);
+        return metadata with { FileProperties = properties, WebParts = parts, WebPartsState = partsState,
+            ContentTypeDisplayFormTemplateName = display, HomeFallbackState = fallback };
+    }
+
+    internal static async Task<ClassicPageItemSource> ReadPageMetadataAsync(SdkList list, ClassicPageDiscovery page,
+        bool skipUsers, CancellationToken token)
+    {
+        if (page.ListId != list.Id || page.ListItemId == null || page.ListItemId <= 0)
+            throw new InvalidDataException("Physical page metadata requires its discovered list and list-item identity.");
+
+        var batch = await LoadBatchAsync(list, ClassicPageQuery.Create(new() { "WikiField", "HTML_x0020_File_x0020_Type", "ClientSideApplicationId" },
+            false, page.ListItemId.Value, skipUsers), null, token, page.SiteUrl, page.WebUrl);
+        var state = SourceReadState.Complete;
+        var fields = new Dictionary<string, SourceField>();
+        if (batch.Items.Length != 1 || batch.NextPage != null || !batch.Items[0].TryGetValue("ID", out var id) || id.Text != page.ListItemId.Value.ToString())
+            state = new("NotReturned", "The discovered list item was not returned uniquely.");
+        else
+        {
+            fields = batch.Items[0];
+            ClassicPageRules.ResolvePhysicalPageUrl(fields.ToDictionary(x => x.Key, x => x.Value.ToValue()), page.Url);
+        }
+        return new(page.SiteUrl, page.WebUrl, page.RecordKey, batch.ListId, batch.ListTitle, batch.ListUrl, fields,
+            new(), [], state, SourceReadState.NotAttempted, null, SourceReadState.NotAttempted);
     }
 
     internal static ClassicPageItemSource EmptyPage(ClassicPageWebSource web, ClassicPageDiscovery page, SourceReadState state) =>
@@ -245,7 +264,7 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
     {
         using var pnp = await OpenAsync(web.SiteUrl, web.WebUrl, token);
         var list = pnp.Web.Lists.AsRequested().FirstOrDefault(x => x.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.Posts);
-        return list == null ? null : await LoadBatchAsync(list, PageScanComponent.PageQuery(new(), false, null, skipUsers), paging, token, web.SiteUrl, web.WebUrl);
+        return list == null ? null : await LoadBatchAsync(list, ClassicPageQuery.Create(new(), false, null, skipUsers), paging, token, web.SiteUrl, web.WebUrl);
     }
 
     internal static async Task<ClassicPageBlogBatchSource> LoadBatchAsync(SdkList list, string query, string? paging, CancellationToken token,

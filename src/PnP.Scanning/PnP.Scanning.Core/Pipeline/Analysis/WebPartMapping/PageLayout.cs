@@ -1,4 +1,4 @@
-﻿﻿namespace PnP.Scanning.Core.Scanners.WebPartMapping
+﻿﻿namespace PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping
 {
     /// <summary>
     /// Possible layouts used by wiki or webpart pages.

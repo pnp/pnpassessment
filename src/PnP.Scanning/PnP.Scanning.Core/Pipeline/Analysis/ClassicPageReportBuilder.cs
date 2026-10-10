@@ -10,8 +10,7 @@ using Web = PnP.Scanning.Core.Pipeline.Contracts.WebRow;
 using System.Text.Json;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Pipeline.Contracts;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 
 
 namespace PnP.Scanning.Core.Pipeline.Analysis;
@@ -114,25 +113,26 @@ internal static class ClassicPageReportBuilder
         var status = succeeded == chunks.Length && chunks.Length > 0 ? "succeeded" : succeeded > 0 ? "partial"
             : chunks.All(x => x.Status == "skipped") ? "skipped" : "failed";
         var reason = string.Join("; ", chunks.Where(x => x.Error != null).OrderBy(x => x.Chunk).Select(x => x.Error));
-        var merged = inputs.GroupBy(x => x.PageUrl, StringComparer.OrdinalIgnoreCase).Select(group => new ClassicAuditPageStats(group.Key,
-            group.Sum(x => x.Views), group.Sum(x => x.Creates), group.Sum(x => x.Edits), group.SelectMany(x => x.UserHashes).Distinct().Take(10_000).ToArray())).ToArray();
+        var merged = inputs.GroupBy(x => x.PageUrl, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key,
+            group => new ClassicPageAuditAnalysis.AuditPageStats(group.Sum(x => x.Views), group.Sum(x => x.Creates),
+                group.Sum(x => x.Edits), group.SelectMany(x => x.UserHashes).Distinct().Take(10_000).Count()), StringComparer.OrdinalIgnoreCase);
         var sites = scope.Sites.OrderByDescending(x => x.Length).ToArray();
         var result = new List<ClassicPageAuditUsage>();
         foreach (var site in scope.Sites)
         {
-            var stats = merged.Where(x => sites.FirstOrDefault(s => x.PageUrl.StartsWith(s.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase)
-                || x.PageUrl.Equals(s, StringComparison.OrdinalIgnoreCase)) == site).ToArray();
+            var stats = merged.Where(x => sites.FirstOrDefault(s => x.Key.StartsWith(s.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase)
+                || x.Key.Equals(s, StringComparison.OrdinalIgnoreCase)) == site).ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
             string Relative(string absolute) { var origin = new Uri(site).GetLeftPart(UriPartial.Authority); var path = absolute.StartsWith(origin, StringComparison.OrdinalIgnoreCase) ? absolute[origin.Length..] : absolute; return path.Length == 0 ? "/" : path; }
             ClassicPageAuditUsage Row(string url) => new() { ScanId = assessmentId, SiteUrl = site, WebUrl = "/", PageUrl = Relative(url),
                 AuditWindowStart = scope.AuditWindowStart, AuditWindowEnd = scope.AuditWindowEnd, QueryStatus = status, SkipReason = string.IsNullOrEmpty(reason) ? null : reason };
             foreach (var value in stats)
             {
-                var row = Row(value.PageUrl); row.AuditViewsCount = value.Views; row.AuditCreatesCount = value.Creates;
-                row.AuditEditsCount = value.Edits; row.AuditUniqueUsers = value.UserHashes.Length;
+                var row = Row(value.Key);
+                ClassicPageAuditAnalysis.ApplyAuditUsage(row, stats, value.Key);
                 if (status != "partial") row.SkipReason = null;
                 result.Add(row);
             }
-            if (stats.Length == 0 || status == "partial") result.Add(Row(site));
+            if (stats.Count == 0 || status == "partial") result.Add(Row(site));
         }
         return result;
     }

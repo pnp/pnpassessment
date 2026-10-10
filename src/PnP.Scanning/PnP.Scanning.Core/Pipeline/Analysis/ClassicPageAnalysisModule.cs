@@ -3,8 +3,7 @@ using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageRow;
 using System.Text.Json;
 using System.Security.Cryptography;
 using PnP.Scanning.Core.Pipeline.Contracts;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 
 
 namespace PnP.Scanning.Core.Pipeline.Analysis;
@@ -73,31 +72,4 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
     public Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results, IAnalysisReportWriter reports,
         VersionedJson parameters, CancellationToken cancellationToken) =>
         ClassicPageReportBuilder.PublishAsync(assessmentId, index, mapping, results, reports, cancellationToken);
-}
-
-internal sealed record ClassicAuditPageStats(string PageUrl, int Views, int Creates, int Edits, string[] UserHashes);
-
-internal static class ClassicPageAuditAnalysis
-{
-    internal static ClassicAuditPageStats[] Parse(string body)
-    {
-        using var doc = JsonDocument.Parse(body);
-        if (!doc.RootElement.TryGetProperty("value", out var values) || values.ValueKind != JsonValueKind.Array)
-            throw new SnapshotIntegrityException("Succeeded audit query has no records array.");
-        var results = new Dictionary<string, (int Views, int Creates, int Edits, HashSet<string> Users)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var record in values.EnumerateArray())
-        {
-            if (!record.TryGetProperty("operation", out var operation) || !record.TryGetProperty("objectId", out var objectId)) continue;
-            var url = objectId.GetString(); var op = operation.GetString();
-            if (string.IsNullOrEmpty(url) || !url.EndsWith(".aspx", StringComparison.OrdinalIgnoreCase)) continue;
-            if (!results.TryGetValue(url, out var value)) value = (0, 0, 0, new(StringComparer.Ordinal));
-            if (record.TryGetProperty("userId", out var user) && !string.IsNullOrEmpty(user.GetString()) && value.Users.Count < 10_000)
-                value.Users.Add(Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(user.GetString()!.ToUpperInvariant()))));
-            results[url] = (value.Views + (string.Equals(op, "ClassicPageViewed", StringComparison.OrdinalIgnoreCase) ? 1 : 0),
-                value.Creates + (string.Equals(op, "ClassicPageCreated", StringComparison.OrdinalIgnoreCase) ? 1 : 0),
-                value.Edits + (string.Equals(op, "ClassicPageEdited", StringComparison.OrdinalIgnoreCase) ? 1 : 0), value.Users);
-        }
-        return results.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(x => new ClassicAuditPageStats(x.Key, x.Value.Views, x.Value.Creates, x.Value.Edits, x.Value.Users.OrderBy(y => y, StringComparer.Ordinal).ToArray())).ToArray();
-    }
 }

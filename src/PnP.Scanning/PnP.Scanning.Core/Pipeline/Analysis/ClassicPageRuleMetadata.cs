@@ -11,7 +11,7 @@ internal static class ClassicPageRuleMetadata
     {
         get
         {
-            using var resource = typeof(ClassicPageRuleMetadata).Assembly.GetManifestResourceStream("PnP.Scanning.Core.Scanners.Classic.WebPartMapping.webpartmapping.xml")
+            using var resource = typeof(ClassicPageRuleMetadata).Assembly.GetManifestResourceStream("PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping.webpartmapping.xml")
                 ?? throw new InvalidOperationException("The pinned mapping resource is unavailable.");
             return Convert.ToHexString(SHA256.HashData(resource)).ToLowerInvariant();
         }

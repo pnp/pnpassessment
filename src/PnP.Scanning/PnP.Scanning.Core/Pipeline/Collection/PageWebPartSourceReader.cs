@@ -2,7 +2,7 @@
 using Microsoft.SharePoint.Client;
 using Microsoft.SharePoint.Client.WebParts;
 using PnP.Scanning.Core.Pipeline.Contracts;
-using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Pipeline.Analysis;
 
 namespace PnP.Scanning.Core.Pipeline.Collection;
 

@@ -2,9 +2,11 @@
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Contracts;
+using System.Text.Json;
 
-namespace PnP.Scanning.Core.Scanners
+namespace PnP.Scanning.Core.Pipeline.Analysis
 {
     /// <summary>
     /// Derives the <see cref="PageLayout"/> of a classic page from its structure, and renders that layout
@@ -15,20 +17,29 @@ namespace PnP.Scanning.Core.Scanners
     /// span plus a column-count fallback). Ported from <c>WikiPage.GetLayout</c>; pure, no CSOM.</description></item>
     /// <item><description><b>Web part pages</b> — derived from the page file's <c>vti_setuppath</c>
     /// property. Ported from <c>WebPartPage.GetLayout</c>; the pure string→layout mapping lives here so it
-    /// is unit-testable (the CSOM property read stays in <see cref="PageWebPartExtractor"/>).</description></item>
+    /// is unit-testable using the captured file properties.</description></item>
     /// </list>
     /// The string form matches the legacy page CSV: the enum name with the <c>Wiki_</c> / <c>WebPart_</c>
     /// prefix stripped (e.g. <c>Wiki_TwoColumns</c> → <c>TwoColumns</c>, <c>WebPart_Custom</c> →
     /// <c>Custom</c>).
     /// <para>
-    /// <b>Publishing pages</b> are handled differently and not here: the legacy <c>PublishingAnalyzer</c>
+    /// <b>Publishing pages</b> are handled differently: the legacy <c>PublishingAnalyzer</c>
     /// records the actual page layout <i>name</i> (e.g. <c>ArticleLeft</c>) from the page's
     /// <c>PublishingPageLayout</c> field, not a derived <see cref="PageLayout"/> enum value. That field read
-    /// lives in <see cref="PageWebPartExtractor.GetPublishingPageLayoutName"/>.
+    /// is captured during collection and read by <see cref="GetPublishingPageLayoutName"/>.
     /// </para>
     /// </summary>
     internal static class PageLayoutDetector
     {
+        internal static string GetPublishingPageLayoutName(IReadOnlyDictionary<string, SourceField> fieldValues)
+        {
+            if (fieldValues == null || !fieldValues.TryGetValue("PublishingPageLayout", out var field) ||
+                field?.Type != "Url" || field.Value.ValueKind != JsonValueKind.Object)
+                return "";
+            return field.Value.TryGetProperty("Description", out var description) && description.ValueKind == JsonValueKind.String
+                ? description.GetString() ?? "" : "";
+        }
+
         /// <summary>
         /// Detects the wiki page layout from its <c>WikiField</c> HTML. An empty/whitespace page is a
         /// one-column layout (parity with the legacy scanner). Ported verbatim from

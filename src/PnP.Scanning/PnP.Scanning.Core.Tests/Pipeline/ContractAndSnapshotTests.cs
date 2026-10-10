@@ -21,11 +21,10 @@ public sealed class ContractAndSnapshotTests
     [Fact]
     public void Analysis_signatures_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
-        // Reused page parsers/mapping models are pure domain code. Include their IL and signatures
-        // in the audit rather than allowing an uninspected namespace exception.
-        bool PurePageType(Type type) => type.Namespace == "PnP.Scanning.Core.Scanners.WebPartMapping" ||
-            type.Namespace == "PnP.Scanning.Core.Scanners" && new[] { "WikiContentParser", "WikiContentParseResult", "WikiWebPartPlaceholder", "HomePageDetector", "PageLayoutDetector", "SiteType" }.Contains(type.Name.Split('+')[0]) ||
-            type.Namespace == "PnP.Scanning.Core.Discovery" && new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(type.Name);
+        // Pure page rules and mapping models now belong to Analysis. Only the shared,
+        // offline discovery value types are included from outside the pipeline modules.
+        bool PurePageType(Type type) => type.Namespace == "PnP.Scanning.Core.Discovery" &&
+            new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(type.Name);
         var types = typeof(AnalysisExecutor).Assembly.GetTypes().Where(x =>
             x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) == true ||
             x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) == true || PurePageType(x) || x.DeclaringType != null && PurePageType(x.DeclaringType)).ToArray();
@@ -45,6 +44,7 @@ public sealed class ContractAndSnapshotTests
             Assert.False(name.StartsWith("PnP.Scanning.Core.Pipeline.Collection", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Storage", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Services", StringComparison.Ordinal), name);
+            Assert.False(name.StartsWith("PnP.Scanning.Core.Scanners", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("Microsoft.AspNetCore.DataProtection", StringComparison.Ordinal), name);
             if (name.StartsWith("PnP.Scanning.Core.", StringComparison.Ordinal))
                 Assert.True(name.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) ||

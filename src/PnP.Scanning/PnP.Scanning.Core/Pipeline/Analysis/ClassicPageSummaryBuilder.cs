@@ -1,4 +1,3 @@
-using PnP.Scanning.Core.Scanners;
 using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageRow;
 using ClassicWebSummary = PnP.Scanning.Core.Pipeline.Contracts.ClassicWebSummaryRow;
 using ClassicSiteSummary = PnP.Scanning.Core.Pipeline.Contracts.ClassicSiteSummaryRow;

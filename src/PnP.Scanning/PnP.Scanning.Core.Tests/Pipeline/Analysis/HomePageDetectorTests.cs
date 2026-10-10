@@ -1,10 +1,10 @@
 ﻿using System.Collections.Generic;
 using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners.Pages
+namespace PnP.Scanning.Core.Tests.Pipeline.Analysis
 {
     /// <summary>
     /// T10 — home-page semantics. The pure pieces are exercised here directly (no CSOM, no live

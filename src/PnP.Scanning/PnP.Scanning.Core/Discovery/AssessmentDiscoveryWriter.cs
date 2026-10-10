@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Pipeline.Analysis;
 using System.Text.Json;
 
 namespace PnP.Scanning.Core.Discovery;

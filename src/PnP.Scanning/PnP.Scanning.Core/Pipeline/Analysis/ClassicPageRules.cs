@@ -1,4 +1,3 @@
-using PnP.Scanning.Core.Scanners;
 using System.Globalization;
 namespace PnP.Scanning.Core.Pipeline.Analysis;
 

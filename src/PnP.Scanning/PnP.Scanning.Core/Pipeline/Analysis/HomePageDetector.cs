@@ -1,7 +1,7 @@
 ﻿using System.Text.RegularExpressions;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 
-namespace PnP.Scanning.Core.Scanners
+namespace PnP.Scanning.Core.Pipeline.Analysis
 {
     /// <summary>
     /// Home-page semantics for a discovered classic page, ported from the Modernization Scanner's
@@ -74,6 +74,11 @@ namespace PnP.Scanning.Core.Scanners
 
             return pageUrl.EndsWith(NormalizeWelcomePage(welcomePageUrl), StringComparison.InvariantCultureIgnoreCase);
         }
+
+        internal static bool? ResolveHomePageState(string pageUrl, string welcomePage,
+            bool welcomePageKnown, bool? discoveredHomePage) => welcomePageKnown
+            ? IsHomePage(pageUrl, welcomePage)
+            : discoveredHomePage;
 
         /// <summary>
         /// Determines whether a wiki page's <c>WikiField</c> HTML still matches the out-of-the-box default

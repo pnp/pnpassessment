@@ -1,9 +1,9 @@
 ﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners.Pages
+namespace PnP.Scanning.Core.Tests.Pipeline.Analysis
 {
     /// <summary>
     /// T7 — page layout detection. Pure (no CSOM) parsing of the wiki <c>WikiField</c> HTML, the web part
@@ -88,7 +88,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         }
 
         // Publishing-page layout is NOT derived here — it is the actual page layout name read from the
-        // PublishingPageLayout field; see PageWebPartExtractorTests.GetPublishingPageLayoutName_*.
+        // PublishingPageLayout field; see PageWebPartAnalysisTests.GetPublishingPageLayoutName_*.
 
         // --- Layout string rendering (what lands on ClassicPage.Layout for wiki / web part pages) --------
 

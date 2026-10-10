@@ -5,6 +5,7 @@ using PnP.Core.Services;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Pipeline.Collection;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners;
@@ -12,6 +13,8 @@ namespace PnP.Scanning.Core.Scanners;
 /// <summary>The legacy mixed Classic scan shares page acquisition/rules, while retaining its existing storage and lifecycle.</summary>
 internal static class ClassicPageLegacyAdapter
 {
+    internal static readonly WebPartMappingManager MappingManager = new();
+
     internal static async Task ExecuteAsync(ClassicScanner scanner, PnPContext pnp, ClientContext csom, IReadOnlyList<ClassicPageDiscovery> discovered)
     {
         var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
@@ -27,7 +30,7 @@ internal static class ClassicPageLegacyAdapter
             try { input = await ClassicPageOnlineSource.ReadPageInputsAsync(pnp, csom, web, sourceRow, options.SkipUserInformation, token); }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception ex) { input = ClassicPageOnlineSource.EmptyPage(web, sourceRow, ClassicPageOnlineSource.Failure(ex)); }
-            var output = ClassicPageProjection.Analyze(scanner.ScanId, web, sourceRow, input, options, PageScanComponent.MappingManager);
+            var output = ClassicPageProjection.Analyze(scanner.ScanId, web, sourceRow, input, options, ClassicPageLegacyAdapter.MappingManager);
             if (output.Page != null) pages.Add(Pipeline.Contracts.ClassicPageSourceJson.Convert<ClassicPage>(output.Page));
             parts.AddRange(output.Parts.Select(Pipeline.Contracts.ClassicPageSourceJson.Convert<ClassicPageWebPart>));
             dispositions.Add(Pipeline.Contracts.ClassicPageSourceJson.Convert<ClassicPageDiscovery>(output.Discovery));
@@ -41,7 +44,7 @@ internal static class ClassicPageLegacyAdapter
                 string paging = null;
                 do
                 {
-                    var batch = await ClassicPageOnlineSource.LoadBatchAsync(list, PageScanComponent.PageQuery(new(), false, null, options.SkipUserInformation), paging, token);
+                    var batch = await ClassicPageOnlineSource.LoadBatchAsync(list, ClassicPageQuery.Create(new(), false, null, options.SkipUserInformation), paging, token);
                     foreach (var fields in batch.Items)
                     {
                         var url = fields.GetValueOrDefault("FileRef")?.Text ?? fields.GetValueOrDefault("ID")?.Text ?? "";

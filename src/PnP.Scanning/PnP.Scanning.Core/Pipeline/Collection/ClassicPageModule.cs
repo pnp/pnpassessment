@@ -5,7 +5,6 @@ using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Pipeline.Contracts;
 using PnP.Scanning.Core.Pipeline.Orchestration;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection;

@@ -1,4 +1,4 @@
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using PnP.Scanning.Core.Pipeline.Contracts;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis
@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis
     /// <see cref="ClassicPageRow.UnmappedWebParts"/> short-type list, and the
     /// <see cref="ClassicPageRow.WebPartCount"/>.
     /// <para>
-    /// Pure computation over the rows produced by <see cref="PageWebPartExtractor"/> — no CSOM — so it
+    /// Pure computation over the rows produced by <see cref="PageWebPartAnalysis"/> — no CSOM — so it
     /// is fully unit-testable. Mirrors the legacy Modernization Scanner's per-page mapping logic
     /// (the MappingPercentage / UnmappedWebParts computation in <c>ModernizationScanJob</c>'s page CSV
     /// generation): the lookup keys on the assembly-qualified type, the unmapped list carries the

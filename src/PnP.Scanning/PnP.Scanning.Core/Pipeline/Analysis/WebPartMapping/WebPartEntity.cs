@@ -1,6 +1,6 @@
 ﻿﻿using System.Text.Json;
 
-namespace PnP.Scanning.Core.Scanners.WebPartMapping
+namespace PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping
 {
     /// <summary>
     /// Entity to describe a web part on a wiki or webpart page.

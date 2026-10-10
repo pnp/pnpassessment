@@ -1,4 +1,3 @@
-using PnP.Scanning.Core.Scanners;
 using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageRow;
 using ClassicPageWebPart = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageWebPartRow;
 using Web = PnP.Scanning.Core.Pipeline.Contracts.WebRow;
@@ -6,7 +5,7 @@ using System.Text.Json;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using PnP.Scanning.Core.Pipeline.Contracts;
 namespace PnP.Scanning.Core.Pipeline.Analysis;
 

@@ -1,8 +1,8 @@
 ﻿﻿﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners.WebPartMapping
+namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.WebPartMapping
 {
     /// <summary>
     /// T4 — the ported web part mapping module. These tests exercise the pure mapping lookup against

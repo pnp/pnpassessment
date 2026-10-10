@@ -1,4 +1,3 @@
-using PnP.Scanning.Core.Scanners;
 namespace PnP.Scanning.Core.Pipeline.Analysis;
 
 internal static class ClassicSiteRules

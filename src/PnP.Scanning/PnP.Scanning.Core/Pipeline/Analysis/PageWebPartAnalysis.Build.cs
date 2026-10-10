@@ -1,9 +1,8 @@
-using PnP.Scanning.Core.Scanners;
 using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageRow;
 using ClassicPageWebPart = PnP.Scanning.Core.Pipeline.Contracts.ClassicPageWebPartRow;
 using PnP.Scanning.Core.Pipeline.Contracts;
 
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis;
 
@@ -41,9 +40,7 @@ internal static partial class PageWebPartAnalysis
             }
             else
             {
-                var field = source.Fields.GetValueOrDefault("PublishingPageLayout");
-                page.Layout = field?.Type == "Url" && field.Value.TryGetProperty("Description", out var description)
-                    ? description.GetString() ?? "" : "";
+                page.Layout = PageLayoutDetector.GetPublishingPageLayoutName(source.Fields);
             }
             var parts = page.PageType == ClassicPageRules.PublishingPage
                 ? source.WebParts.OrderBy(x => x.ZoneIndex).ToArray() : source.WebParts;

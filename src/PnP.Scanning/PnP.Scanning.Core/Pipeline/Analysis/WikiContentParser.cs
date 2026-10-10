@@ -3,9 +3,9 @@ using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
 using System.Text;
 using System.Text.RegularExpressions;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 
-namespace PnP.Scanning.Core.Scanners
+namespace PnP.Scanning.Core.Pipeline.Analysis
 {
     /// <summary>
     /// Pure (no CSOM) parser of a classic wiki page's <c>WikiField</c> HTML. It walks the wiki layout

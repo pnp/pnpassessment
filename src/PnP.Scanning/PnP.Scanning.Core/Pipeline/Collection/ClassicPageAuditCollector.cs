@@ -4,7 +4,6 @@ using System.Threading.Tasks.Dataflow;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Pipeline.Contracts;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection;
@@ -27,7 +26,7 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception ex) { skip = "TokenError: " + ex.Message; }
         }
-        var windows = AuditLogUsageAnalyzer.SplitWindow(scope.AuditWindowStart, scope.AuditWindowEnd, 2);
+        var windows = ClassicPageAuditClient.SplitWindow(scope.AuditWindowStart, scope.AuditWindowEnd, 2);
         var workers = new ActionBlock<int>(async chunk =>
         {
             var (start, end) = windows[chunk];
@@ -121,7 +120,7 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
     {
         try
         {
-            using var response = await AuditLogUsageAnalyzer.SendWithRetryAsync(client ?? AuthenticationManager.HttpClient, () =>
+            using var response = await ClassicPageAuditClient.SendWithRetryAsync(client ?? AuthenticationManager.HttpClient, () =>
             {
                 var request = new HttpRequestMessage(body == null ? HttpMethod.Get : HttpMethod.Post, url);
                 if (body != null) request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");

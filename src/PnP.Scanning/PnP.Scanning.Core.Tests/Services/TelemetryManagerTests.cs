@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -27,13 +28,13 @@ namespace PnP.Scanning.Core.Tests.Services
             // The ASPX page is the (uncustomized) home page.
             var pages = new List<ClassicPage>
             {
-                NewPage(scanId, siteUrl, "/Pages/a.aspx", PageScanComponent.WikiPage, webPartCount: 4, mappingPercentage: 75),
-                NewPage(scanId, siteUrl, "/Pages/b.aspx", PageScanComponent.WebPartPage, webPartCount: 2, mappingPercentage: 100),
-                NewPage(scanId, siteUrl, "/Pages/c.aspx", PageScanComponent.PublishingPage, webPartCount: 3, mappingPercentage: 50),
-                NewPage(scanId, siteUrl, "/Lists/Posts/d.aspx", PageScanComponent.BlogPage, webPartCount: 0, mappingPercentage: 100),
-                NewPage(scanId, siteUrl, "/default.aspx", PageScanComponent.ASPXPage, webPartCount: 0, mappingPercentage: 100,
+                NewPage(scanId, siteUrl, "/Pages/a.aspx", ClassicPageRules.WikiPage, webPartCount: 4, mappingPercentage: 75),
+                NewPage(scanId, siteUrl, "/Pages/b.aspx", ClassicPageRules.WebPartPage, webPartCount: 2, mappingPercentage: 100),
+                NewPage(scanId, siteUrl, "/Pages/c.aspx", ClassicPageRules.PublishingPage, webPartCount: 3, mappingPercentage: 50),
+                NewPage(scanId, siteUrl, "/Lists/Posts/d.aspx", ClassicPageRules.BlogPage, webPartCount: 0, mappingPercentage: 100),
+                NewPage(scanId, siteUrl, "/default.aspx", ClassicPageRules.ASPXPage, webPartCount: 0, mappingPercentage: 100,
                         homePage: true, uncustomizedHomePage: true),
-                NewPage(scanId, siteUrl, "/Lists/Posts/f.aspx", PageScanComponent.DelveBlogPage, webPartCount: 0, mappingPercentage: 100),
+                NewPage(scanId, siteUrl, "/Lists/Posts/f.aspx", ClassicPageRules.DelveBlogPage, webPartCount: 0, mappingPercentage: 100),
             };
 
             // Five web part rows total across the three pages that carry parts.

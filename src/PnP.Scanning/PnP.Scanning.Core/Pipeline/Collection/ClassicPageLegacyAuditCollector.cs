@@ -1,9 +1,10 @@
-﻿using PnP.Scanning.Core.Storage;
+﻿using PnP.Scanning.Core.Pipeline.Analysis;
+using static PnP.Scanning.Core.Pipeline.Analysis.ClassicPageAuditAnalysis;
 using System.Net;
 using System.Text.Json;
 using System.Collections.Generic;
 
-namespace PnP.Scanning.Core.Scanners
+namespace PnP.Scanning.Core.Pipeline.Collection
 {
     /// <summary>
     /// Queries the Microsoft Graph <c>security/auditLog/queries</c> (v1.0) API for classic
@@ -33,21 +34,8 @@ namespace PnP.Scanning.Core.Scanners
     /// Record field mapping (v1.0): "operation", "objectId", "userId" are all top-level properties.
     /// The "auditData" field is a nested object and is NOT used.
     /// </summary>
-    internal static class AuditLogUsageAnalyzer
+    internal static class ClassicPageLegacyAuditCollector
     {
-        internal readonly record struct AuditPageStats(int ViewsCount, int CreatesCount, int EditsCount, int UniqueUsers);
-
-        // Intermediate type used within a single chunk's fetch result.
-        // Carries raw HashSet<int> user hashes so MergeChunks can union them correctly.
-        internal readonly record struct ChunkPageData(int ViewsCount, int CreatesCount, int EditsCount, HashSet<int> UserHashes);
-
-        private static readonly HashSet<string> ViewOperations = new(StringComparer.OrdinalIgnoreCase)
-            { "ClassicPageViewed" };
-        private static readonly HashSet<string> CreateOperations = new(StringComparer.OrdinalIgnoreCase)
-            { "ClassicPageCreated" };
-        private static readonly HashSet<string> EditOperations = new(StringComparer.OrdinalIgnoreCase)
-            { "ClassicPageEdited" };
-
         private static readonly TimeSpan PollInterval   = TimeSpan.FromSeconds(60);
         // Graph audit queries are async and can sit in "notStarted" for a long time on a busy tenant
         // before Graph even begins processing. Observed queue waits of ~50-60 min end-to-end, so a
@@ -57,27 +45,6 @@ namespace PnP.Scanning.Core.Scanners
         private const int ChunkDays         = 2;    // each sub-query covers 2 days — keeps server-side processing fast
         private const int PageSize          = 5000;  // $top per records page — 5× fewer HTTP round trips than 1000
         private const int MaxParallelChunks = 7;     // cap concurrent Graph queries — avoids flooding the API for large windows (e.g. 180d = 90 chunks)
-        // Memory safety: store the hash of userId (int, 4 bytes) instead of the full string (~50 bytes).
-        // Accepts a tiny false-positive rate on UniqueUsers count (hash collision) in exchange for ~12× less memory.
-        // Also caps the set at MaxTrackedUsersPerPage — beyond this the page is clearly "heavily used" and the
-        // exact count matters less; memory is bounded to MaxTrackedUsersPerPage × 4 bytes per page.
-        private const int MaxTrackedUsersPerPage = 10_000;
-
-        /// <summary>
-        /// Pure: applies audit stats to the record. If stats is null or the pageUrl key is not found,
-        /// leaves counts at 0.
-        /// </summary>
-        internal static void ApplyAuditUsage(ClassicPageAuditUsage record, IReadOnlyDictionary<string, AuditPageStats> stats)
-        {
-            if (stats == null || !stats.TryGetValue(record.PageUrl, out var pageStats))
-                return;
-
-            record.AuditViewsCount = pageStats.ViewsCount;
-            record.AuditCreatesCount = pageStats.CreatesCount;
-            record.AuditEditsCount = pageStats.EditsCount;
-            record.AuditUniqueUsers = pageStats.UniqueUsers;
-        }
-
         /// <summary>
         /// Integration-only: splits the window into ChunkDays sub-windows, submits up to
         /// MaxParallelChunks queries concurrently, merges results, and returns a per-page
@@ -93,7 +60,7 @@ namespace PnP.Scanning.Core.Scanners
             CancellationToken cancellationToken,
             Action<string> progress = null)
         {
-            var chunks = SplitWindow(windowStart, windowEnd, ChunkDays);
+            var chunks = ClassicPageAuditClient.SplitWindow(windowStart, windowEnd, ChunkDays);
             int total = chunks.Count;
 
             progress?.Invoke($"Submitting {total} audit log quer{(total == 1 ? "y" : "ies")} " +
@@ -159,7 +126,7 @@ namespace PnP.Scanning.Core.Scanners
                 return (null, failures[0]);
             }
 
-            var merged = MergeChunks(succeeded);
+            var merged = ClassicPageAuditAnalysis.MergeChunks(succeeded);
 
             // Total attributed events across all pages (views + creates + edits). Reported alongside the
             // page count so the log answers both "how many pages had activity" and "how much activity" —
@@ -183,60 +150,6 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // ── private helpers ──────────────────────────────────────────────────────
-
-        internal static List<(DateTime Start, DateTime End)> SplitWindow(DateTime start, DateTime end, int chunkDays)
-        {
-            var chunks = new List<(DateTime, DateTime)>();
-            var cursor = start.ToUniversalTime();
-            var endUtc = end.ToUniversalTime();
-            while (cursor < endUtc)
-            {
-                var chunkEnd = cursor.AddDays(chunkDays) < endUtc ? cursor.AddDays(chunkDays) : endUtc;
-                chunks.Add((cursor, chunkEnd));
-                cursor = chunkEnd;
-            }
-            return chunks;
-        }
-
-        internal static IReadOnlyDictionary<string, AuditPageStats> MergeChunks(
-            IEnumerable<IReadOnlyDictionary<string, ChunkPageData>> chunks)
-        {
-            var merged = new Dictionary<string, (int Views, int Creates, int Edits, HashSet<int> Users)>(StringComparer.OrdinalIgnoreCase);
-            foreach (var chunk in chunks)
-            {
-                foreach (var kvp in chunk)
-                {
-                    if (!merged.TryGetValue(kvp.Key, out var existing))
-                    {
-                        // Copy so we never alias (or later mutate) the input chunk's own set.
-                        // The chunk set is already ≤ MaxTrackedUsersPerPage (capped at fetch time).
-                        merged[kvp.Key] = (kvp.Value.ViewsCount, kvp.Value.CreatesCount, kvp.Value.EditsCount, new HashSet<int>(kvp.Value.UserHashes));
-                    }
-                    else
-                    {
-                        // Re-apply the per-page cap on the merged (cross-chunk) set: a hot page appearing
-                        // in every chunk could otherwise accumulate up to chunks × MaxTrackedUsersPerPage
-                        // hashes. Stop unioning once the merged set reaches the cap — beyond that the page
-                        // is clearly "heavily used" and the exact distinct count matters less, while memory
-                        // stays bounded to MaxTrackedUsersPerPage × 4 bytes per page.
-                        foreach (var userHash in kvp.Value.UserHashes)
-                        {
-                            if (existing.Users.Count >= MaxTrackedUsersPerPage) break;
-                            existing.Users.Add(userHash);
-                        }
-                        merged[kvp.Key] = (
-                            existing.Views   + kvp.Value.ViewsCount,
-                            existing.Creates + kvp.Value.CreatesCount,
-                            existing.Edits   + kvp.Value.EditsCount,
-                            existing.Users);
-                    }
-                }
-            }
-            return merged.ToDictionary(
-                kvp => kvp.Key,
-                kvp => new AuditPageStats(kvp.Value.Views, kvp.Value.Creates, kvp.Value.Edits, kvp.Value.Users.Count),
-                StringComparer.OrdinalIgnoreCase);
-        }
 
         /// <summary>Submits, polls, and fetches one sub-window Graph query.</summary>
         private static async Task<(IReadOnlyDictionary<string, ChunkPageData> Stats, string SkipReason)> QueryChunkAsync(
@@ -272,7 +185,7 @@ namespace PnP.Scanning.Core.Scanners
 
                 var body = JsonSerializer.Serialize(queryBody);
 
-                using var postResponse = await SendWithRetryAsync(httpClient, () =>
+                using var postResponse = await ClassicPageAuditClient.SendWithRetryAsync(httpClient, () =>
                 {
                     var req = new HttpRequestMessage(HttpMethod.Post, queriesUrl);
                     req.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
@@ -333,7 +246,7 @@ namespace PnP.Scanning.Core.Scanners
                 HttpResponseMessage pollResponse;
                 try
                 {
-                    pollResponse = await SendWithRetryAsync(httpClient, () =>
+                    pollResponse = await ClassicPageAuditClient.SendWithRetryAsync(httpClient, () =>
                     {
                         var req = new HttpRequestMessage(HttpMethod.Get, $"{queriesUrl}/{queryId}");
                         return req;
@@ -386,7 +299,7 @@ namespace PnP.Scanning.Core.Scanners
 
             // Step 3: Fetch records ($top=5000 to minimise round trips)
             // HashSet<int> stores hash(userId) — 4 bytes/entry vs ~50 bytes for full string; bounded by MaxTrackedUsersPerPage
-            var results = new Dictionary<string, (int Views, int Creates, int Edits, HashSet<int> Users)>(StringComparer.OrdinalIgnoreCase);
+            var results = new Dictionary<string, ChunkPageData>(StringComparer.OrdinalIgnoreCase);
             string nextLink = $"{queriesUrl}/{queryId}/records?$top={PageSize}";
 
             // Record-fetch can page through many @odata.nextLink hops after a query succeeds. Without
@@ -405,7 +318,7 @@ namespace PnP.Scanning.Core.Scanners
                 HttpResponseMessage recordsResponse;
                 try
                 {
-                    recordsResponse = await SendWithRetryAsync(httpClient, () =>
+                    recordsResponse = await ClassicPageAuditClient.SendWithRetryAsync(httpClient, () =>
                     {
                         var req = new HttpRequestMessage(HttpMethod.Get, nextLink);
                         return req;
@@ -437,33 +350,8 @@ namespace PnP.Scanning.Core.Scanners
                 if (!recordsDoc.RootElement.TryGetProperty("value", out var valueElement))
                     return (null, $"ParseError: records response for query {queryId} missing 'value' array");
 
-                int pageRecordCount = 0;
-                foreach (var record in valueElement.EnumerateArray())
-                {
-                    pageRecordCount++;
-                    if (!record.TryGetProperty("operation", out var opProp)) continue;
-                    string operation = opProp.GetString() ?? string.Empty;
-
-                    if (!record.TryGetProperty("objectId", out var objProp)) continue;
-                    string pageUrl = objProp.GetString();
-                    if (string.IsNullOrEmpty(pageUrl)) continue;
-                    if (!pageUrl.EndsWith(".aspx", StringComparison.OrdinalIgnoreCase)) continue;
-
-                    string userId = record.TryGetProperty("userId", out var uidProp)
-                        ? uidProp.GetString() ?? string.Empty : string.Empty;
-
-                    if (!results.TryGetValue(pageUrl, out var existing))
-                    {
-                        existing = (0, 0, 0, new HashSet<int>());
-                        results[pageUrl] = existing;
-                    }
-                    int views   = existing.Views   + (ViewOperations.Contains(operation)   ? 1 : 0);
-                    int creates = existing.Creates + (CreateOperations.Contains(operation) ? 1 : 0);
-                    int edits   = existing.Edits   + (EditOperations.Contains(operation)   ? 1 : 0);
-                    results[pageUrl] = (views, creates, edits, existing.Users);
-                    if (!string.IsNullOrEmpty(userId) && existing.Users.Count < MaxTrackedUsersPerPage)
-                        existing.Users.Add(StringComparer.OrdinalIgnoreCase.GetHashCode(userId));
-                }
+                int pageRecordCount = valueElement.GetArrayLength();
+                ClassicPageAuditAnalysis.AccumulateLegacyRecords(results, valueElement);
 
                 recordPages++;
                 recordsFetched += pageRecordCount;
@@ -482,48 +370,9 @@ namespace PnP.Scanning.Core.Scanners
             progress?.Invoke($"[{chunkLabel}] query {queryId} fetched {recordsFetched} record(s) in {recordPages} page(s) " +
                              $"over {(DateTime.UtcNow - fetchStart).TotalSeconds:0}s → {results.Count} distinct page(s)");
 
-            var output = new Dictionary<string, ChunkPageData>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kvp in results)
-                output[kvp.Key] = new ChunkPageData(kvp.Value.Views, kvp.Value.Creates, kvp.Value.Edits, kvp.Value.Users);
-
-            return (output, null);
+            return (results, null);
         }
 
-        internal static async Task<HttpResponseMessage> SendWithRetryAsync(
-            HttpClient client, Func<HttpRequestMessage> requestFactory,
-            Func<CancellationToken, Task<string>> tokenProvider, CancellationToken ct)
-        {
-            int attempts = 0;
-            int throttleAttempts = 0;
-            while (true)
-            {
-                var request = requestFactory();
-                // Set a FRESH bearer token on every send (including retries). A long-running audit scan
-                // can outlive the initial token's ~1h lifetime while Graph queues/processes queries, so a
-                // token captured once at the start would be expired by the time we fetch records (HTTP 401).
-                // GetAccessTokenAsync is cache-backed, so this is cheap when the token is still valid.
-                var token = await tokenProvider(ct);
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-                var response = await client.SendAsync(request, ct);
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    if (++throttleAttempts > 10) return response; // give up after 10 throttle retries
-                    int wait = 60;
-                    if (response.Headers.TryGetValues("Retry-After", out var vals) &&
-                        int.TryParse(vals.First(), out int ra)) wait = ra;
-                    response.Dispose(); // superseded — release before retrying so retries don't leak responses
-                    await Task.Delay(TimeSpan.FromSeconds(wait), ct);
-                    continue;
-                }
-                if ((int)response.StatusCode is 503 or 504)
-                {
-                    if (++attempts > 3) return response;
-                    response.Dispose(); // superseded — release before retrying so retries don't leak responses
-                    await Task.Delay(TimeSpan.FromSeconds(attempts == 1 ? 5 : attempts == 2 ? 15 : 30), ct);
-                    continue;
-                }
-                return response;
-            }
-        }
+
     }
 }

@@ -17,7 +17,7 @@
 // which was renamed PageTransformation -> WebPartMappingModel to avoid implying this scan-only repo
 // performs page transformation; its XML element/type name is pinned to "PageTransformation" so the
 // wire format is identical.
-namespace PnP.Scanning.Core.Scanners.WebPartMapping {
+namespace PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping {
     using System.Xml.Serialization;
 
 

@@ -1,19 +1,16 @@
 ﻿using FluentAssertions;
 using PnP.Core.Model.Security;
 using PnP.Core.Model.SharePoint;
-using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Collection;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners
+namespace PnP.Scanning.Core.Tests.Pipeline.Analysis
 {
-    /// <summary>
-    /// T3 — quick-win metadata fixes: Delve blog page typing and the page "Modified By" capture.
-    /// Both helpers are pure functions over the raw list-item field values (no CSOM), so they are
-    /// exercised here directly with fake field dictionaries.
-    /// </summary>
-    public class PageScanComponentTests
+    /// <summary>Tests page classification and editor values detached from SDK objects.</summary>
+    public class ClassicPageRulesTests
     {
-        // SharePoint internal field names (mirrors the private constants in PageScanComponent).
+        // SharePoint internal field names (used by the collection query and analysis rules).
         private const string FileTypeField = "File_x0020_Type";
         private const string HtmlFileTypeField = "HTML_x0020_File_x0020_Type";
         private const string WikiField = "WikiField";
@@ -29,7 +26,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { FileTypeField, "pointpub" },
             };
 
-            PageScanComponent.GetPageType(fields).Should().Be(PageScanComponent.DelveBlogPage);
+            ClassicPageRules.GetPageType(fields).Should().Be(ClassicPageRules.DelveBlogPage);
         }
 
         [Fact]
@@ -40,7 +37,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { FileTypeField, "PointPub" },
             };
 
-            PageScanComponent.GetPageType(fields).Should().Be(PageScanComponent.DelveBlogPage);
+            ClassicPageRules.GetPageType(fields).Should().Be(ClassicPageRules.DelveBlogPage);
         }
 
         [Fact]
@@ -52,7 +49,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { HtmlFileTypeField, "SharePoint.WebPartPage.Document" },
                 { FileTypeField, "aspx" },
             };
-            PageScanComponent.GetPageType(webPartPage).Should().Be(PageScanComponent.WebPartPage);
+            ClassicPageRules.GetPageType(webPartPage).Should().Be(ClassicPageRules.WebPartPage);
 
             // Control 2: a plain aspx page (no pointpub marker) is never classified as Delve.
             var aspxPage = new Dictionary<string, object>
@@ -60,7 +57,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { FileTypeField, "aspx" },
                 { BSNField, "1" },
             };
-            PageScanComponent.GetPageType(aspxPage).Should().NotBe(PageScanComponent.DelveBlogPage);
+            ClassicPageRules.GetPageType(aspxPage).Should().NotBe(ClassicPageRules.DelveBlogPage);
 
             // Control 3: a wiki page (WikiField present) wins before the Delve check.
             var wikiPage = new Dictionary<string, object>
@@ -68,7 +65,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { WikiField, "<div></div>" },
                 { FileTypeField, "pointpub" },
             };
-            PageScanComponent.GetPageType(wikiPage).Should().Be(PageScanComponent.WikiPage);
+            ClassicPageRules.GetPageType(wikiPage).Should().Be(ClassicPageRules.WikiPage);
         }
 
         [Fact]
@@ -80,7 +77,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { ModifiedByField, new FakeUserValue(email: "jane.doe@contoso.com", lookupValue: "Jane Doe") },
             };
 
-            PageScanComponent.GetModifiedBy(fields, skipUserInformation: false).Should().Be("jane.doe@contoso.com");
+            ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(fields), skipUserInformation: false).Should().Be("jane.doe@contoso.com");
         }
 
         [Fact]
@@ -91,7 +88,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { ModifiedByField, new FakeUserValue(email: "", lookupValue: "John Smith") },
             };
 
-            PageScanComponent.GetModifiedBy(fields, skipUserInformation: false).Should().Be("John Smith");
+            ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(fields), skipUserInformation: false).Should().Be("John Smith");
         }
 
         [Fact]
@@ -102,13 +99,13 @@ namespace PnP.Scanning.Core.Tests.Scanners
                 { ModifiedByField, new FakeUserValue(email: "jane.doe@contoso.com", lookupValue: "Jane Doe") },
             };
 
-            PageScanComponent.GetModifiedBy(fields, skipUserInformation: true).Should().BeNull();
+            ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(fields), skipUserInformation: true).Should().BeNull();
         }
 
         [Fact]
         public void ModifiedBy_NoEditorField_IsNull()
         {
-            PageScanComponent.GetModifiedBy(new Dictionary<string, object>(), skipUserInformation: false).Should().BeNull();
+            ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(new Dictionary<string, object>()), skipUserInformation: false).Should().BeNull();
         }
 
         /// <summary>

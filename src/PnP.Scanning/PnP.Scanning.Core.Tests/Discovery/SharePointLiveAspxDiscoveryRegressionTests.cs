@@ -1,4 +1,5 @@
 using FluentAssertions;
+using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
@@ -100,14 +101,13 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
     [Fact]
     public void Assessment_home_page_state_falls_back_without_erasing_a_known_value()
     {
-        PageScanComponent.ResolveHomePageState("/sites/a/SitePages/Home.aspx", "SitePages/Home.aspx",
+        HomePageDetector.ResolveHomePageState("/sites/a/SitePages/Home.aspx", "SitePages/Home.aspx",
             welcomePageKnown: true, discoveredHomePage: false).Should().BeTrue();
-        PageScanComponent.ResolveHomePageState("/sites/a/default.aspx", null,
+        HomePageDetector.ResolveHomePageState("/sites/a/default.aspx", null,
             welcomePageKnown: false, discoveredHomePage: null).Should().BeNull();
 
-        var page = new ClassicPage { HomePage = true };
-        PageScanComponent.ApplyDiscoveryState(page, new ClassicPageDiscovery { HomePage = null });
-        page.HomePage.Should().BeTrue();
+        HomePageDetector.ResolveHomePageState("/sites/a/default.aspx", null,
+            welcomePageKnown: false, discoveredHomePage: true).Should().BeTrue();
     }
 
     [Fact]

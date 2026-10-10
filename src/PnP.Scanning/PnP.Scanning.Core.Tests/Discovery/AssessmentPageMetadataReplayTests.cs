@@ -4,8 +4,11 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
+using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Collection;
+using PnP.Scanning.Core.Pipeline.Contracts;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -59,21 +62,19 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
 
         foreach (var fixture in fixtures)
         {
-            var input = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+            var input = await fixture.ReadAsync();
             fixture.StreamRequests.Should().Be(1, "computed metadata requires explicit native list-stream ViewFields");
             fixture.AllProjectionRequests.Should().Be(0, "$select=* is not complete page metadata");
-            fixture.Row.PageType = input.Page.PageType;
-            fixture.Row.AssessmentStatus = input.Page.AddToDatabase() ? "Complete" : "NotApplicable";
-            if (input.Page.PageType == PageScanComponent.WikiPage)
+            SourceReadState webPartsState = SourceReadState.Complete;
+            if (input.Fields.TryGetValue("WikiField", out var wiki))
             {
-                input.WikiFieldHtml.Should().Be("<p>Wiki body</p>");
+                wiki.Text.Should().Be("<p>Wiki body</p>");
                 // Replay a later WP-extraction failure. Physical discovery must not disappear.
-                fixture.Row.AssessmentStatus = "Failed";
-                AssessmentWebDiscovery.AddError(fixture.Row, "WebPartAssessment", "HTTP403", "access denied, \"web parts\"\nretained page");
+                webPartsState = new("HTTP403", "access denied, \"web parts\"\nretained page");
             }
-            PageScanComponent.ApplyDiscoveryState(input.Page, fixture.Row);
-            if (input.Page.AddToDatabase()) assessedPages.Add(input.Page);
-            await writer.WriteAsync(new[] { fixture.Row });
+            var output = fixture.Project(input, webPartsState);
+            if (output.Page != null) assessedPages.Add(ClassicPageSourceJson.Convert<ClassicPage>(output.Page));
+            await writer.WriteAsync(new[] { ClassicPageSourceJson.Convert<ClassicPageDiscovery>(output.Discovery) });
         }
         var denied = new ClassicPageDiscovery
         {
@@ -137,10 +138,11 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         wildcardItem.Values.Should().ContainKey("ContentTypeId");
         wildcardItem.Values.Should().NotContainKey("HTML_x0020_File_x0020_Type");
         wildcardItem.Values.Should().NotContainKey("FileLeafRef");
-        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
-        loaded.Page.PageType.Should().Be("WebPartPage");
-        loaded.Page.PageUrl.Should().Be(fixture.Row.Url);
-        loaded.FileLeafRef.Should().Be("webpart.aspx");
+        var loaded = await fixture.ReadAsync();
+        var projection = fixture.Project(loaded);
+        projection.Page.PageType.Should().Be("WebPartPage");
+        projection.Page.PageUrl.Should().Be(fixture.Row.Url);
+        loaded.Fields["FileLeafRef"].Text.Should().Be("webpart.aspx");
         fixture.AllProjectionRequests.Should().Be(1);
         fixture.StreamRequests.Should().Be(1);
         fixture.LastViewFields.Should().Contain("ClientSideApplicationId", "an absent optional modern field is allowed in the native CAML query");
@@ -156,9 +158,11 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             ["ClientSideApplicationId"] = "{B6917CB1-93A0-4B97-A84D-7CF49975D4EC}",
             ["BSN"] = "265",
         });
-        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
-        loaded.Page.PageType.Should().Be("ModernPage");
-        loaded.Page.AddToDatabase().Should().BeFalse();
+        var loaded = await fixture.ReadAsync();
+        var projection = fixture.Project(loaded);
+        projection.Discovery.PageType.Should().Be("ModernPage");
+        projection.Modern.Should().BeTrue();
+        projection.Page.Should().BeNull();
         fixture.StreamRequests.Should().Be(1);
     }
 
@@ -166,7 +170,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     public async Task Native_metadata_query_requests_editor_only_when_user_information_is_enabled()
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/wiki.aspx", new() { ["WikiField"] = "<p>body</p>" });
-        await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, false);
+        await fixture.ReadAsync(skipUsers: false);
         fixture.LastViewFields.Should().Contain("Editor");
     }
 
@@ -175,9 +179,10 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/enterprise.aspx", new());
         fixture.Row.ContentTypeId = PublishingContentType;
-        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
-        loaded.Page.PageType.Should().Be("PublishingPage");
-        loaded.Page.PageName.Should().Be("enterprise");
+        var loaded = await fixture.ReadAsync();
+        var projection = fixture.Project(loaded);
+        projection.Page.PageType.Should().Be("PublishingPage");
+        projection.Page.PageName.Should().Be("enterprise");
     }
 
     [Fact]
@@ -186,7 +191,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new() { ["FileRef"] = Web + "/Other/two.aspx" });
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(new[] { fixture.Row });
-        var load = () => PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+        var load = () => fixture.ReadAsync();
         await load.Should().ThrowAsync<InvalidDataException>().WithMessage("*FileRef differs*");
         (await writer.ReadPagesAsync(fixture.Row.ScanId, Site, Web)).Should().ContainSingle()
             .Which.DiscoveryStatus.Should().Be("Discovered");
@@ -198,8 +203,12 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     public async Task Absent_or_different_item_cannot_be_assessed_as_the_requested_file(int? returnedId)
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new()) { ReturnedId = returnedId };
-        var load = () => PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
-        await load.Should().ThrowAsync<InvalidDataException>().WithMessage("*not returned*");
+        var loaded = await fixture.ReadAsync();
+        loaded.MetadataState.Status.Should().Be("NotReturned");
+        var projection = fixture.Project(loaded);
+        projection.Page.Should().BeNull();
+        projection.Discovery.AssessmentStatus.Should().Be("Failed");
+        projection.Discovery.ErrorDetail.Should().Contain("not returned");
     }
 
     [Fact]
@@ -207,7 +216,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new());
         fixture.Row.ListId = Guid.NewGuid();
-        var load = () => PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+        var load = () => fixture.ReadAsync();
         await load.Should().ThrowAsync<InvalidDataException>().WithMessage("*list and list-item identity*");
         fixture.ItemRequests.Should().Be(0);
     }
@@ -227,6 +236,20 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         public int AllProjectionRequests { get; private set; }
         public int StreamRequests { get; private set; }
         public string[] LastViewFields { get; private set; } = Array.Empty<string>();
+
+        public Task<ClassicPageItemSource> ReadAsync(bool skipUsers = true) =>
+            ClassicPageOnlineSource.ReadPageMetadataAsync(List, ClassicPageSourceJson.Convert<ClassicPageDiscoveryRow>(Row), skipUsers, CancellationToken.None);
+
+        public ClassicPageProjectionResult Project(ClassicPageItemSource input, SourceReadState webPartsState = null)
+        {
+            var web = new ClassicPageWebSource(Site, Web, "STS#3", Row.SiteCollectionId.Value, Row.WebId.Value,
+                default, [], [], null, SourceReadState.NotAttempted, null, SourceReadState.NotAttempted,
+                null, 1033, null, SourceReadState.NotAttempted, SourceReadState.Complete);
+            // This metadata fixture supplies a detached, empty Web Part inventory or a settled
+            // acquisition failure. The CSOM transport is exercised by the pipeline transport tests.
+            return ClassicPageProjection.Analyze(Row.ScanId, web, ClassicPageSourceJson.Convert<ClassicPageDiscoveryRow>(Row),
+                input with { WebPartsState = webPartsState ?? SourceReadState.Complete }, new(false, true, true, false, 14), new WebPartMappingManager());
+        }
 
         public MetadataFixture(Guid scan, string path, Dictionary<string, object> fields)
         {

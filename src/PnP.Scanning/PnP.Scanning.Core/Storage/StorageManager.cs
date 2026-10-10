@@ -1,10 +1,12 @@
 ﻿using EFCore.BulkExtensions;
+using PnP.Scanning.Core.Pipeline.Analysis;
+using PnP.Scanning.Core.Pipeline.Collection;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Scanners.WebPartMapping;
+using PnP.Scanning.Core.Pipeline.Analysis.WebPartMapping;
 using PnP.Scanning.Core.Services;
 using Serilog;
 
@@ -1085,7 +1087,7 @@ namespace PnP.Scanning.Core.Storage
                 .ToListAsync();
 
             var publishingPages = await dbContext.ClassicPages
-                .Where(p => p.ScanId == scanId && p.PageType == PageScanComponent.PublishingPage)
+                .Where(p => p.ScanId == scanId && p.PageType == ClassicPageRules.PublishingPage)
                 .Select(p => new { p.SiteUrl, p.Layout, p.ModifiedAt })
                 .ToListAsync();
 
@@ -1211,7 +1213,7 @@ namespace PnP.Scanning.Core.Storage
             IReadOnlyList<string> siteUrlsForFilter = hasExplicitSiteList ? siteUrls : null;
 
             Action<string> auditProgress = msg => Log.Information("[AuditLog] {ScanId} {AuditMsg}", scanId, msg);
-            var (allStats, skipReason) = await Scanners.AuditLogUsageAnalyzer.QueryAllSitesAuditUsageAsync(
+            var (allStats, skipReason) = await ClassicPageLegacyAuditCollector.QueryAllSitesAuditUsageAsync(
                 Authentication.AuthenticationManager.HttpClient, graphBaseUrl, tokenProvider,
                 siteUrlsForFilter, windowStart, windowEnd, cancellationToken, auditProgress);
 
@@ -1244,10 +1246,10 @@ namespace PnP.Scanning.Core.Storage
             // Pre-compute the "<site>/" prefixes once instead of re-allocating (s + "/") per page × site.
             var sitePrefixes = sortedSiteUrls.Select(s => s + "/").ToList();
 
-            Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>> statsBySite = null;
+            Dictionary<string, Dictionary<string, ClassicPageAuditAnalysis.AuditPageStats>> statsBySite = null;
             if (allStats != null)
             {
-                statsBySite = new Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>>(StringComparer.OrdinalIgnoreCase);
+                statsBySite = new Dictionary<string, Dictionary<string, ClassicPageAuditAnalysis.AuditPageStats>>(StringComparer.OrdinalIgnoreCase);
                 foreach (var kvp in allStats)
                 {
                     string owningSite = null;
@@ -1263,7 +1265,7 @@ namespace PnP.Scanning.Core.Storage
                         continue; // page under no scanned site — same exclusion as before
 
                     if (!statsBySite.TryGetValue(owningSite, out var siteDict))
-                        statsBySite[owningSite] = siteDict = new Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>(StringComparer.OrdinalIgnoreCase);
+                        statsBySite[owningSite] = siteDict = new Dictionary<string, ClassicPageAuditAnalysis.AuditPageStats>(StringComparer.OrdinalIgnoreCase);
                     siteDict[kvp.Key] = kvp.Value;
                 }
             }
@@ -1271,7 +1273,7 @@ namespace PnP.Scanning.Core.Storage
             var allRecords = new List<ClassicPageAuditUsage>();
             foreach (var siteUrl in siteUrls)
             {
-                IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> siteStats = null;
+                IReadOnlyDictionary<string, ClassicPageAuditAnalysis.AuditPageStats> siteStats = null;
                 if (statsBySite != null && statsBySite.TryGetValue(siteUrl, out var assigned) && assigned.Count > 0)
                     siteStats = assigned;
                 BuildAuditLogRecords(allRecords, scanId, siteUrl, siteStats, windowStart, windowEnd, globalStatus, skipReason);
@@ -1284,14 +1286,14 @@ namespace PnP.Scanning.Core.Storage
             List<ClassicPageAuditUsage> target,
             Guid scanId,
             string siteUrl,
-            IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> stats,
+            IReadOnlyDictionary<string, ClassicPageAuditAnalysis.AuditPageStats> stats,
             DateTime windowStart,
             DateTime windowEnd,
             string queryStatus,
             string skipReason)
         {
             // Strip scheme+host so stored PageUrl is server-relative (matches classicpages.csv Url column).
-            // ApplyAuditUsage looks up record.PageUrl in the stats dict (absolute keys), so we convert after.
+            // Audit stats use absolute URL keys; storage uses the server-relative report URL.
             string tenantOrigin = null;
             try { tenantOrigin = new Uri(siteUrl).GetLeftPart(UriPartial.Authority); }
             catch { }
@@ -1342,7 +1344,10 @@ namespace PnP.Scanning.Core.Storage
                         QueryStatus = queryStatus,
                         SkipReason = queryStatus == "partial" ? skipReason : null,
                     };
-                    Scanners.AuditLogUsageAnalyzer.ApplyAuditUsage(record, stats);
+                    record.AuditViewsCount = kvp.Value.ViewsCount;
+                    record.AuditCreatesCount = kvp.Value.CreatesCount;
+                    record.AuditEditsCount = kvp.Value.EditsCount;
+                    record.AuditUniqueUsers = kvp.Value.UniqueUsers;
                     record.PageUrl = Rel(kvp.Key);
                     target.Add(record);
                 }

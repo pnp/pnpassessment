@@ -3,6 +3,7 @@ using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
+using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Discovery;
@@ -110,7 +111,7 @@ namespace PnP.Scanning.Core.Scanners
                     Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
                     // Call the Page scan component
-                    await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
+                    await ClassicPageLegacyAdapter.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
 
                     Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
@@ -221,7 +222,7 @@ namespace PnP.Scanning.Core.Scanners
                 // transformation readiness up into its ClassicWebSummary and build the scan-wide unique
                 // web part inventory. The site loop below then reads the now-populated web columns.
                 await StorageManager.ComputeAndStoreWebPageRollupsAsync(dbContext, ScanId);
-                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, PageScanComponent.MappingManager);
+                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, ClassicPageLegacyAdapter.MappingManager);
 
                 // Roll the publishing webs + pages up into one per-site-collection publishing-portal line
                 // (parity with the legacy ModernizationPublishingSiteScanResults.csv). Reads the web summaries
