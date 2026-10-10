@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -151,7 +152,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                 WebUrl = webUrl,
                 PageUrl = pageUrl,
                 PageName = Path.GetFileName(pageUrl),
-                PageType = PageScanComponent.PublishingPage,
+                PageType = ClassicPageRules.PublishingPage,
                 Layout = layout,
                 ModifiedAt = modifiedAt,
             };
@@ -167,7 +168,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                 WebUrl = webUrl,
                 PageUrl = pageUrl,
                 PageName = Path.GetFileName(pageUrl),
-                PageType = PageScanComponent.WikiPage,
+                PageType = ClassicPageRules.WikiPage,
                 Layout = layout,
                 ModifiedAt = modifiedAt,
             };

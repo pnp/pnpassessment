@@ -23,6 +23,12 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\PnP.Scanning.Core\PnP.Scanning.Core.csproj" />
+		<ProjectReference Include="..\PnP.Scanning.Process\PnP.Scanning.Process.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Pipeline\Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+		<None Update="Pipeline\Fixtures\*.sql" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>

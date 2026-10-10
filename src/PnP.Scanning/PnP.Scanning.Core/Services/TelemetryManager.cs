@@ -3,6 +3,7 @@ using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core.Admin.Model.SharePoint;
 using PnP.Core.Model.SharePoint;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
@@ -283,12 +284,12 @@ namespace PnP.Scanning.Core.Services
 
                 switch (page.PageType)
                 {
-                    case PageScanComponent.WikiPage: wikiPageCount++; break;
-                    case PageScanComponent.WebPartPage: webPartPageCount++; break;
-                    case PageScanComponent.ASPXPage: aspxPageCount++; break;
-                    case PageScanComponent.PublishingPage: publishingPageCount++; break;
-                    case PageScanComponent.BlogPage: blogPageCount++; break;
-                    case PageScanComponent.DelveBlogPage: delveBlogPageCount++; break;
+                    case ClassicPageRules.WikiPage: wikiPageCount++; break;
+                    case ClassicPageRules.WebPartPage: webPartPageCount++; break;
+                    case ClassicPageRules.ASPXPage: aspxPageCount++; break;
+                    case ClassicPageRules.PublishingPage: publishingPageCount++; break;
+                    case ClassicPageRules.BlogPage: blogPageCount++; break;
+                    case ClassicPageRules.DelveBlogPage: delveBlogPageCount++; break;
                 }
 
                 if (page.HomePage == true)

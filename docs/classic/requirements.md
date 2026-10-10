@@ -32,11 +32,11 @@ To add this permission: go to the Entra Portal → **App registrations** → sel
 
 ## Command line arguments for starting an assessment
 
-The classic pages assessment is selected with `--mode Classic` and the `--classicinclude Pages` component. The following page-scan specific arguments are available (they are only valid together with `--mode Classic`):
+The classic pages assessment is selected with `--mode ClassicPage`. The page-scan arguments below can also be used with `--mode Classic --classicinclude Pages` when running a classic assessment with multiple components.
 
 Argument | Description
 ---------|------------
-`--classicinclude Pages` | Include the classic page scan in a classic assessment. When `--classicinclude` is omitted all classic components are included.
+`--classicinclude Pages` | Include the classic page scan when using `--mode Classic`. When omitted in that mode all classic components are included. `--mode ClassicPage` only runs the Pages component.
 `--exportwebpartproperties` | Also export each web part's properties (as JSON) into the per-web-part inventory. Off by default to keep the export compact.
 `--skipusageinformation` | Skip collecting audit log usage statistics (ClassicPageViewed / ClassicPageCreated / ClassicPageEdited). When set, `classicpageauditusage.csv` is not generated. Use this to speed up the assessment when audit log data is not needed.
 `--auditlogwindowdays` | Number of days back to query the audit log (1–180, default 14). Requires the `AuditLogsQuery-SharePoint.Read.All` permission. Audit Standard retention is 180 days; Audit Premium (E5) retains up to 1 year.

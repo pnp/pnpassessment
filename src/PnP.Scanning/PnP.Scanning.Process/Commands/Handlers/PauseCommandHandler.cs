@@ -56,17 +56,18 @@ namespace PnP.Scanning.Process.Commands
                 }
             });
 
-            cmd.SetHandler(async (Guid scanId, bool all) =>
-                            {
-                                await HandleStartAsync(scanId, all);
-                            },
-                            scanIdOption, allScansOption);
+            cmd.SetHandler(async context =>
+            {
+                context.ExitCode = await HandleStartAsync(context.ParseResult.GetValueForOption(scanIdOption),
+                    context.ParseResult.GetValueForOption(allScansOption));
+            });
 
             return cmd;
         }
 
-        private async Task HandleStartAsync(Guid scanId, bool all)
+        private async Task<int> HandleStartAsync(Guid scanId, bool all)
         {
+            int exitCode = 0;
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Pausing Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
@@ -78,6 +79,7 @@ namespace PnP.Scanning.Process.Commands
                 {
                     if (message.Type == Constants.MessageError)
                     {
+                        exitCode = 1;
                         AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
                     }
                     else if (message.Type == Constants.MessageWarning)
@@ -94,6 +96,7 @@ namespace PnP.Scanning.Process.Commands
 
                 }
             });
+            return exitCode;
         }
     }
 }

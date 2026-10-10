@@ -35,10 +35,13 @@ Column | Description
 -------|------------
 Id | The assessment id
 Mode | The assessment mode (e.g. Classic) defines the adoption or deprecation scenario the assessment is targeting
+Path / phase | Shows whether the assessment is collecting data or analyzing saved data
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
-Progress | Shows how many site collections of the total in scope site collections are assessed
+Progress | Shows how many site collections of the total in scope site collections are assessed. For `ClassicPage`, shows how many collected records have been processed in the current step
 Started at | When was this assessment for the first time started
 Ended at | When was this assessment finished
+Snapshot / run / analysis | Identifies the saved data and the runs used by a collection or analysis
+Errors | Shows the error count and summary for the run
 
 ## Getting a live status overview of a running assessment
 
@@ -63,7 +66,7 @@ Column | Description
 Id | The assessment id
 Mode | The assessment mode (e.g. Classic) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
-Progress | Shows how many site collections of the total in scope site collections are assessed
+Progress | Shows how many site collections of the total in scope site collections are assessed. For `ClassicPage`, shows how many collected records have been processed in the current step
 Retries | Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot)
 Session start | When was this assessment run started. If you've restarted an assessment the restart time is shown here
 Session duration | How long has the current assessment session been running
@@ -119,6 +122,8 @@ The easiest way to see all possible command line arguments for a command (e.g. f
 ![restart argument overview](../images/restartargumentshelp.png)
 
 Restarting happens per assessment and you specify the assessment to restart via the `--id` argument. When restarting an assessment you do have the option to change the number of parallel operations via the `--threads` argument. If you omit this argument the assessment will restart using the number of parallel operations set at assessment start.
+
+For `ClassicPage`, restarting continues the interrupted collection or analysis using its saved progress. If collection has already finished, the tool continues analysis without collecting the data again. The saved snapshot and selected analysis rules remain the same. When an assessment has several runs, use `restart --id <assessment id> --run-id <run id>` to select the run to resume.
 
 ## Clearing authentication caches
 

@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
+using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Storage;
 using System.Text.Json;
 
@@ -12,12 +15,16 @@ internal sealed class AssessmentDiscoveryWriter
 {
     private static readonly SemaphoreSlim WriteGate = new(1, 1);
     private readonly Func<ScanContext> createContext;
+    private readonly Func<IEnumerable<ClassicPageDiscovery>, CancellationToken, Task> sourceSink;
+
+    internal AssessmentDiscoveryWriter(Func<IEnumerable<ClassicPageDiscovery>, CancellationToken, Task> sourceSink) => this.sourceSink = sourceSink;
 
     internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId)) { }
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
     internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
     {
+        if (sourceSink != null) { await sourceSink(rows, cancellationToken); return; }
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -29,60 +36,7 @@ internal sealed class AssessmentDiscoveryWriter
                 if (previous == null) db.ClassicPageDiscoveries.Add(row);
                 else
                 {
-                    // Observing the same file through Forms/Views and raw files must not erase
-                    // richer metadata previously read through its list-item surface.
-                    if (row.RowType == "Page")
-                    {
-                        var changed = new List<string>();
-                        if (!string.Equals(previous.Url, row.Url, StringComparison.OrdinalIgnoreCase)) changed.Add("Url");
-                        if (previous.ListId.HasValue && row.ListId.HasValue && previous.ListId != row.ListId) changed.Add("ListId");
-                        if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");
-                        if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage) changed.Add("HomePage");
-                        if (previous.ContentTypeId != null && row.ContentTypeId != null && previous.ContentTypeId != row.ContentTypeId) changed.Add("ContentTypeId");
-                        if (changed.Count != 0)
-                            AssessmentWebDiscovery.AddError(row, "DiscoveryMetadata", DiscoveryGapCodes.ChangedDuringScan,
-                                "Repeated file identity changed: " + string.Join(", ", changed));
-                        row.ListId ??= previous.ListId;
-                        row.FolderUniqueId ??= previous.FolderUniqueId;
-                        row.ListItemId ??= previous.ListItemId;
-                        row.ContentTypeId ??= previous.ContentTypeId;
-                        row.PageType ??= previous.PageType;
-                        row.HomePage ??= previous.HomePage;
-                        row.LibraryHidden ??= previous.LibraryHidden;
-                        row.AssessmentStatus ??= previous.AssessmentStatus;
-                    }
-                    else if (row.RowType == "Reference")
-                    {
-                        if (previous.FileUniqueId.HasValue && row.FileUniqueId.HasValue &&
-                            previous.FileUniqueId != row.FileUniqueId)
-                        {
-                            row.DiscoveryStatus = "Unknown";
-                            AssessmentWebDiscovery.AddError(row, "ReferenceReconciliation",
-                                DiscoveryGapCodes.MetadataConflict,
-                                "Repeated reference identity resolved to a different physical file.");
-                            row.FileUniqueId = previous.FileUniqueId;
-                        }
-                        row.FileUniqueId ??= previous.FileUniqueId;
-                    }
-                    else if (row.RowType == "Pagination" && previous.EvidenceJson != null &&
-                             row.EvidenceJson != null && previous.EvidenceJson != row.EvidenceJson)
-                    {
-                        row.DiscoveryStatus = "Unknown";
-                        AssessmentWebDiscovery.AddError(row, "PaginationReconciliation",
-                            DiscoveryGapCodes.ChangedDuringScan,
-                            "Repeated pagination evidence changed for the same request identity.");
-                    }
-                    else if (row.RowType == "Scope" && row.ScopeType == "Surface" &&
-                             !TerminalSuccess(previous.DiscoveryStatus) && TerminalSuccess(row.DiscoveryStatus))
-                    {
-                        // A later successful visit cannot erase a retained denied/failed/unknown surface.
-                        row.DiscoveryStatus = previous.DiscoveryStatus;
-                        row.EvidenceJson = previous.EvidenceJson;
-                    }
-                    row.ErrorStage = Join(previous.ErrorStage, row.ErrorStage);
-                    row.ErrorCodes = Join(previous.ErrorCodes, row.ErrorCodes);
-                    row.ErrorDetail = Join(previous.ErrorDetail, row.ErrorDetail, "\n");
-                    row.EvidenceJson ??= previous.EvidenceJson;
+                    Reconcile(previous, row);
                     db.Entry(previous).CurrentValues.SetValues(row);
                 }
             }
@@ -147,75 +101,75 @@ internal sealed class AssessmentDiscoveryWriter
             var allRows = await db.ClassicPageDiscoveries.AsNoTracking()
                 .Where(row => row.ScanId == scanId)
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
-            var coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
-            var scopes = coverageRows.Where(row => row.RowType == "Scope").ToArray();
-            var selection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:site-selection");
-            var pageSelection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:page-selection");
-            var statuses = coverageRows.Select(row => row.DiscoveryStatus)
-                .Concat(allRows.Where(row => row.RowType == "Reference" ||
-                    (row.RowType == "Pagination" && row.DiscoveryStatus is ("Denied" or "Failed" or "Unknown")))
-                    .Select(row => row.DiscoveryStatus)).ToArray();
-            var gapCodes = allRows.SelectMany(row => (row.ErrorCodes ?? string.Empty)
-                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                .Select(code => code.Contains(':') ? code[(code.LastIndexOf(':') + 1)..] : code)
-                .ToArray();
-
-            DiscoveryVerdict verdict;
-            if (scopes.Length == 0 || selection?.ScopeType is not ("Tenant" or "SiteSelection") ||
-                statuses.Any(status => status is "Pending" or "Unknown") ||
-                gapCodes.Any(DiscoveryGapCodes.ForcesUnknown))
-            {
-                verdict = DiscoveryVerdict.Unknown;
-            }
-            else if (statuses.Any(status => status is "Denied" or "Failed" or "Partial" or "Cancelled") ||
-                     gapCodes.Contains(DiscoveryGapCodes.ExpectedChildMissing, StringComparer.Ordinal))
-            {
-                verdict = DiscoveryVerdict.Incomplete;
-            }
-            else if (pageSelection?.ObservationMethod == "HomePageOnly" || selection?.ScopeType == "SiteSelection")
-            {
-                verdict = DiscoveryVerdict.CompleteDeclaredSubset;
-            }
-            else
-            {
-                verdict = DiscoveryVerdict.CompleteTenantVerified;
-            }
-
-            var pageCount = allRows.Count(row => row.RowType == "Page");
-            var gapCount = coverageRows.Count(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
+            var current = Pipeline.Contracts.Shared.ClassicPageSourceJson.Convert<ClassicPageDiscovery>(ClassicPageCoverage.Create(scanId,
+                allRows.Select(Pipeline.Contracts.Shared.ClassicPageSourceJson.Convert<Pipeline.Contracts.Page.ClassicPageDiscoveryRow>).ToArray(), DateTime.UtcNow));
+            var verdict = Enum.Parse<DiscoveryVerdict>(current.DiscoveryStatus);
             var summary = await db.ClassicPageDiscoveries.FindAsync(
                 new object[] { scanId, "summary:coverage" }, cancellationToken).ConfigureAwait(false);
-            var current = new ClassicPageDiscovery
-            {
-                ScanId = scanId,
-                RecordKey = "summary:coverage",
-                RowType = "Summary",
-                ScopeType = "Assessment",
-                Url = selection?.Url,
-                ObservationMethod = pageSelection?.ObservationMethod ?? selection?.ObservationMethod,
-                DiscoveryStatus = verdict.ToString(),
-                ExpectedChildCount = selection?.ExpectedChildCount,
-                ObservedChildCount = pageCount,
-                ErrorCodes = string.Join(';', gapCodes.Distinct(StringComparer.Ordinal)
-                    .OrderBy(value => value, StringComparer.Ordinal)),
-                EvidenceJson = JsonSerializer.Serialize(new
-                {
-                    verdict = verdict.ToString(),
-                    declaredScope = selection?.ScopeType == "SiteSelection" || pageSelection != null,
-                    pageScope = pageSelection?.ObservationMethod ?? AspxDiscoveryIntent.FullInventory.ToString(),
-                    siteCount = selection?.ObservedChildCount,
-                    pageCount,
-                    scopeCount = scopes.Length,
-                    incompleteScopeCount = gapCount,
-                }),
-                ObservedAtUtc = DateTime.UtcNow,
-            };
             if (summary == null) db.ClassicPageDiscoveries.Add(current);
             else db.Entry(summary).CurrentValues.SetValues(current);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return verdict;
         }
         finally { WriteGate.Release(); }
+    }
+
+    internal static void Reconcile(ClassicPageDiscovery previous, ClassicPageDiscovery row)
+    {
+                    // Observing the same file through Forms/Views and raw files must not erase
+                    // richer metadata previously read through its list-item surface.
+                    if (row.RowType == "Page")
+                    {
+                        var changed = new List<string>();
+                        if (!string.Equals(previous.Url, row.Url, StringComparison.OrdinalIgnoreCase)) changed.Add("Url");
+                        if (previous.ListId.HasValue && row.ListId.HasValue && previous.ListId != row.ListId) changed.Add("ListId");
+                        if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");
+                        if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage) changed.Add("HomePage");
+                        if (previous.ContentTypeId != null && row.ContentTypeId != null && previous.ContentTypeId != row.ContentTypeId) changed.Add("ContentTypeId");
+                        if (changed.Count != 0)
+                            AssessmentWebDiscovery.AddError(row, "DiscoveryMetadata", DiscoveryGapCodes.ChangedDuringScan,
+                                "Repeated file identity changed: " + string.Join(", ", changed));
+                        row.ListId ??= previous.ListId;
+                        row.FolderUniqueId ??= previous.FolderUniqueId;
+                        row.ListItemId ??= previous.ListItemId;
+                        row.ContentTypeId ??= previous.ContentTypeId;
+                        row.PageType ??= previous.PageType;
+                        row.HomePage ??= previous.HomePage;
+                        row.LibraryHidden ??= previous.LibraryHidden;
+                        row.AssessmentStatus ??= previous.AssessmentStatus;
+                    }
+                    else if (row.RowType == "Reference")
+                    {
+                        if (previous.FileUniqueId.HasValue && row.FileUniqueId.HasValue &&
+                            previous.FileUniqueId != row.FileUniqueId)
+                        {
+                            row.DiscoveryStatus = "Unknown";
+                            AssessmentWebDiscovery.AddError(row, "ReferenceReconciliation",
+                                DiscoveryGapCodes.MetadataConflict,
+                                "Repeated reference identity resolved to a different physical file.");
+                            row.FileUniqueId = previous.FileUniqueId;
+                        }
+                        row.FileUniqueId ??= previous.FileUniqueId;
+                    }
+                    else if (row.RowType == "Pagination" && previous.EvidenceJson != null &&
+                             row.EvidenceJson != null && previous.EvidenceJson != row.EvidenceJson)
+                    {
+                        row.DiscoveryStatus = "Unknown";
+                        AssessmentWebDiscovery.AddError(row, "PaginationReconciliation",
+                            DiscoveryGapCodes.ChangedDuringScan,
+                            "Repeated pagination evidence changed for the same request identity.");
+                    }
+                    else if (row.RowType == "Scope" && row.ScopeType == "Surface" &&
+                             !TerminalSuccess(previous.DiscoveryStatus) && TerminalSuccess(row.DiscoveryStatus))
+                    {
+                        // A later successful visit cannot erase a retained denied/failed/unknown surface.
+                        row.DiscoveryStatus = previous.DiscoveryStatus;
+                        row.EvidenceJson = previous.EvidenceJson;
+                    }
+                    row.ErrorStage = Join(previous.ErrorStage, row.ErrorStage);
+                    row.ErrorCodes = Join(previous.ErrorCodes, row.ErrorCodes);
+                    row.ErrorDetail = Join(previous.ErrorDetail, row.ErrorDetail, "\n");
+                    row.EvidenceJson ??= previous.EvidenceJson;
     }
 
     internal static string Join(string left, string right, string separator = ";")

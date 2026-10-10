@@ -23,6 +23,13 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Web> Webs { get; set; }
 
+        internal DbSet<Pipeline.SourceSnapshotRow> SourceSnapshots { get; set; }
+        internal DbSet<Pipeline.SourceObservationRow> SourceObservations { get; set; }
+        internal DbSet<Pipeline.PhaseRunRow> PhaseRuns { get; set; }
+        internal DbSet<Pipeline.AnalysisRunRow> AnalysisRuns { get; set; }
+        internal DbSet<Pipeline.AnalysisResultRow> AnalysisResults { get; set; }
+        internal DbSet<Pipeline.ClassicPageReportRow> ClassicPageReportRows { get; set; }
+
         // PER SCAN COMPONENT: add new tables needed to store the data for the scan component
         internal DbSet<SyntexList> SyntexLists { get; set; }
 
@@ -132,6 +139,7 @@ namespace PnP.Scanning.Core.Storage
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            Pipeline.PipelineModel.Configure(modelBuilder);
             // Extend the model defined via annotations, typically used for defining compound keys
 
             modelBuilder.Entity<Property>(entity =>
@@ -309,12 +317,13 @@ namespace PnP.Scanning.Core.Storage
             });
             #endregion
 
-#if DEBUG
+            // This table is part of historical migrations even in Release. Keep its mapping
+            // in the model so a Release-generated incremental migration cannot drop old data.
             modelBuilder.Entity<TestDelay>(entity =>
             {
+                entity.ToTable("TestDelays");
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
             });
-#endif
 
             base.OnModelCreating(modelBuilder);
         }

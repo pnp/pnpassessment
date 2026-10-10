@@ -24,7 +24,7 @@ namespace PnP.Scanning.Core.Services
         internal StorageManager StorageManager { get; private set; }
 
         internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback,
-            ICollection<ClassicPageDiscovery> discoveryEvidence = null)
+            ICollection<ClassicPageDiscovery> discoveryEvidence = null, CancellationToken cancellationToken = default)
         {
             List<string> list = new();
             var classicOptions = OptionsBase.FromScannerInput(start) as ClassicOptions;
@@ -84,7 +84,7 @@ namespace PnP.Scanning.Core.Services
                                                                         {
                                                                             return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                                                                         }
-                    )))
+                    ), cancellationToken))
                 {
                     // Enumerate all site collections
                     VanityUrlOptions vanityUrlOptions = null;
@@ -174,7 +174,8 @@ namespace PnP.Scanning.Core.Services
             return list;
         }
 
-        internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
+        internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart,
+            CancellationToken cancellationToken = default, string contextPropertyKey = Constants.PnPContextPropertyScanId)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
             
@@ -194,7 +195,7 @@ namespace PnP.Scanning.Core.Services
             var contextOptions = new PnPContextOptions()
             {
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[] { w => w.WebTemplateConfiguration },
-                Properties = new Dictionary<string, object>() { { Constants.PnPContextPropertyScanId, scanId } }
+                Properties = new Dictionary<string, object>() { { contextPropertyKey, scanId } }
             };
 
             using (var context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl), 
@@ -202,7 +203,7 @@ namespace PnP.Scanning.Core.Services
                                                                     {
                                                                         return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                                                                     }),
-                                                                    contextOptions))
+                                                                    cancellationToken, contextOptions))
             {
                 if (options is ClassicOptions { Pages: true } || !context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
                 {

@@ -2,6 +2,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -167,11 +168,11 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
     public void Missing_item_fields_never_collapse_physical_pages_to_their_list_item_number()
     {
         var minimalFields = new Dictionary<string, object> { ["Id"] = 1 };
-        var first = Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(minimalFields, "/Pages/a.aspx");
-        var second = Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(minimalFields, "/OtherPages/b.aspx");
+        var first = Core.Pipeline.Analysis.Page.ClassicPageRules.ResolvePhysicalPageUrl(minimalFields, "/Pages/a.aspx");
+        var second = Core.Pipeline.Analysis.Page.ClassicPageRules.ResolvePhysicalPageUrl(minimalFields, "/OtherPages/b.aspx");
         first.Should().Be("/Pages/a.aspx");
         second.Should().Be("/OtherPages/b.aspx").And.NotBe(first);
-        var invalid = () => Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(minimalFields, "1");
+        var invalid = () => Core.Pipeline.Analysis.Page.ClassicPageRules.ResolvePhysicalPageUrl(minimalFields, "1");
         invalid.Should().Throw<InvalidDataException>();
     }
 
@@ -179,7 +180,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
     public void Metadata_for_a_different_file_is_rejected_before_it_enters_classic_page_assessment()
     {
         var fields = new Dictionary<string, object> { ["FileRef"] = "/OtherPages/not-this-file.aspx" };
-        var resolve = () => Core.Scanners.PageScanComponent.ResolvePhysicalPageUrl(fields, "/Pages/a.aspx");
+        var resolve = () => Core.Pipeline.Analysis.Page.ClassicPageRules.ResolvePhysicalPageUrl(fields, "/Pages/a.aspx");
         resolve.Should().Throw<InvalidDataException>();
     }
 
@@ -246,7 +247,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         {
             ["ClientSideApplicationId"] = Guid.Parse("B6917CB1-93A0-4B97-A84D-7CF49975D4EC"),
         };
-        Core.Scanners.PageScanComponent.GetPageType(fields).Should().Be("ModernPage");
+        Core.Pipeline.Analysis.Page.ClassicPageRules.GetPageType(fields).Should().Be("ModernPage");
     }
 
     [Fact]

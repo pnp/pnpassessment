@@ -10,7 +10,7 @@ Task | CLI
 -----|------
 Start a new Add-Ins and ACS assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode AddInsACS --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 Start a new Alerts assessment (delegated permissions) for a set of site collections | microsoft365-assessment.exe start --mode Alerts --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
-Start a new Classic page assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode Classic --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
+Start a new Classic page assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode ClassicPage --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 
 ## Command line arguments
 
@@ -25,6 +25,8 @@ In the next chapters the arguments are described in more details, grouped by cat
 The main argument to use is the `--mode` argument that enables you to pick the assessment to run. This argument is required and when not specified it defaults to `Classic`. Overtime more assessment modules will be added. Currently supported assessments are:
 
 [!INCLUDE [Assessment overview](./../fragments/supportedassessments.md)]
+
+For `ClassicPage`, `start` collects data from your tenant and then analyzes the saved data. You can also use `collect` and `analyze` to run these steps separately. See [Run a classic pages assessment](../classic/assess.md#collect-data-and-analyze-separately) for examples. The `Classic` mode continues to run the selected classic components together.
 
 ## Assessment scope
 

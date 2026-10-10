@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Storage
@@ -47,7 +48,7 @@ namespace PnP.Scanning.Core.Storage
 
         public bool AddToDatabase()
         {
-            if (PageType == PageScanComponent.ModernPage)
+            if (PageType == ClassicPageRules.ModernPage)
             {
                 return false;
             }

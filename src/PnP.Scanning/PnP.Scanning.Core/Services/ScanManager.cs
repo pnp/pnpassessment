@@ -7,6 +7,7 @@ using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Pipeline.Orchestration;
 using Serilog;
 using System.Collections.Concurrent;
 
@@ -24,17 +25,22 @@ namespace PnP.Scanning.Core.Services
         private readonly IPnPContextFactory contextFactory;
         private readonly RateLimiter rateLimiter;
         private readonly TelemetryManager telemetryManager;
+        private readonly PipelineCoordinator pipelineCoordinator;
+        private static ScanManager current;
+        internal static int LegacyScansRunning => Volatile.Read(ref current)?.NumberOfScansRunning() ?? 0;
         private object scanListLock = new();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, TelemetryManager telemetry,
-                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, RateLimiter limiter)
+                           IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, RateLimiter limiter, PipelineCoordinator pipeline = null)
         {
             this.hostApplicationLifetime = hostApplicationLifetime;
             dataProtectionProvider = provider;
             contextFactory = pnpContextFactory;
             rateLimiter = limiter;
             telemetryManager = telemetry;
+            pipelineCoordinator = pipeline;
+            Volatile.Write(ref current, this);
 
             // Get notified whenever the scan engine is getting throttled
             contextFactory.EventHub.RequestRetry = (retryEvent) =>
@@ -60,8 +66,7 @@ namespace PnP.Scanning.Core.Services
 
             SiteEnumerationManager = siteEnumerationManager;
 
-            // Launch a thread that will mark the running scans as terminated
-            Task.Run(async () => await MarkRunningScansAsTerminatedAsync());
+            // Startup recovery runs before RPC admission through LegacyAssessmentRecovery.
 
             // Launch a thread that will monitor and update the list of scans
             Task.Run(async () => await AutoUpdateRunningScansAsync());
@@ -180,7 +185,7 @@ namespace PnP.Scanning.Core.Services
 
         private void EnforeMaximumParallelRunningScans()
         {
-            if (NumberOfScansRunning() >= MaxParallelScans)
+            if (NumberOfScansRunning() + (pipelineCoordinator?.ActiveCount ?? 0) >= MaxParallelScans)
             {
                 Log.Error("Max number of parallel assessments reached");
                 throw new Exception("Max number of parallel assessments reached");
@@ -320,6 +325,7 @@ namespace PnP.Scanning.Core.Services
                 {
                     Id = runningScan.Value.Id.ToString(),
                     Mode = runningScan.Value.Options.Mode,
+                    ExecutionPath = "legacy",
                     Status = runningScan.Value.PostScanRunning ? "Finalizing" : runningScan.Value.Status.ToString(),
                     SiteCollectionsToScan = runningScan.Value.SiteCollectionsToScan,
                     SiteCollectionsScanned = runningScan.Value.SiteCollectionsScanned,
@@ -650,6 +656,7 @@ namespace PnP.Scanning.Core.Services
 
         private void OnStopped()
         {
+            Interlocked.CompareExchange(ref current, null, this);
             Log.Information("Kestrel stopped");
         }
 

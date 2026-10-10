@@ -98,10 +98,13 @@ namespace PnP.Scanning.Process.Commands
                 // Add some columns
                 table.AddColumn("Id ");
                 table.AddColumn("Mode");
+                table.AddColumn("Path / phase");
                 table.AddColumn(new TableColumn("Status").Centered());
                 table.AddColumn(new TableColumn("Progress").Centered());
                 table.AddColumn("Started at");
                 table.AddColumn("Ended at");
+                table.AddColumn("Snapshot / run / analysis");
+                table.AddColumn("Errors");
 
                 foreach (var item in listResult.Status)
                 {
@@ -139,6 +142,9 @@ namespace PnP.Scanning.Process.Commands
                         procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
                     }
 
+                    if (item.ExecutionPath == "pipeline")
+                        procent = new Markup($"{item.RecordsCompleted}/{item.RecordsTotal} records");
+
                     Markup endedAt;
                     if (item.ScanEnded.ToDateTime() == DateTime.MinValue)
                     {
@@ -151,10 +157,13 @@ namespace PnP.Scanning.Process.Commands
 
                     table.AddRow(new Markup($"{item.Id}"),
                                  new Markup($"{item.Mode}"),
+                                 new Markup(Markup.Escape($"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
                                  status,
                                  procent,
                                  new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),
-                                 endedAt
+                                 endedAt,
+                                 new Markup(Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
+                                 new Markup(Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}"))
                                  );
                 }
 

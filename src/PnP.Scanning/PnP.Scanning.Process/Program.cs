@@ -7,10 +7,14 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PnP.Core.Auth.Services.Builder.Configuration;
 using PnP.Core.Services.Builder.Configuration;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
+using PnP.Scanning.Core.Pipeline.Collection.Shared;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.Storage.Pipeline;
+using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Process.Commands;
 using PnP.Scanning.Process.Services;
 using Serilog;
@@ -24,7 +28,7 @@ namespace PnP.Scanning.Process
 {
     internal class Program
     {
-        internal static async Task Main(string[] args)
+        internal static async Task<int> Main(string[] args)
         {
             bool isCliProcess = true;
 
@@ -37,7 +41,10 @@ namespace PnP.Scanning.Process
             if (isCliProcess)
             {
 
-                await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
+                bool pipelineCommand = args.Length > 0 &&
+                    (args[0].Equals("analyze", StringComparison.OrdinalIgnoreCase) ||
+                     args[0].Equals("collect", StringComparison.OrdinalIgnoreCase) || args.Contains("--module"));
+                if (!pipelineCommand) await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
                 {
                     var versions = await VersionManager.LatestVersionAsync();
 
@@ -94,7 +101,7 @@ namespace PnP.Scanning.Process
                 }
                 else
                 {
-                    await parser.InvokeAsync(args);
+                    return await parser.InvokeAsync(args);
                 }
             }
             else
@@ -146,6 +153,7 @@ namespace PnP.Scanning.Process
                     Log.CloseAndFlush();
                 }
             }
+            return 0;
         }
 
         private static IHost ConfigureCliHost(string[] args)
@@ -171,6 +179,11 @@ namespace PnP.Scanning.Process
                        .UseConsoleLifetime()
                        .Build();
         }
+
+        // EF's host resolver probes this conventional factory even when a design-time
+        // DbContext factory is present. The base host needs no CLI, authentication or SDK services.
+        public static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
+            .ConfigureLogging(logging => logging.ClearProviders());
 
         private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
@@ -207,6 +220,16 @@ namespace PnP.Scanning.Process
                           services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 
                           services.AddSingleton<StorageManager>();
+                          services.AddSingleton(new PipelineStore(StorageManager.GetScannerFolder()));
+                          services.AddSingleton<IHostedService, LegacyAssessmentRecovery>();
+                          services.AddSingleton(PnP.Scanning.Core.Pipeline.Collection.Module.ClassicPageModule.Registry());
+                          services.AddSingleton<ICollectionEnvironment>(provider => new CollectionEnvironment(
+                              () => provider.GetRequiredService<IDataProtectionProvider>(),
+                              () => provider.GetRequiredService<PnP.Core.Services.IPnPContextFactory>(),
+                              () => provider.GetRequiredService<SiteEnumerationManager>()));
+                          services.AddSingleton<PipelineCoordinator>();
+                          services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<PipelineCoordinator>());
+                          services.AddSingleton<Scanner>();
                           services.AddSingleton<RateLimiter>();
                           services.AddSingleton<ScanManager>();
                           services.AddSingleton<TelemetryManager>();
