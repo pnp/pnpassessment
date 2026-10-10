@@ -15,11 +15,11 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
-[Trait("Category", "HFFoundation")]
+[Trait("Category", "Pipeline")]
 public sealed class ContractAndSnapshotTests
 {
     [Fact]
-    public void T28_Analysis_signatures_and_state_machines_have_no_online_or_mutable_storage_dependencies()
+    public void Analysis_signatures_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
         // Reused page parsers/mapping models are pure domain code. Include their IL and signatures
         // in the audit rather than allowing an uninspected namespace exception.
@@ -96,9 +96,9 @@ public sealed class ContractAndSnapshotTests
     }
 
     [Fact]
-    public async Task T28_Offline_analysis_uses_only_read_and_result_write_capabilities_after_reopen()
+    public async Task Offline_analysis_uses_only_read_and_result_write_capabilities_after_reopen()
     {
-        using var data = new StoreCase("t28-offline");
+        using var data = new StoreCase("pipeline-offline");
         var seed = await data.UnsealedAsync();
         var info = await seed.Writer.SealAsync(default);
         var reopened = new PipelineStore(data.DirectoryPath);
@@ -130,7 +130,7 @@ public sealed class ContractAndSnapshotTests
     }
 
     [Fact]
-    public void T28_Production_registry_has_no_fixture_or_legacy_phase_modules()
+    public void Production_registry_has_no_fixture_or_legacy_phase_modules()
     {
         var registry = new ModuleRegistry();
         Assert.Throws<NotSupportedException>(() => registry.GetCollector(FixedSource.ModuleKey));
@@ -139,9 +139,9 @@ public sealed class ContractAndSnapshotTests
     }
 
     [Fact]
-    public async Task T29_Sealed_snapshot_distinguishes_empty_blob_from_null_and_preserves_settled_failures()
+    public async Task Sealed_snapshot_distinguishes_empty_blob_from_null_and_preserves_settled_failures()
     {
-        using var data = new StoreCase("t29-outcomes");
+        using var data = new StoreCase("pipeline-outcomes");
         var seed = await data.UnsealedAsync();
         var sealedInfo = await seed.Writer.SealAsync(default);
         var reopened = new PipelineStore(data.DirectoryPath);
@@ -172,9 +172,9 @@ public sealed class ContractAndSnapshotTests
     [InlineData("digest")]
     [InlineData("bytes")]
     [InlineData("schema")]
-    public async Task T29_Inconsistent_saved_storage_cannot_publish_a_seal(string fault)
+    public async Task Inconsistent_saved_storage_cannot_publish_a_seal(string fault)
     {
-        using var data = new StoreCase($"t29-{fault}");
+        using var data = new StoreCase($"pipeline-{fault}");
         var seed = await data.UnsealedAsync();
         var id = FixedSource.Read()[0].ObservationId;
         using (var db = data.Store.CreateContext(seed.Assessment))
@@ -210,9 +210,9 @@ public sealed class ContractAndSnapshotTests
     }
 
     [Fact]
-    public async Task T29_Interrupted_transaction_rolls_back_source_blob_checkpoint_and_progress_together()
+    public async Task Interrupted_transaction_rolls_back_source_blob_checkpoint_and_progress_together()
     {
-        using var data = new StoreCase("t29-transaction");
+        using var data = new StoreCase("pipeline-transaction");
         var seed = await data.UnsealedAsync([]);
         var interceptor = new FailArtifactCommitOnce();
         var store = new PipelineStore(data.DirectoryPath, id => new ScanContext(new DbContextOptionsBuilder<ScanContext>()
@@ -250,9 +250,9 @@ public sealed class ContractAndSnapshotTests
     }
 
     [Fact]
-    public async Task T29_Sqlite_enforces_source_immutability_after_seal()
+    public async Task Sqlite_enforces_source_immutability_after_seal()
     {
-        using var data = new StoreCase("t29-immutability");
+        using var data = new StoreCase("pipeline-immutability");
         var seed = await data.UnsealedAsync();
         await seed.Writer.SealAsync(default);
         using var db = data.Store.CreateContext(seed.Assessment);
@@ -267,9 +267,9 @@ public sealed class ContractAndSnapshotTests
     }
 
     [Fact]
-    public async Task T29_Unsealed_and_corrupt_snapshots_are_rejected_before_an_analysis_run_is_created()
+    public async Task Unsealed_and_corrupt_snapshots_are_rejected_before_an_analysis_run_is_created()
     {
-        using var data = new StoreCase("t29-reject-input");
+        using var data = new StoreCase("pipeline-reject-input");
         var seed = await data.UnsealedAsync();
         var coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(new()), new ForbiddenOnlineEnvironment());
         var request = new AnalyzeRequest { Id = seed.Assessment.ToString(), SnapshotId = seed.Snapshot.ToString() };
@@ -277,7 +277,7 @@ public sealed class ContractAndSnapshotTests
         await seed.Writer.SealAsync(default);
         using (var db = data.Store.CreateContext(seed.Assessment))
         {
-            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER HF_SourceArtifacts_sealed_UPDATE");
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceArtifacts_sealed_UPDATE");
             await db.Database.ExecuteSqlRawAsync("UPDATE SourceArtifacts SET Length = Length + 1 WHERE RawBytes IS NOT NULL");
         }
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => coordinator.AnalyzeAsync(request));

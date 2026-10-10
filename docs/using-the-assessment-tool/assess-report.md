@@ -10,6 +10,7 @@ Task | CLI
 -----|------
 Generate Power BI report (includes CSV export) in the default location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3
 Export the gathered data as CSV files in a custom location | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --mode CsvOnly --path "c:\reports"
+Export the result of a specific classic page analysis | microsoft365-assessment.exe report --id 22989c75-f08f-4af9-8857-6f19e333d6d3 <br> --analysis-run-id &lt;analysis run id&gt; --mode CsvOnly
 
 ## Power BI
 
@@ -32,9 +33,15 @@ The easiest way to see all possible command line arguments for a command (e.g. f
 
 The key argument to specify is the `--id` argument as that will allow you to select the assessment for which a report must be generated. It's the easiest to copy the needed assessment id by using the `list` option as described in the [assessment operations](assess-operations.md) documentation. The report mode argument (`--mode`) is also required but since it defaults to `PowerBI` you don't need to specify it to create a Power BI report. If you however only want to generate CSV files then you need to set `--mode` to `CsvOnly`.
 
+## Selecting a classic page analysis via `--analysis-run-id`
+
+When you've collected classic page data and analyzed it more than once, each analysis has its own result. By default `report` selects the latest completed analysis. Use `--analysis-run-id` to select a particular completed result. You can find the analysis run id in the command output or the `list` output. Generating a report does not collect new data from your tenant.
+
 ## Report location via `--path`
 
 By default the assessment Power BI report and CSV files are generated inside a subfolder named `Report` underneath the report containing your assessment data. So assuming the Microsoft 365 Assessment tool was added in folder `c:\Microsoft365AssessmentTool` and the assessment id is `22989c75-f08f-4af9-8857-6f19e333d6d3`, then the report will live in `c:\Microsoft365AssessmentTool\22989c75-f08f-4af9-8857-6f19e333d6d3\report`. If you prefer to put the created Power BI report and CSV files in another location then you can specify the custom location via the `--path` argument. A sample: `--path "c:\reports"`.
+
+For `ClassicPage`, the default report location has an additional subfolder named after the analysis run id. This keeps the reports from repeated analyses in separate folders.
 
 ## Report delimiter setting via `--delimiter`
 

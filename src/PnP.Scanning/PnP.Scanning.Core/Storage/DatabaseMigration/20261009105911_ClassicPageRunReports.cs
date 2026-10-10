@@ -33,11 +33,11 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 });
             foreach (var operation in new[] { "UPDATE", "DELETE" })
                 migrationBuilder.Sql($"""
-                    CREATE TRIGGER CP_ReportRows_immutable_{operation} BEFORE {operation} ON ClassicPageReportRows
+                    CREATE TRIGGER ClassicPage_ReportRows_immutable_{operation} BEFORE {operation} ON ClassicPageReportRows
                     BEGIN SELECT RAISE(ABORT, 'published report rows are immutable'); END;
                     """);
             migrationBuilder.Sql("""
-                CREATE TRIGGER CP_ReportRows_running_analysis BEFORE INSERT ON ClassicPageReportRows
+                CREATE TRIGGER ClassicPage_ReportRows_running_analysis BEFORE INSERT ON ClassicPageReportRows
                 WHEN NOT EXISTS (SELECT 1 FROM PhaseRuns WHERE RunId = NEW.AnalysisRunId AND Kind = 'Analysis' AND Status = 2)
                 BEGIN SELECT RAISE(ABORT, 'report publication requires a running analysis'); END;
                 """);

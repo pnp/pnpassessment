@@ -10,7 +10,7 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class ClassicPageModeledCollectionTests
 {
     [Fact]
-    public void CP15_Folder_capture_reads_requested_SDK_members_without_remote_projection()
+    public void Folder_capture_reads_requested_SDK_members_without_remote_projection()
     {
         var folders = Collection<IFolderCollection>("FolderCollection");
         var folder = Model<IFolder>("Folder");
@@ -29,7 +29,7 @@ public sealed class ClassicPageModeledCollectionTests
     }
 
     [Fact]
-    public void CP15_File_capture_preserves_requested_identity_and_customization_without_authentication()
+    public void File_capture_preserves_requested_identity_and_customization_without_authentication()
     {
         var files = Collection<IFileCollection>("FileCollection");
         var file = Model<IFile>("File");

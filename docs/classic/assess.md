@@ -1,6 +1,8 @@
 # Run a classic pages assessment
 
-Running the classic pages assessment is just like running any other module of the Microsoft 365 Assessment tool: you use the CLI with the `Start` action to launch an assessment. By specifying the `--mode` to be `Classic` (and including the `Pages` component) the Microsoft 365 Assessment tool will run the classic pages assessment for you. This page provides you with a quick start and links to the relevant Microsoft 365 Assessment tool documentation for more details.
+Running the classic pages assessment is just like running any other module of the Microsoft 365 Assessment tool: you use the CLI with the `Start` action to launch an assessment. By specifying the `--mode` to be `ClassicPage` the Microsoft 365 Assessment tool will collect page data and then analyze the saved data. This page provides you with a quick start and links to the relevant Microsoft 365 Assessment tool documentation for more details.
+
+Use `--mode Classic` when you want to include other classic components, such as Lists or InfoPath, in the same assessment. `ClassicPage` supports the Pages component and allows you to collect and analyze its data separately.
 
 > [!NOTE]
 > The classic pages assessment is available as of **version 1.15.0** of the Microsoft 365 Assessment tool. Within a Classic assessment the Azure ACS and SharePoint Add-Ins components are skipped (they are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module).
@@ -21,9 +23,9 @@ Below are some quick start samples that show how to run a classic pages assessme
 
 Task | CLI
 -----|------
-Start a new classic pages assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode Classic --classicinclude Pages --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
-Start a classic pages assessment for a set of site collections | microsoft365-assessment.exe start --mode Classic --classicinclude Pages --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
-Assess only the home page of each web, exporting web part properties | microsoft365-assessment.exe start --mode Classic --classicinclude Pages --homepageonly --exportwebpartproperties <br> --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
+Start a new classic pages assessment (application permissions) for a complete tenant | microsoft365-assessment.exe start --mode ClassicPage --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
+Start a classic pages assessment for a set of site collections | microsoft365-assessment.exe start --mode ClassicPage --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
+Assess only the home page of each web, exporting web part properties | microsoft365-assessment.exe start --mode ClassicPage --homepageonly --exportwebpartproperties <br> --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 
 See the [requirements](requirements.md) page for the full list of classic page-scan arguments (`--exportwebpartproperties`, `--skipusageinformation`, `--skipuserinformation`, `--homepageonly`).
 
@@ -51,3 +53,14 @@ The CSV export includes [discovery.csv](csv-discovery.md), which lists physical 
 [!INCLUDE [Clarify the --id parameter](./../fragments/clarify-id-parameter.md)]
 
 To better understand the generated Power BI report and accompanying CSV files use the nodes in the left navigation.
+
+## Collect data and analyze separately
+
+If you want to collect data now and analyze it later, use the `collect` action with the same authentication, scope and page options as `start`. The command returns an assessment id and a snapshot id. A snapshot contains the data saved during that collection. Wait until collection has finished before using the snapshot for analysis.
+
+Task | CLI
+-----|------
+Collect classic page data for a site collection | microsoft365-assessment.exe collect --mode ClassicPage --authmode application <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84" <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales"
+Analyze the collected data | microsoft365-assessment.exe analyze --id &lt;assessment id&gt; --snapshot-id &lt;snapshot id&gt;
+
+The `analyze` action reads the saved snapshot and does not need authentication or a connection to your tenant. Each analysis creates a new analysis run id, so you can analyze the same collection again and keep both results. Once analysis has finished, use `report --id <assessment id> --analysis-run-id <analysis run id>` to export that result. See the [Report documentation](../using-the-assessment-tool/assess-report.md) for the report options.

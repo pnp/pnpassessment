@@ -17,11 +17,11 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 
 internal static class FixedSource
 {
-    internal const string ModuleKey = "hf-fixture";
+    internal const string ModuleKey = "snapshot-fixture";
     internal const string InputVersion = "fixture/v1";
     internal const string Rule1 = "fixture/rule-1";
     internal const string Rule2 = "fixture/rule-2";
-    internal static string Path => System.IO.Path.Combine(AppContext.BaseDirectory, "Pipeline", "Fixtures", "hf-source-v1.json");
+    internal static string Path => System.IO.Path.Combine(AppContext.BaseDirectory, "Pipeline", "Fixtures", "source-v1.json");
 
     internal static IReadOnlyList<CollectedObservation> Read()
     {
@@ -169,8 +169,8 @@ internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IData
 
 internal sealed class StoreCase : IDisposable
 {
-    internal static string TestRoot => Environment.GetEnvironmentVariable("HF_TEST_ROOT") ??
-        System.IO.Path.Combine(Directory.GetCurrentDirectory(), ".temp", "hf-acceptance");
+    internal static string TestRoot => Environment.GetEnvironmentVariable("ASSESSMENT_TEST_ROOT") ??
+        System.IO.Path.Combine(Directory.GetCurrentDirectory(), ".temp", "pipeline-tests");
     internal StoreCase(string name)
     {
         DirectoryPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(TestRoot, name, Guid.NewGuid().ToString("N")));
@@ -228,7 +228,7 @@ internal sealed class StoreCase : IDisposable
     }
     public void Dispose()
     {
-        if (Environment.GetEnvironmentVariable("HF_KEEP_FIXTURES") == "1") return;
+        if (Environment.GetEnvironmentVariable("ASSESSMENT_TEST_KEEP_DATA") == "1") return;
         var root = System.IO.Path.GetFullPath(TestRoot).TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
         if (!DirectoryPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Refusing cleanup outside the test root.");
         Directory.Delete(DirectoryPath, true);

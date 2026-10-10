@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "moduleKey": "hf-fixture",
+  "moduleKey": "snapshot-fixture",
   "inputVersion": "fixture/v1",
   "records": [
     { "id": "00000000-0000-0000-0000-000000000001", "identity": "fixture:bytes", "revision": "r1", "status": "Complete", "rawHex": "00010203ff", "error": null },

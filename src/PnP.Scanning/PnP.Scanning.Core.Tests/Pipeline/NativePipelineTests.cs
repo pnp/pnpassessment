@@ -1,9 +1,7 @@
 #nullable enable
 using System.Reflection;
 using System.Text.Json;
-using System.Security.Cryptography;
 using Grpc.Core;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Contracts;
 using PnP.Scanning.Core.Pipeline.Orchestration;
@@ -14,17 +12,17 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
-[CollectionDefinition("H-F native CLI", DisableParallelization = true)]
+[CollectionDefinition("Native pipeline CLI", DisableParallelization = true)]
 public sealed class NativePipelineCollection;
 
-[Collection("H-F native CLI")]
-[Trait("Category", "HFFoundation")]
+[Collection("Native pipeline CLI")]
+[Trait("Category", "Pipeline")]
 public sealed class NativePipelineTests
 {
     [Fact]
-    public async Task T30_Native_cli_binds_collection_options_and_runs_separate_offline_analysis_over_loopback_rpc()
+    public async Task Native_cli_binds_collection_options_and_runs_separate_offline_analysis_over_loopback_rpc()
     {
-        using var data = new StoreCase("t30-native-stages");
+        using var data = new StoreCase("pipeline-native-stages");
         var control = new FixtureControl();
         var environment = new ForbiddenOnlineEnvironment();
         await using var host = await NativePipelineHost.StartAsync(data.Store, FixedSource.Registry(control), environment);
@@ -66,9 +64,9 @@ public sealed class NativePipelineTests
     }
 
     [Fact]
-    public async Task T30_Native_pause_close_reopen_and_restart_keep_the_original_analysis_run_and_rule()
+    public async Task Native_pause_close_reopen_and_restart_keep_the_original_analysis_run_and_rule()
     {
-        using var data = new StoreCase("t30-native-resume");
+        using var data = new StoreCase("pipeline-native-resume");
         var control = new FixtureControl();
         var environment = new ForbiddenOnlineEnvironment();
         PhaseReply analysis;
@@ -125,9 +123,9 @@ public sealed class NativePipelineTests
     }
 
     [Fact]
-    public async Task T30_New_pipeline_rpc_is_not_downgraded_to_start_on_an_old_service()
+    public async Task New_pipeline_rpc_is_not_downgraded_to_start_on_an_old_service()
     {
-        using var data = new StoreCase("t30-old-service");
+        using var data = new StoreCase("pipeline-old-service");
         var environment = new ForbiddenOnlineEnvironment();
         await using var old = await NativePipelineHost.StartAsync(data.Store, new ModuleRegistry(), environment, legacyOnly: true);
         var result = await old.InvokeAsync("start", "--module", FixedSource.ModuleKey, "--threads", "1");
@@ -141,9 +139,9 @@ public sealed class NativePipelineTests
     }
 
     [Fact]
-    public async Task T30_Unregistered_modules_rules_and_incompatible_inputs_are_rejected_before_collection()
+    public async Task Unregistered_modules_rules_and_incompatible_inputs_are_rejected_before_collection()
     {
-        using var data = new StoreCase("t30-preflight");
+        using var data = new StoreCase("pipeline-preflight");
         var environment = new ForbiddenOnlineEnvironment();
         var control = new FixtureControl();
         await using (var host = await NativePipelineHost.StartAsync(data.Store, new ModuleRegistry(), environment))
@@ -179,9 +177,9 @@ public sealed class NativePipelineTests
     }
 
     [Fact]
-    public async Task T30_Native_stop_terminates_one_run_without_stopping_the_engine_and_restart_resumes_it()
+    public async Task Native_stop_terminates_one_run_without_stopping_the_engine_and_restart_resumes_it()
     {
-        using var data = new StoreCase("t30-stop");
+        using var data = new StoreCase("pipeline-stop");
         var control = new FixtureControl { BlockAnalysisAt = FixedSource.Read()[1].ObservationId };
         var environment = new ForbiddenOnlineEnvironment();
         await using var host = await NativePipelineHost.StartAsync(data.Store, FixedSource.Registry(control), environment);
@@ -205,9 +203,9 @@ public sealed class NativePipelineTests
     }
 
     [Fact]
-    public async Task T32_Legacy_start_rpc_and_cli_selection_remain_distinct_from_pipeline_selection()
+    public async Task Legacy_start_rpc_and_cli_selection_remain_distinct_from_pipeline_selection()
     {
-        using var data = new StoreCase("t32-legacy-start");
+        using var data = new StoreCase("pipeline-legacy-start");
         var environment = new ForbiddenOnlineEnvironment();
         await using var host = await NativePipelineHost.StartAsync(data.Store, new ModuleRegistry(), environment);
         var parsed = host.Parser.Parse(new[] { "start", "--mode", "Classic" });
@@ -226,9 +224,9 @@ public sealed class NativePipelineTests
     }
 
     [Fact]
-    public async Task T33_Fixed_fixture_native_combination_reopen_and_offline_reanalysis_emit_a_real_receipt()
+    public async Task Native_start_reopen_and_offline_reanalysis_preserve_source_and_create_independent_results()
     {
-        using var data = new StoreCase("t33-native-acceptance");
+        using var data = new StoreCase("pipeline-native-acceptance");
         var control = new FixtureControl();
         var environment = new ForbiddenOnlineEnvironment();
         PhaseReply combined;
@@ -268,7 +266,6 @@ public sealed class NativePipelineTests
         var results = await db.AnalysisResults.AsNoTracking().OrderBy(x => x.AnalysisRunId).ThenBy(x => x.ObservationId).ToListAsync();
         Assert.Equal(12, results.Count);
         Assert.Equal(8, results.Count(x => x.Outcome == AnalysisOutcome.Unknown));
-        var sources = await db.SourceObservations.AsNoTracking().OrderBy(x => x.ObservationId).ToListAsync();
         var artifacts = await db.SourceArtifacts.AsNoTracking().OrderBy(x => x.ObservationId).ToListAsync();
         foreach (var expected in FixedSource.Read())
         {
@@ -281,40 +278,6 @@ public sealed class NativePipelineTests
                 Assert.Equal(expected.SourceRevision, value.GetProperty("SourceRevision").GetString());
             }
         }
-        var receiptDirectory = Environment.GetEnvironmentVariable("HF_RECEIPT_DIRECTORY");
-        if (string.IsNullOrWhiteSpace(receiptDirectory)) return;
-        Directory.CreateDirectory(receiptDirectory);
-        var schema = new List<object>();
-        await db.Database.OpenConnectionAsync();
-        using (var command = db.Database.GetDbConnection().CreateCommand())
-        {
-            command.CommandText = "SELECT type, name, sql FROM sqlite_master WHERE type IN ('table', 'index', 'trigger') ORDER BY type, name";
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync()) schema.Add(new { type = reader.GetString(0), name = reader.GetString(1), sql = reader.IsDBNull(2) ? null : reader.GetString(2) });
-        }
-        using (var destination = new SqliteConnection($"Data Source={System.IO.Path.Combine(receiptDirectory, "hf-native-assessment.db")}"))
-        {
-            await destination.OpenAsync();
-            ((SqliteConnection)db.Database.GetDbConnection()).BackupDatabase(destination);
-        }
-        var schemaJson = JsonSerializer.Serialize(schema);
-        var receipt = new
-        {
-            kind = "H-F independent engineering acceptance", scenario = "T33", result = "PASS",
-            definitionSha256 = "446e75af6788aac73c3cb93d6cc51abec4a600b43bc9efa49a9b8500f43f2bee",
-            sourceCommit = Environment.GetEnvironmentVariable("HF_SOURCE_COMMIT"),
-            fixture = new { file = "Pipeline/Fixtures/hf-source-v1.json", sha256 = FixedSource.Digest(File.ReadAllBytes(FixedSource.Path)) },
-            binaries = new[] { typeof(PipelineStore).Assembly, typeof(PnP.Scanning.Process.Program).Assembly }.Select(x =>
-                new { name = x.GetName().Name, sha256 = FixedSource.Digest(File.ReadAllBytes(x.Location)) }),
-            schema = new { migrations = (await db.Database.GetAppliedMigrationsAsync()).ToArray(), sha256 = FixedSource.Digest(System.Text.Encoding.UTF8.GetBytes(schemaJson)), definitions = schema },
-            input = new { before.AssessmentId, before.SnapshotId, before.ModuleKey, before.InputVersion, before.ManifestDigest, before.ObservationIds },
-            combined, reanalyzed, phases, sources,
-            artifacts = artifacts.Select(x => new { x.ArtifactId, x.ObservationId, x.Length, x.Sha256, rawHex = x.RawBytes == null ? null : Convert.ToHexString(x.RawBytes).ToLowerInvariant() }),
-            results, onlineRequests = environment.OnlineRequests, authenticationInitializations = environment.ProtectionRequests,
-            collectionStarts = control.CollectionStarts, businessAcceptance = "C1-C3/A1-A4/T26 NOT_RUN",
-        };
-        await File.WriteAllTextAsync(System.IO.Path.Combine(receiptDirectory, "hf-fixture-receipt.json"),
-            JsonSerializer.Serialize(receipt, new JsonSerializerOptions { WriteIndented = true }));
     }
 
     private static async Task<List<RestartStatus>> ReadRestartAsync(PnPScanner.PnPScannerClient client, Guid assessment)

@@ -16,9 +16,9 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class ClassicPageIntegrityTests
 {
     [Fact]
-    public async Task CP07_Reports_are_immutable_and_source_corruption_rejects_report_and_reanalysis()
+    public async Task Reports_are_immutable_and_source_corruption_rejects_report_and_reanalysis()
     {
-        using var data = new StoreCase("cp07-corruption"); var fixture = new ClassicPageFixture();
+        using var data = new StoreCase("classicpage-corruption"); var fixture = new ClassicPageFixture();
         var coordinator = new PipelineCoordinator(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), new ForbiddenOnlineEnvironment());
         var ticket = await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
         var id = Guid.Parse(ticket.AssessmentId); Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
@@ -26,7 +26,7 @@ public sealed class ClassicPageIntegrityTests
         var corruptedPayload = "{}";
         await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE ClassicPageReportRows SET PayloadJson = {corruptedPayload}"));
         var artifact = await db.SourceArtifacts.FirstAsync(x => x.Length > 0);
-        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER HF_SourceArtifacts_sealed_UPDATE");
+        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceArtifacts_sealed_UPDATE");
         await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET RawBytes = X'01' WHERE ArtifactId = {artifact.ArtifactId}");
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => coordinator.AnalyzeAsync(new() { Id = ticket.AssessmentId, SnapshotId = ticket.SnapshotId }));
         var path = System.IO.Path.Combine(data.DirectoryPath, "corrupt-report");
@@ -35,9 +35,9 @@ public sealed class ClassicPageIntegrityTests
     }
 
     [Fact]
-    public async Task CP08_Page_reference_mismatch_and_unsettled_audit_window_cannot_be_accepted()
+    public async Task Page_reference_mismatch_and_unsettled_audit_window_cannot_be_accepted()
     {
-        using var data = new StoreCase("cp08-references"); var fixture = new ClassicPageFixture();
+        using var data = new StoreCase("classicpage-references"); var fixture = new ClassicPageFixture();
         var coordinator = new PipelineCoordinator(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), new ForbiddenOnlineEnvironment());
         var ticket = await coordinator.CollectAsync(ClassicPageFixture.Request()); var id = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
@@ -57,9 +57,9 @@ public sealed class ClassicPageIntegrityTests
     }
 
     [Fact]
-    public async Task CP09_Pause_after_report_publication_resumes_finalization_without_rewriting_results_or_reports()
+    public async Task Pause_after_report_publication_resumes_finalization_without_rewriting_results_or_reports()
     {
-        using var data = new StoreCase("cp09-finalizer"); var fixture = new ClassicPageFixture();
+        using var data = new StoreCase("classicpage-finalizer"); var fixture = new ClassicPageFixture();
         var control = new FinalizerControl(); var basis = ClassicPageModule.Registry(fixture.OpenAsync);
         var registry = new ModuleRegistry([basis.GetCollector("classicpage")],
             [basis.GetAnalyzer("classicpage") with { Create = () => control.Create() }], new Dictionary<string, string> { ["classicpage"] = "classicpage-v1" });

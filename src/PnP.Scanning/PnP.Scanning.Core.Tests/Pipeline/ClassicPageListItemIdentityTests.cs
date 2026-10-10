@@ -10,7 +10,7 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class ClassicPageListItemIdentityTests
 {
     [Fact]
-    public void CP14_List_stream_identity_survives_when_SDK_values_omit_ID()
+    public void List_stream_identity_survives_when_SDK_values_omit_ID()
     {
         // PnP Core 1.18 ListDataAsStreamHandler sets item.Id and skips ID in Values.
         // Reproduce that actual SDK shape, rather than the old fixture containing ID twice.
@@ -26,7 +26,7 @@ public sealed class ClassicPageListItemIdentityTests
     }
 
     [Fact]
-    public void CP14_Conflicting_field_identity_cannot_replace_modeled_identity()
+    public void Conflicting_field_identity_cannot_replace_modeled_identity()
     {
         var values = (TransientDictionary)Activator.CreateInstance(typeof(TransientDictionary), nonPublic: true);
         values.Add("ID", 99);

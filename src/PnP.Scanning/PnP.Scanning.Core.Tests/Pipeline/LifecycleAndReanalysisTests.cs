@@ -11,13 +11,13 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
-[Trait("Category", "HFFoundation")]
+[Trait("Category", "Pipeline")]
 public sealed class LifecycleAndReanalysisTests
 {
     [Fact]
-    public async Task T30_Queued_pipeline_capacity_and_pause_all_share_existing_lifecycle_limits()
+    public async Task Queued_pipeline_capacity_and_pause_all_share_existing_lifecycle_limits()
     {
-        using var data = new StoreCase("t30-capacity");
+        using var data = new StoreCase("pipeline-capacity");
         var control = new FixtureControl { BlockCollectionAt = FixedSource.Read()[0].ObservationId };
         var coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(control), new ForbiddenOnlineEnvironment());
         var tickets = new List<PhaseReply>();
@@ -34,9 +34,9 @@ public sealed class LifecycleAndReanalysisTests
         }
     }
     [Fact]
-    public async Task T29_Infrastructure_collection_failure_does_not_seal_or_start_analysis_and_can_resume_original_checkpoint()
+    public async Task Infrastructure_collection_failure_does_not_seal_or_start_analysis_and_can_resume_original_checkpoint()
     {
-        using var data = new StoreCase("t29-infrastructure");
+        using var data = new StoreCase("pipeline-infrastructure");
         var environment = new ForbiddenOnlineEnvironment();
         var control = new FixtureControl();
         var registration = new ModuleRegistry(
@@ -85,9 +85,9 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     [Fact]
-    public async Task T29_Seal_failure_does_not_start_analysis_or_force_finished_status()
+    public async Task Seal_failure_does_not_start_analysis_or_force_finished_status()
     {
-        using var data = new StoreCase("t29-seal-failure");
+        using var data = new StoreCase("pipeline-seal-failure");
         var control = new FixtureControl();
         var registration = new ModuleRegistry(
             [new(FixedSource.ModuleKey, FixedSource.InputVersion, () => new IncompleteManifestCollector())],
@@ -120,9 +120,9 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     [Fact]
-    public async Task T30_Collection_pause_and_restart_use_saved_record_checkpoint_without_legacy_cleanup()
+    public async Task Collection_pause_and_restart_use_saved_record_checkpoint_without_legacy_cleanup()
     {
-        using var data = new StoreCase("t30-collection-resume");
+        using var data = new StoreCase("pipeline-collection-resume");
         var control = new FixtureControl { BlockCollectionAt = FixedSource.Read()[1].ObservationId };
         var environment = new ForbiddenOnlineEnvironment();
         var coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(control), environment);
@@ -148,9 +148,9 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     [Fact]
-    public async Task T30_Combined_restart_after_seal_requires_only_the_pinned_analyzer()
+    public async Task Combined_restart_after_seal_requires_only_the_pinned_analyzer()
     {
-        using var data = new StoreCase("t30-after-seal");
+        using var data = new StoreCase("pipeline-after-seal");
         var control = new FixtureControl { FailAnalysisFactoryOnce = true };
         var environment = new ForbiddenOnlineEnvironment();
         var coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(control), environment);
@@ -178,9 +178,9 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     [Fact]
-    public async Task T30_Out_of_order_parallel_results_resume_by_committed_membership_instead_of_last_record()
+    public async Task Out_of_order_parallel_results_resume_by_committed_membership_instead_of_last_record()
     {
-        using var data = new StoreCase("t30-parallel-resume");
+        using var data = new StoreCase("pipeline-parallel-resume");
         var control = new FixtureControl();
         var environment = new ForbiddenOnlineEnvironment();
         var coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(control), environment);
@@ -205,9 +205,9 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     [Fact]
-    public async Task T29_Corruption_during_analysis_terminates_the_run_and_preserves_committed_results_and_diagnostics()
+    public async Task Corruption_during_analysis_terminates_the_run_and_preserves_committed_results_and_diagnostics()
     {
-        using var data = new StoreCase("t29-analysis-corruption");
+        using var data = new StoreCase("pipeline-analysis-corruption");
         var control = new FixtureControl();
         var environment = new ForbiddenOnlineEnvironment();
         var coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(control), environment);
@@ -219,7 +219,7 @@ public sealed class LifecycleAndReanalysisTests
         await control.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
         using (var db = data.Store.CreateContext(id))
         {
-            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER HF_SourceArtifacts_sealed_UPDATE");
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER Pipeline_SourceArtifacts_sealed_UPDATE");
             var observation = FixedSource.Read()[1].ObservationId;
             await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceArtifacts SET Length = Length + 1 WHERE ObservationId = {observation}");
         }
@@ -234,9 +234,9 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     [Fact]
-    public async Task T31_Repeated_rules_and_later_sources_create_independent_results_without_replacing_selected_input()
+    public async Task Repeated_rules_and_later_sources_create_independent_results_without_replacing_selected_input()
     {
-        using var data = new StoreCase("t31-reanalysis");
+        using var data = new StoreCase("pipeline-reanalysis");
         var seed = await data.UnsealedAsync();
         var original = await seed.Writer.SealAsync(default);
         var control = new FixtureControl();

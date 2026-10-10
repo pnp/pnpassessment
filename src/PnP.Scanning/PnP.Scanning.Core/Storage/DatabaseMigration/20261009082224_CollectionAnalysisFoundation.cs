@@ -239,7 +239,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     if (operation == "UPDATE")
                         condition += " OR EXISTS (SELECT 1 FROM SourceSnapshots WHERE SnapshotId = OLD.SnapshotId AND IsSealed = 1)";
                     migrationBuilder.Sql($"""
-                        CREATE TRIGGER HF_{table}_sealed_{operation} BEFORE {operation} ON {table}
+                        CREATE TRIGGER Pipeline_{table}_sealed_{operation} BEFORE {operation} ON {table}
                         WHEN {condition}
                         BEGIN SELECT RAISE(ABORT, 'sealed source data is immutable'); END;
                         """);
@@ -248,24 +248,24 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
             foreach (var operation in new[] { "UPDATE", "DELETE" })
             {
                 migrationBuilder.Sql($"""
-                    CREATE TRIGGER HF_SourceSnapshots_sealed_{operation} BEFORE {operation} ON SourceSnapshots
+                    CREATE TRIGGER Pipeline_SourceSnapshots_sealed_{operation} BEFORE {operation} ON SourceSnapshots
                     WHEN OLD.IsSealed = 1
                     BEGIN SELECT RAISE(ABORT, 'sealed snapshot is immutable'); END;
                     """);
                 foreach (var table in new[] { "AnalysisRuns", "AnalysisResults" })
                     migrationBuilder.Sql($"""
-                        CREATE TRIGGER HF_{table}_immutable_{operation} BEFORE {operation} ON {table}
+                        CREATE TRIGGER Pipeline_{table}_immutable_{operation} BEFORE {operation} ON {table}
                         BEGIN SELECT RAISE(ABORT, 'analysis input and committed results are immutable'); END;
                         """);
             }
             foreach (var table in new[] { "AnalysisRuns", "AnalysisResults" })
                 migrationBuilder.Sql($"""
-                    CREATE TRIGGER HF_{table}_requires_sealed_input BEFORE INSERT ON {table}
+                    CREATE TRIGGER Pipeline_{table}_requires_sealed_input BEFORE INSERT ON {table}
                     WHEN NOT EXISTS (SELECT 1 FROM SourceSnapshots WHERE SnapshotId = NEW.SnapshotId AND IsSealed = 1)
                     BEGIN SELECT RAISE(ABORT, 'analysis requires a sealed snapshot'); END;
                     """);
             migrationBuilder.Sql("""
-                CREATE TRIGGER HF_PhaseRuns_fixed_input BEFORE UPDATE ON PhaseRuns
+                CREATE TRIGGER Pipeline_PhaseRuns_fixed_input BEFORE UPDATE ON PhaseRuns
                 WHEN OLD.AssessmentId IS NOT NEW.AssessmentId OR OLD.ParentRunId IS NOT NEW.ParentRunId
                     OR OLD.Kind IS NOT NEW.Kind OR OLD.ModuleKey IS NOT NEW.ModuleKey
                     OR OLD.InputVersion IS NOT NEW.InputVersion OR OLD.SnapshotId IS NOT NEW.SnapshotId

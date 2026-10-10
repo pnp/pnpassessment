@@ -14,9 +14,9 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class ClassicPageTransportTests
 {
     [Fact]
-    public async Task CP12_Discovery_transport_reopens_and_replays_original_modeled_and_REST_responses()
+    public async Task Discovery_transport_reopens_and_replays_original_modeled_and_REST_responses()
     {
-        using var data = new StoreCase("cp12-discovery-transport"); var seed = await data.UnsealedAsync([]);
+        using var data = new StoreCase("classicpage-discovery-transport"); var seed = await data.UnsealedAsync([]);
         var context = new CollectionContext(ClassicPageFixture.MakeOptions(), VersionedJson.Empty, null, new ForbiddenOnlineEnvironment(), seed.Assessment,
             data.Store.CollectionJournal(seed.Assessment, seed.Snapshot, seed.Run));
         var journal = new ClassicPageAcquisitionJournal(context); await journal.InitializeAsync(default);
@@ -38,9 +38,9 @@ public sealed class ClassicPageTransportTests
         Assert.Equal(4, (await context.Journal!.ReadCommittedAsync(default)).Count);
     }
     [Fact]
-    public async Task CP10_Actual_audit_collector_resumes_original_query_and_pagination_from_SQLite_receipts()
+    public async Task Actual_audit_collector_resumes_original_query_and_pagination_from_SQLite_receipts()
     {
-        using var data = new StoreCase("cp10-audit-transport"); var seed = await data.UnsealedAsync([]);
+        using var data = new StoreCase("classicpage-audit-transport"); var seed = await data.UnsealedAsync([]);
         var options = ClassicPageFixture.MakeOptions(usage: true); options.Threads = 1;
         var context = new CollectionContext(options, VersionedJson.Empty, null, new ForbiddenOnlineEnvironment(), seed.Assessment,
             data.Store.CollectionJournal(seed.Assessment, seed.Snapshot, seed.Run));
@@ -73,7 +73,7 @@ public sealed class ClassicPageTransportTests
     }
 
     [Fact]
-    public async Task CP11_Collection_Csom_transport_propagates_cancellation_without_changing_shared_http_client()
+    public async Task Collection_Csom_transport_propagates_cancellation_without_changing_shared_http_client()
     {
         var pending = new PendingHandler(); using var shared = new HttpClient(pending);
         using var collection = new CancellationTokenSource();

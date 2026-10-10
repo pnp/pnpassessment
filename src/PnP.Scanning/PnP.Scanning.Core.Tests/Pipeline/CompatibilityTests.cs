@@ -15,16 +15,16 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
-[Trait("Category", "HFFoundation")]
+[Trait("Category", "Pipeline")]
 public sealed class CompatibilityTests
 {
     private const string MainMigration = "20260918022217_ClassicAspxDiscovery";
     private const string HistoricalMigration = "20260928091529_ClassicPublishingLayoutTypeEvidence";
 
     [Fact]
-    public async Task T32_Startup_recovery_settles_legacy_running_rows_without_touching_pipeline_phases_or_online_services()
+    public async Task Startup_recovery_settles_legacy_running_rows_without_touching_pipeline_phases_or_online_services()
     {
-        using var data = new StoreCase("t32-startup-recovery");
+        using var data = new StoreCase("pipeline-startup-recovery");
         var pipeline = await data.UnsealedAsync();
         var legacy = Guid.NewGuid();
         await data.Store.EnsureDatabaseAsync(legacy, default, create: true);
@@ -46,9 +46,9 @@ public sealed class CompatibilityTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task T32_Incremental_upgrade_reopen_preserves_legacy_rows_reports_counts_and_inert_history(bool historicalColumns)
+    public async Task Incremental_upgrade_reopen_preserves_legacy_rows_reports_counts_and_inert_history(bool historicalColumns)
     {
-        using var data = new StoreCase(historicalColumns ? "t32-historical" : "t32-main");
+        using var data = new StoreCase(historicalColumns ? "pipeline-historical" : "pipeline-main");
         var id = Guid.NewGuid();
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(data.Store.DatabasePath(id))!);
         using (var db = data.Store.CreateContext(id))

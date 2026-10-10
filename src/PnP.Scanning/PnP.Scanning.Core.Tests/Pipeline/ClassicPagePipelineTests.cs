@@ -2,7 +2,6 @@
 using System.Globalization;
 using System.Text.Json;
 using CsvHelper;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Analysis;
 using PnP.Scanning.Core.Pipeline.Collection;
@@ -16,13 +15,13 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
 [Trait("Category", "ClassicPagePipeline")]
-[Collection("H-F native CLI")]
+[Collection("Native pipeline CLI")]
 public sealed class ClassicPagePipelineTests
 {
     [Fact]
-    public async Task CP13_Native_collect_analyze_and_run_selected_report_use_the_production_page_module()
+    public async Task Native_collect_analyze_and_run_selected_report_use_the_production_page_module()
     {
-        using var data = new StoreCase("cp13-native-stages"); var fixture = new ClassicPageFixture(); var environment = new ForbiddenOnlineEnvironment();
+        using var data = new StoreCase("classicpage-native-stages"); var fixture = new ClassicPageFixture(); var environment = new ForbiddenOnlineEnvironment();
         await using var host = await NativePipelineHost.StartAsync(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), environment);
         var collected = await host.InvokeAsync("collect", "--mode", "classicpage", "--tenant", "contoso.sharepoint.com", "--applicationid", ClassicPageFixture.App,
             "--exportwebpartproperties", "--skipusageinformation", "--skipuserinformation");
@@ -46,9 +45,9 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal(1, notReady.ExitCode);
     }
     [Fact]
-    public async Task CP01_Native_start_mode_classicpage_runs_real_collection_analysis_and_report_without_legacy_services()
+    public async Task Native_start_mode_classicpage_runs_real_collection_analysis_and_report_without_legacy_services()
     {
-        using var data = new StoreCase("cp01-native");
+        using var data = new StoreCase("classicpage-native");
         var fixture = new ClassicPageFixture(); var environment = new ForbiddenOnlineEnvironment();
         await using var host = await NativePipelineHost.StartAsync(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), environment);
         var started = await host.InvokeAsync("start", "--mode", "classicpage", "--applicationid", ClassicPageFixture.App,
@@ -79,37 +78,12 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal(1, fixture.Calls["sites"]); Assert.Equal(1, fixture.Calls["metadata"]);
         var listed = await host.Client.ListAsync(new ListRequest()); var listing = Assert.Single(listed.Status);
         Assert.Equal("pipeline", listing.ExecutionPath); Assert.Equal(0, listing.SiteCollectionsScanned);
-        var receiptDirectory = Environment.GetEnvironmentVariable("HF_RECEIPT_DIRECTORY");
-        if (receiptDirectory != null)
-        {
-            Directory.CreateDirectory(receiptDirectory);
-            var backup = System.IO.Path.Combine(receiptDirectory, "classicpage-native-assessment.db");
-            using var sourceConnection = new SqliteConnection("Data Source=" + data.Store.DatabasePath(id));
-            using var destination = new SqliteConnection("Data Source=" + backup);
-            await sourceConnection.OpenAsync(); await destination.OpenAsync(); sourceConnection.BackupDatabase(destination);
-            var artifacts = await db.SourceArtifacts.AsNoTracking().ToListAsync();
-            var observations = await db.SourceObservations.AsNoTracking().ToListAsync();
-            var perPage = observations.Where(x => x.SourceIdentity.StartsWith("Page:")).Select(x => artifacts.Single(a => a.ArtifactId == x.ArtifactId).Length ?? 0).Order().ToArray();
-            var projections = await db.ClassicPageReportRows.AsNoTracking().ToListAsync();
-            var receipt = new { result = "PASS", sourceCommit = Environment.GetEnvironmentVariable("HF_SOURCE_COMMIT"), assessmentId = id,
-                snapshotId = snapshot.SnapshotId, analysisRunId = runId, snapshot.ModuleKey, snapshot.InputVersion, ruleVersion = "classicpage-v1",
-                snapshot.ManifestDigest, mappingDigest = ClassicPageRuleMetadata.MappingDigest, migrations = await db.Database.GetAppliedMigrationsAsync(),
-                rawArtifacts = artifacts.Select(x => new { x.ArtifactId, x.ObservationId, x.Length, x.Sha256 }),
-                analysisResults = await db.AnalysisResults.CountAsync(), reportRows = projections.Count,
-                reportDigest = AnalysisReportDigest.Compute(projections.Select(x => new AnalysisReportRow(x.Kind, x.RowKey, x.Ordinal, new VersionedJson(x.PayloadJson)))),
-                storage = new { databaseBytes = new FileInfo(backup).Length, pageArtifactBytes = perPage.Sum(),
-                    averagePageArtifactBytes = perPage.Average(), p95PageArtifactBytes = perPage[(int)Math.Ceiling(perPage.Length * .95) - 1],
-                    maximumPageArtifactBytes = perPage.Max(), totalArtifactBytes = artifacts.Sum(x => x.Length ?? 0),
-                    reportPayloadBytes = projections.Sum(x => System.Text.Encoding.UTF8.GetByteCount(x.PayloadJson)),
-                    sample = "Recorded inputs: seven physical pages; not a tenant capacity estimate" }, liveTenant = "NOT_RUN" };
-            await File.WriteAllTextAsync(System.IO.Path.Combine(receiptDirectory, "classicpage-native-receipt.json"), JsonSerializer.Serialize(receipt, new JsonSerializerOptions { WriteIndented = true }));
-        }
     }
 
     [Fact]
-    public async Task CP02_Collect_reopen_reanalyze_and_select_report_keep_original_bytes_and_results()
+    public async Task Collect_reopen_reanalyze_and_select_report_keep_original_bytes_and_results()
     {
-        using var data = new StoreCase("cp02-reanalysis"); var fixture = new ClassicPageFixture();
+        using var data = new StoreCase("classicpage-reanalysis"); var fixture = new ClassicPageFixture();
         var environment = new ForbiddenOnlineEnvironment();
         var coordinator = new PipelineCoordinator(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), environment);
         var collected = await coordinator.CollectAsync(ClassicPageFixture.Request()); var id = Guid.Parse(collected.AssessmentId);
@@ -142,9 +116,9 @@ public sealed class ClassicPagePipelineTests
     [Theory]
     [InlineData("page:3")]
     [InlineData("discovery")]
-    public async Task CP03_Pause_and_reopen_collection_replay_receipts_and_continue_original_run(string blockAt)
+    public async Task Pause_and_reopen_collection_replay_receipts_and_continue_original_run(string blockAt)
     {
-        using var data = new StoreCase("cp03-resume"); var fixture = new ClassicPageFixture { BlockAt = blockAt };
+        using var data = new StoreCase("classicpage-resume"); var fixture = new ClassicPageFixture { BlockAt = blockAt };
         var environment = new ForbiddenOnlineEnvironment(); PhaseReply ticket;
         await using (var host = await NativePipelineHost.StartAsync(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), environment))
         {
@@ -169,9 +143,9 @@ public sealed class ClassicPagePipelineTests
     }
 
     [Fact]
-    public async Task CP04_Discovery_survives_failed_metadata_and_analysis_reports_failures_without_invented_pages()
+    public async Task Discovery_survives_failed_metadata_and_analysis_reports_failures_without_invented_pages()
     {
-        using var data = new StoreCase("cp04-failure"); var fixture = new ClassicPageFixture { FailEnrichment = true };
+        using var data = new StoreCase("classicpage-failure"); var fixture = new ClassicPageFixture { FailEnrichment = true };
         var coordinator = new PipelineCoordinator(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), new ForbiddenOnlineEnvironment());
         var ticket = await coordinator.StartPipelineAsync(new StartPipelineRequest { Collection = ClassicPageFixture.Request() });
         var id = Guid.Parse(ticket.AssessmentId); Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
@@ -187,9 +161,9 @@ public sealed class ClassicPagePipelineTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CP05_Page_options_blog_and_audit_statistics_preserve_scope(bool homeOnly)
+    public async Task Page_options_blog_and_audit_statistics_preserve_scope(bool homeOnly)
     {
-        using var data = new StoreCase("cp05-options"); var fixture = new ClassicPageFixture { IncludeBlog = true };
+        using var data = new StoreCase("classicpage-options"); var fixture = new ClassicPageFixture { IncludeBlog = true };
         var coordinator = new PipelineCoordinator(data.Store, ClassicPageModule.Registry(fixture.OpenAsync), new ForbiddenOnlineEnvironment());
         var ticket = await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request(usage: true, homeOnly: homeOnly) });
         var id = Guid.Parse(ticket.AssessmentId); Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
@@ -203,9 +177,9 @@ public sealed class ClassicPagePipelineTests
     }
 
     [Fact]
-    public async Task CP06_Unsupported_component_and_rule_are_rejected_before_auth_and_database_creation()
+    public async Task Unsupported_component_and_rule_are_rejected_before_auth_and_database_creation()
     {
-        using var data = new StoreCase("cp06-preflight"); var environment = new ForbiddenOnlineEnvironment();
+        using var data = new StoreCase("classicpage-preflight"); var environment = new ForbiddenOnlineEnvironment();
         var coordinator = new PipelineCoordinator(data.Store, ClassicPageModule.Registry(), environment);
         var request = ClassicPageFixture.Request(); request.CollectionOptions.Properties.Add(new PropertyRequest { Property = "InfoPath", Type = "bool", Value = "True" });
         await Assert.ThrowsAsync<ArgumentException>(() => coordinator.CollectAsync(request));
