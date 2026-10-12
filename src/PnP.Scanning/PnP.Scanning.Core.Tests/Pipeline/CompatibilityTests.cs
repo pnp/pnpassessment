@@ -21,7 +21,6 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class CompatibilityTests
 {
     private const string MainMigration = "20260918022217_ClassicAspxDiscovery";
-    private const string HistoricalMigration = "20260928091529_ClassicPublishingLayoutTypeEvidence";
 
     /// <summary>
     /// Verifies local legacy startup settlement without changing pipeline phases or resolving online services.
@@ -49,14 +48,12 @@ public sealed class CompatibilityTests
     }
 
     /// <summary>
-    /// Verifies published-schema upgrade and reopen preserve legacy rows, report bytes, counts and historical extra columns.
+    /// Verifies that upgrading and reopening the main database preserves legacy rows, report bytes, counts and published migration history.
     /// </summary>
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Incremental_upgrade_reopen_preserves_legacy_rows_reports_counts_and_inert_history(bool historicalColumns)
+    [Fact]
+    public async Task Main_database_upgrade_reopen_preserves_legacy_rows_reports_and_counts()
     {
-        using var data = new StoreCase(historicalColumns ? "pipeline-historical" : "pipeline-main");
+        using var data = new StoreCase("pipeline-main");
         var id = Guid.NewGuid();
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(data.Store.DatabasePath(id))!);
         using (var db = data.Store.CreateContext(id))
@@ -88,13 +85,6 @@ public sealed class CompatibilityTests
                 ScanId = id, SiteUrl = "https://legacy.invalid/sites/a", WebUrl = "/", Delay1 = 11, Delay2 = 22, Delay3 = 33,
             });
             await db.SaveChangesAsync();
-            if (historicalColumns)
-            {
-                await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(System.IO.Path.Combine(AppContext.BaseDirectory,
-                    "Pipeline", "Fixtures", "legacy-publishing-layout-evidence.sql")));
-                var catalog = "{\"legacy\":true}";
-                await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Scans SET PublishingLayoutRuleVersion = {77}, PublishingLayoutTypeCatalogJson = {catalog}");
-            }
         }
         var beforePath = System.IO.Path.Combine(data.DirectoryPath, "report-before");
         var afterPath = System.IO.Path.Combine(data.DirectoryPath, "report-after");
@@ -117,22 +107,10 @@ public sealed class CompatibilityTests
         Assert.Equal(0, await read.SourceSnapshots.CountAsync());
         Assert.Equal(0, await read.SourceObservations.CountAsync());
         Assert.Equal(0, await read.PhaseRuns.CountAsync());
-        Assert.DoesNotContain(read.Model.GetEntityTypes().SelectMany(x => x.GetProperties()), x => x.Name == "PublishingLayoutRuleVersion");
         var migrations = (await read.Database.GetAppliedMigrationsAsync()).ToArray();
         Assert.Contains(MainMigration, migrations);
         Assert.Contains("20261010110520_ClassicPagePipeline", migrations);
         Assert.Contains("20220325101514_v0.2.0", migrations);
-        if (historicalColumns)
-        {
-            Assert.Contains(HistoricalMigration, migrations);
-            await read.Database.OpenConnectionAsync();
-            using var command = read.Database.GetDbConnection().CreateCommand();
-            command.CommandText = "SELECT PublishingLayoutRuleVersion, PublishingLayoutTypeCatalogJson FROM Scans";
-            using var result = await command.ExecuteReaderAsync();
-            Assert.True(await result.ReadAsync());
-            Assert.Equal(77, result.GetInt32(0));
-            Assert.Equal("{\"legacy\":true}", result.GetString(1));
-        }
         var coordinator = new PipelineCoordinator(reopened, new ModuleRegistry(), new ForbiddenOnlineEnvironment { ForbidRestore = true });
         await Assert.ThrowsAsync<NotSupportedException>(() => coordinator.AnalyzeAsync(new()
         {

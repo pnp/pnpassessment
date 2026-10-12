@@ -28,7 +28,6 @@
 
 	<ItemGroup>
 		<None Update="Pipeline\Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
-		<None Update="Pipeline\Fixtures\*.sql" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>
