@@ -26,8 +26,14 @@ using System.CommandLine.Parsing;
 
 namespace PnP.Scanning.Process
 {
+    /// <summary>
+    /// Bootstraps the assessment CLI or scanner service and registers production pipeline and legacy services.
+    /// </summary>
     internal class Program
     {
+        /// <summary>
+        /// Selects CLI or scanner mode, builds command handlers and starts the corresponding process entry point.
+        /// </summary>
         internal static async Task<int> Main(string[] args)
         {
             bool isCliProcess = true;
@@ -182,9 +188,15 @@ namespace PnP.Scanning.Process
 
         // EF's host resolver probes this conventional factory even when a design-time
         // DbContext factory is present. The base host needs no CLI, authentication or SDK services.
+        /// <summary>
+        /// Creates the production scanner host at the configured service port.
+        /// </summary>
         public static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
             .ConfigureLogging(logging => logging.ClearProviders());
 
+        /// <summary>
+        /// Configures loopback gRPC, local pipeline storage, module registration and lazy legacy service composition.
+        /// </summary>
         private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)

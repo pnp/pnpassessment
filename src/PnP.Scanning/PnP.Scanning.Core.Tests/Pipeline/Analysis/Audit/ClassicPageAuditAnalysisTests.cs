@@ -9,11 +9,17 @@ using PnP.Scanning.Core.Pipeline.Collection.Audit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
 {
-    /// <summary>Tests audit window partitioning and offline usage aggregation.</summary>
+    /// <summary>
+    /// Verifies detached audit count application and legacy chunk reduction, including distinct-user preservation across response pages.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+    /// </summary>
     public class ClassicPageAuditAnalysisTests
     {
         private const string PageUrl = "https://contoso.sharepoint.com/sites/team/SitePages/Home.aspx";
 
+        /// <summary>
+        /// Verifies that legacy audit pagination accumulates all event counts and distinct users across records pages.
+        /// </summary>
         [Fact]
         public void LegacyRecords_MultipleRecordPages_PreserveCountsAndDistinctUsers()
         {
@@ -40,9 +46,17 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             merged[PageUrl].Should().Be(new ClassicPageAuditAnalysis.AuditPageStats(2, 1, 1, 2));
         }
 
+        /// <summary>
+        /// Creates an audit usage row with fixed page identity for count application assertions.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         private static ClassicPageAuditUsage Record(string pageUrl = PageUrl) =>
             new() { PageUrl = pageUrl };
 
+        /// <summary>
+        /// Creates a page statistics lookup for the selected count and distinct-user assertions.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         private static IReadOnlyDictionary<string, ClassicPageAuditAnalysis.AuditPageStats> Stats(
             string url = PageUrl, int views = 5, int creates = 2, int edits = 3, int users = 4) =>
             new Dictionary<string, ClassicPageAuditAnalysis.AuditPageStats>(StringComparer.OrdinalIgnoreCase)
@@ -50,6 +64,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
                 [url] = new ClassicPageAuditAnalysis.AuditPageStats(views, creates, edits, users)
             };
 
+        /// <summary>
+        /// Verifies that matching audit statistics populate every usage count on the report row.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void AuditUsage_ApplyAuditUsage_MapsAllCountsOntoRecord()
         {
@@ -63,6 +81,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             record.AuditUniqueUsers.Should().Be(4);
         }
 
+        /// <summary>
+        /// Verifies that missing audit statistics leave default usage counts at zero.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void AuditUsage_ApplyAuditUsage_NullStats_LeavesCountsAtZero()
         {
@@ -76,6 +98,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             record.AuditUniqueUsers.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies that a page absent from audit statistics retains zero usage counts.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void AuditUsage_ApplyAuditUsage_PageUrlNotInStats_LeavesCountsAtZero()
         {
@@ -89,6 +115,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             record.AuditUniqueUsers.Should().Be(0);
         }
 
+        /// <summary>
+        /// Verifies case-insensitive page URL lookup when applying audit statistics.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void AuditUsage_ApplyAuditUsage_PageUrlMatchIsCaseInsensitive()
         {
@@ -101,6 +131,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             record.AuditUniqueUsers.Should().Be(4);
         }
 
+        /// <summary>
+        /// Verifies that explicit zero audit counts replace the previous row counts.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void AuditUsage_ApplyAuditUsage_ZeroCounts_StillApplied()
         {
@@ -118,6 +152,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
 
         // ── SplitWindow ──────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Verifies even audit chunks when the requested interval is an exact multiple of the chunk duration.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void SplitWindow_ExactMultiple_ProducesEvenChunks()
         {
@@ -132,6 +170,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             chunks[2].Should().Be((start.AddDays(4), end));
         }
 
+        /// <summary>
+        /// Verifies that the last audit chunk ends at the requested interval boundary when it is shorter than the others.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void SplitWindow_NonExactMultiple_LastChunkShorter()
         {
@@ -145,6 +187,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             (chunks[2].End - chunks[2].Start).TotalDays.Should().Be(1); // last chunk is 1 day
         }
 
+        /// <summary>
+        /// Verifies a single audit chunk for an interval shorter than the configured chunk duration.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void SplitWindow_WindowSmallerThanChunk_ProducesSingleChunk()
         {
@@ -160,6 +206,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
 
         // ── MergeChunks ──────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Verifies that merging audit chunks retains statistics for every distinct page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void MergeChunks_SeparatePages_CombinesAllEntries()
         {
@@ -179,6 +229,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             merged["https://contoso.sharepoint.com/sites/s/SitePages/B.aspx"].ViewsCount.Should().Be(5);
         }
 
+        /// <summary>
+        /// Verifies that audit chunk merging sums event counts for the same page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void MergeChunks_SamePage_SumsCountsAcrossChunks()
         {
@@ -198,6 +252,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             merged[url].UniqueUsers.Should().Be(2);  // union({1,2}, {1}) = {1,2} — cross-chunk dedup
         }
 
+        /// <summary>
+        /// Verifies an empty statistics lookup when no audit chunks exist.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void MergeChunks_EmptyInput_ReturnsEmptyDict()
         {
@@ -207,6 +265,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Audit
             merged.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Verifies that merged audit user sets retain the per-page memory cap.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/AuditLogUsageAnalyzerTests.cs</c> to verify audit reduction separately from Graph acquisition.</para>
+        /// </summary>
         [Fact]
         public void MergeChunks_UnionExceedingCap_IsBoundedToMaxTrackedUsersPerPage()
         {

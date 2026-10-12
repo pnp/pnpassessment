@@ -17,6 +17,9 @@ using PnP.Scanning.Core.Storage.Pipeline;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Defines the fixed source fixture, input versions and two deterministic analysis rules used by infrastructure verification.
+/// </summary>
 internal static class FixedSource
 {
     internal const string ModuleKey = "snapshot-fixture";
@@ -25,6 +28,9 @@ internal static class FixedSource
     internal const string Rule2 = "fixture/rule-2";
     internal static string Path => System.IO.Path.Combine(AppContext.BaseDirectory, "Pipeline", "Fixtures", "source-v1.json");
 
+    /// <summary>
+    /// Loads the recorded source identities, revisions, acquisition outcomes and bytes from the fixed fixture file.
+    /// </summary>
     internal static IReadOnlyList<CollectedObservation> Read()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path));
@@ -36,8 +42,14 @@ internal static class FixedSource
             x.GetProperty("error").GetString())).ToArray();
     }
 
+    /// <summary>
+    /// Computes the expected lowercase SHA-256 of recorded source bytes for integrity assertions.
+    /// </summary>
     internal static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
+    /// <summary>
+    /// Builds a collection request with fixed offline fixture scope and the selected thread count.
+    /// </summary>
     internal static CollectRequest Request(int threads = 1) => new()
     {
         Module = ModuleKey, ParametersJson = VersionedJson.Empty.Json,
@@ -49,6 +61,9 @@ internal static class FixedSource
         },
     };
 
+    /// <summary>
+    /// Registers the requested fixture collector and explicit rule versions, allowing unavailable-version and analysis-only compositions.
+    /// </summary>
     internal static ModuleRegistry Registry(FixtureControl control, bool collector = true,
         string current = Rule1, bool rule1 = true, bool rule2 = true)
     {
@@ -60,6 +75,9 @@ internal static class FixedSource
     }
 }
 
+/// <summary>
+/// Counts collection and analysis calls and controls pauses or injected analyzer construction failure.
+/// </summary>
 internal sealed class FixtureControl
 {
     internal int CollectionStarts;
@@ -72,22 +90,34 @@ internal sealed class FixtureControl
     internal TaskCompletionSource Reached { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    /// <summary>
+    /// Replaces the synchronization gates so another collection or analysis boundary can be tested.
+    /// </summary>
     internal void ResetGate()
     {
         Reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
         release = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+    /// <summary>
+    /// Clears the configured block and releases the waiting fixture operation.
+    /// </summary>
     internal void Release()
     {
         BlockCollectionAt = BlockAnalysisAt = null;
         release.TrySetResult();
     }
+    /// <summary>
+    /// Signals and blocks at the selected source identity until released or canceled.
+    /// </summary>
     internal async Task WaitAsync(bool collection, Guid id, CancellationToken token)
     {
         if ((collection ? BlockCollectionAt : BlockAnalysisAt) != id) return;
         Reached.TrySetResult();
         await release.Task.WaitAsync(token);
     }
+    /// <summary>
+    /// Creates the requested deterministic rule and optionally injects its one-time construction failure.
+    /// </summary>
     internal IAnalysisModule CreateAnalyzer(string rule)
     {
         Interlocked.Increment(ref AnalysisFactories);
@@ -100,11 +130,16 @@ internal sealed class FixtureControl
     }
 }
 
-/// <summary>Registered only in this test assembly. It does not read a tenant or interpret ASPX.</summary>
+/// <summary>
+/// Emits the fixed source fixture starting from its durable record checkpoint.
+/// </summary>
 internal sealed class FixtureCollector(FixtureControl control) : ICollectionModule
 {
     public string ModuleKey => FixedSource.ModuleKey;
     public string InputVersion => FixedSource.InputVersion;
+    /// <summary>
+    /// Restores the next source index and yields each remaining recorded observation with its checkpoint.
+    /// </summary>
     public async IAsyncEnumerable<CollectionRecord> CollectAsync(CollectionContext context,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -121,10 +156,16 @@ internal sealed class FixtureCollector(FixtureControl control) : ICollectionModu
     }
 }
 
+/// <summary>
+/// Produces deterministic results from saved fixture bytes and fixed parameters without online dependencies.
+/// </summary>
 internal sealed class FixtureAnalyzer(FixtureControl control, string rule) : IAnalysisModule
 {
     public string ModuleKey => FixedSource.ModuleKey;
     public string RuleVersion => rule;
+    /// <summary>
+    /// Counts and optionally blocks source evaluation, then returns the saved revision, bytes, digest and selected rule.
+    /// </summary>
     public async Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken cancellationToken)
     {
         control.AnalysisCalls.AddOrUpdate((rule, source.ObservationId), 1, (_, count) => count + 1);
@@ -143,6 +184,9 @@ internal sealed class FixtureAnalyzer(FixtureControl control, string rule) : IAn
     }
 }
 
+/// <summary>
+/// Rejects online service and authentication construction so offline analysis cannot pass by using tenant access.
+/// </summary>
 internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IDataProtectionProvider
 {
     internal int ProtectionRequests;
@@ -150,18 +194,30 @@ internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IData
     internal int RestoreRequests;
     internal bool ForbidRestore;
 
+    /// <summary>
+    /// Clones fixture options without resolving authentication or cryptographic services.
+    /// </summary>
     public StartRequest Protect(StartRequest options) => options.Clone();
+    /// <summary>
+    /// Counts option restoration and rejects it when analysis-only verification forbids collection resume.
+    /// </summary>
     public StartRequest Restore(StartRequest options)
     {
         Interlocked.Increment(ref RestoreRequests);
         if (ForbidRestore) throw new InvalidOperationException("Collection configuration must not be restored during analysis.");
         return options.Clone();
     }
+    /// <summary>
+    /// Counts and rejects any attempt to initialize online collection services.
+    /// </summary>
     public Task<CollectionServices> OpenAsync(StartRequest options, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref OnlineRequests);
         throw new InvalidOperationException("Online collection services are forbidden in the offline fixture.");
     }
+    /// <summary>
+    /// Counts and rejects authentication-related data protection initialization.
+    /// </summary>
     public IDataProtector CreateProtector(string purpose)
     {
         Interlocked.Increment(ref ProtectionRequests);
@@ -169,10 +225,16 @@ internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IData
     }
 }
 
+/// <summary>
+/// Creates an isolated real assessment SQLite store and provides fixed collection setup and safe test-directory cleanup.
+/// </summary>
 internal sealed class StoreCase : IDisposable
 {
     internal static string TestRoot => Environment.GetEnvironmentVariable("ASSESSMENT_TEST_ROOT") ??
         System.IO.Path.Combine(Directory.GetCurrentDirectory(), ".temp", "pipeline-tests");
+    /// <summary>
+    /// Creates the isolated workstream directory and pipeline store for the named test case.
+    /// </summary>
     internal StoreCase(string name)
     {
         DirectoryPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(TestRoot, name, Guid.NewGuid().ToString("N")));
@@ -182,6 +244,9 @@ internal sealed class StoreCase : IDisposable
     internal string DirectoryPath { get; }
     internal PipelineStore Store { get; }
 
+    /// <summary>
+    /// Creates a running collection snapshot and commits the requested fixture records without sealing it.
+    /// </summary>
     internal async Task<(Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer)> UnsealedAsync(
         IReadOnlyList<CollectedObservation>? records = null, Guid? existingAssessment = null)
     {
@@ -218,16 +283,25 @@ internal sealed class StoreCase : IDisposable
         return (assessment, snapshot, run, writer);
     }
 
+    /// <summary>
+    /// Reads the number of committed results for the selected analysis run.
+    /// </summary>
     internal async Task<int> ResultCountAsync(Guid assessment, Guid analysisId)
     {
         using var db = Store.CreateContext(assessment);
         return await db.AnalysisResults.CountAsync(x => x.AnalysisRunId == analysisId);
     }
+    /// <summary>
+    /// Waits for an asynchronous lifecycle condition with the fixture timeout.
+    /// </summary>
     internal static async Task WaitUntilAsync(Func<Task<bool>> condition)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         while (!await condition()) await Task.Delay(20, timeout.Token);
     }
+    /// <summary>
+    /// Removes only the isolated test directory unless fixture evidence retention was requested.
+    /// </summary>
     public void Dispose()
     {
         if (Environment.GetEnvironmentVariable("ASSESSMENT_TEST_KEEP_DATA") == "1") return;

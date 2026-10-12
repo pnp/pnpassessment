@@ -2,8 +2,8 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page
 {
     /// <summary>
-    /// Per-page web part inventory for a classic page. One row per web part discovered on a
-    /// WebPart or Wiki page. Mirrors the old Modernization Scanner's per-web-part output.
+    /// Carries a detached web part inventory row with page identity, layout position and optional captured properties.
+    /// <para>Evolved from <c>Storage/Model/ClassicPageWebPart.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
     /// </summary>
 
     internal class ClassicPageWebPartRow : ClassicPageBaseRow

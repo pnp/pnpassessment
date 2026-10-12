@@ -1,9 +1,16 @@
 using System.Globalization;
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
-/// <summary>Page rules shared by the legacy facade and snapshot analysis; no online objects.</summary>
+/// <summary>
+/// Provides shared page field names and pure classification rules for snapshot analysis and the legacy page adapter.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+/// </summary>
 internal static class ClassicPageRules
 {
+    /// <summary>
+    /// Recognizes publishing-page content type IDs and their descendants.
+    /// <para>Evolved from <c>Discovery/SharePoint/SharePointLiveAspxDiscoveryProvider.cs</c> to reuse content-type recognition without giving offline analysis an online provider dependency.</para>
+    /// </summary>
     internal static bool IsPublishingContentType(string contentTypeId) => !string.IsNullOrWhiteSpace(contentTypeId) &&
         (contentTypeId.StartsWith("0x010100C568DB52D9D0A14D9B2FDCC96666E9F2007948130EC3DB064584E219954237AF39", StringComparison.OrdinalIgnoreCase) ||
          contentTypeId.StartsWith("0x01010007FF3E057FA8AB4AA42FCB67B453FFC1", StringComparison.OrdinalIgnoreCase));
@@ -36,6 +43,10 @@ internal static class ClassicPageRules
         // The localized default home page resource (e.g. "Home") used to recognize an uncustomized STS#0 home page.
         internal const string WikiHomePageResource = "$Resources:WikiPageHomePageName";
 
+        /// <summary>
+        /// Reads a typed captured field value, converting text with invariant culture and falling back when the value is absent or incompatible.
+        /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+        /// </summary>
         private static T GetFieldValue<T>(IDictionary<string, object> fieldValues, string fieldName, T defaultValue = default)
         {
             if (fieldValues.ContainsKey(fieldName) && fieldValues[fieldName] != null)
@@ -48,6 +59,10 @@ internal static class ClassicPageRules
 
             return defaultValue;
         }
+        /// <summary>
+        /// Classifies saved list fields as a web part, modern, wiki, ASPX or Delve blog page.
+        /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+        /// </summary>
         internal static string GetPageType(IDictionary<string, object> fieldValues)
         {
             if (GetFieldValue(fieldValues, HtmlFileTypeField, string.Empty) == "SharePoint.WebPartPage.Document")
@@ -80,6 +95,10 @@ internal static class ClassicPageRules
                 return WikiPage;
             }
         }
+        /// <summary>
+        /// Requires a discovered server-relative file URL and rejects a conflicting FileRef instead of using a list item ID as a URL.
+        /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+        /// </summary>
         internal static string ResolvePhysicalPageUrl(IDictionary<string, object> fields, string discoveredUrl)
         {
             if (string.IsNullOrWhiteSpace(discoveredUrl) || !discoveredUrl.StartsWith('/'))

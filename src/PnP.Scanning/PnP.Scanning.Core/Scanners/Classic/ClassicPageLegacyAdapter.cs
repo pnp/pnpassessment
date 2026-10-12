@@ -14,11 +14,18 @@ using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners;
 
-/// <summary>The legacy mixed Classic scan shares page acquisition/rules, while retaining its existing storage and lifecycle.</summary>
+/// <summary>
+/// Bridges discovered pages in mixed Classic mode to the separated page collector and offline projection while retaining legacy result storage.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to keep mixed Classic mode working after moving page acquisition and analysis into separate modules.</para>
+/// </summary>
 internal static class ClassicPageLegacyAdapter
 {
     internal static readonly WebPartMappingManager MappingManager = new();
 
+    /// <summary>
+    /// Reads discovered page inputs, applies detached page analysis and persists the results through the existing Classic scanner storage path.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to keep mixed Classic mode working after moving page acquisition and analysis into separate modules.</para>
+    /// </summary>
     internal static async Task ExecuteAsync(ClassicScanner scanner, PnPContext pnp, ClientContext csom, IReadOnlyList<ClassicPageDiscovery> discovered)
     {
         var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;

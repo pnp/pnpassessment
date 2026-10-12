@@ -12,7 +12,9 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
-/// <summary>Recorded online inputs injected into the production Classic Page collector, not a demonstration module.</summary>
+/// <summary>
+/// Supplies fixed online source responses to the production Classic Pages collector, with request counters and interruption controls.
+/// </summary>
 internal sealed class ClassicPageFixture : IClassicPageOnlineSource
 {
     internal const string Site = "https://contoso.sharepoint.com/sites/a";
@@ -28,6 +30,9 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
     internal bool IncludeBlog;
     private Guid assessment;
     internal ClassicPageSourceOptions Options = new(false, true, false, false, 14);
+    /// <summary>
+    /// Binds the requested assessment and collection options and returns the recorded online source.
+    /// </summary>
     internal Task<IClassicPageOnlineSource> OpenAsync(CollectionContext context, CancellationToken token)
     {
         assessment = context.AssessmentId;
@@ -35,12 +40,21 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
         Count("open");
         return Task.FromResult<IClassicPageOnlineSource>(this);
     }
+    /// <summary>
+    /// Counts calls by acquisition operation so replay tests can detect repeated online work.
+    /// </summary>
     private void Count(string key) => Calls.AddOrUpdate(key, 1, (_, n) => n + 1);
+    /// <summary>
+    /// Builds a production Classic Pages collect request with the selected audit and home-page options.
+    /// </summary>
     internal static CollectRequest Request(bool usage = false, bool homeOnly = false) => new()
     {
         Module = "classicpage", ParametersJson = VersionedJson.Empty.Json,
         CollectionOptions = MakeOptions(usage, homeOnly),
     };
+    /// <summary>
+    /// Creates fixed tenant and authentication options and attaches the selected Classic page properties.
+    /// </summary>
     internal static StartRequest MakeOptions(bool usage = false, bool homeOnly = false)
     {
         var request = new StartRequest { Mode = Mode.ClassicPage.ToString(), Threads = 2, Environment = "Production", AuthMode = "Device",
@@ -48,6 +62,9 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
         global::PnP.Scanning.Core.Scanners.ClassicStartRequestBuilder.AddClassicProperties(request, new[] { ClassicComponent.Pages }, false, !usage, false, homeOnly, 14);
         return request;
     }
+    /// <summary>
+    /// Returns the fixed site scope and audit interval with deterministic selection evidence.
+    /// </summary>
     public Task<ClassicPageScopeSource> ReadSitesAsync(ClassicPageSourceOptions options, CancellationToken token)
     {
         Count("sites");
@@ -56,22 +73,37 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
             Url = Site, ObservationMethod = "DeclaredSites", DiscoveryStatus = "Complete", ExpectedChildCount = 1, ObservedChildCount = 1, ObservedAtUtc = end };
         return Task.FromResult(new ClassicPageScopeSource([Site], [], true, options, end.AddDays(-14), end, [evidence]));
     }
+    /// <summary>
+    /// Returns the fixed root web and selected site template with successful enumeration state.
+    /// </summary>
     public Task<ClassicPageSiteScope> ReadWebsAsync(string siteUrl, CancellationToken token)
     {
         Count("webs");
         return Task.FromResult(new ClassicPageSiteScope(Site, ["/"], [IncludeBlog ? "BLOG#0" : "STS#0"], SourceReadState.Complete));
     }
+    /// <summary>
+    /// Builds detached web identity and successful home-page facts for the selected test template.
+    /// </summary>
     internal ClassicPageWebSource Web(string template = "STS#0") => new(Site, "/", template, SiteId, WebId,
         new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), [], [], "SitePages/Home.aspx", SourceReadState.Complete,
         true, SourceReadState.Complete, null, 1033, null, SourceReadState.NotAttempted, SourceReadState.Complete);
+    /// <summary>
+    /// Returns the fixed site and web identity while counting minimum-identity reads.
+    /// </summary>
     public Task<ClassicPageWebSource> ReadIdentityAsync(string siteUrl, string webUrl, string template, CancellationToken token)
     { Count("identity"); return Task.FromResult(Web(template)); }
+    /// <summary>
+    /// Returns fixed web enrichment or injects the configured optional metadata failure.
+    /// </summary>
     public Task<ClassicPageWebSource> ReadWebAsync(string siteUrl, string webUrl, string template, CancellationToken token)
     {
         Count("metadata");
         if (FailEnrichment) throw new InvalidOperationException("Feature-dependent metadata denied");
         return Task.FromResult(Web(template));
     }
+    /// <summary>
+    /// Builds deterministic physical page discovery records, including a page without list-item identity.
+    /// </summary>
     internal ClassicPageDiscoveryRow[] DiscoveryRows() => Enumerable.Range(1, 7).Select(i => new ClassicPageDiscoveryRow
     {
         ScanId = assessment, SiteUrl = Site, WebUrl = "/", RecordKey = "page:" + i, RowType = "Page", ScopeType = "Folder",
@@ -80,6 +112,9 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
         FileUniqueId = Guid.Parse("00000000-0000-0000-0000-" + i.ToString("D12")), FileName = i == 1 ? "Home.aspx" : i + ".aspx",
         DiscoveryStatus = "Discovered", ObservationMethod = "RecordedREST", ObservedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
     }).ToArray();
+    /// <summary>
+    /// Journals two recorded discovery pages and optionally interrupts between them to exercise durable replay.
+    /// </summary>
     public async Task<ClassicPageDiscoverySource> DiscoverAsync(ClassicPageWebSource web, ClassicPageAcquisitionJournal journal, CancellationToken token)
     {
         Count("discovery");
@@ -92,6 +127,9 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
             DiscoveryStatus = "Complete", Url = Site, ExpectedChildCount = 7, ObservedChildCount = 7, ObservedAtUtc = web.LastItemUserModifiedDate };
         return new(Site, "/", rows.Append(scope).ToArray());
     }
+    /// <summary>
+    /// Returns recorded page fields and web part evidence, with optional page acquisition interruption.
+    /// </summary>
     public async Task<ClassicPageItemSource> ReadPageAsync(ClassicPageWebSource web, ClassicPageDiscoveryRow page, bool skipUsers, CancellationToken token)
     {
         Count(page.RecordKey);
@@ -120,9 +158,15 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
             SourceReadState.Complete, page.ListItemId is 1 or 2 or 3 ? SourceReadState.Complete : SourceReadState.NotAttempted,
             null, SourceReadState.NotAttempted);
     }
+    /// <summary>
+    /// Builds a recorded web part definition and export XML for offline inventory analysis.
+    /// </summary>
     internal static ClassicPageWebPartSource Part(string zone, int index) => new(Guid.Parse("00000000-0000-0000-1111-" + index.ToString("D12")), null, zone, index,
         "Content", false, false, "All", new() { ["Content"] = SourceField.Of("String", "Recorded web part content") },
         "<webParts><webPart xmlns=\"http://schemas.microsoft.com/WebPart/v3\"><metaData><type name=\"Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c\" /></metaData></webPart></webParts>", SourceReadState.Complete);
+    /// <summary>
+    /// Returns the optional recorded blog batch and continuation for blog collection tests.
+    /// </summary>
     public Task<ClassicPageBlogBatchSource?> ReadBlogBatchAsync(ClassicPageWebSource web, string? paging, bool skipUsers, CancellationToken token)
     {
         Count("blog:" + (paging ?? "first"));
@@ -130,6 +174,9 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
             ["Title"] = SourceField.Of("String", "Recorded blog post"), ["Modified"] = SourceField.Of("DateTime", web.LastItemUserModifiedDate) };
         return Task.FromResult<ClassicPageBlogBatchSource?>(new(Site, "/", ListId, "Posts", "/sites/a/Lists/Posts", [fields], paging == null ? "second" : null, SourceReadState.Complete));
     }
+    /// <summary>
+    /// Commits recorded audit chunk and records-page evidence for production audit finalization.
+    /// </summary>
     public async Task CollectAuditAsync(ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, CancellationToken token)
     {
         Count("audit");
@@ -137,5 +184,8 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
             "{\"value\":[{\"operation\":\"ClassicPageViewed\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"one\"},{\"operation\":\"ClassicPageEdited\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"ONE\"}]}", null)), token);
         await journal.ReadOrAcquireAsync("AuditChunk", "0", () => Task.FromResult(new ClassicPageAuditChunkSource(0, scope.AuditWindowStart, scope.AuditWindowEnd, "recorded-query", "succeeded", null)), token);
     }
+    /// <summary>
+    /// Completes fixture disposal because its recorded source owns no live network resources.
+    /// </summary>
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

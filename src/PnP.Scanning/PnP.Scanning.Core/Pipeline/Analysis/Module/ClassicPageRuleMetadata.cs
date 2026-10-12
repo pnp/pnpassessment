@@ -5,6 +5,9 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
+/// <summary>
+/// Pins and validates the embedded web part mapping digest used by a Classic Pages analysis rule.
+/// </summary>
 internal static class ClassicPageRuleMetadata
 {
     internal static string MappingDigest
@@ -16,11 +19,17 @@ internal static class ClassicPageRuleMetadata
             return Convert.ToHexString(SHA256.HashData(resource)).ToLowerInvariant();
         }
     }
+    /// <summary>
+    /// Records the current mapping digest when parameters are empty, after validating any explicitly supplied digest.
+    /// </summary>
     internal static VersionedJson Pin(VersionedJson parameters)
     {
         Validate(parameters);
         return parameters.Value.EnumerateObject().Any() ? parameters : VersionedJson.From(new { mappingDigest = MappingDigest });
     }
+    /// <summary>
+    /// Rejects unsupported parameter schemas, unknown parameter names or a mapping digest unavailable in this build.
+    /// </summary>
     internal static void Validate(VersionedJson parameters)
     {
         if (parameters.SchemaVersion != 1 || parameters.Value.ValueKind != JsonValueKind.Object ||

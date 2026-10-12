@@ -21,6 +21,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
     using System.Xml.Serialization;
 
 
+    /// <summary>
+    /// Represents the root of the embedded page-transformation mapping XML, including version, base properties, add-ons and web part mappings.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -82,6 +86,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Defines properties and mappings shared by all web part entries in the mapping XML.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -116,6 +124,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Defines one typed source property and its metadata in the web part mapping XML.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -164,6 +176,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Lists the source property types accepted by the mapping XML schema.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -186,6 +202,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         datetime,
     }
 
+    /// <summary>
+    /// Defines a classic web part type, its properties and the mappings available to modern components.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -259,6 +279,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Contains mapping alternatives and the selector that chooses them for a classic web part.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -294,6 +318,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Defines the condition and target components of one mapping alternative.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -368,6 +396,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Represents a modern text component produced by a mapping rule.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -403,6 +435,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Represents a modern client-side web part target and its mapped properties.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -464,6 +500,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         }
     }
 
+    /// <summary>
+    /// Lists the client-side target component types supported by the mapping schema.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]
@@ -588,6 +628,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping {
         Planner,
     }
 
+    /// <summary>
+    /// Defines an optional mapping extension and the assembly that supplies its implementation.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingModel.cs</c> to keep the XML schema model with offline mapping analysis while preserving its serialized names.</para>
+    /// </summary>
     /// <remarks/>
     [System.CodeDom.Compiler.GeneratedCodeAttribute("xsd", "4.7.3081.0")]
     [System.SerializableAttribute()]

@@ -4,6 +4,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Composes the existing assessment commands with standalone collect and analyze entry points.
+    /// </summary>
     internal sealed class RootCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -17,6 +20,9 @@ namespace PnP.Scanning.Process.Commands
             configurationOptions = configurationOptionsInstance;
         }
 
+        /// <summary>
+        /// Registers every supported command, sharing the typed collection options between collect and start.
+        /// </summary>
         public Command Create()
         {
             var rootCommand = new RootCommand();

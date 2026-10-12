@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Builds the restart command with optional pipeline run selection and execution thread overrides.
+    /// </summary>
     internal sealed class RestartCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -17,6 +20,9 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> threadsOption;
         private Option<Guid?> runIdOption;
 
+        /// <summary>
+        /// Binds restart selection, configured defaults and the scanner service client.
+        /// </summary>
         internal RestartCommandHandler(ScannerManager processManagerInstance, ConfigurationOptions configurationOptionsInstance)
         {
             processManager = processManagerInstance;
@@ -43,6 +49,9 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(runIdOption);
         }
 
+        /// <summary>
+        /// Registers restart options and binds the selected assessment, run and threads.
+        /// </summary>
         public Command Create()
         {
             cmd.SetHandler(async context =>
@@ -54,6 +63,9 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Requests resume of the selected assessment or pipeline run and displays the streamed response.
+        /// </summary>
         private async Task<int> HandleRestartAsync(Guid scanId, int threads, Guid? runId)
         {
             int exitCode = 0;

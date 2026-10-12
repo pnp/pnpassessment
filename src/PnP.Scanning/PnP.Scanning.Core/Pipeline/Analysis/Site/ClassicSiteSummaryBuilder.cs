@@ -3,8 +3,16 @@ using ClassicSiteSummary = PnP.Scanning.Core.Pipeline.Contracts.Site.ClassicSite
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Site;
 
+/// <summary>
+/// Aggregates web summaries into the existing per-site Classic assessment report shape.
+/// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> to calculate site rollups from detached web summaries during offline analysis.</para>
+/// </summary>
 internal static class ClassicSiteSummaryBuilder
 {
+    /// <summary>
+    /// Groups webs by site and calculates templates, counts, depth, remediation codes and page-weighted mapping percentages.
+    /// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> to calculate site rollups from detached web summaries during offline analysis.</para>
+    /// </summary>
     internal static List<ClassicSiteSummary> Build(Guid assessmentId, IEnumerable<ClassicWebSummary> webs)
     {
         var result = new List<ClassicSiteSummary>();

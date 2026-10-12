@@ -13,7 +13,9 @@ using PnP.Scanning.Core.Storage.Pipeline;
 
 namespace PnP.Scanning.Core.Pipeline.Orchestration;
 
-/// <summary>Shared stage scheduling and lifecycle. Legacy web cleanup and auth restart are never used here.</summary>
+/// <summary>
+/// Schedules collection, analysis and combined runs with fixed inputs, bounded capacity and shared pause, restart and stop control.
+/// </summary>
 internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry registry,
     ICollectionEnvironment collectionEnvironment) : IHostedService
 {
@@ -22,9 +24,18 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
     private bool stopping;
 
     internal int ActiveCount => active.Count;
+    /// <summary>
+    /// Checks whether the assessment currently has an in-memory pipeline execution.
+    /// </summary>
     internal bool IsActive(Guid assessmentId) => active.ContainsKey(assessmentId);
 
+    /// <summary>
+    /// Marks unfinished persisted pipeline runs as interrupted when the engine starts, retaining their recovery state.
+    /// </summary>
     public Task StartAsync(CancellationToken cancellationToken) => store.MarkInterruptedRunsAsync(cancellationToken);
+    /// <summary>
+    /// Stops accepting work and requests termination and settlement of all active pipeline executions.
+    /// </summary>
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         stopping = true;
@@ -32,13 +43,22 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
             await RequestStopAsync(execution, ScanStatus.Terminated, cancellationToken);
     }
 
+    /// <summary>
+    /// Validates and queues a collection-only assessment without selecting an analyzer.
+    /// </summary>
     internal Task<PhaseReply> CollectAsync(CollectRequest request, CancellationToken token = default) =>
         QueueCollectionAsync(request, null, null, token);
 
+    /// <summary>
+    /// Validates and queues a combined assessment whose sealed collection is followed by the selected analysis rule.
+    /// </summary>
     internal Task<PhaseReply> StartPipelineAsync(StartPipelineRequest request, CancellationToken token = default) =>
         QueueCollectionAsync(request.Collection ?? throw new ArgumentException("A collection request is required."),
             request.RuleVersion, ParseParameters(request.AnalysisParametersJson), token);
 
+    /// <summary>
+    /// Validates module compatibility before authentication, fixes scope and rule parameters, persists the queued runs, and launches execution.
+    /// </summary>
     private async Task<PhaseReply> QueueCollectionAsync(CollectRequest request, string? ruleVersion,
         VersionedJson? analysisParameters, CancellationToken token)
     {
@@ -93,6 +113,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         finally { scheduling.Release(); }
     }
 
+    /// <summary>
+    /// Validates an explicitly selected sealed snapshot and queues a new analysis run with fixed rule and parameters.
+    /// </summary>
     internal async Task<PhaseReply> AnalyzeAsync(AnalyzeRequest request, CancellationToken token = default)
     {
         var assessmentId = ParseId(request.Id, "assessment");
@@ -122,6 +145,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         finally { scheduling.Release(); }
     }
 
+    /// <summary>
+    /// Resumes the selected paused or terminated run with its original snapshot, rule and checkpoints after checking implementation availability.
+    /// </summary>
     internal async Task<PhaseReply> RestartAsync(Guid assessmentId, int threads = 0,
         Guid? runId = null, CancellationToken token = default)
     {
@@ -157,6 +183,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         finally { scheduling.Release(); }
     }
 
+    /// <summary>
+    /// Requests cancellation and paused settlement for the selected active assessment or all active pipeline assessments.
+    /// </summary>
     internal async Task PauseAsync(Guid assessmentId, bool all, CancellationToken token = default)
     {
         var selected = all ? active.Values.ToArray() : active.TryGetValue(assessmentId, out var execution)
@@ -164,6 +193,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         foreach (var item in selected) await RequestStopAsync(item, ScanStatus.Paused, token);
     }
 
+    /// <summary>
+    /// Requests termination of one active assessment while leaving the engine available for other work.
+    /// </summary>
     internal async Task TerminateAsync(Guid assessmentId, CancellationToken token = default)
     {
         if (!active.TryGetValue(assessmentId, out var execution))
@@ -171,6 +203,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         await RequestStopAsync(execution, ScanStatus.Terminated, token);
     }
 
+    /// <summary>
+    /// Serializes a pause or stop request, cancels execution and waits for phase settlement, recording termination if settlement times out.
+    /// </summary>
     private async Task RequestStopAsync(ActiveExecution execution, ScanStatus desired, CancellationToken token)
     {
         await execution.Control.WaitAsync(token);
@@ -198,6 +233,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         }
     }
 
+    /// <summary>
+    /// Rejects new work when the engine is stopping, the assessment is already active or the shared execution limit is reached.
+    /// </summary>
     private void CheckCapacity(Guid? assessmentId = null)
     {
         if (stopping) throw new InvalidOperationException("Assessment engine is stopping.");
@@ -207,6 +245,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
             throw new InvalidOperationException("Max number of parallel assessments reached.");
     }
 
+    /// <summary>
+    /// Registers one active execution and starts its asynchronous phase workflow.
+    /// </summary>
     private void Launch(PhaseRunRow root)
     {
         var execution = new ActiveExecution(root);
@@ -214,6 +255,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         _ = Task.Run(() => ExecuteAsync(execution));
     }
 
+    /// <summary>
+    /// Restores and continues collection when needed, analyzes only a sealed input, finalizes reports and settles success, cancellation or failure.
+    /// </summary>
     private async Task ExecuteAsync(ActiveExecution execution)
     {
         var root = execution.Root;
@@ -296,18 +340,27 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         }
     }
 
+    /// <summary>
+    /// Waits for active settlement or returns the persisted status of the latest root run.
+    /// </summary>
     internal async Task<ScanStatus> WaitForCompletionAsync(Guid assessmentId, CancellationToken token = default)
     {
         if (active.TryGetValue(assessmentId, out var execution)) return await execution.Completion.Task.WaitAsync(token);
         return (await store.LatestRootAsync(assessmentId, token))?.Status ?? throw new KeyNotFoundException("Assessment is unknown.");
     }
 
+    /// <summary>
+    /// Determines whether a local assessment database contains pipeline runs for routing lifecycle and report commands.
+    /// </summary>
     internal async Task<bool> OwnsAssessmentAsync(Guid assessmentId, CancellationToken token = default)
     {
         if (!File.Exists(store.DatabasePath(assessmentId))) return false;
         return (await store.GetRunsAsync(assessmentId, token)).Count > 0;
     }
 
+    /// <summary>
+    /// Lists persisted root runs with phase, snapshot, record progress and diagnostics, applying the requested status filters.
+    /// </summary>
     internal async Task<ListReply> ListAsync(ListRequest request, CancellationToken token = default)
     {
         var all = !request.Running && !request.Paused && !request.Finished && !request.Terminated;
@@ -331,6 +384,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         return reply;
     }
 
+    /// <summary>
+    /// Projects running pipeline roots into the public status response without using legacy site counts for records.
+    /// </summary>
     internal async Task<StatusReply> StatusAsync(CancellationToken token = default)
     {
         var reply = new StatusReply();
@@ -350,6 +406,9 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         return reply;
     }
 
+    /// <summary>
+    /// Constructs a queued phase row with fixed identities, parameters, thread count and creation time.
+    /// </summary>
     private static PhaseRunRow NewRun(Guid assessmentId, Guid id, Guid snapshotId, string key, string inputVersion,
         PhaseKind kind, int threads, VersionedJson parameters, VersionedJson? analysisParameters) => new()
     {
@@ -359,20 +418,35 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         CreatedAtUtc = DateTime.UtcNow,
     };
 
+    /// <summary>
+    /// Returns the assessment, snapshot and run identifiers acknowledged when work is queued.
+    /// </summary>
     private static PhaseReply Ticket(PhaseRunRow root) => new()
     {
         AssessmentId = root.AssessmentId.ToString(), SnapshotId = root.SnapshotId.ToString(), RunId = root.RunId.ToString(),
         AnalysisRunId = root.AnalysisRunId?.ToString() ?? "", Status = ScanStatus.Queued.ToString(), RuleVersion = root.RuleVersion ?? "",
     };
 
+    /// <summary>
+    /// Parses supplied versioned parameters or supplies the empty version-one envelope.
+    /// </summary>
     private static VersionedJson ParseParameters(string? json) => string.IsNullOrWhiteSpace(json) ? VersionedJson.Empty : new(json);
+    /// <summary>
+    /// Requires a valid nonempty GUID for the named pipeline identity.
+    /// </summary>
     private static Guid ParseId(string value, string name) => Guid.TryParse(value, out var id) && id != Guid.Empty
         ? id : throw new ArgumentException($"A valid {name} ID is required.");
+    /// <summary>
+    /// Rejects thread counts outside the supported execution range.
+    /// </summary>
     private static void ValidateThreads(int threads)
     {
         if (threads is < 1 or > 512) throw new ArgumentException("Threads must be between 1 and 512.");
     }
 
+    /// <summary>
+    /// Tracks cancellation, lifecycle serialization, requested settlement and completion for one active root run.
+    /// </summary>
     private sealed class ActiveExecution(PhaseRunRow root)
     {
         internal PhaseRunRow Root { get; } = root;

@@ -8,8 +8,16 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Page;
 
+/// <summary>
+/// Collects detached web part definitions, exports and page properties through CSOM for later offline analysis.
+/// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to keep CSOM reads in collection and move type, layout and inventory calculations into analysis.</para>
+/// </summary>
 internal static class PageWebPartSourceReader
 {
+    /// <summary>
+    /// Reads the page-specific web part surface and original export XML, retaining publishing layout fields and explicit export states.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to keep CSOM reads in collection and move type, layout and inventory calculations into analysis.</para>
+    /// </summary>
     internal static async Task<(Dictionary<string, SourceField> Properties, ClassicPageWebPartSource[] Parts)> ReadAsync(
         ClientContext context, string pageUrl, string pageType, Dictionary<string, SourceField> fields, CancellationToken token, bool includeTitleBar = false)
     {

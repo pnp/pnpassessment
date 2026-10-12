@@ -8,11 +8,13 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
     /// (SharePointPnP.Modernization.Framework\Entities\WebPartEntity.cs). The transform/function
     /// engine is intentionally left behind; this is the plain inventory record consumed by the
     /// mapping lookup (<see cref="WebPartMappingManager"/>) and persisted to ClassicPageWebPart.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartEntity.cs</c> to keep detached web part data with offline analysis.</para>
     /// </summary>
     public class WebPartEntity
     {
         /// <summary>
         /// Default constructor
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartEntity.cs</c> to keep detached web part data with offline analysis.</para>
         /// </summary>
         public WebPartEntity()
         {
@@ -81,6 +83,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
 
         /// <summary>
         /// Returns the shortened web part type name (the class name, dropping the assembly qualifier).
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartEntity.cs</c> to keep detached web part data with offline analysis.</para>
         /// </summary>
         /// <returns>Shortened web part type name</returns>
         public string TypeShort()
@@ -90,6 +93,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
 
         /// <summary>
         /// Returns this instance as Json
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartEntity.cs</c> to keep detached web part data with offline analysis.</para>
         /// </summary>
         /// <returns>Json serialized string of this web part instance</returns>
         public string Json()
@@ -100,6 +104,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
         /// <summary>
         /// Returns the part of a type string before the first comma (the type name without the
         /// assembly qualification). Ported from the legacy StringExtensions.GetTypeShort.
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartEntity.cs</c> to keep detached web part data with offline analysis.</para>
         /// </summary>
         internal static string GetTypeShort(string typeValue)
         {

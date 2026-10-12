@@ -6,15 +6,26 @@ using PnP.Scanning.Core.Pipeline.Contracts.Module;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Audit;
 
+/// <summary>
+/// Carries per-page audit event counts and stable user hashes reduced from one saved Graph response.
+/// </summary>
 internal sealed record ClassicAuditPageStats(string PageUrl, int Views, int Creates, int Edits, string[] UserHashes);
 
+/// <summary>
+/// Reduces saved Classic Pages audit events into usage statistics without Graph or authentication dependencies.
+/// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to separate audit event reduction from Graph requests.</para>
+/// </summary>
 internal static class ClassicPageAuditAnalysis
 {
+    /// <summary>
+    /// Contains view, creation, edit and distinct-user counts for a page usage report.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to separate audit event reduction from Graph requests.</para>
+    /// </summary>
     internal readonly record struct AuditPageStats(int ViewsCount, int CreatesCount, int EditsCount, int UniqueUsers);
 
     /// <summary>
-    /// Pure: applies audit stats to the record. If stats is null or the pageUrl key is not found,
-    /// leaves counts at 0.
+    /// Copies matching audit statistics into a report row, leaving its counts unchanged when no statistics exist.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to separate audit event reduction from Graph requests.</para>
     /// </summary>
     internal static void ApplyAuditUsage(ClassicPageAuditUsageRow record, IReadOnlyDictionary<string, AuditPageStats>? stats, string? sourcePageUrl = null)
     {
@@ -27,6 +38,10 @@ internal static class ClassicPageAuditAnalysis
         record.AuditUniqueUsers = pageStats.UniqueUsers;
     }
 
+    /// <summary>
+    /// Parses a saved records response, counts supported ASPX events, and hashes user identities for deterministic cross-page reduction.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to separate audit event reduction from Graph requests.</para>
+    /// </summary>
     internal static ClassicAuditPageStats[] Parse(string body)
     {
         using var doc = JsonDocument.Parse(body);

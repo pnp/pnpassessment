@@ -13,11 +13,22 @@ using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Carries a page assessment, web part inventory and discovery disposition, including modern-page and error outcomes.
+/// </summary>
 internal sealed record ClassicPageProjectionResult(ClassicPage? Page, ClassicPageWebPart[] Parts,
     ClassicPageDiscovery? Discovery, bool Modern, string? Error = null);
 
+/// <summary>
+/// Projects detached page inputs into Classic Pages assessment rows without changing the collected source.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+/// </summary>
 internal static class ClassicPageProjection
 {
+    /// <summary>
+    /// Classifies a discovered page, applies selection and enrichment rules, and returns its report rows and explicit assessment failures.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+    /// </summary>
     internal static ClassicPageProjectionResult Analyze(Guid assessmentId, ClassicPageWebSource web,
         ClassicPageDiscovery discovered, ClassicPageItemSource source, ClassicPageSourceOptions options, WebPartMappingManager mapping)
     {
@@ -89,6 +100,10 @@ internal static class ClassicPageProjection
         return new(page, parts, row, false, error);
     }
 
+    /// <summary>
+    /// Evaluates the legacy home-page fallback from saved template, feature, layout and web part facts.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+    /// </summary>
     private static bool HomeFallback(ClassicPageWebSource web, ClassicPage page, ClassicPageItemSource source, ClassicPageWebPart[] parts)
     {
         var split = web.Template.Split('#');
@@ -103,6 +118,10 @@ internal static class ClassicPageProjection
             source.Fields.GetValueOrDefault("WikiField")?.Text,
             parts.Select(x => new WebPartEntity { Type = x.WebPartType }).ToArray(), source.ContentTypeDisplayFormTemplateName);
     }
+    /// <summary>
+    /// Reads the saved editor email or display value unless user information was excluded from analysis.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+    /// </summary>
     internal static string? ModifiedBy(Dictionary<string, SourceField> fields, bool skipUserInformation = false)
     {
         if (skipUserInformation) return null;
@@ -110,6 +129,10 @@ internal static class ClassicPageProjection
         var email = field.Value.TryGetProperty("Email", out var e) ? e.GetString() : null;
         return !string.IsNullOrEmpty(email) ? email : field.Value.TryGetProperty("LookupValue", out var lookup) ? lookup.GetString() : null;
     }
+    /// <summary>
+    /// Appends distinct acquisition stages, status codes and diagnostic text to the detached discovery result.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+    /// </summary>
     internal static void AddError(ClassicPageDiscovery row, string stage, SourceReadState state)
     {
         row.ErrorStage = string.Join(';', new[] { row.ErrorStage, stage }.Where(x => !string.IsNullOrEmpty(x)).Distinct());

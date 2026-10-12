@@ -10,12 +10,22 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Audit;
 
+/// <summary>
+/// Records an audit HTTP response body, status, receipt time and any transport failure for durable replay.
+/// </summary>
 internal sealed record ClassicAuditHttpReceipt(int StatusCode, string Body, DateTime ReceivedAtUtc, string? Error = null);
 
-/// <summary>Graph acquisition only. Completed submissions, polls and record pages survive pause/process restart.</summary>
+/// <summary>
+/// Collects Graph audit query submissions, polls and records pages into durable acquisition receipts.
+/// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to persist raw Graph responses and resumable query progress before offline audit reduction.</para>
+/// </summary>
 internal sealed class ClassicPageAuditCollector(StartRequest options, AuthenticationManager authentication,
     HttpClient? client = null, Func<CancellationToken, Task<string>>? tokenProvider = null, TimeSpan? pollInterval = null)
 {
+    /// <summary>
+    /// Collects bounded concurrent audit chunks for the pinned scope, recording unsupported-cloud or token failures as skipped chunks.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to persist raw Graph responses and resumable query progress before offline audit reduction.</para>
+    /// </summary>
     internal async Task CollectAsync(ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, CancellationToken token)
     {
         Enum.TryParse<Microsoft365Environment>(options.Environment, out var cloud);
@@ -43,12 +53,17 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
         finally { workers.Complete(); await workers.Completion; }
     }
 
+    /// <summary>
+    /// Submits or replays a query, polls its status, saves every records page, and settles the chunk with explicit coverage or failure.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to persist raw Graph responses and resumable query progress before offline audit reduction.</para>
+    /// </summary>
     private async Task<ClassicPageAuditChunkSource> CollectChunkAsync(int chunk, DateTime start, DateTime end,
         ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, string graph,
         Func<CancellationToken, Task<string>> provider, CancellationToken token)
     {
         var endpoint = "https://" + graph + "/v1.0/security/auditLog/queries";
         string? queryId = null;
+        // Settle a failed subwindow while retaining any query identity already submitted.
         ClassicPageAuditChunkSource Failed(string error) => new(chunk, start, end, queryId, "failed", error);
         var query = new Dictionary<string, object>
         {
@@ -118,6 +133,10 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
         return new(chunk, start, end, queryId, "succeeded", null);
     }
 
+    /// <summary>
+    /// Sends one audit request with retry handling and returns the original response body or a recorded transport error.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to persist raw Graph responses and resumable query progress before offline audit reduction.</para>
+    /// </summary>
     private async Task<ClassicAuditHttpReceipt> RequestAsync(string url, string? body, Func<CancellationToken, Task<string>> provider, CancellationToken token)
     {
         try

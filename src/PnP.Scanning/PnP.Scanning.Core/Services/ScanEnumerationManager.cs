@@ -5,8 +5,14 @@ using System.Text.RegularExpressions;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Lists legacy assessment databases while leaving pipeline phase counters and lifecycle to the pipeline coordinator.
+    /// </summary>
     internal static class ScanEnumerationManager
     {
+        /// <summary>
+        /// Reads local legacy assessments, filters them by status and returns existing site counts while excluding pipeline-owned assessments.
+        /// </summary>
         internal static async Task<ListReply> EnumerateScansFromDiskAsync(StorageManager storageManager, bool running, bool paused, bool finished, bool terminated)
         {
             ListReply scans = new();

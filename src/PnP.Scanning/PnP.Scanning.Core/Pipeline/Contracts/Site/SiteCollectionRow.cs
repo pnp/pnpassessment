@@ -1,6 +1,10 @@
 namespace PnP.Scanning.Core.Pipeline.Contracts.Site
 {
 
+    /// <summary>
+    /// Carries site enumeration status and diagnostics in the existing site collection report shape.
+    /// <para>Evolved from <c>Storage/Model/SiteCollection.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
+    /// </summary>
     internal sealed class SiteCollectionRow
     {
         public Guid ScanId { get; set; }

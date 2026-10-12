@@ -4,6 +4,9 @@ using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Storage
 {
+    /// <summary>
+    /// Stores the existing legacy page assessment and supplies the compatible Classic Pages CSV field shape.
+    /// </summary>
     [Index(nameof(ScanId), [nameof(SiteUrl), nameof(WebUrl), nameof(PageUrl)], IsUnique = true)]
     internal class ClassicPage : BaseScanResult
     {
@@ -46,6 +49,9 @@ namespace PnP.Scanning.Core.Storage
 
         public string RemediationCode { get; set; }
 
+        /// <summary>
+        /// Includes only the supported classic physical page types in the legacy assessment table.
+        /// </summary>
         public bool AddToDatabase()
         {
             if (PageType == ClassicPageRules.ModernPage)

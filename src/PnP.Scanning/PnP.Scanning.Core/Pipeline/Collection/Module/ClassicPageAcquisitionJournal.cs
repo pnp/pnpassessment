@@ -7,18 +7,29 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Module;
 
-/// <summary>Every completed request is committed before its successor. Replays return the original receipt.</summary>
+/// <summary>
+/// Persists acquisition receipts and reconstructs completed request identities so a resumed collection reuses the original responses.
+/// </summary>
 internal sealed class ClassicPageAcquisitionJournal(CollectionContext context)
 {
     private readonly ConcurrentDictionary<string, CollectedObservation> committed = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> gates = new(StringComparer.Ordinal);
     internal ICollectionJournal Writer => context.Journal ?? throw new InvalidOperationException("Classic Pages requires a collection journal.");
     internal IReadOnlyCollection<CollectedObservation> Records => committed.Values.ToArray();
+    /// <summary>
+    /// Checks whether a request kind and key already have a committed acquisition receipt.
+    /// </summary>
     internal bool Contains(string kind, string key) => committed.ContainsKey(kind + ":" + key);
+    /// <summary>
+    /// Loads committed receipt identities without BLOBs before replaying or continuing acquisition.
+    /// </summary>
     internal async Task InitializeAsync(CancellationToken token)
     {
         foreach (var record in await Writer.ReadCommittedAsync(token, metadataOnly: true)) committed.TryAdd(record.SourceIdentity, record);
     }
+    /// <summary>
+    /// Serializes acquisition by request identity, replays an existing saved payload, or commits the new payload before returning it.
+    /// </summary>
     internal async Task<T> ReadOrAcquireAsync<T>(string kind, string key, Func<Task<T>> acquire, CancellationToken token,
         Func<T, AcquisitionStatus>? status = null, Func<T, string?>? error = null)
     {
@@ -40,7 +51,16 @@ internal sealed class ClassicPageAcquisitionJournal(CollectionContext context)
         }
         finally { gate.Release(); }
     }
+    /// <summary>
+    /// Persists collector progress without adding a source observation.
+    /// </summary>
     internal Task CheckpointAsync(object checkpoint, CancellationToken token) => Writer.CommitAsync(new(null, VersionedJson.From(checkpoint)), token);
+    /// <summary>
+    /// Derives a stable observation ID from the assessment and request identity for idempotent collection replay.
+    /// </summary>
     internal Guid Id(string key) => new(SHA256.HashData(Encoding.UTF8.GetBytes(context.AssessmentId.ToString("D") + "|" + key)).AsSpan(0, 16));
+    /// <summary>
+    /// Converts a recorded read state into a persisted acquisition status, retaining unknown states explicitly.
+    /// </summary>
     internal static AcquisitionStatus Status(SourceReadState state) => Enum.TryParse<AcquisitionStatus>(state.Status, out var status) ? status : AcquisitionStatus.Unknown;
 }

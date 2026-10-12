@@ -6,10 +6,8 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 {
     /// <summary>
-    /// T5 — the pure (no CSOM) wiki-HTML parser. These tests feed it captured <c>WikiField</c> HTML and
-    /// assert the extracted web part placeholders (count + position + control id) and inline text blocks.
-    /// The <c>LimitedWebPartManager</c> resolution path that turns a placeholder into a typed web part is
-    /// CSOM-only and is covered by the integration test, not here.
+    /// Verifies wiki text, media and web part placeholder extraction from saved HTML without SharePoint access.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
     /// </summary>
     public class WikiContentParserTests
     {
@@ -84,6 +82,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
               </table>
             </div>";
 
+        /// <summary>
+        /// Verifies extraction of captured wiki web part control IDs and positions.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_Parse_ExtractsWebPartPlaceholders()
         {
@@ -115,6 +117,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             result.TextParts[0].Properties["Text"].Should().Contain("Hello wiki world");
         }
 
+        /// <summary>
+        /// Verifies one-based column assignment from wiki layout cells.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_Parse_AssignsColumnNumbersPerLayoutColumn()
         {
@@ -127,6 +133,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             result.Placeholders[1].ControlId.Should().Be("g_bbbbbbbb_bbbb_bbbb_bbbb_bbbbbbbbbbbb");
         }
 
+        /// <summary>
+        /// Verifies that markup without web part placeholders produces no placeholder entries.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_NoWebParts_ReturnsEmpty()
         {
@@ -140,6 +150,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             result.TextParts[0].Properties["Text"].Should().Contain("Just some article text");
         }
 
+        /// <summary>
+        /// Verifies that empty wiki HTML yields no content or placeholder inventory.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Theory]
         [InlineData(null)]
         [InlineData("")]
@@ -151,6 +165,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             result.TextParts.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Verifies text-part projection for wiki markup without a recognized layout.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_NonLayoutHtml_WrapsContentAsSingleTextPart()
         {
@@ -224,6 +242,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
               </table>
             </div>";
 
+        /// <summary>
+        /// Verifies image-part extraction from wiki HTML.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_EmbeddedImage_EmitsWikiImagePart()
         {
@@ -253,6 +275,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
                 .Should().Contain("Before the picture").And.Contain("After the picture");
         }
 
+        /// <summary>
+        /// Verifies embedded video-part extraction from wiki iframe markup.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_EmbeddedIframe_EmitsWikiVideoPart()
         {
@@ -278,6 +304,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             result.TextParts.Should().OnlyContain(t => !t.Properties["Text"].Contains("<iframe"));
         }
 
+        /// <summary>
+        /// Verifies preservation of the hyperlink around an extracted wiki image.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_AnchorWrappedImage_EmitsImagePartWithAnchor()
         {
@@ -296,6 +326,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
                 .Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Verifies that extracted wiki media types are recognized by the mapping catalog.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/WikiContentParserTests.cs</c> to keep saved HTML parser regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void WikiHtml_EmbeddedMediaTypes_AreMappable()
         {

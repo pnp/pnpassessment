@@ -19,6 +19,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
     /// </list>
     /// Everything in this module is pure (no CSOM): the caller resolves the CSOM inputs (welcome page,
     /// feature flags, master page url, content type, localized home-page name) and passes them in.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/HomePageDetector.cs</c> to make home-page rules available to offline snapshot analysis.</para>
     /// </summary>
     internal static class HomePageDetector
     {
@@ -52,6 +53,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// <summary>
         /// Returns the welcome page name to compare against, defaulting to <c>default.aspx</c> when the
         /// web reports no welcome page (the legacy behaviour for web-part-page home pages).
+        /// <para>Evolved from <c>Scanners/Classic/Pages/HomePageDetector.cs</c> to make home-page rules available to offline snapshot analysis.</para>
         /// </summary>
         internal static string NormalizeWelcomePage(string welcomePage)
         {
@@ -62,6 +64,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// Whether the given page is the web's home page: a case-insensitive suffix match of the page's
         /// server-relative url against the web's welcome page. Ported from the legacy
         /// <c>pageUrl.EndsWith(homePageUrl)</c> compare.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/HomePageDetector.cs</c> to make home-page rules available to offline snapshot analysis.</para>
         /// </summary>
         /// <param name="pageUrl">The page's server-relative url.</param>
         /// <param name="welcomePageUrl">The web's welcome page (<c>web.WelcomePage</c>); empty ⇒ default.aspx.</param>
@@ -75,6 +78,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
             return pageUrl.EndsWith(NormalizeWelcomePage(welcomePageUrl), StringComparison.InvariantCultureIgnoreCase);
         }
 
+        /// <summary>
+        /// Determines home-page identity from a known welcome-page value, otherwise preserving the previously discovered state.
+        /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to apply welcome-page precedence using detached values during offline analysis.</para>
+        /// </summary>
         internal static bool? ResolveHomePageState(string pageUrl, string welcomePage,
             bool welcomePageKnown, bool? discoveredHomePage) => welcomePageKnown
             ? IsHomePage(pageUrl, welcomePage)
@@ -85,6 +92,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// (i.e. the page was not customized). Ported verbatim from the legacy
         /// <c>PageAnalyzer.IsHtmlUncustomized</c>: strip whitespace, GUIDs and the per-page
         /// <c>ExternalClass</c> marker, then compare to the two captured default layouts.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/HomePageDetector.cs</c> to make home-page rules available to offline snapshot analysis.</para>
         /// </summary>
         internal static bool IsHtmlUncustomized(string wikiHtml)
         {
@@ -106,6 +114,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// nothing else. Derived from the legacy <c>PageAnalyzer.GetPageWebPartInfo</c>, which produced four
         /// categories but whose only consumer (this heuristic) cared solely about the "default set" one — so
         /// it is reduced here to that single boolean rather than carrying three unused categories.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/HomePageDetector.cs</c> to make home-page rules available to offline snapshot analysis.</para>
         /// </summary>
         internal static bool IsDefaultTeamSiteWebPartSet(IReadOnlyList<WebPartEntity> webParts)
         {
@@ -156,6 +165,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// page (no publishing, not groupified, not opted out, still on seattle.master, still named the
         /// localized default home page, still the default wiki HTML, still the default web part set, still
         /// the WikiEditForm content type) is considered uncustomized.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/HomePageDetector.cs</c> to make home-page rules available to offline snapshot analysis.</para>
         /// </summary>
         /// <param name="isHomePage">Whether this page is the web's home page (see <see cref="IsHomePage"/>).</param>
         /// <param name="webTemplate">The web template (e.g. <c>STS</c>).</param>

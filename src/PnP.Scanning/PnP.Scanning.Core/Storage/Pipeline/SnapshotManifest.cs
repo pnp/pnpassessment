@@ -7,16 +7,31 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Fixes one source identity, acquisition metadata, content length and digest in the snapshot manifest.
+/// </summary>
 internal sealed record ManifestMember(Guid ObservationId, string SourceIdentity, string? SourceRevision,
     AcquisitionStatus AcquisitionStatus, string MetadataJson, string? AcquisitionError,
     long? Length, string? Sha256);
 
+/// <summary>
+/// Provides the deterministic snapshot envelope and member list used to seal and validate offline analysis inputs.
+/// </summary>
 internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Guid SnapshotId,
     string ModuleKey, string InputVersion, string ScopeJson, IReadOnlyList<ManifestMember> Members)
 {
+    /// <summary>
+    /// Computes a lowercase SHA-256 digest, encoding text as UTF-8 when required.
+    /// </summary>
     internal static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+    /// <summary>
+    /// Computes a lowercase SHA-256 digest, encoding text as UTF-8 when required.
+    /// </summary>
     internal static string Digest(string text) => Digest(Encoding.UTF8.GetBytes(text));
 
+    /// <summary>
+    /// Validates snapshot and observation identities, orders fixed members and constructs the manifest from saved metadata.
+    /// </summary>
     internal static SnapshotManifest Build(SourceSnapshotRow snapshot,
         IEnumerable<SourceObservationRow> observations, bool contentVerified = false)
     {
@@ -39,6 +54,9 @@ internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Gu
             snapshot.ModuleKey, snapshot.InputVersion, snapshot.ScopeJson, members);
     }
 
+    /// <summary>
+    /// Requires a consistent acquired BLOB length and digest, distinguishing missing content from an empty successful BLOB.
+    /// </summary>
     internal static void ValidateContent(SourceObservationRow observation)
     {
         if (observation.RawBytes == null)
@@ -50,6 +68,9 @@ internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Gu
             throw new SnapshotIntegrityException($"Source content length or SHA-256 mismatch: {observation.ObservationId}.");
     }
 
+    /// <summary>
+    /// Requires a valid versioned JSON envelope and translates malformed metadata into a snapshot integrity failure.
+    /// </summary>
     private static void ValidatePayload(string json, string description)
     {
         try { _ = new VersionedJson(json); }
@@ -59,8 +80,17 @@ internal sealed record SnapshotManifest(int FormatVersion, Guid AssessmentId, Gu
         }
     }
 
+    /// <summary>
+    /// Serializes the deterministic manifest envelope and ordered members used for the pinned digest.
+    /// </summary>
     internal string Serialize() => JsonSerializer.Serialize(this);
+    /// <summary>
+    /// Serializes the fixed ordered observation IDs stored alongside the sealed manifest.
+    /// </summary>
     internal string MemberIds() => JsonSerializer.Serialize(Members.Select(x => x.ObservationId));
+    /// <summary>
+    /// Projects the validated manifest into read-only snapshot information for modules and lifecycle responses.
+    /// </summary>
     internal SnapshotInfo Info() => new(AssessmentId, SnapshotId, ModuleKey, InputVersion,
         new VersionedJson(ScopeJson), Digest(Serialize()), Members.Select(x => x.ObservationId));
 }

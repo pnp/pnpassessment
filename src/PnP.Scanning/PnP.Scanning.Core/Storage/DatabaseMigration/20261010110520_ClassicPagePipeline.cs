@@ -5,9 +5,15 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
+    /// <summary>
+    /// Adds the final collection, snapshot, analysis and run-scoped report schema to the database model already published on main.
+    /// </summary>
     /// <inheritdoc />
     public partial class ClassicPagePipeline : Migration
     {
+        /// <summary>
+        /// Creates the six pipeline tables, ownership keys and triggers that protect sealed source data and published results.
+        /// </summary>
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -279,6 +285,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
         }
 
+        /// <summary>
+        /// Removes the pipeline tables in dependency order while leaving the previously published assessment schema intact.
+        /// </summary>
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {

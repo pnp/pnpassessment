@@ -16,14 +16,21 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies analysis dependency boundaries, detached source reads, atomic commits, sealing and corruption rejection.
+/// </summary>
 [Trait("Category", "Pipeline")]
 public sealed class ContractAndSnapshotTests
 {
+    /// <summary>
+    /// Verifies offline dependency isolation in analyzer signatures, nested generic types and generated state-machine IL.
+    /// </summary>
     [Fact]
     public void Analysis_signatures_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
         // Pure page rules and mapping models now belong to Analysis. Only the shared,
         // offline discovery value types are included from outside the pipeline modules.
+        // Permit only the shared offline discovery value types in the analysis dependency boundary.
         bool PurePageType(Type type) => type.Namespace == "PnP.Scanning.Core.Discovery" &&
             new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(type.Name);
         var types = typeof(AnalysisExecutor).Assembly.GetTypes().Where(x =>
@@ -56,6 +63,9 @@ public sealed class ContractAndSnapshotTests
             p => p.ParameterType == typeof(ISnapshotWriter));
     }
 
+    /// <summary>
+    /// Enumerates types referenced by method IL, including generated state-machine implementations, for dependency boundary checks.
+    /// </summary>
     private static IEnumerable<Type> IlDependencies(MethodBase method)
     {
         var bytes = method.GetMethodBody()?.GetILAsByteArray();
@@ -87,6 +97,9 @@ public sealed class ContractAndSnapshotTests
         }
     }
 
+    /// <summary>
+    /// Expands element and generic argument types so forbidden dependencies cannot hide inside containers.
+    /// </summary>
     private static IEnumerable<Type> Unwrap(Type type)
     {
         yield return type;
@@ -96,6 +109,9 @@ public sealed class ContractAndSnapshotTests
             foreach (var item in Unwrap(argument)) yield return item;
     }
 
+    /// <summary>
+    /// Verifies reopened offline analysis succeeds with only source-read and result-write capabilities.
+    /// </summary>
     [Fact]
     public async Task Offline_analysis_uses_only_read_and_result_write_capabilities_after_reopen()
     {
@@ -129,6 +145,9 @@ public sealed class ContractAndSnapshotTests
         Assert.Equal(6, await db.AnalysisResults.CountAsync());
     }
 
+    /// <summary>
+    /// Verifies the production registry cannot resolve fixture or unmigrated legacy phase modules.
+    /// </summary>
     [Fact]
     public void Production_registry_has_no_fixture_or_legacy_phase_modules()
     {
@@ -138,6 +157,9 @@ public sealed class ContractAndSnapshotTests
         Assert.Throws<NotSupportedException>(() => registry.GetCollector("Classic"));
     }
 
+    /// <summary>
+    /// Verifies empty BLOB and missing-content distinctions and explicit settled acquisition failures in a sealed snapshot.
+    /// </summary>
     [Fact]
     public async Task Sealed_snapshot_distinguishes_empty_blob_from_null_and_preserves_settled_failures()
     {
@@ -164,6 +186,9 @@ public sealed class ContractAndSnapshotTests
         Assert.Equal(4, (await db.PhaseRuns.SingleAsync(x => x.RunId == seed.Run)).ErrorCount);
     }
 
+    /// <summary>
+    /// Verifies that missing, misowned or corrupted saved observations prevent snapshot sealing.
+    /// </summary>
     [Theory]
     [InlineData("missing")]
     [InlineData("null-content")]
@@ -208,6 +233,9 @@ public sealed class ContractAndSnapshotTests
         Assert.Null(snapshot.SealedAtUtc);
     }
 
+    /// <summary>
+    /// Verifies atomic rollback of source metadata, BLOB, progress and checkpoint after an injected commit failure.
+    /// </summary>
     [Fact]
     public async Task Interrupted_transaction_rolls_back_source_blob_checkpoint_and_progress_together()
     {
@@ -232,9 +260,15 @@ public sealed class ContractAndSnapshotTests
         Assert.Single((await store.OpenSnapshotAsync(seed.Assessment, seed.Snapshot)).ObservationIds);
     }
 
+    /// <summary>
+    /// Injects one infrastructure failure after source SQL writes but before transaction commit.
+    /// </summary>
     private sealed class FailSourceCommitOnce : DbTransactionInterceptor
     {
         private bool failed;
+        /// <summary>
+        /// Fails the first transaction containing source rows to verify BLOB, progress and checkpoint rollback together.
+        /// </summary>
         public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
             TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
         {
@@ -247,6 +281,9 @@ public sealed class ContractAndSnapshotTests
         }
     }
 
+    /// <summary>
+    /// Verifies that SQLite triggers reject source and snapshot mutations after sealing.
+    /// </summary>
     [Fact]
     public async Task Sqlite_enforces_source_immutability_after_seal()
     {
@@ -265,6 +302,9 @@ public sealed class ContractAndSnapshotTests
             new(FixedSource.Read()[0], VersionedJson.Empty), default));
     }
 
+    /// <summary>
+    /// Verifies rejection of unsealed or corrupted inputs before persisting a new analysis run.
+    /// </summary>
     [Fact]
     public async Task Unsealed_and_corrupt_snapshots_are_rejected_before_an_analysis_run_is_created()
     {

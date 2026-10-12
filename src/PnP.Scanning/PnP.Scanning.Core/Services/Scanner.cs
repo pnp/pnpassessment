@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 namespace PnP.Scanning.Core.Services
 {
     /// <summary>
-    /// Scanner GRPC server
+    /// Serves assessment RPCs and routes pipeline commands without initializing legacy authentication or online scan services.
     /// </summary>
     internal sealed class Scanner : PnPScanner.PnPScannerBase
     {        
@@ -25,6 +25,9 @@ namespace PnP.Scanning.Core.Services
         private readonly IHost kestrelWebServer;
         private IDataProtectionProvider dataProtectionProvider => services.GetRequiredService<IDataProtectionProvider>();
 
+        /// <summary>
+        /// Binds the pipeline coordinator and host and defers legacy scan manager construction until a legacy request needs it.
+        /// </summary>
         public Scanner(PipelineCoordinator coordinator, IHost host, IServiceProvider serviceProvider)
         {
             kestrelWebServer = host;
@@ -33,6 +36,9 @@ namespace PnP.Scanning.Core.Services
             legacyScanManager = new Lazy<ScanManager>(() => services.GetRequiredService<ScanManager>());
         }
 
+        /// <summary>
+        /// Combines pipeline record progress with status from an already-created legacy manager.
+        /// </summary>
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
         {
             Log.Information("Status {Message} received", request.Message);
@@ -42,6 +48,9 @@ namespace PnP.Scanning.Core.Services
             return reply;
         }
 
+        /// <summary>
+        /// Combines pipeline roots and legacy disk listings without forcing online service initialization.
+        /// </summary>
         public override async Task<ListReply> List(ListRequest request, ServerCallContext context)
         {
             Log.Information("List request received");
@@ -54,15 +63,27 @@ namespace PnP.Scanning.Core.Services
             return reply;
         }
 
+        /// <summary>
+        /// Queues a standalone collection through the pipeline coordinator and returns its fixed assessment and snapshot identities.
+        /// </summary>
         public override Task<PhaseReply> Collect(CollectRequest request, ServerCallContext context) =>
             PipelineCallAsync(() => pipeline.CollectAsync(request, context.CancellationToken));
 
+        /// <summary>
+        /// Queues a new offline analysis of the explicitly selected sealed snapshot.
+        /// </summary>
         public override Task<PhaseReply> Analyze(AnalyzeRequest request, ServerCallContext context) =>
             PipelineCallAsync(() => pipeline.AnalyzeAsync(request, context.CancellationToken));
 
+        /// <summary>
+        /// Queues collection followed by analysis through the dedicated pipeline RPC.
+        /// </summary>
         public override Task<PhaseReply> StartPipeline(StartPipelineRequest request, ServerCallContext context) =>
             PipelineCallAsync(() => pipeline.StartPipelineAsync(request, context.CancellationToken));
 
+        /// <summary>
+        /// Translates pipeline validation, unsupported input and integrity errors into explicit gRPC status codes.
+        /// </summary>
         private static async Task<PhaseReply> PipelineCallAsync(Func<Task<PhaseReply>> action)
         {
             try { return await action(); }
@@ -74,6 +95,9 @@ namespace PnP.Scanning.Core.Services
             catch (Pipeline.Contracts.Module.SnapshotIntegrityException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
         }
 
+        /// <summary>
+        /// Routes pause requests to pipeline phase control or the existing legacy cancellation and persistence path.
+        /// </summary>
         public override async Task Pause(PauseRequest request, IServerStreamWriter<PauseStatus> responseStream, ServerCallContext context)
         {
             if (!Guid.TryParse(request.Id, out Guid scanId))
@@ -185,6 +209,9 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>
+        /// Resumes the selected pipeline run with fixed inputs or invokes the existing legacy assessment restart path.
+        /// </summary>
         public override async Task Restart(RestartRequest request, IServerStreamWriter<RestartStatus> responseStream, ServerCallContext context)
         {
             await responseStream.WriteAsync(new RestartStatus
@@ -261,6 +288,9 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>
+        /// Terminates the requested assessment or schedules engine shutdown after settling active pipeline work.
+        /// </summary>
         public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
         {
             if (!string.IsNullOrWhiteSpace(request.Id))
@@ -287,12 +317,18 @@ namespace PnP.Scanning.Core.Services
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        /// <summary>
+        /// Returns process availability and advertises support for the dedicated collection and analysis RPCs.
+        /// </summary>
         public async override Task<PingReply> Ping(Empty request, ServerCallContext context)
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId, SupportsPipeline = true };
         }
 
+        /// <summary>
+        /// Runs the original legacy scan RPC, including its authentication and site enumeration workflow.
+        /// </summary>
         public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
         {
             try
@@ -363,6 +399,9 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>
+        /// Exports the selected pipeline analysis run or routes legacy assessments to the existing report manager.
+        /// </summary>
         public async override Task Report(ReportRequest request, IServerStreamWriter<ReportStatus> responseStream, ServerCallContext context)
         {
             try

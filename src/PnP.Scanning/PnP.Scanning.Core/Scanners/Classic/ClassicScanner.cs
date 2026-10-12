@@ -13,6 +13,9 @@ using System.Linq.Expressions;
 
 namespace PnP.Scanning.Core.Scanners
 {
+    /// <summary>
+    /// Runs the existing mixed Classic component scan and delegates its page component through the separated page adapter.
+    /// </summary>
     internal class ClassicScanner : ScannerBase
     {
         public ClassicScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
@@ -24,6 +27,9 @@ namespace PnP.Scanning.Core.Scanners
 
         internal ClassicOptions Options { get; set; }
 
+        /// <summary>
+        /// Executes the selected Classic components for the current web and stores their legacy summary and discovery dispositions.
+        /// </summary>
         internal async override Task ExecuteAsync()
         {
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
@@ -207,6 +213,9 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Pre assessment work done");
         }
 
+        /// <summary>
+        /// Finalizes legacy page readiness, publishing and site aggregates after all selected web components have completed.
+        /// </summary>
         internal async override Task PostScanningAsync()
         {
 
@@ -301,6 +310,9 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Post assessment work done");
         }
 
+        /// <summary>
+        /// Delegates legacy site classification to the shared detached site rules.
+        /// </summary>
         internal static SiteType GetSiteType(string webTemplate) => ClassicSiteRules.GetSiteType(webTemplate);
 
     }

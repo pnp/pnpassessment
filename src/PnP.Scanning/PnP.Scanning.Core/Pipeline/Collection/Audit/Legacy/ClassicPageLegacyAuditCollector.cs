@@ -36,6 +36,7 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Audit.Legacy
     ///
     /// Record field mapping (v1.0): "operation", "objectId", "userId" are all top-level properties.
     /// The "auditData" field is a nested object and is NOT used.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to retain legacy audit collection while sharing the extracted transport and reduction helpers.</para>
     /// </summary>
     internal static class ClassicPageLegacyAuditCollector
     {
@@ -55,6 +56,7 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Audit.Legacy
         /// Returns (null, skipReason) on permission error, query failure, or timeout, where skipReason
         /// is a human-readable message (written to the CSV SkipReason column). On full success returns
         /// (stats, null); on partial success returns (merged stats, "PartialData: ..." reason).
+        /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to retain legacy audit collection while sharing the extracted transport and reduction helpers.</para>
         /// </summary>
         internal static async Task<(IReadOnlyDictionary<string, AuditPageStats> Stats, string SkipReason)> QueryAllSitesAuditUsageAsync(
             HttpClient httpClient, string graphBaseUrl, Func<CancellationToken, Task<string>> tokenProvider,
@@ -154,7 +156,10 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Audit.Legacy
 
         // ── private helpers ──────────────────────────────────────────────────────
 
-        /// <summary>Submits, polls, and fetches one sub-window Graph query.</summary>
+        /// <summary>
+        /// Submits, polls, and fetches one sub-window Graph query.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to retain legacy audit collection while sharing the extracted transport and reduction helpers.</para>
+        /// </summary>
         private static async Task<(IReadOnlyDictionary<string, ChunkPageData> Stats, string SkipReason)> QueryChunkAsync(
             HttpClient httpClient, string graphBaseUrl, Func<CancellationToken, Task<string>> tokenProvider,
             IReadOnlyList<string> siteUrls,

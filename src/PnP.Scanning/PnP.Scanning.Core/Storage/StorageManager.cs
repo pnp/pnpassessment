@@ -687,9 +687,16 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        /// <summary>
+        /// Reads the existing local assessment summary through the disk-based reader.
+        /// </summary>
         internal async Task<ScanResultFromDatabase> GetScanResultAsync(Guid scanId)
             => await ReadScanResultFromDiskAsync(scanId);
 
+        /// <summary>
+        /// Opens a local assessment database and reads its summary without requiring a constructed online scan engine.
+        /// <para>Evolved from <c>Storage/StorageManager.cs (GetScanResultAsync)</c> to allow local lifecycle listing without constructing the online legacy engine.</para>
+        /// </summary>
         internal static async Task<ScanResultFromDatabase> ReadScanResultFromDiskAsync(Guid scanId)
         {
             try
@@ -1065,6 +1072,9 @@ namespace PnP.Scanning.Core.Storage
         //   UsedSystemMasterPages = distinct system master pages used across the portal's publishing webs.
         //   UsedPageLayouts       = distinct layouts used by the portal's publishing pages.
         //   LastPageUpdateDate    = most recent publishing-page modification (null when no pages were scanned).
+        /// <summary>
+        /// Builds legacy publishing-site totals, distinct layouts and latest page update dates from the stored web and page rows.
+        /// </summary>
         internal static async Task PopulatePublishingSiteSummaryAsync(ScanContext dbContext, Guid scanId)
         {
             var publishingWebs = await dbContext.ClassicWebSummaries
@@ -1154,6 +1164,9 @@ namespace PnP.Scanning.Core.Storage
             Log.Information("PopulatePublishingSiteSummaryAsync succeeded");
         }
 
+        /// <summary>
+        /// Runs the retained legacy audit collector and persists per-site usage rows and explicit unavailable or partial outcomes.
+        /// </summary>
         internal async Task CollectAndStoreAuditLogUsageAsync(
             ScanContext dbContext,
             Guid scanId,
@@ -1284,6 +1297,9 @@ namespace PnP.Scanning.Core.Storage
             await dbContext.BulkInsertAsync(allRecords);
         }
 
+        /// <summary>
+        /// Builds legacy audit usage rows from merged statistics and query coverage, including a coverage row when no page statistics exist.
+        /// </summary>
         private static void BuildAuditLogRecords(
             List<ClassicPageAuditUsage> target,
             Guid scanId,

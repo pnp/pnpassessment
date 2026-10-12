@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Builds the assessment list command and displays legacy site progress or pipeline phase and record progress.
+    /// </summary>
     internal sealed class ListCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -77,6 +80,9 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Requests the selected status filters and renders assessment rows with the appropriate lifecycle fields.
+        /// </summary>
         private async Task HandleStartAsync(bool running, bool paused, bool finished, bool terminated)
         {
             // Setup client to talk to scanner

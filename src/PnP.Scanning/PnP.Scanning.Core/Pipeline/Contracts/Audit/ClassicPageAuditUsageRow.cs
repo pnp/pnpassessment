@@ -1,6 +1,10 @@
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Audit
 {
+    /// <summary>
+    /// Carries per-page audit counts, the fixed query window and coverage diagnostics for report publication.
+    /// <para>Evolved from <c>Storage/Model/ClassicPageAuditUsage.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
+    /// </summary>
     internal class ClassicPageAuditUsageRow : ClassicPageBaseRow
     {
         public string PageUrl { get; set; }

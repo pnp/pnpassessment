@@ -9,14 +9,13 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Services
 {
     /// <summary>
-    /// T14 — verifies the classic page-scan telemetry payload built by
-    /// <see cref="TelemetryManager.BuildClassicMetrics"/> (page type distribution + page
-    /// transformation readiness). Payload construction only — no Application Insights / network.
-    /// Each test owns a fresh in-memory <see cref="ScanContext"/>, mirroring the one-database-per-scan
-    /// production layout the metric builder iterates over (it is not scan-id filtered).
+    /// Verifies telemetry metric aggregation from the existing assessment table shapes.
     /// </summary>
     public class TelemetryManagerTests
     {
+        /// <summary>
+        /// Verifies that legacy page scan telemetry retains the expected metrics and event payload.
+        /// </summary>
         [Fact]
         public void Telemetry_LogPageScan_BuildsExpectedPayload()
         {

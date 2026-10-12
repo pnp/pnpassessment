@@ -6,8 +6,16 @@ using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Builds page-specific web part inventories from saved definitions, XML, properties and wiki placeholders.
+/// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+/// </summary>
 internal static partial class PageWebPartAnalysis
 {
+    /// <summary>
+    /// Combines saved web part definitions and page fields into ordered inventory rows, including wiki and publishing content.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+    /// </summary>
     internal static List<ClassicPageWebPart> Build(ClassicPage page, ClassicPageItemSource source, bool exportProperties, bool includeTitleBar = false)
     {
         var wiki = source.Fields.GetValueOrDefault("WikiField")?.Text;
@@ -56,6 +64,10 @@ internal static partial class PageWebPartAnalysis
         return ToRows(page, entities, exportProperties);
     }
 
+    /// <summary>
+    /// Converts a saved web part definition to a detached analysis entity and resolves its type from XML or properties.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+    /// </summary>
     private static WebPartEntity Entity(ClassicPageWebPartSource part)
     {
         var properties = part.Properties.ToDictionary(x => x.Key, x => x.Value.ToValue());

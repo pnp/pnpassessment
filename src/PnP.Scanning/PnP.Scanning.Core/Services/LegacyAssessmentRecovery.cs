@@ -5,9 +5,16 @@ using PnP.Scanning.Core.Storage.Pipeline;
 
 namespace PnP.Scanning.Core.Services;
 
-/// <summary>Legacy startup settlement requires local storage, not construction of the online scan engine.</summary>
+/// <summary>
+/// Settles interrupted legacy assessments at engine startup using local storage without constructing the online scan manager.
+/// <para>Evolved from <c>Services/ScanManager.cs</c> to perform legacy startup recovery without resolving authentication or online scan services.</para>
+/// </summary>
 internal sealed class LegacyAssessmentRecovery(PipelineStore store) : IHostedService
 {
+    /// <summary>
+    /// Marks only legacy running assessments as terminated and records their history, leaving pipeline phase recovery to the coordinator.
+    /// <para>Evolved from <c>Services/ScanManager.cs</c> to perform legacy startup recovery without resolving authentication or online scan services.</para>
+    /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         foreach (var assessmentId in store.AssessmentsOnDisk())
@@ -27,5 +34,9 @@ internal sealed class LegacyAssessmentRecovery(PipelineStore store) : IHostedSer
             await db.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(RESTART);", cancellationToken);
         }
     }
+    /// <summary>
+    /// Completes host shutdown because legacy recovery performs all work during startup and has no running execution to stop.
+    /// <para>Evolved from <c>Services/ScanManager.cs</c> to perform legacy startup recovery without resolving authentication or online scan services.</para>
+    /// </summary>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

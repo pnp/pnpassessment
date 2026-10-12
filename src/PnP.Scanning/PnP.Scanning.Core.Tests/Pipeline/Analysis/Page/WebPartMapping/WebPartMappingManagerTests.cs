@@ -5,10 +5,8 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
 {
     /// <summary>
-    /// T4 — the ported web part mapping module. These tests exercise the pure mapping lookup against
-    /// the embedded <c>webpartmapping.xml</c>: no CSOM, no live SharePoint. They guard both the
-    /// embedded-resource wiring and the "is mappable" parity definition carried over from the legacy
-    /// Modernization Scanner.
+    /// Verifies the embedded mapping catalog, built-in type recognition and mappable web part classifications.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
     /// </summary>
     public class WebPartMappingManagerTests
     {
@@ -20,6 +18,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
 
         private readonly WebPartMappingManager manager = new();
 
+        /// <summary>
+        /// Verifies that a supported built-in web part has a usable mapping.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Theory]
         [InlineData(ContentEditorType)]
         [InlineData(XsltListViewType)]
@@ -29,6 +31,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
             manager.IsMappable(webPartType).Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies case-insensitive lookup of known mappable web part types.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Fact]
         public void Mapping_KnownWebPart_IsMappable_IsCaseInsensitive()
         {
@@ -36,6 +42,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
             manager.IsMappable(ContentEditorType.ToUpperInvariant()).Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies that an unknown web part type has no mapping.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Fact]
         public void Mapping_UnknownWebPart_IsNotMappable()
         {
@@ -43,6 +53,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
                 .Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that missing type information cannot imply a supported mapping.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Theory]
         [InlineData(null)]
         [InlineData("")]
@@ -52,6 +66,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
             manager.InMappingFile(webPartType).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that catalog recognition and actual mappability remain distinct for Script Editor.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Fact]
         public void Mapping_ScriptEditor_InFileButNotMappable()
         {
@@ -61,6 +79,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
             manager.IsMappable(ScriptEditorType).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies the mapping for a wiki embedded-content inventory part.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Fact]
         public void Mapping_WikiEmbedPart_IsMappable()
         {
@@ -71,6 +93,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page.WebPartMapping
             manager.IsMappable("SharePointPnP.Modernization.WikiEmbedPart").Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies that the embedded mapping XML loads a nonempty catalog.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/WebPartMapping/WebPartMappingManagerTests.cs</c> to verify the unchanged embedded mapping catalog in the analysis module.</para>
+        /// </summary>
         [Fact]
         public void Mapping_EmbeddedXml_ParsesNonZeroEntries()
         {

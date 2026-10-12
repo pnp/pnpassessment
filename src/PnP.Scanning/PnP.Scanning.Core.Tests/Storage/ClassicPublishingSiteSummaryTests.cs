@@ -8,9 +8,7 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Storage
 {
     /// <summary>
-    /// Verifies <see cref="StorageManager.PopulatePublishingSiteSummaryAsync"/> — the per-site-collection
-    /// publishing-portal rollup that ports the legacy <c>ModernizationPublishingSiteScanResults.csv</c>.
-    /// Runs against the shared in-memory SQLite <see cref="ScanContext"/> fixture.
+    /// Verifies publishing-site counts, distinct layouts and update dates calculated from legacy report rows.
     /// </summary>
     public class ClassicPublishingSiteSummaryTests : IClassFixture<ScanContextFixture>
     {
@@ -142,6 +140,9 @@ namespace PnP.Scanning.Core.Tests.Storage
             };
         }
 
+        /// <summary>
+        /// Creates a stored publishing page with the requested layout and modification date for rollup assertions.
+        /// </summary>
         private static ClassicPage NewPublishingPage(Guid scanId, string siteUrl, string webUrl, string pageUrl,
                                                      string layout, DateTime modifiedAt)
         {
@@ -158,6 +159,9 @@ namespace PnP.Scanning.Core.Tests.Storage
             };
         }
 
+        /// <summary>
+        /// Creates a non-publishing page to verify that publishing summaries exclude unrelated page types.
+        /// </summary>
         private static ClassicPage NewNonPublishingPage(Guid scanId, string siteUrl, string webUrl, string pageUrl,
                                                         string layout, DateTime modifiedAt)
         {

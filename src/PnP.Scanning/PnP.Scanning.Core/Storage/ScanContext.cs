@@ -137,6 +137,9 @@ namespace PnP.Scanning.Core.Storage
             base.OnConfiguring(optionsBuilder);
         }
 
+        /// <summary>
+        /// Configures the existing assessment entities and the pipeline tables with their composite keys and ownership relationships.
+        /// </summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             Pipeline.PipelineModel.Configure(modelBuilder);

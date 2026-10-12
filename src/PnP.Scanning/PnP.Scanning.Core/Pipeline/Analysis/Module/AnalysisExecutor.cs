@@ -5,9 +5,14 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
-/// <summary>Offline execution. This type accepts only read-only source and result-write capabilities.</summary>
+/// <summary>
+/// Runs an analysis module over a sealed snapshot using read-only source access and run-scoped result writes.
+/// </summary>
 internal sealed class AnalysisExecutor
 {
+    /// <summary>
+    /// Prepares the module, skips committed observations, and processes the remaining fixed snapshot members with bounded concurrency.
+    /// </summary>
     public async Task ExecuteAsync(IAnalysisModule module, ISnapshotReader reader,
         IAnalysisResultWriter writer, VersionedJson parameters, int threads, CancellationToken cancellationToken)
     {

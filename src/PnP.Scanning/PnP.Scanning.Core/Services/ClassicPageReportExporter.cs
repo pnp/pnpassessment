@@ -11,9 +11,16 @@ using PnP.Scanning.Core.Storage.Pipeline;
 
 namespace PnP.Scanning.Core.Services;
 
-/// <summary>Exports one published run. Legacy tables and the latest assessment status never select its inputs.</summary>
+/// <summary>
+/// Exports one completed Classic Pages analysis as the existing CSV set or Power BI template after validating its input and publication digests.
+/// <para>Evolved from <c>Services/ReportManager.cs</c> to export run-specific projections while preserving the existing Classic CSV and Power BI formats.</para>
+/// </summary>
 internal static class ClassicPageReportExporter
 {
+    /// <summary>
+    /// Selects the requested completed run, verifies its sealed input and reports, writes compatible CSVs and optionally prepares the Power BI template.
+    /// <para>Evolved from <c>Services/ReportManager.cs</c> to export run-specific projections while preserving the existing Classic CSV and Power BI formats.</para>
+    /// </summary>
     internal static async Task<(Guid RunId, string Path)> ExportAsync(PipelineStore store, Guid assessmentId, Guid? selectedRun,
         string? exportPath, string? delimiter, bool powerBi, CancellationToken token)
     {
@@ -34,6 +41,7 @@ internal static class ClassicPageReportExporter
         var path = string.IsNullOrWhiteSpace(exportPath) ? System.IO.Path.Combine(store.RootDirectory, assessmentId.ToString(), "report", run.RunId.ToString()) : System.IO.Path.GetFullPath(exportPath);
         Directory.CreateDirectory(path);
         var config = new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = string.IsNullOrEmpty(delimiter) ? "," : delimiter };
+        // Write a compatible header even for empty reports, then stream the selected run's ordered rows.
         async Task Write<T>(string kind, IEnumerable<T>? values = null)
         {
             token.ThrowIfCancellationRequested();
@@ -80,8 +88,14 @@ internal static class ClassicPageReportExporter
         }
         return (run.RunId, path);
     }
+    /// <summary>
+    /// Preserves the existing audit CSV column shape by excluding the shared WebUrl identity field.
+    /// </summary>
     private sealed class AuditMap : ClassMap<ClassicPageAuditUsage>
     {
+        /// <summary>
+        /// Builds the invariant-culture audit row mapping and omits WebUrl from export.
+        /// </summary>
         public AuditMap() { AutoMap(CultureInfo.InvariantCulture); Map(x => x.WebUrl).Ignore(); }
     }
 }

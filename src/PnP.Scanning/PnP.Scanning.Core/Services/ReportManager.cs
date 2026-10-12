@@ -9,6 +9,9 @@ using System.Text;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Exports existing assessment tables and prepares the component report templates and data locations.
+    /// </summary>
     internal sealed class ReportManager
     {
         private const string ReportFolder = "report";
@@ -522,6 +525,9 @@ namespace PnP.Scanning.Core.Services
             return exportPath;
         }
 
+        /// <summary>
+        /// Copies an embedded Power BI template to the requested output file for either legacy or pipeline reports.
+        /// </summary>
         internal static void PersistPBitFromResource(string pbitIdentifier, string pbitFile)
         {
             File.WriteAllBytes(pbitFile, LoadResourceBytes(pbitIdentifier));

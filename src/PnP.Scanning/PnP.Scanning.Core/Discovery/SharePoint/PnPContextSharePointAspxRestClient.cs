@@ -6,6 +6,9 @@ using System.Text.Json;
 
 namespace PnP.Scanning.Core.Discovery;
 
+/// <summary>
+/// Uses a PnP context to read ASPX discovery REST pages and modeled file, folder and welcome-page facts.
+/// </summary>
 internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestClient
 {
     private readonly PnPContext context;
@@ -92,6 +95,9 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
     }
 
+    /// <summary>
+    /// Reads modeled folder contents and returns detached identities or an explicit denied or failed result.
+    /// </summary>
     public async Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
         CancellationToken cancellationToken = default)
     {
@@ -136,10 +142,16 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     // SDK collections implement IQueryable: projecting them directly invokes the remote
     // query provider, which does not support changing the element type. Capture the
     // already requested members without issuing another query or losing their identity.
+    /// <summary>
+    /// Projects only already-requested folder members into discovery facts without invoking the SDK remote query provider.
+    /// </summary>
     internal static SharePointModeledFolder[] FolderFacts(IFolderCollection folders) =>
         folders.AsRequested().Select(child => new SharePointModeledFolder(
             child.UniqueId.ToString("D"), child.Name, child.ServerRelativeUrl)).ToArray();
 
+    /// <summary>
+    /// Projects only already-requested file members and their customization state into detached discovery facts.
+    /// </summary>
     internal static SharePointModeledFile[] FileFacts(IFileCollection files) =>
         files.AsRequested().Select(file => new SharePointModeledFile(
             file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,

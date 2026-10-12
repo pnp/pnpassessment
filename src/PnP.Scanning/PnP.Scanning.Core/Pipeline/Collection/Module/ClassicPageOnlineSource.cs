@@ -29,19 +29,49 @@ using ClassicPageDiscovery = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPa
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Module;
 
+/// <summary>
+/// Defines the online scope and evidence reads needed by the Classic Pages collector, returning detached source DTOs.
+/// </summary>
 internal interface IClassicPageOnlineSource : IAsyncDisposable
 {
+    /// <summary>
+    /// Enumerates the selected sites and fixes the collection options, audit interval and scope evidence.
+    /// </summary>
     Task<ClassicPageScopeSource> ReadSitesAsync(ClassicPageSourceOptions options, CancellationToken token);
+    /// <summary>
+    /// Enumerates one site collection into web identities and templates, retaining its read status.
+    /// </summary>
     Task<ClassicPageSiteScope> ReadWebsAsync(string siteUrl, CancellationToken token);
+    /// <summary>
+    /// Reads the minimum site and web identity required before discovery, without optional enrichment.
+    /// </summary>
     Task<ClassicPageWebSource> ReadIdentityAsync(string siteUrl, string webUrl, string template, CancellationToken token);
+    /// <summary>
+    /// Reads web metadata and acquisition states needed by page classification and home-page analysis.
+    /// </summary>
     Task<ClassicPageWebSource> ReadWebAsync(string siteUrl, string webUrl, string template, CancellationToken token);
+    /// <summary>
+    /// Discovers physical ASPX files and scope evidence through the resumable request journal.
+    /// </summary>
     Task<ClassicPageDiscoverySource> DiscoverAsync(ClassicPageWebSource web, ClassicPageAcquisitionJournal journal, CancellationToken token);
+    /// <summary>
+    /// Reads one discovered page item and its web part and home-page evidence into detached values.
+    /// </summary>
     Task<ClassicPageItemSource> ReadPageAsync(ClassicPageWebSource web, ClassicPageDiscovery page, bool skipUsers, CancellationToken token);
+    /// <summary>
+    /// Reads one batch of blog items and its continuation, or returns null when no Posts list exists.
+    /// </summary>
     Task<ClassicPageBlogBatchSource?> ReadBlogBatchAsync(ClassicPageWebSource web, string? paging, bool skipUsers, CancellationToken token);
+    /// <summary>
+    /// Collects audit response receipts for the fixed scope and audit interval.
+    /// </summary>
     Task CollectAuditAsync(ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, CancellationToken token);
 }
 
-/// <summary>All PnP/CSOM/Graph objects live here and are disposed before offline analysis.</summary>
+/// <summary>
+/// Owns authenticated PnP, CSOM and Graph acquisition and converts SDK responses to persistable Classic Pages inputs.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+/// </summary>
 internal sealed class ClassicPageOnlineSource(CollectionContext context, CollectionServices services) : IClassicPageOnlineSource
 {
     private readonly System.Collections.Concurrent.ConcurrentBag<HttpClient> collectionClients = new();
@@ -56,8 +86,14 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             w => w.Lists.QueryProperties(l => l.Id, l => l.Title, l => l.TemplateType, l => l.RootFolder.QueryProperties(f => f.ServerRelativeUrl)),
         },
     };
+    /// <summary>
+    /// Creates a PnP context for the selected web with collection-specific authentication and modeled property requests.
+    /// </summary>
     private Task<PnPContext> OpenAsync(string site, string web, CancellationToken token) =>
         services.ContextFactory.CreateAsync(new Uri(site.TrimEnd('/') + (web == "/" ? "" : web)), auth, token, ContextOptions);
+    /// <summary>
+    /// Creates a bearer-authenticated CSOM context whose transport observes the collection cancellation token.
+    /// </summary>
     private ClientContext Csom(PnPContext pnp, CancellationToken token)
     {
         var client = new ClientContext(pnp.Uri) { DisableReturnValueCache = true };
@@ -72,9 +108,16 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         client.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(transport);
         return client;
     }
+    /// <summary>
+    /// Classifies a read exception as denied or failed and retains the underlying diagnostic message.
+    /// </summary>
     internal static SourceReadState Failure(Exception error) => new(
         AssessmentWebDiscovery.Classify(error) == DiscoveryTerminalOutcome.Denied ? "Denied" : "Failed", error.GetType().Name + ": " + error.GetBaseException().Message);
 
+    /// <summary>
+    /// Reuses site enumeration to capture the fixed site list, scope evidence, page options and UTC audit window.
+    /// <para>Evolved from <c>Services/SiteEnumerationManager.cs</c> to capture existing enumeration results as fixed snapshot inputs.</para>
+    /// </summary>
     public async Task<ClassicPageScopeSource> ReadSitesAsync(ClassicPageSourceOptions options, CancellationToken token)
     {
         var request = context.Options.Clone();
@@ -92,6 +135,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             options, end.AddDays(-options.AuditLogWindowDays), end, evidence.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>).ToArray());
     }
 
+    /// <summary>
+    /// Enumerates web URLs and templates for a site and persists an explicit terminal read state on failure.
+    /// <para>Evolved from <c>Services/SiteEnumerationManager.cs</c> to capture existing enumeration results as fixed snapshot inputs.</para>
+    /// </summary>
     public async Task<ClassicPageSiteScope> ReadWebsAsync(string siteUrl, CancellationToken token)
     {
         try
@@ -105,6 +152,9 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         catch (Exception error) { return new(siteUrl, [], [], Failure(error)); }
     }
 
+    /// <summary>
+    /// Opens the selected web and reads its captured features, welcome page and home-page API or fallback facts.
+    /// </summary>
     public async Task<ClassicPageWebSource> ReadWebAsync(string siteUrl, string webUrl, string template, CancellationToken token)
     {
         using var pnp = await OpenAsync(siteUrl, webUrl, token);
@@ -114,6 +164,9 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         return await ReadWebFactsAsync(pnp, csom, siteUrl, webUrl, template, token);
     }
 
+    /// <summary>
+    /// Reads site and web IDs with a minimal context so optional metadata failures do not prevent discovery.
+    /// </summary>
     public async Task<ClassicPageWebSource> ReadIdentityAsync(string siteUrl, string webUrl, string template, CancellationToken token)
     {
         using var pnp = await services.ContextFactory.CreateAsync(new Uri(siteUrl.TrimEnd('/') + (webUrl == "/" ? "" : webUrl)), auth, token,
@@ -125,6 +178,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             SourceReadState.NotAttempted, null, SourceReadState.NotAttempted, null, 0, null, SourceReadState.NotAttempted, SourceReadState.Complete);
     }
 
+    /// <summary>
+    /// Captures web features and home-page API or fallback inputs, recording each optional read status independently.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+    /// </summary>
     internal static async Task<ClassicPageWebSource> ReadWebFactsAsync(PnPContext pnp, ClientContext csom, string siteUrl, string webUrl, string template, CancellationToken token)
     {
         string? welcome = null, master = null, localized = null;
@@ -171,6 +228,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             welcome, welcomeState, canModernize, primaryState, master, language, localized, fallbackState, SourceReadState.Complete);
     }
 
+    /// <summary>
+    /// Runs the existing ASPX discovery provider through journaled requests and returns detached discovery rows for the selected web.
+    /// <para>Evolved from <c>Scanners/Classic/ClassicPageDiscoveryComponent.cs</c> to reuse ASPX discovery with durable request receipts in collection.</para>
+    /// </summary>
     public async Task<ClassicPageDiscoverySource> DiscoverAsync(ClassicPageWebSource web, ClassicPageAcquisitionJournal journal, CancellationToken token)
     {
         var rows = new Dictionary<string, Storage.ClassicPageDiscovery>(StringComparer.Ordinal);
@@ -194,6 +255,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         return new(web.SiteUrl, web.WebUrl, rows.Values.OrderBy(x => x.RecordKey, StringComparer.Ordinal).Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>).ToArray());
     }
 
+    /// <summary>
+    /// Opens the owning web and reads a discovered physical page using its fixed list and item identity.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+    /// </summary>
     public async Task<ClassicPageItemSource> ReadPageAsync(ClassicPageWebSource web, ClassicPageDiscovery page, bool skipUsers, CancellationToken token)
     {
         if (page.ListId == null || page.ListItemId == null)
@@ -203,6 +268,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         return await ReadPageInputsAsync(pnp, csom, web, page, skipUsers, token);
     }
 
+    /// <summary>
+    /// Collects page fields, web part definitions and fallback facts while retaining metadata and enrichment failures separately.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+    /// </summary>
     internal static async Task<ClassicPageItemSource> ReadPageInputsAsync(PnPContext pnp, ClientContext csom, ClassicPageWebSource web, ClassicPageDiscovery page, bool skipUsers, CancellationToken token)
     {
         if (page.ListId == null || page.ListItemId == null) return EmptyPage(web, page, SourceReadState.NotAttempted);
@@ -244,6 +313,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             ContentTypeDisplayFormTemplateName = display, HomeFallbackState = fallback };
     }
 
+    /// <summary>
+    /// Reads the exact discovered list item and rejects missing, duplicate or mismatched identity and file URL responses.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+    /// </summary>
     internal static async Task<ClassicPageItemSource> ReadPageMetadataAsync(SdkList list, ClassicPageDiscovery page,
         bool skipUsers, CancellationToken token)
     {
@@ -265,10 +338,17 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             new(), [], state, SourceReadState.NotAttempted, null, SourceReadState.NotAttempted);
     }
 
+    /// <summary>
+    /// Creates an explicit failed or unavailable page source without inventing metadata or web part content.
+    /// </summary>
     internal static ClassicPageItemSource EmptyPage(ClassicPageWebSource web, ClassicPageDiscovery page, SourceReadState state) =>
         new(web.SiteUrl, web.WebUrl, page.RecordKey, page.ListId, null, null, new(), new(), [], state,
             SourceReadState.NotAttempted, null, SourceReadState.NotAttempted);
 
+    /// <summary>
+    /// Finds the web Posts list and captures one requested blog batch with its paging continuation.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+    /// </summary>
     public async Task<ClassicPageBlogBatchSource?> ReadBlogBatchAsync(ClassicPageWebSource web, string? paging, bool skipUsers, CancellationToken token)
     {
         using var pnp = await OpenAsync(web.SiteUrl, web.WebUrl, token);
@@ -276,6 +356,10 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         return list == null ? null : await LoadBatchAsync(list, ClassicPageQuery.Create(new(), false, null, skipUsers), paging, token, web.SiteUrl, web.WebUrl);
     }
 
+    /// <summary>
+    /// Loads one modeled list data response and captures only its returned items, fields and next-page token.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to persist acquisition facts separately from classification and report generation.</para>
+    /// </summary>
     internal static async Task<ClassicPageBlogBatchSource> LoadBatchAsync(SdkList list, string query, string? paging, CancellationToken token,
         string site = "", string web = "")
     {
@@ -287,7 +371,13 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
             list.Items.AsRequested().Select(ItemFields).ToArray(),
             response.TryGetValue("NextHref", out var next) ? next?.ToString()?.TrimStart('?') : null, SourceReadState.Complete);
     }
+    /// <summary>
+    /// Converts a returned SDK property bag into detached, typed JSON field values.
+    /// </summary>
     internal static Dictionary<string, SourceField> Fields(IDictionary<string, object> fields) => fields.ToDictionary(x => x.Key, x => Field(x.Value), StringComparer.Ordinal);
+    /// <summary>
+    /// Captures modeled item fields and adds the returned Id, rejecting conflicts with an explicit ID field.
+    /// </summary>
     internal static Dictionary<string, SourceField> ItemFields(IListItem item)
     {
         var fields = Fields(item.Values);
@@ -298,6 +388,9 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         fields["ID"] = SourceField.Of("Int32", item.Id);
         return fields;
     }
+    /// <summary>
+    /// Converts SDK user, URL and scalar values to stable typed source fields without retaining SDK objects.
+    /// </summary>
     private static SourceField Field(object? value) => value switch
     {
         null => SourceField.Of("Null", null),
@@ -309,8 +402,15 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         int number => SourceField.Of("Int32", number), bool boolean => SourceField.Of("Boolean", boolean),
         _ => SourceField.Of("String", Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)),
     };
+    /// <summary>
+    /// Invokes the Graph audit collector using collection-only authentication and the durable acquisition journal.
+    /// <para>Evolved from <c>Storage/StorageManager.cs</c> to move audit acquisition out of report storage and into the collection phase.</para>
+    /// </summary>
     public Task CollectAuditAsync(ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, CancellationToken token) =>
         new ClassicPageAuditCollector(context.Options, services.Authentication).CollectAsync(scope, journal, token);
+    /// <summary>
+    /// Disposes the collection HTTP transports created for its CSOM contexts.
+    /// </summary>
     public ValueTask DisposeAsync()
     {
         foreach (var client in collectionClients) client.Dispose();

@@ -5,6 +5,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Builds engine-stop and selected-assessment termination commands.
+    /// </summary>
     internal sealed class StopCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -14,6 +17,9 @@ namespace PnP.Scanning.Process.Commands
             processManager = processManagerInstance;
         }
 
+        /// <summary>
+        /// Binds the optional assessment ID and sends either a run termination or an engine shutdown request.
+        /// </summary>
         public Command Create()
         {
             var cmd = new Command("stop", "Stops the Microsoft 365 Assessment engine, terminating all running assessments");

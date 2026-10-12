@@ -9,6 +9,9 @@ using System.Runtime.InteropServices;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Builds report export options, including explicit analysis-run selection for pipeline reports.
+    /// </summary>
     internal sealed class ReportCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -22,6 +25,9 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> openGeneratedReportOption;
         private Option<Guid> analysisRunIdOption;
 
+        /// <summary>
+        /// Binds the scanner client manager and report path, format, delimiter and run-selection options.
+        /// </summary>
         internal ReportCommandHandler(ScannerManager processManagerInstance)
         {
             processManager = processManagerInstance;
@@ -75,6 +81,9 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(openGeneratedReportOption);
         }
 
+        /// <summary>
+        /// Registers the report options and binds them to the report RPC handler.
+        /// </summary>
         public Command Create()
         {
             // Custom validation of provided command input, use to validate option combinations
@@ -93,6 +102,9 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Requests the selected report export and displays its output path or streamed error.
+        /// </summary>
         private async Task<int> HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open, Guid analysisRunId)
         {
             var failed = false;

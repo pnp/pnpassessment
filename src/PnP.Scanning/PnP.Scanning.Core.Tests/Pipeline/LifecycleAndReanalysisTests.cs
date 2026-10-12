@@ -12,9 +12,15 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies phase cancellation, original-checkpoint restart, fixed rule selection and independent repeated analysis results.
+/// </summary>
 [Trait("Category", "Pipeline")]
 public sealed class LifecycleAndReanalysisTests
 {
+    /// <summary>
+    /// Verifies shared pipeline capacity limits and pause-all settlement for queued work.
+    /// </summary>
     [Fact]
     public async Task Queued_pipeline_capacity_and_pause_all_share_existing_lifecycle_limits()
     {
@@ -34,6 +40,9 @@ public sealed class LifecycleAndReanalysisTests
             Assert.Equal(0, root.CompletedRecords);
         }
     }
+    /// <summary>
+    /// Verifies that infrastructure collection failure prevents sealing and analysis and resumes from the original checkpoint.
+    /// </summary>
     [Fact]
     public async Task Infrastructure_collection_failure_does_not_seal_or_start_analysis_and_can_resume_original_checkpoint()
     {
@@ -71,10 +80,16 @@ public sealed class LifecycleAndReanalysisTests
         Assert.Contains("unsettled infrastructure", (await read.PhaseRuns.SingleAsync(x => x.ParentRunId == null)).ErrorsJson, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Emits one committed source and then fails to exercise infrastructure-failure recovery.
+    /// </summary>
     private sealed class InterruptedCollector : ICollectionModule
     {
         public string ModuleKey => FixedSource.ModuleKey;
         public string InputVersion => FixedSource.InputVersion;
+        /// <summary>
+        /// Produces the recorded initial observation before injecting collection failure.
+        /// </summary>
         public async IAsyncEnumerable<CollectionRecord> CollectAsync(CollectionContext context,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -84,6 +99,9 @@ public sealed class LifecycleAndReanalysisTests
         }
     }
 
+    /// <summary>
+    /// Verifies that an inconsistent expected member count cannot seal collection or start analysis.
+    /// </summary>
     [Fact]
     public async Task Seal_failure_does_not_start_analysis_or_force_finished_status()
     {
@@ -104,10 +122,16 @@ public sealed class LifecycleAndReanalysisTests
         Assert.Equal(0, control.AnalysisFactories);
     }
 
+    /// <summary>
+    /// Declares an expected member count that cannot be satisfied to exercise seal failure.
+    /// </summary>
     private sealed class IncompleteManifestCollector : ICollectionModule
     {
         public string ModuleKey => FixedSource.ModuleKey;
         public string InputVersion => FixedSource.InputVersion;
+        /// <summary>
+        /// Emits an incomplete recorded collection with a larger fixed expected count.
+        /// </summary>
         public async IAsyncEnumerable<CollectionRecord> CollectAsync(CollectionContext context,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -119,6 +143,9 @@ public sealed class LifecycleAndReanalysisTests
         }
     }
 
+    /// <summary>
+    /// Verifies paused collection resumes committed records without legacy web cleanup.
+    /// </summary>
     [Fact]
     public async Task Collection_pause_and_restart_use_saved_record_checkpoint_without_legacy_cleanup()
     {
@@ -147,6 +174,9 @@ public sealed class LifecycleAndReanalysisTests
         Assert.Equal(0, environment.OnlineRequests);
     }
 
+    /// <summary>
+    /// Verifies that combined execution resumed after sealing does not recreate the collector or authentication.
+    /// </summary>
     [Fact]
     public async Task Combined_restart_after_seal_requires_only_the_pinned_analyzer()
     {
@@ -177,6 +207,9 @@ public sealed class LifecycleAndReanalysisTests
         Assert.Equal(0, environment.OnlineRequests);
     }
 
+    /// <summary>
+    /// Verifies parallel analysis recovery uses committed member IDs rather than a positional last-record checkpoint.
+    /// </summary>
     [Fact]
     public async Task Out_of_order_parallel_results_resume_by_committed_membership_instead_of_last_record()
     {
@@ -204,6 +237,9 @@ public sealed class LifecycleAndReanalysisTests
         Assert.Equal(1, control.CollectionStarts);
     }
 
+    /// <summary>
+    /// Verifies source corruption terminates analysis while retaining committed results and failure diagnostics.
+    /// </summary>
     [Fact]
     public async Task Corruption_during_analysis_terminates_the_run_and_preserves_committed_results_and_diagnostics()
     {
@@ -233,6 +269,9 @@ public sealed class LifecycleAndReanalysisTests
         Assert.Equal(ScanStatus.Terminated, (await read.Scans.SingleAsync()).Status);
     }
 
+    /// <summary>
+    /// Verifies repeated rules and later source snapshots cannot replace the selected original input or prior results.
+    /// </summary>
     [Fact]
     public async Task Repeated_rules_and_later_sources_create_independent_results_without_replacing_selected_input()
     {

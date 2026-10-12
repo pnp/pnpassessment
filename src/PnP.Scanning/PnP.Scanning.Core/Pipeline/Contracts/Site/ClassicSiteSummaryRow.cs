@@ -1,6 +1,10 @@
 namespace PnP.Scanning.Core.Pipeline.Contracts.Site
 {
 
+    /// <summary>
+    /// Carries per-site Classic assessment totals, templates, remediation codes and mapping-readiness aggregates.
+    /// <para>Evolved from <c>Storage/Model/ClassicSiteSummary.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
+    /// </summary>
     internal sealed class ClassicSiteSummaryRow
     {
         public Guid ScanId { get; set; }

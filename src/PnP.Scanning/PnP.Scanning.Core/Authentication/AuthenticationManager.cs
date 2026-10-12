@@ -7,6 +7,9 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace PnP.Scanning.Core.Authentication
 {
+    /// <summary>
+    /// Creates the selected authentication provider and supplies tokens for existing scans or collection-only online execution.
+    /// </summary>
     internal sealed class AuthenticationManager
     {
         private IClientApplicationBase clientApplication;
@@ -22,6 +25,9 @@ namespace PnP.Scanning.Core.Authentication
         internal static HttpClient HttpClient { get => httpClient; }
 
         internal IDataProtectionProvider DataProtectionProvider { get; private set; }
+        /// <summary>
+        /// Assigns the device-login notification callback used when a collector initializes interactive authentication.
+        /// </summary>
         internal void SetCollectionDeviceCodeCallback(Func<DeviceCodeResult, Task> callback) => deviceCodeCallback = callback;
 
         internal static AuthenticationManager Create(StartRequest request, IDataProtectionProvider provider)

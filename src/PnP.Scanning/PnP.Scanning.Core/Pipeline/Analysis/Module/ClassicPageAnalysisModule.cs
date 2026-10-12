@@ -15,6 +15,10 @@ using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
+/// <summary>
+/// Analyzes saved Classic Pages, blog items and audit responses, then publishes reports for the selected analysis run.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+/// </summary>
 internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnapshotPreparation, IAnalysisFinalizer
 {
     private ClassicPageInputIndex index = null!;
@@ -22,16 +26,24 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
     private readonly WebPartMappingManager mapping = new();
     public string ModuleKey => "classicpage";
     public string RuleVersion => "classicpage-v1";
+    /// <summary>
+    /// Reads the selected snapshot and builds a validated index of scope, web, page and audit identities.
+    /// </summary>
     public async Task PrepareAsync(ISnapshotReader snapshot, CancellationToken cancellationToken)
     {
         var manifest = await snapshot.OpenAsync(cancellationToken);
         assessmentId = manifest.AssessmentId;
+        // Read exactly the pinned manifest members for the shared input index.
         async IAsyncEnumerable<SourceRecord> Records()
         {
             foreach (var id in manifest.ObservationIds) yield return await snapshot.ReadAsync(id, cancellationToken);
         }
         index = await ClassicPageInputIndex.CreateAsync(Records(), cancellationToken);
     }
+    /// <summary>
+    /// Dispatches one saved source by kind and returns its page projection, audit statistics or retained-evidence disposition.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+    /// </summary>
     public Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -62,6 +74,10 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
         return Task.FromResult(new AnalysisResult(source.ObservationId, success ? AnalysisOutcome.NotApplicable : AnalysisOutcome.Unknown,
             source.AcquisitionError ?? (success ? "Source evidence retained for finalization" : source.AcquisitionStatus.ToString()), VersionedJson.From(new { kind })));
     }
+    /// <summary>
+    /// Projects one saved blog item into a page report row while applying the pinned home-page and user-information options.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
+    /// </summary>
     private ClassicPage? BlogPage(ClassicPageBlogBatchSource input, Dictionary<string, SourceField> fields, ClassicPageWebSource web)
     {
         var url = fields.GetValueOrDefault("FileRef")?.Text ?? fields.GetValueOrDefault("ID")?.Text ?? "";
@@ -76,6 +92,10 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
             PageType = ClassicPageRules.BlogPage, HomePage = home, RemediationCode = "CP4",
         };
     }
+    /// <summary>
+    /// Combines committed per-source results into Classic Pages report rows for this run.
+    /// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> to run report aggregation after offline analysis rather than after online scanning.</para>
+    /// </summary>
     public Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results, IAnalysisReportWriter reports,
         VersionedJson parameters, CancellationToken cancellationToken) =>
         ClassicPageReportBuilder.PublishAsync(assessmentId, index, mapping, results, reports, cancellationToken);

@@ -8,7 +8,10 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 {
-    /// <summary>Computes page rollups and per-part verdicts using the embedded mapping.</summary>
+    /// <summary>
+    /// Verifies page readiness percentages and unmapped types calculated from detached web part rows.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+    /// </summary>
     public class SnapshotPageMappingCalculatorTests
     {
         // A web part with a known modern mapping (mappable) and one without (unmappable), straight from
@@ -21,6 +24,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         private readonly WebPartMappingManager mappingManager = new();
 
+        /// <summary>
+        /// Creates one detached web part report row with the specified type for mapping assertions.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         private static ClassicPageWebPart WebPart(string fullType, int row = 1, int column = 1, int order = 0)
         {
             return new ClassicPageWebPart
@@ -33,6 +40,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             };
         }
 
+        /// <summary>
+        /// Verifies a 75 percent readiness score when three of four parts are mappable.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         [Fact]
         public void MappingPercent_3of4Mappable_Returns75()
         {
@@ -58,6 +69,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             webParts[3].IsMappable.Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies the 100 percent readiness convention for an empty page inventory.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         [Fact]
         public void MappingPercent_NoWebParts_Returns100()
         {
@@ -71,6 +86,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             page.UnmappedWebParts.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Verifies the empty-inventory readiness convention when no web part collection is supplied.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         [Fact]
         public void MappingPercent_NullWebParts_Returns100()
         {
@@ -84,6 +103,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             page.UnmappedWebParts.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Verifies a zero readiness score when every captured part is unmappable.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         [Fact]
         public void MappingPercent_AllUnmappable_Returns0()
         {
@@ -102,6 +125,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             webParts.Should().OnlyContain(wp => wp.IsMappable == false);
         }
 
+        /// <summary>
+        /// Verifies that the unmapped type list contains each type only once.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         [Fact]
         public void MappingPercent_DuplicateUnmappedType_ListedOnce()
         {
@@ -122,6 +149,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             page.UnmappedWebParts.Should().Be("Contoso.Custom.WebParts.WidgetA");
         }
 
+        /// <summary>
+        /// Verifies deterministic unmapped type ordering by layout row and column.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageMappingCalculatorTests.cs</c> to verify detached page readiness after moving mapping calculations into analysis.</para>
+        /// </summary>
         [Fact]
         public void MappingPercent_UnmappedList_InRowColumnOrder()
         {

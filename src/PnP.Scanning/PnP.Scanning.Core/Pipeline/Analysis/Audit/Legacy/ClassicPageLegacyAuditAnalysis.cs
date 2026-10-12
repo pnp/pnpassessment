@@ -4,12 +4,24 @@ using static PnP.Scanning.Core.Pipeline.Analysis.Audit.ClassicPageAuditAnalysis;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Audit.Legacy;
 
+/// <summary>
+/// Preserves event reduction and capped distinct-user counts for the mixed Classic scanner audit path.
+/// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to keep legacy audit reduction available after separating its Graph collection code.</para>
+/// </summary>
 internal static class ClassicPageLegacyAuditAnalysis
 {
+    /// <summary>
+    /// Holds page event counts and the bounded user-hash set accumulated for one legacy query chunk.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to keep legacy audit reduction available after separating its Graph collection code.</para>
+    /// </summary>
     internal readonly record struct ChunkPageData(int ViewsCount, int CreatesCount, int EditsCount, HashSet<int> UserHashes);
 
     private const int MaxTrackedUsersPerPage = 10_000;
 
+    /// <summary>
+    /// Adds one Graph records page to the existing chunk statistics without replacing previously counted events.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to keep legacy audit reduction available after separating its Graph collection code.</para>
+    /// </summary>
     internal static void AccumulateLegacyRecords(Dictionary<string, ChunkPageData> results, JsonElement records)
     {
         foreach (var record in records.EnumerateArray())
@@ -30,6 +42,10 @@ internal static class ClassicPageLegacyAuditAnalysis
         }
     }
 
+    /// <summary>
+    /// Combines chunk counts and bounded user sets while copying input sets to avoid mutating prior query results.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to keep legacy audit reduction available after separating its Graph collection code.</para>
+    /// </summary>
     internal static IReadOnlyDictionary<string, AuditPageStats> MergeChunks(
         IEnumerable<IReadOnlyDictionary<string, ChunkPageData>> chunks)
     {

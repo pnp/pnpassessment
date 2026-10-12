@@ -7,6 +7,9 @@ using PnP.Scanning.Core.Pipeline.Contracts.Web;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
+/// <summary>
+/// Indexes shared Classic Pages source identities and metadata without retaining every page XML or audit response body.
+/// </summary>
 internal sealed class ClassicPageInputIndex
 {
     internal ClassicPageScopeSource Scope { get; private set; } = null!;
@@ -16,6 +19,9 @@ internal sealed class ClassicPageInputIndex
     internal Dictionary<int, ClassicPageAuditChunkSource> AuditChunks { get; } = [];
 
     // Keep identities and shared metadata, not all page XML / audit bodies, in the index.
+    /// <summary>
+    /// Builds the index and rejects inconsistent scope ownership, page references, audit windows or pagination receipts.
+    /// </summary>
     internal static async Task<ClassicPageInputIndex> CreateAsync(IAsyncEnumerable<SourceRecord> records, CancellationToken token)
     {
         var index = new ClassicPageInputIndex();

@@ -13,6 +13,9 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
+/// <summary>
+/// Verifies that assessment discovery persists physical page identities and explicit scope evidence through the existing storage boundary.
+/// </summary>
 [Trait("Category", "ClassicDiscoveryIntegration")]
 public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanContextFixture>
 {
@@ -164,6 +167,9 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
     }
 
     private AssessmentDiscoveryWriter Writer() => new(database.CreateContext);
+    /// <summary>
+    /// Verifies that physical pages retain their discovered file URLs when optional item fields are absent.
+    /// </summary>
     [Fact]
     public void Missing_item_fields_never_collapse_physical_pages_to_their_list_item_number()
     {
@@ -176,6 +182,9 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         invalid.Should().Throw<InvalidDataException>();
     }
 
+    /// <summary>
+    /// Verifies that metadata for a different file is rejected before page assessment.
+    /// </summary>
     [Fact]
     public void Metadata_for_a_different_file_is_rejected_before_it_enters_classic_page_assessment()
     {
@@ -240,6 +249,9 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         page.AssessmentStatus.Should().Be("Failed");
     }
 
+    /// <summary>
+    /// Verifies that a modeled GUID modern-page marker is classified without an invalid string cast.
+    /// </summary>
     [Fact]
     public void Direct_list_item_guid_classifies_modern_page_without_string_cast_failure()
     {

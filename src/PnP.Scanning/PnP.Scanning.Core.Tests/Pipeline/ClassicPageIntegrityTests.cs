@@ -14,9 +14,15 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies report immutability, source corruption rejection, reference validation and finalization recovery.
+/// </summary>
 [Trait("Category", "ClassicPagePipeline")]
 public sealed class ClassicPageIntegrityTests
 {
+    /// <summary>
+    /// Verifies report immutability and rejection of export or reanalysis when sealed source content is corrupted.
+    /// </summary>
     [Fact]
     public async Task Reports_are_immutable_and_source_corruption_rejects_report_and_reanalysis()
     {
@@ -36,6 +42,9 @@ public sealed class ClassicPageIntegrityTests
         Assert.False(Directory.Exists(path)); Assert.Equal(1, await db.AnalysisRuns.CountAsync());
     }
 
+    /// <summary>
+    /// Verifies that foreign page references and incomplete audit-window coverage cannot pass input validation.
+    /// </summary>
     [Fact]
     public async Task Page_reference_mismatch_and_unsettled_audit_window_cannot_be_accepted()
     {
@@ -48,6 +57,7 @@ public sealed class ClassicPageIntegrityTests
         var pageIndex = records.FindIndex(x => ClassicPageSourceJson.Kind(x) == "Page"); var original = records[pageIndex];
         var input = ClassicPageSourceJson.Read<ClassicPageItemSource>(original.Artifact.GetBytes()) with { ListId = Guid.NewGuid() };
         records[pageIndex] = original with { Artifact = new SourceArtifact(null, null, ClassicPageSourceJson.Bytes(input)) };
+        // Feed the modified detached records through the production input index without storage writes.
         async IAsyncEnumerable<SourceRecord> Read() { foreach (var record in records) { yield return record; await Task.CompletedTask; } }
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => ClassicPageInputIndex.CreateAsync(Read(), default));
         records[pageIndex] = original;
@@ -58,6 +68,9 @@ public sealed class ClassicPageIntegrityTests
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => ClassicPageInputIndex.CreateAsync(Read(), default));
     }
 
+    /// <summary>
+    /// Verifies finalizer recovery after publication without replacing committed results or report rows.
+    /// </summary>
     [Fact]
     public async Task Pause_after_report_publication_resumes_finalization_without_rewriting_results_or_reports()
     {
@@ -83,20 +96,38 @@ public sealed class ClassicPageIntegrityTests
         Assert.Equal(1, fixture.Calls["sites"]); Assert.Equal(1, environment.RestoreRequests);
     }
 
+    /// <summary>
+    /// Controls a pause immediately after report publication and counts per-source analysis calls.
+    /// </summary>
     private sealed class FinalizerControl
     {
         internal bool Block = true;
         internal int AnalysisCalls;
         internal TaskCompletionSource Reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        /// <summary>
+        /// Creates the controlled wrapper around the production Classic Pages analyzer.
+        /// </summary>
         internal IAnalysisModule Create() => new Module(this);
+        /// <summary>
+        /// Delegates production page analysis while allowing finalization to block after publishing reports.
+        /// </summary>
         private sealed class Module(FinalizerControl owner) : IAnalysisModule, IAnalysisSnapshotPreparation, IAnalysisFinalizer
         {
             private readonly ClassicPageAnalysisModule inner = new();
             public string ModuleKey => inner.ModuleKey;
             public string RuleVersion => inner.RuleVersion;
+            /// <summary>
+            /// Delegates snapshot preparation to the production analyzer.
+            /// </summary>
             public Task PrepareAsync(ISnapshotReader reader, CancellationToken token) => inner.PrepareAsync(reader, token);
+            /// <summary>
+            /// Counts each source analysis and delegates its result to the production analyzer.
+            /// </summary>
             public Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken token)
             { Interlocked.Increment(ref owner.AnalysisCalls); return inner.AnalyzeAsync(source, parameters, token); }
+            /// <summary>
+            /// Publishes the production report and optionally waits for cancellation to verify finalizer restart.
+            /// </summary>
             public async Task FinalizeAsync(ISnapshotReader reader, IAnalysisResultReader results, IAnalysisReportWriter reports, VersionedJson parameters, CancellationToken token)
             {
                 await inner.FinalizeAsync(reader, results, reports, parameters, token);

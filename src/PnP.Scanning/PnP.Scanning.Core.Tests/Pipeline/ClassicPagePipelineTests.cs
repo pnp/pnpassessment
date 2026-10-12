@@ -14,10 +14,16 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies the production Classic Pages collect, analyze and report flow through native command binding and loopback RPC.
+/// </summary>
 [Trait("Category", "ClassicPagePipeline")]
 [Collection("Native pipeline CLI")]
 public sealed class ClassicPagePipelineTests
 {
+    /// <summary>
+    /// Verifies native collect, analyze and run-selected report commands against the production page module.
+    /// </summary>
     [Fact]
     public async Task Native_collect_analyze_and_run_selected_report_use_the_production_page_module()
     {
@@ -44,6 +50,9 @@ public sealed class ClassicPagePipelineTests
         var notReady = await host.InvokeAsync("report", "--id", collected.Ticket.AssessmentId, "--analysis-run-id", Guid.NewGuid().ToString(), "--mode", "CsvOnly", "--open", "false");
         Assert.Equal(1, notReady.ExitCode);
     }
+    /// <summary>
+    /// Verifies that native ClassicPage start executes collection, analysis and report export without resolving legacy services.
+    /// </summary>
     [Fact]
     public async Task Native_start_mode_classicpage_runs_real_collection_analysis_and_report_without_legacy_services()
     {
@@ -80,6 +89,9 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal("pipeline", listing.ExecutionPath); Assert.Equal(0, listing.SiteCollectionsScanned);
     }
 
+    /// <summary>
+    /// Verifies repeated offline analysis and selected report export preserve source bytes and independent run results.
+    /// </summary>
     [Fact]
     public async Task Collect_reopen_reanalyze_and_select_report_keep_original_bytes_and_results()
     {
@@ -95,6 +107,7 @@ public sealed class ClassicPagePipelineTests
         var reopened = new PipelineStore(data.DirectoryPath);
         var offline = new PipelineCoordinator(reopened, ClassicPageModule.Registry((_, _) => throw new InvalidOperationException("Online source must not be opened")), environment);
         await offline.StartAsync(default);
+        // Run one new offline analysis over the same sealed input and wait for report publication.
         async Task<PhaseReply> Analyze()
         {
             var ticket = await offline.AnalyzeAsync(new AnalyzeRequest { Id = collected.AssessmentId, SnapshotId = collected.SnapshotId });
@@ -113,6 +126,9 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal(Guid.Parse(second.AnalysisRunId), latest.RunId);
     }
 
+    /// <summary>
+    /// Verifies collection restart replays saved requests and resumes the original run.
+    /// </summary>
     [Theory]
     [InlineData("page:3")]
     [InlineData("discovery")]
@@ -142,6 +158,9 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal(2, await read.SourceObservations.CountAsync(x => x.SourceIdentity.StartsWith("DiscoveryRequest:")));
     }
 
+    /// <summary>
+    /// Verifies retained discovery and explicit assessment failure when page metadata acquisition fails.
+    /// </summary>
     [Fact]
     public async Task Discovery_survives_failed_metadata_and_analysis_reports_failures_without_invented_pages()
     {
@@ -158,6 +177,9 @@ public sealed class ClassicPagePipelineTests
         Assert.True((await data.Store.LatestRootAsync(id))!.ErrorCount > 0);
     }
 
+    /// <summary>
+    /// Verifies that page options, blog projection and audit statistics honor the fixed collection scope.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -176,6 +198,9 @@ public sealed class ClassicPagePipelineTests
         Assert.Equal("succeeded", projected.QueryStatus); Assert.Equal(1, fixture.Calls["audit"]);
     }
 
+    /// <summary>
+    /// Verifies preflight rejection of unsupported components and rules before authentication or database creation.
+    /// </summary>
     [Fact]
     public async Task Unsupported_component_and_rule_are_rejected_before_auth_and_database_creation()
     {

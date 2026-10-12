@@ -15,9 +15,15 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies durable discovery and audit transport replay, including cancellation between recorded request stages.
+/// </summary>
 [Trait("Category", "ClassicPagePipeline")]
 public sealed class ClassicPageTransportTests
 {
+    /// <summary>
+    /// Verifies durable replay of discovery REST and modeled responses after reopening storage.
+    /// </summary>
     [Fact]
     public async Task Discovery_transport_reopens_and_replays_original_modeled_and_REST_responses()
     {
@@ -42,6 +48,9 @@ public sealed class ClassicPageTransportTests
         Assert.Equal(resolved, await replay.ResolveFileAsync("/sites/a/SitePages/Home.aspx"));
         Assert.Equal(4, (await context.Journal!.ReadCommittedAsync(default)).Count);
     }
+    /// <summary>
+    /// Verifies production audit query and pagination resume from committed SQLite receipts.
+    /// </summary>
     [Fact]
     public async Task Actual_audit_collector_resumes_original_query_and_pagination_from_SQLite_receipts()
     {
@@ -77,6 +86,9 @@ public sealed class ClassicPageTransportTests
         await seed.Writer.SealAsync(default);
     }
 
+    /// <summary>
+    /// Verifies cancellation propagation through the collection CSOM transport while preserving the shared HTTP client.
+    /// </summary>
     [Fact]
     public async Task Collection_Csom_transport_propagates_cancellation_without_changing_shared_http_client()
     {
@@ -94,12 +106,18 @@ public sealed class ClassicPageTransportTests
         using var response = await shared.GetAsync("https://contoso.sharepoint.com/"); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    /// <summary>
+    /// Returns recorded Graph submit, poll and records responses and counts requests for replay assertions.
+    /// </summary>
     private sealed class AuditHandler : HttpMessageHandler
     {
         internal int SubmitCalls, PollCalls, FirstPageCalls, SecondPageCalls;
         internal bool BlockSecondPage = true;
         internal string? SubmittedBody;
         internal TaskCompletionSource Reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        /// <summary>
+        /// Routes recorded audit requests and injects the configured cancellation or page response behavior.
+        /// </summary>
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             Assert.Equal("Bearer", request.Headers.Authorization?.Scheme); Assert.Equal("fixture-token", request.Headers.Authorization?.Parameter);
@@ -116,12 +134,21 @@ public sealed class ClassicPageTransportTests
             FirstPageCalls++;
             return Response("{\"value\":[],\"@odata.nextLink\":\"https://graph.microsoft.com/v1.0/security/auditLog/queries/query-original/records?$skip=5000\"}");
         }
+        /// <summary>
+        /// Creates a successful JSON HTTP response for the recorded audit transport.
+        /// </summary>
         private static HttpResponseMessage Response(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
     }
+    /// <summary>
+    /// Returns a submitted query that remains pending so pause and poll checkpoint behavior can be verified.
+    /// </summary>
     private sealed class PendingHandler : HttpMessageHandler
     {
         internal bool Complete; internal string? Body;
         internal TaskCompletionSource Reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        /// <summary>
+        /// Counts and returns the next recorded pending-query transport response.
+        /// </summary>
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             if (Complete) return new(HttpStatusCode.OK);
@@ -129,23 +156,47 @@ public sealed class ClassicPageTransportTests
             await Task.Delay(Timeout.Infinite, token); return new(HttpStatusCode.OK);
         }
     }
+    /// <summary>
+    /// Implements the discovery factory and client using recorded pages and modeled file facts.
+    /// </summary>
     private sealed class DiscoveryClient : ISharePointAspxRestClientFactory, ISharePointAspxRestClient
     {
         internal bool Forbidden; internal int Requests;
         public Uri WebUrl => new(ClassicPageFixture.Site);
+        /// <summary>
+        /// Returns the recorded discovery client for the requested web.
+        /// </summary>
         public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl, CancellationToken token = default) => Task.FromResult<ISharePointAspxRestClient>(this);
+        /// <summary>
+        /// Counts discovery requests so resumed traversal can assert that saved requests were replayed.
+        /// </summary>
         private void Count() { if (Forbidden) throw new InvalidOperationException("Completed discovery request repeated online"); Requests++; }
+        /// <summary>
+        /// Returns the recorded REST page and continuation for the requested discovery URI.
+        /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri request, CancellationToken token = default)
         {
             Count(); return Task.FromResult(new SharePointRestPage(request, HttpStatusCode.OK, [JsonSerializer.SerializeToElement(new { Id = ClassicPageFixture.ListId })],
                 null!, "original-response-digest", "odata", DiscoveryTerminalOutcome.Complete, ReceivedAtUtc: DateTimeOffset.UtcNow));
         }
+        /// <summary>
+        /// Returns the recorded modeled welcome-page value.
+        /// </summary>
         public Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken token = default)
         { Count(); return Task.FromResult(new SharePointModeledValue(DiscoveryTerminalOutcome.Complete, "SitePages/Home.aspx", "CSOM", "WelcomePage", null!, "original-welcome", DateTimeOffset.UtcNow)); }
+        /// <summary>
+        /// Returns recorded modeled folder contents for the requested locator.
+        /// </summary>
         public Task<SharePointModeledFolderResult> ReadFolderAsync(string url, CancellationToken token = default)
         { Count(); return Task.FromResult(new SharePointModeledFolderResult(DiscoveryTerminalOutcome.Denied, null!, url, [], [], "CSOM", "ReadFolder", "Denied", "original-folder", DateTimeOffset.UtcNow)); }
+        /// <summary>
+        /// Returns the recorded owning list and item identity for a discovered file.
+        /// </summary>
         public Task<SharePointResolvedFile> ResolveFileAsync(string url, CancellationToken token = default)
         { Count(); return Task.FromResult(new SharePointResolvedFile(DiscoveryTerminalOutcome.Complete, ClassicPageFixture.WebId.ToString(), "Home.aspx", url, "Customized", "original-file", ListId: ClassicPageFixture.ListId, ListItemId: 1)); }
+        /// <summary>
+        /// Completes disposal because the recorded client owns no live transport.
+        /// </summary>
         public void Dispose() { }
     }
 }

@@ -22,8 +22,16 @@ using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
+/// <summary>
+/// Assembles page results, web and site summaries, discovery coverage and audit usage into deterministic report rows.
+/// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> and <c>Storage/StorageManager.cs</c> to build report projections from fixed offline results instead of mutable scanner tables.</para>
+/// </summary>
 internal static class ClassicPageReportBuilder
 {
+    /// <summary>
+    /// Reads committed analysis payloads, builds all Classic Pages report projections, and publishes them under the current analysis run.
+    /// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> and <c>Storage/StorageManager.cs</c> to build report projections from fixed offline results instead of mutable scanner tables.</para>
+    /// </summary>
     internal static async Task PublishAsync(Guid assessmentId, ClassicPageInputIndex index, WebPartMappingManager mapping,
         IAnalysisResultReader results, IAnalysisReportWriter reports, CancellationToken token)
     {
@@ -51,12 +59,14 @@ internal static class ClassicPageReportBuilder
                 audit.AddRange(payload.GetProperty("output").Deserialize<ClassicAuditPageStats[]>()!);
         }
         var rows = new List<AnalysisReportRow>();
+        // Assign stable keys and per-report ordinals before publishing versioned row payloads.
         void Add<T>(string kind, IEnumerable<T> values, Func<T, string> key)
         {
             var ordinal = 0;
             foreach (var value in values.OrderBy(key, StringComparer.Ordinal))
                 rows.Add(new(kind, key(value), ordinal++, VersionedJson.From(value)));
         }
+        // Keep physical page identity distinct across site collections and webs.
         string PageKey(ClassicPage page) => ClassicPageSourceJson.WebKey(page.SiteUrl, page.WebUrl) + "|" + page.PageUrl;
         var summaries = index.Webs.Values.Where(x => x.State.Succeeded).Select(web => ClassicWebSummaryBuilder.Build(assessmentId, web,
             pages.Where(p => p.SiteUrl == web.SiteUrl && p.WebUrl == web.WebUrl).ToArray(),
@@ -113,6 +123,10 @@ internal static class ClassicPageReportBuilder
         await reports.PublishAsync(rows, token);
     }
 
+    /// <summary>
+    /// Combines saved audit statistics and settled chunk coverage into per-site page usage rows and explicit partial or empty coverage rows.
+    /// <para>Evolved from <c>Storage/StorageManager.cs</c> to build audit report rows from saved responses and a pinned audit window.</para>
+    /// </summary>
     private static List<ClassicPageAuditUsage> AuditRows(Guid assessmentId, ClassicPageScopeSource scope,
         ClassicPageAuditChunkSource[] chunks, List<ClassicAuditPageStats> inputs)
     {
@@ -129,7 +143,9 @@ internal static class ClassicPageReportBuilder
         {
             var stats = merged.Where(x => sites.FirstOrDefault(s => x.Key.StartsWith(s.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase)
                 || x.Key.Equals(s, StringComparison.OrdinalIgnoreCase)) == site).ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+            // Preserve server-relative page URLs in the existing audit CSV shape.
             string Relative(string absolute) { var origin = new Uri(site).GetLeftPart(UriPartial.Authority); var path = absolute.StartsWith(origin, StringComparison.OrdinalIgnoreCase) ? absolute[origin.Length..] : absolute; return path.Length == 0 ? "/" : path; }
+            // Initialize page or coverage rows with the same pinned audit window and settled query outcome.
             ClassicPageAuditUsage Row(string url) => new() { ScanId = assessmentId, SiteUrl = site, WebUrl = "/", PageUrl = Relative(url),
                 AuditWindowStart = scope.AuditWindowStart, AuditWindowEnd = scope.AuditWindowEnd, QueryStatus = status, SkipReason = string.IsNullOrEmpty(reason) ? null : reason };
             foreach (var value in stats)

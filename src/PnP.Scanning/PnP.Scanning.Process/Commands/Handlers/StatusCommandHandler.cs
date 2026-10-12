@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Displays active legacy assessments and pipeline phase, record progress and diagnostics.
+    /// </summary>
     internal sealed class StatusCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -26,6 +29,9 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Reads public assessment status and renders progress fields appropriate to each execution path.
+        /// </summary>
         private async Task HandleStatusAsync()
         {
             var client = await processManager.GetScannerClientAsync();

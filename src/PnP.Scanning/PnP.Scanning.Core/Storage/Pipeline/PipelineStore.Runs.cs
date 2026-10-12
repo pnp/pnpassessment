@@ -6,8 +6,14 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Persists phase creation, progress, recovery and immutable per-observation analysis results.
+/// </summary>
 internal sealed partial class PipelineStore
 {
+    /// <summary>
+    /// Creates the assessment, source snapshot, protected options and collection or combined phase rows in one transaction.
+    /// </summary>
     internal Task<bool> CreateCollectionAsync(SourceSnapshotRow snapshot, PhaseRunRow root,
         PhaseRunRow? collectionChild, StartRequest protectedOptions, CancellationToken token) =>
         WriteAsync(snapshot.AssessmentId, db =>
@@ -32,6 +38,9 @@ internal sealed partial class PipelineStore
             return Task.FromResult(true);
         }, token, create: true);
 
+    /// <summary>
+    /// Validates the sealed input and persists a queued standalone analysis with its fixed manifest digest.
+    /// </summary>
     internal Task<bool> CreateAnalysisAsync(PhaseRunRow root, CancellationToken token) =>
         WriteAsync(root.AssessmentId, async db =>
         {
@@ -45,6 +54,9 @@ internal sealed partial class PipelineStore
             return true;
         }, token);
 
+    /// <summary>
+    /// Reuses or creates the analysis child after verifying that collection sealed the originally selected input.
+    /// </summary>
     internal Task<PhaseRunRow> PrepareAnalysisChildAsync(PhaseRunRow root, CancellationToken token) =>
         WriteAsync(root.AssessmentId, async db =>
         {
@@ -72,6 +84,9 @@ internal sealed partial class PipelineStore
             return child;
         }, token);
 
+    /// <summary>
+    /// Copies the pinned rule, input digest and analysis parameters into the immutable analysis run record.
+    /// </summary>
     private static AnalysisRunRow AnalysisRow(PhaseRunRow phase, string manifestDigest) => new()
     {
         AnalysisRunId = phase.RunId, SnapshotId = phase.SnapshotId, ModuleKey = phase.ModuleKey,
@@ -80,6 +95,9 @@ internal sealed partial class PipelineStore
         ManifestDigest = manifestDigest,
     };
 
+    /// <summary>
+    /// Marks the root and active phase as running, recording their first start time and clearing prior end times.
+    /// </summary>
     internal Task<bool> SetRunningAsync(Guid assessmentId, Guid rootId, Guid phaseId, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {
@@ -95,6 +113,9 @@ internal sealed partial class PipelineStore
             return true;
         }, token);
 
+    /// <summary>
+    /// Queues only paused or terminated roots and unfinished children while preserving their original inputs and checkpoints.
+    /// </summary>
     internal Task<bool> QueueRestartAsync(Guid assessmentId, Guid rootId, int threads, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {
@@ -115,6 +136,9 @@ internal sealed partial class PipelineStore
             return true;
         }, token);
 
+    /// <summary>
+    /// Marks active root and child phases as pausing and updates the assessment lifecycle.
+    /// </summary>
     internal Task<bool> SetPausingAsync(Guid assessmentId, Guid rootId, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {
@@ -124,6 +148,9 @@ internal sealed partial class PipelineStore
             return true;
         }, token);
 
+    /// <summary>
+    /// Requires results for every manifest member and a valid published report checkpoint before finishing analysis.
+    /// </summary>
     internal Task<bool> FinishAnalysisAsync(Guid assessmentId, Guid analysisRunId, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {
@@ -151,6 +178,9 @@ internal sealed partial class PipelineStore
             return true;
         }, token);
 
+    /// <summary>
+    /// Records root and unfinished child settlement with diagnostics, rejecting successful settlement when a child is unfinished.
+    /// </summary>
     internal Task<bool> SettleRootAsync(Guid assessmentId, Guid rootId, ScanStatus status, string? error = null,
         CancellationToken token = default) => WriteAsync(assessmentId, async db =>
     {
@@ -172,6 +202,9 @@ internal sealed partial class PipelineStore
         return true;
     }, token);
 
+    /// <summary>
+    /// Terminates persisted active roots after engine interruption while retaining their resume checkpoints.
+    /// </summary>
     internal async Task MarkInterruptedRunsAsync(CancellationToken token)
     {
         foreach (var root in await ListRootsAsync(token))
@@ -180,6 +213,9 @@ internal sealed partial class PipelineStore
                     "Engine stopped before phase settlement; resume the original run and checkpoint.", token);
     }
 
+    /// <summary>
+    /// Reads committed result members and rejects a result count inconsistent with saved phase progress.
+    /// </summary>
     private async Task<IReadOnlySet<Guid>> CompletedResultsAsync(Guid assessmentId, Guid analysisRunId, CancellationToken token)
     {
         await EnsureDatabaseAsync(assessmentId, token);
@@ -192,6 +228,9 @@ internal sealed partial class PipelineStore
         return completed;
     }
 
+    /// <summary>
+    /// Validates the selected sealed input and confirms its digest matches the immutable analysis run.
+    /// </summary>
     private async Task<PinnedManifest> AnalysisManifestAsync(Guid assessmentId, Guid analysisRunId, CancellationToken token)
     {
         await EnsureDatabaseAsync(assessmentId, token);
@@ -203,6 +242,9 @@ internal sealed partial class PipelineStore
         return manifest;
     }
 
+    /// <summary>
+    /// Revalidates the pinned source and atomically appends its result, progress and error checkpoint, rejecting changed result replay.
+    /// </summary>
     private Task<bool> CommitResultAsync(Guid assessmentId, Guid analysisRunId, AnalysisResult result, PinnedManifest pinned, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {

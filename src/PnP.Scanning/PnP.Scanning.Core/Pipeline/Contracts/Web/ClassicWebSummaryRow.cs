@@ -2,6 +2,10 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Web
 {
 
+    /// <summary>
+    /// Carries per-web page, site-type and mapping-readiness aggregates in the existing report shape.
+    /// <para>Evolved from <c>Storage/Model/ClassicWebSummary.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
+    /// </summary>
     internal class ClassicWebSummaryRow : ClassicPageBaseRow
     {
         public string Template { get; set; }

@@ -3,6 +3,9 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Carries the typed CLI scope, authentication, thread, module and assessment-component choices before execution.
+    /// </summary>
     internal class StartOptions
     {
         public string Module { get; set; }

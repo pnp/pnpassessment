@@ -14,9 +14,7 @@ using System.Collections.Concurrent;
 namespace PnP.Scanning.Core.Services
 {
     /// <summary>
-    /// Class for in memory tracking the running scans.
-    /// 
-    /// This class is loaded as singleton, don't use instance variables unless they're thread-safe
+    /// Schedules legacy site and web scans and coordinates their capacity with active collection and analysis pipeline runs.
     /// </summary>
     internal sealed class ScanManager : IHostedService
     {
@@ -31,6 +29,9 @@ namespace PnP.Scanning.Core.Services
         private object scanListLock = new();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
+        /// <summary>
+        /// Binds legacy scanning services, pipeline capacity coordination and host lifecycle callbacks.
+        /// </summary>
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, TelemetryManager telemetry,
                            IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, RateLimiter limiter, PipelineCoordinator pipeline = null)
         {
@@ -183,6 +184,9 @@ namespace PnP.Scanning.Core.Services
             return scanId;
         }
 
+        /// <summary>
+        /// Rejects a new legacy assessment when legacy and pipeline executions together reach the shared limit.
+        /// </summary>
         private void EnforeMaximumParallelRunningScans()
         {
             if (NumberOfScansRunning() + (pipelineCoordinator?.ActiveCount ?? 0) >= MaxParallelScans)
@@ -314,6 +318,9 @@ namespace PnP.Scanning.Core.Services
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        /// <summary>
+        /// Projects active legacy assessment status and site progress for the public status response.
+        /// </summary>
         internal async Task<StatusReply> GetScanStatusAsync()
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
@@ -654,6 +661,9 @@ namespace PnP.Scanning.Core.Services
             Log.Warning("Running assessments marked as terminated, Kestrel can shutdown now");
         }
 
+        /// <summary>
+        /// Clears the current legacy scan manager reference when its host has stopped.
+        /// </summary>
         private void OnStopped()
         {
             Interlocked.CompareExchange(ref current, null, this);

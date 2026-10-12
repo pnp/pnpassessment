@@ -3,11 +3,16 @@ using System.Text.Json;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
-/// <summary>Opaque module data. Its schema version is independent of the database schema.</summary>
+/// <summary>
+/// Validates and preserves a module payload together with its positive schema version, independently of database schema versions.
+/// </summary>
 internal sealed record VersionedJson
 {
     public static VersionedJson Empty { get; } = new("{\"schemaVersion\":1,\"value\":{}}");
 
+    /// <summary>
+    /// Parses an envelope, requires a positive schemaVersion and a value, and retains detached JSON for persistence.
+    /// </summary>
     public VersionedJson(string json)
     {
         using var document = JsonDocument.Parse(json);
@@ -33,6 +38,9 @@ internal sealed record VersionedJson
         }
     }
 
+    /// <summary>
+    /// Serializes a value inside the versioned envelope used for sources, checkpoints, analysis parameters and results.
+    /// </summary>
     public static VersionedJson From<T>(T value, int schemaVersion = 1) =>
         new(JsonSerializer.Serialize(new { schemaVersion, value }));
 }

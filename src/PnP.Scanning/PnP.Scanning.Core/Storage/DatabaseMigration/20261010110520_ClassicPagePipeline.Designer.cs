@@ -10,10 +10,16 @@ using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
+    /// <summary>
+    /// Records the EF-generated target model for the final Classic Pages pipeline migration.
+    /// </summary>
     [DbContext(typeof(ScanContext))]
     [Migration("20261010110520_ClassicPagePipeline")]
     partial class ClassicPagePipeline
     {
+        /// <summary>
+        /// Reconstructs the migration target model used by EF tooling and migration validation.
+        /// </summary>
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {

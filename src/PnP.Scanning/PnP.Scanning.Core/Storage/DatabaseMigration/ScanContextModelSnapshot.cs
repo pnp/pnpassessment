@@ -9,9 +9,15 @@ using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
+    /// <summary>
+    /// Records the EF-generated current assessment model used to detect schema changes when creating the next migration.
+    /// </summary>
     [DbContext(typeof(ScanContext))]
     partial class ScanContextModelSnapshot : ModelSnapshot
     {
+        /// <summary>
+        /// Reconstructs the latest EF model, including the final merged source storage and run-scoped report tables.
+        /// </summary>
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

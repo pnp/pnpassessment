@@ -7,8 +7,14 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands;
 
+/// <summary>
+/// Builds authentication-free analysis commands and dispatches collection or combined requests through the dedicated pipeline RPCs.
+/// </summary>
 internal static class PipelineCommandHandler
 {
+    /// <summary>
+    /// Binds the selected assessment, snapshot, rule and parameters to a standalone offline analysis command.
+    /// </summary>
     internal static Command Analyze(ScannerManager manager)
     {
         var command = new Command("analyze", "Analyzes one explicitly selected sealed snapshot without authentication");
@@ -35,6 +41,9 @@ internal static class PipelineCommandHandler
         return command;
     }
 
+    /// <summary>
+    /// Dispatches either collect or combined start through its matching RPC and fixed rule parameters.
+    /// </summary>
     internal static Task<int> RunCollectionAsync(ScannerManager manager, CollectRequest request, bool collectOnly,
         string ruleVersion, string analysisParameters) => ExecuteAsync(manager, client => collectOnly
             ? client.CollectAsync(request)
@@ -44,6 +53,9 @@ internal static class PipelineCommandHandler
                 AnalysisParametersJson = analysisParameters ?? VersionedJson.Empty.Json,
             }));
 
+    /// <summary>
+    /// Calls a pipeline RPC, prints the queued run identities and reports an explicit error when the running service lacks pipeline support.
+    /// </summary>
     private static async Task<int> ExecuteAsync(ScannerManager manager,
         Func<PnPScanner.PnPScannerClient, AsyncUnaryCall<PhaseReply>> call)
     {

@@ -7,17 +7,8 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 {
     /// <summary>
-    /// T10 — home-page semantics. The pure pieces are exercised here directly (no CSOM, no live
-    /// SharePoint):
-    /// <list type="bullet">
-    /// <item><description><see cref="HomePageDetector.IsHomePage"/> — the welcome-page url compare.</description></item>
-    /// <item><description><see cref="HomePageDetector.IsHtmlUncustomized"/> — the default-home-page HTML
-    /// compare (the fallback used when the CSOM <c>CanModernizeHomepage</c> API is unavailable).</description></item>
-    /// <item><description><see cref="HomePageDetector.IsDefaultTeamSiteWebPartSet"/> and
-    /// <see cref="HomePageDetector.IsUncustomizedHomePageFallback"/> — the rest of the fallback decision.</description></item>
-    /// </list>
-    /// The reliable CSOM <c>web.CanModernizeHomepage</c> path (a bare property read) is wired per-web with
-    /// the rest of the page scan and is covered by the integration test (T15).
+    /// Verifies welcome-page identity, default HTML and legacy fallback rules used by offline home-page analysis.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
     /// </summary>
     public class HomePageDetectorTests
     {
@@ -36,6 +27,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         private const string DefaultRootHomeHtml = "<divclass=\"<tableid=\"layoutsTable\"style=\"width&#58;100%;\">\n            <tbody>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdstyle=\"width&#58;100%;padding&#58;0px;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"min-height&#58;60px;word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_AAAAAAAA-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_BBBBBBBB-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_AAAAAAAA-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_BBBBBBBB-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            </tbody>\n            </table>\n            <spanid=\"layoutsData\"style=\"display&#58;none;\">false,false,1</span>\n            </div>";
 
+        /// <summary>
+        /// Creates a detached web part entity with the selected type for default home-page set assertions.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         private static WebPartEntity WebPart(string fullType)
         {
             return new WebPartEntity { Type = fullType };
@@ -43,24 +38,40 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         #region IsHomePage
 
+        /// <summary>
+        /// Verifies home-page recognition when the page URL matches the welcome-page value.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void HomePage_UrlEqualsWelcomePage_True()
         {
             HomePageDetector.IsHomePage("/sites/team/SitePages/Home.aspx", "SitePages/Home.aspx").Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies that a different page URL is not marked as the home page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void HomePage_DifferentUrl_False()
         {
             HomePageDetector.IsHomePage("/sites/team/SitePages/About.aspx", "SitePages/Home.aspx").Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies case-insensitive home-page URL matching.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void HomePage_IsCaseInsensitive()
         {
             HomePageDetector.IsHomePage("/sites/team/SitePages/HOME.ASPX", "SitePages/Home.aspx").Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies the default.aspx convention when the web has an empty welcome page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void HomePage_EmptyWelcomePage_DefaultsToDefaultAspx()
         {
@@ -70,12 +81,20 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             HomePageDetector.IsHomePage("/sites/team/SitePages/Home.aspx", "").Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that a missing page URL cannot be classified as the home page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void HomePage_NullPageUrl_False()
         {
             HomePageDetector.IsHomePage(null, "SitePages/Home.aspx").Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies default welcome-page normalization for empty and null values.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void NormalizeWelcomePage_EmptyOrNull_ReturnsDefaultAspx()
         {
@@ -88,18 +107,30 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         #region IsHtmlUncustomized
 
+        /// <summary>
+        /// Verifies recognition of the default team-site home-page HTML.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void UncustomizedHome_DefaultStsHtml_True()
         {
             HomePageDetector.IsHtmlUncustomized(DefaultHomeHtml).Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies recognition of the default root team-site home-page HTML.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void UncustomizedHome_DefaultRootStsHtml_True()
         {
             HomePageDetector.IsHtmlUncustomized(DefaultRootHomeHtml).Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies that modified home-page HTML is not classified as uncustomized.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void UncustomizedHome_CustomizedHtml_False()
         {
@@ -108,6 +139,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             HomePageDetector.IsHtmlUncustomized(customized).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that missing HTML does not imply an uncustomized home page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void UncustomizedHome_NullOrEmptyHtml_False()
         {
@@ -119,6 +154,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         #region IsDefaultTeamSiteWebPartSet
 
+        /// <summary>
+        /// Verifies the expected team-site web part set with one XSLT list view and default supporting parts.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void DefaultWebPartSet_SingleXsltListViewPlusDefaults_True()
         {
@@ -133,6 +172,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies that a set without the required list view is not the default home-page inventory.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void DefaultWebPartSet_NoListViews_False()
         {
@@ -145,6 +188,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that multiple list views fail the default home-page web part rule.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void DefaultWebPartSet_MultipleListViews_False()
         {
@@ -158,6 +205,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that an additional unsupported part fails the default home-page inventory rule.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void DefaultWebPartSet_ContainsOtherWebPart_False()
         {
@@ -170,6 +221,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that an absent web part inventory cannot establish an uncustomized home page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void DefaultWebPartSet_NullOrEmpty_False()
         {
@@ -182,6 +237,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         #region IsUncustomizedHomePageFallback
 
+        /// <summary>
+        /// Builds the standard detached web part inventory used by the default team-site home-page fallback.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         private static List<WebPartEntity> DefaultHomeWebParts() => new()
         {
             WebPart(GettingStartedType),
@@ -189,6 +248,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
         };
 
         // Builds the fallback call with all conditions satisfied; each test overrides one input to flip it.
+        /// <summary>
+        /// Evaluates the fallback with supplied template, feature and content inputs for the selected test case.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         private static bool Evaluate(
             bool isHomePage = true,
             string webTemplate = "STS",
@@ -210,18 +273,30 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
                 wikiHtml, webParts ?? DefaultHomeWebParts(), contentTypeDisplayFormTemplateName);
         }
 
+        /// <summary>
+        /// Verifies that all recorded default team-site conditions satisfy the legacy home-page fallback.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_DefaultStsHomePage_True()
         {
             Evaluate().Should().BeTrue();
         }
 
+        /// <summary>
+        /// Verifies that the fallback does not apply to an ordinary page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_NotHomePage_False()
         {
             Evaluate(isHomePage: false).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that the fallback excludes non-team-site templates.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_NotStsTeamSite_False()
         {
@@ -229,6 +304,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             Evaluate(webConfiguration: 1).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that publishing features or modernization opt-out prevent the default home-page verdict.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_PublishingOrOptedOut_False()
         {
@@ -237,12 +316,20 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             Evaluate(homePageModernizationOptedOut: true).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that a group-connected home page is excluded by the legacy fallback.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_Groupified_False()
         {
             Evaluate(siteWasGroupified: true).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that a customized master page prevents the default home-page verdict.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_NonDefaultMasterPage_False()
         {
@@ -250,24 +337,40 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             Evaluate(masterUrl: null).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that a different file name fails the localized default home-page rule.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_NotTheDefaultHomePageName_False()
         {
             Evaluate(pageName: "Welcome.aspx").Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that modified HTML fails the home-page fallback.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_CustomizedHtml_False()
         {
             Evaluate(wikiHtml: "<div>totally custom content</div>").Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that a nondefault web part inventory fails the home-page fallback.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_NonDefaultWebPartSet_False()
         {
             Evaluate(webParts: new List<WebPartEntity> { WebPart(ContentEditorType) }).Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that an incompatible content-type form template fails the home-page fallback.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/HomePageDetectorTests.cs</c> to keep home-page rule regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Fallback_NotWikiEditFormContentType_False()
         {

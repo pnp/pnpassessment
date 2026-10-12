@@ -2,8 +2,16 @@ using System.Net;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Audit;
 
+/// <summary>
+/// Provides UTC audit-window partitioning and cancellation-aware Graph request retries for audit collectors.
+/// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to share audit transport and window handling between the separated collectors.</para>
+/// </summary>
 internal static class ClassicPageAuditClient
 {
+    /// <summary>
+    /// Partitions the requested UTC interval into consecutive chunks no longer than the requested number of days.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to share audit transport and window handling between the separated collectors.</para>
+    /// </summary>
     internal static List<(DateTime Start, DateTime End)> SplitWindow(DateTime start, DateTime end, int chunkDays)
     {
         var chunks = new List<(DateTime, DateTime)>();
@@ -18,6 +26,10 @@ internal static class ClassicPageAuditClient
         return chunks;
     }
 
+    /// <summary>
+    /// Creates an authenticated request for each attempt and retries throttling or temporary service failures with bounded delays.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/AuditLogUsageAnalyzer.cs</c> to share audit transport and window handling between the separated collectors.</para>
+    /// </summary>
     internal static async Task<HttpResponseMessage> SendWithRetryAsync(
         HttpClient client, Func<HttpRequestMessage> requestFactory,
         Func<CancellationToken, Task<string>> tokenProvider, CancellationToken ct)

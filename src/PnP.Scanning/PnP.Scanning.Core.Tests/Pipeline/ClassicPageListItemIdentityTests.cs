@@ -6,9 +6,15 @@ using PnP.Scanning.Core.Pipeline.Collection.Module;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies that modeled list item IDs are captured and conflicting field IDs are rejected.
+/// </summary>
 [Trait("Category", "ClassicPagePipeline")]
 public sealed class ClassicPageListItemIdentityTests
 {
+    /// <summary>
+    /// Verifies that modeled item identity is persisted even when the SDK field bag omits ID.
+    /// </summary>
     [Fact]
     public void List_stream_identity_survives_when_SDK_values_omit_ID()
     {
@@ -25,6 +31,9 @@ public sealed class ClassicPageListItemIdentityTests
         Assert.False(values.ContainsKey("ID"));
     }
 
+    /// <summary>
+    /// Verifies rejection of an ID field that conflicts with the modeled item identity.
+    /// </summary>
     [Fact]
     public void Conflicting_field_identity_cannot_replace_modeled_identity()
     {
@@ -33,6 +42,9 @@ public sealed class ClassicPageListItemIdentityTests
         Assert.Throws<InvalidDataException>(() => ClassicPageOnlineSource.ItemFields(Item(23, values)));
     }
 
+    /// <summary>
+    /// Creates the modeled list item proxy with the requested identity and field values.
+    /// </summary>
     private static IListItem Item(int id, TransientDictionary values)
     {
         var item = DispatchProxy.Create<IListItem, ItemProxy>();
@@ -40,10 +52,16 @@ public sealed class ClassicPageListItemIdentityTests
         ((ItemProxy)(object)item).Values = values;
         return item;
     }
+    /// <summary>
+    /// Implements only the SDK item identity and values required by source field capture.
+    /// </summary>
     public class ItemProxy : DispatchProxy
     {
         public int ReturnedId;
         public TransientDictionary Values;
+        /// <summary>
+        /// Returns the configured modeled ID or value bag and rejects unsupported SDK calls.
+        /// </summary>
         protected override object Invoke(MethodInfo targetMethod, object[] args) => targetMethod.Name switch
         {
             "get_Id" => ReturnedId,

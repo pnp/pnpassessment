@@ -14,21 +14,33 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Module;
 
+/// <summary>
+/// Registers the production Classic Pages collector, analyzer, input version and rule version, and validates their command options.
+/// </summary>
 internal static class ClassicPageModule
 {
     internal const string Key = "classicpage";
     internal const string InputVersion = "classicpage-source-v1";
     internal const string RuleVersion = "classicpage-v1";
+    /// <summary>
+    /// Composes the matching collector and analyzer registrations, with an optional injected online source for verification.
+    /// </summary>
     internal static ModuleRegistry Registry(Func<CollectionContext, CancellationToken, Task<IClassicPageOnlineSource>>? online = null) => new(
         new[] { new CollectionRegistration(Key, InputVersion, () => new ClassicPageCollectionModule(online), ValidateParameters, ValidateOptions) },
         new[] { new AnalysisRegistration(Key, RuleVersion, new[] { InputVersion }, () => new ClassicPageAnalysisModule(),
             ClassicPageRuleMetadata.Validate, ClassicPageRuleMetadata.Pin) },
         new Dictionary<string, string> { [Key] = RuleVersion });
+    /// <summary>
+    /// Rejects module JSON parameters that are not the empty version-one object required by the typed page options.
+    /// </summary>
     internal static void ValidateParameters(VersionedJson parameters)
     {
         if (parameters.SchemaVersion != 1 || parameters.Value.ValueKind != System.Text.Json.JsonValueKind.Object || parameters.Value.EnumerateObject().Any())
             throw new ArgumentException("Classic Pages v1 uses its typed CLI page options; module parameters must be empty.");
     }
+    /// <summary>
+    /// Checks Classic Pages mode, authentication, tenant, component selection and audit-window options before collection starts.
+    /// </summary>
     internal static void ValidateOptions(StartRequest request)
     {
         if (!request.Mode.Equals(Mode.ClassicPage.ToString(), StringComparison.OrdinalIgnoreCase))
@@ -47,8 +59,12 @@ internal static class ClassicPageModule
             throw new ArgumentException("Collection property names must be unique.");
         if (options.AuditLogWindowDays is < 1 or > 180) throw new ArgumentException("Audit log window must be between 1 and 180 days.");
     }
+    /// <summary>
+    /// Converts the persisted Classic command properties into the fixed page collection options.
+    /// </summary>
     internal static ClassicPageSourceOptions Options(StartRequest request)
     {
+        // Read the page option flag from the persisted Classic command properties.
         bool Flag(string key) => request.Properties.FirstOrDefault(x => x.Property == key)?.Value is string value && bool.Parse(value);
         var window = request.Properties.FirstOrDefault(x => x.Property == Constants.StartClassicAuditLogWindowDays)?.Value;
         return new(Flag(Constants.StartClassicExportWebPartProperties), Flag(Constants.StartClassicSkipUsageInformation),
@@ -56,11 +72,19 @@ internal static class ClassicPageModule
     }
 }
 
+/// <summary>
+/// Collects fixed scope, discovery, page, blog and audit inputs into a resumable snapshot without producing analysis results.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate raw acquisition from page analysis and persist completed requests for restart.</para>
+/// </summary>
 internal sealed class ClassicPageCollectionModule(Func<CollectionContext, CancellationToken, Task<IClassicPageOnlineSource>>? online = null)
     : ICollectionModule, ICollectionSnapshotValidator
 {
     public string ModuleKey => ClassicPageModule.Key;
     public string InputVersion => ClassicPageModule.InputVersion;
+    /// <summary>
+    /// Replays committed requests and collects remaining web and page facts with bounded concurrency, saving checkpoints and settled failures.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate raw acquisition from page analysis and persist completed requests for restart.</para>
+    /// </summary>
     public async IAsyncEnumerable<CollectionRecord> CollectAsync(CollectionContext context, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var journal = new ClassicPageAcquisitionJournal(context);
@@ -132,9 +156,13 @@ internal sealed class ClassicPageCollectionModule(Func<CollectionContext, Cancel
         if (!plan.Options.SkipUsageInformation) await source.CollectAuditAsync(fixedScope, journal, cancellationToken);
         yield return new(null, VersionedJson.From(new { stage = "ClassicPageCollectionComplete" }));
     }
+    /// <summary>
+    /// Validates source ownership and audit pagination through the detached input index before the snapshot is sealed.
+    /// </summary>
     public async Task ValidateAsync(ICollectionJournal journal, CancellationToken cancellationToken)
     {
         var headers = await journal.ReadCommittedAsync(cancellationToken, metadataOnly: true);
+        // Stream acquired records as detached inputs for consistency checking before sealing.
         async IAsyncEnumerable<SourceRecord> Records()
         {
             foreach (var header in headers)

@@ -7,6 +7,10 @@ using System.Xml.XPath;
 using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Resolves classic web part types and layout positions, then serializes the detached inventory for reports.
+/// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+/// </summary>
 internal static partial class PageWebPartAnalysis
 {
         private const string XsltListViewType = "Microsoft.SharePoint.WebPartPages.XsltListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
@@ -29,6 +33,10 @@ internal static partial class PageWebPartAnalysis
         // Description is the layout's friendly name). Ported from the legacy Constants.PublishingPageLayoutField.
         private const string PublishingPageLayoutField = "PublishingPageLayout";
 
+        /// <summary>
+        /// Reads the type from version-two or version-three export XML, returns Unknown for empty input, and lets malformed XML fail assessment.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         internal static string GetTypeFromXml(string webPartXml)
         {
             string type = "Unknown";
@@ -49,6 +57,10 @@ internal static partial class PageWebPartAnalysis
 
             return type;
         }
+        /// <summary>
+        /// Recognizes built-in web part types from the combinations of captured property names.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         internal static string GetTypeFromProperties(IDictionary<string, object> properties)
         {
             if (HasAll(properties, "ListUrl", "ListId", "Xsl", "JSLink", "ShowTimelineIfAvailable")) return XsltListViewType;
@@ -64,6 +76,10 @@ internal static partial class PageWebPartAnalysis
 
             return UnsupportedWebPartType;
         }
+        /// <summary>
+        /// Checks whether a captured property bag contains every discriminator required by a web part type.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         private static bool HasAll(IDictionary<string, object> properties, params string[] keys)
         {
             foreach (var key in keys)
@@ -76,6 +92,10 @@ internal static partial class PageWebPartAnalysis
 
             return true;
         }
+        /// <summary>
+        /// Maps a zone ID to its one-based column for the detected web part page layout.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         private static int GetColumn(string zoneId, PageLayout layout)
         {
             switch (layout)
@@ -127,6 +147,10 @@ internal static partial class PageWebPartAnalysis
 
             return 1;
         }
+        /// <summary>
+        /// Maps a zone ID to its one-based row for the detected web part page layout.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         private static int GetRow(string zoneId, PageLayout layout)
         {
             switch (layout)
@@ -177,6 +201,10 @@ internal static partial class PageWebPartAnalysis
 
             return 1;
         }
+        /// <summary>
+        /// Matches a zone ID against the accepted names without case sensitivity.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         private static bool IsZone(string zoneId, params string[] candidates)
         {
             foreach (var candidate in candidates)
@@ -189,6 +217,10 @@ internal static partial class PageWebPartAnalysis
 
             return false;
         }
+        /// <summary>
+        /// Converts detached web part entities to indexed report rows and includes properties only when requested.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         private static List<ClassicPageWebPart> ToRows(ClassicPage page, List<WebPartEntity> entities, bool exportWebPartProperties)
         {
             var rows = new List<ClassicPageWebPart>();
@@ -218,6 +250,10 @@ internal static partial class PageWebPartAnalysis
 
             return rows;
         }
+        /// <summary>
+        /// Serializes captured web part properties in the format expected by the existing inventory report.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to analyze saved web part evidence without CSOM access.</para>
+        /// </summary>
         private static string SerializeProperties(Dictionary<string, string> properties)
         {
             if (properties == null || properties.Count == 0)

@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Builds the pause command for selected or all active legacy and pipeline assessments.
+    /// </summary>
     internal sealed class PauseCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -40,6 +43,9 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(allScansOption);
         }
 
+        /// <summary>
+        /// Binds pause selection options and installs the RPC handler.
+        /// </summary>
         public Command Create()
         {
             // Custom validation of provided command input, use to validate option combinations
@@ -65,6 +71,9 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Sends the pause request and displays the streamed lifecycle messages.
+        /// </summary>
         private async Task<int> HandleStartAsync(Guid scanId, bool all)
         {
             int exitCode = 0;

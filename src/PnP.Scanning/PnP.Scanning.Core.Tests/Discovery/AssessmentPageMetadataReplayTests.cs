@@ -23,10 +23,7 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Discovery;
 
 /// <summary>
-/// Offline replay of the native scan's list-item projection regression. No credentials, network,
-/// daemon or tenant are used. The SDK boundary is a strict test double; metadata loading/projection,
-/// discovery persistence, EF migrations and native CSV export are production code.
-/// This does not establish live SharePoint coverage or validate the SDK's HTTP serialization.
+/// Replays modeled page metadata through the production collector and offline projection to verify identity and disposition parity.
 /// </summary>
 [Trait("Category", "ClassicDiscoveryIntegration")]
 public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContextFixture>
@@ -38,6 +35,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
 
     public AssessmentPageMetadataReplayTests(ScanContextFixture database) => this.database = database;
 
+    /// <summary>
+    /// Verifies that equal item numbers in different libraries remain distinct through projection, storage and native report export.
+    /// </summary>
     [Fact]
     public async Task Same_item_number_in_different_libraries_survives_projection_database_and_native_report()
     {
@@ -128,6 +128,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         finally { Directory.Delete(reportDirectory, recursive: true); }
     }
 
+    /// <summary>
+    /// Verifies that modeled list data supplies computed fields omitted by wildcard REST projection.
+    /// </summary>
     [Fact]
     public async Task Wildcard_rest_projection_omits_computed_fields_but_native_list_stream_loads_them()
     {
@@ -151,6 +154,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.LastViewFields.Should().NotContain("Editor", "SkipUserInformation should avoid requesting user details");
     }
 
+    /// <summary>
+    /// Verifies that modeled modern-page markers do not add modern pages to the classic inventory.
+    /// </summary>
     [Fact]
     public async Task Native_list_stream_modern_marker_is_classified_without_inflating_classic_rows()
     {
@@ -168,6 +174,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.StreamRequests.Should().Be(1);
     }
 
+    /// <summary>
+    /// Verifies that page metadata requests include Editor only when user information is enabled.
+    /// </summary>
     [Fact]
     public async Task Native_metadata_query_requests_editor_only_when_user_information_is_enabled()
     {
@@ -176,6 +185,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.LastViewFields.Should().Contain("Editor");
     }
 
+    /// <summary>
+    /// Verifies publishing-page classification using the discovered content type when acquired metadata omits it.
+    /// </summary>
     [Fact]
     public async Task Publishing_type_can_fall_back_to_discovered_content_type()
     {
@@ -187,6 +199,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         projection.Page.PageName.Should().Be("enterprise");
     }
 
+    /// <summary>
+    /// Verifies that mismatched metadata cannot erase the original physical file discovery.
+    /// </summary>
     [Fact]
     public async Task Metadata_for_another_file_is_rejected_without_deleting_its_discovery()
     {
@@ -199,6 +214,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             .Which.DiscoveryStatus.Should().Be("Discovered");
     }
 
+    /// <summary>
+    /// Verifies that an absent or different list item cannot be projected as the selected file.
+    /// </summary>
     [Theory]
     [InlineData(null)]
     [InlineData(2)]
@@ -213,6 +231,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         projection.Discovery.ErrorDetail.Should().Contain("not returned");
     }
 
+    /// <summary>
+    /// Verifies that a mismatched list owner is rejected before the metadata request is sent.
+    /// </summary>
     [Fact]
     public async Task Wrong_list_is_rejected_before_requesting_an_item()
     {
@@ -229,6 +250,9 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         return csv.GetRecords<T>().ToArray();
     }
 
+    /// <summary>
+    /// Provides recorded modeled list responses and detached source values for physical page metadata replay.
+    /// </summary>
     private sealed class MetadataFixture
     {
         public ClassicPageDiscovery Row { get; }
@@ -239,9 +263,15 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         public int StreamRequests { get; private set; }
         public string[] LastViewFields { get; private set; } = Array.Empty<string>();
 
+        /// <summary>
+        /// Reads the selected fixture item through the production page metadata collector.
+        /// </summary>
         public Task<ClassicPageItemSource> ReadAsync(bool skipUsers = true) =>
             ClassicPageOnlineSource.ReadPageMetadataAsync(List, ClassicPageSourceJson.Convert<ClassicPageDiscoveryRow>(Row), skipUsers, CancellationToken.None);
 
+        /// <summary>
+        /// Runs the captured metadata through the production offline page projection.
+        /// </summary>
         public ClassicPageProjectionResult Project(ClassicPageItemSource input, SourceReadState webPartsState = null)
         {
             var web = new ClassicPageWebSource(Site, Web, "STS#3", Row.SiteCollectionId.Value, Row.WebId.Value,

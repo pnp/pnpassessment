@@ -1,9 +1,8 @@
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page
 {
     /// <summary>
-    /// Scan-wide unique web part inventory: one row per distinct web part type seen across the
-    /// whole scan, with whether it exists in the mapping file and how many pages reference it.
-    /// Mirrors the old Modernization Scanner's UniqueWebParts.csv.
+    /// Summarizes one web part type, the number of pages using it and whether the mapping catalog recognizes it.
+    /// <para>Evolved from <c>Storage/Model/ClassicWebPartUnique.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
     /// </summary>
 
     internal sealed class ClassicWebPartUniqueRow

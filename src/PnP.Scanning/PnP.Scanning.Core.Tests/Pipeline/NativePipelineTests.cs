@@ -13,13 +13,22 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Serializes tests that share native process and command-line host state.
+/// </summary>
 [CollectionDefinition("Native pipeline CLI", DisableParallelization = true)]
 public sealed class NativePipelineCollection;
 
+/// <summary>
+/// Verifies actual collect, analyze and combined CLI/RPC routing, lifecycle operations and old-service rejection.
+/// </summary>
 [Collection("Native pipeline CLI")]
 [Trait("Category", "Pipeline")]
 public sealed class NativePipelineTests
 {
+    /// <summary>
+    /// Verifies native option binding and separate offline analysis through the actual loopback RPC service.
+    /// </summary>
     [Fact]
     public async Task Native_cli_binds_collection_options_and_runs_separate_offline_analysis_over_loopback_rpc()
     {
@@ -64,6 +73,9 @@ public sealed class NativePipelineTests
         Assert.NotEmpty(authParse.Errors);
     }
 
+    /// <summary>
+    /// Verifies native pause and restart retain the original analysis identity and pinned rule after reopening storage.
+    /// </summary>
     [Fact]
     public async Task Native_pause_close_reopen_and_restart_keep_the_original_analysis_run_and_rule()
     {
@@ -123,6 +135,9 @@ public sealed class NativePipelineTests
         Assert.Equal(0, environment.ProtectionRequests);
     }
 
+    /// <summary>
+    /// Verifies explicit failure for an old service instead of silently invoking legacy start.
+    /// </summary>
     [Fact]
     public async Task New_pipeline_rpc_is_not_downgraded_to_start_on_an_old_service()
     {
@@ -139,6 +154,9 @@ public sealed class NativePipelineTests
         Assert.Empty(data.Store.AssessmentsOnDisk());
     }
 
+    /// <summary>
+    /// Verifies native preflight rejects unknown modules, unavailable rules and incompatible inputs before acquisition.
+    /// </summary>
     [Fact]
     public async Task Unregistered_modules_rules_and_incompatible_inputs_are_rejected_before_collection()
     {
@@ -177,6 +195,9 @@ public sealed class NativePipelineTests
         Assert.Equal(0, environment.OnlineRequests);
     }
 
+    /// <summary>
+    /// Verifies selected-run termination preserves the engine and allows the original checkpoint to resume.
+    /// </summary>
     [Fact]
     public async Task Native_stop_terminates_one_run_without_stopping_the_engine_and_restart_resumes_it()
     {
@@ -203,6 +224,9 @@ public sealed class NativePipelineTests
         Assert.Contains("canceled", (await db.PhaseRuns.SingleAsync(x => x.ParentRunId == null)).ErrorsJson, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Verifies that legacy and pipeline CLI selections invoke their respective native RPC paths.
+    /// </summary>
     [Fact]
     public async Task Legacy_start_rpc_and_cli_selection_remain_distinct_from_pipeline_selection()
     {
@@ -224,6 +248,9 @@ public sealed class NativePipelineTests
         Assert.Equal(0, environment.OnlineRequests);
     }
 
+    /// <summary>
+    /// Verifies native combined execution and reopened reanalysis preserve source evidence while creating independent results.
+    /// </summary>
     [Fact]
     public async Task Native_start_reopen_and_offline_reanalysis_preserve_source_and_create_independent_results()
     {
@@ -281,6 +308,9 @@ public sealed class NativePipelineTests
         }
     }
 
+    /// <summary>
+    /// Collects the streamed restart response from the actual scanner RPC.
+    /// </summary>
     private static async Task<List<RestartStatus>> ReadRestartAsync(PnPScanner.PnPScannerClient client, Guid assessment)
     {
         using var call = client.Restart(new RestartRequest { Id = assessment.ToString() });

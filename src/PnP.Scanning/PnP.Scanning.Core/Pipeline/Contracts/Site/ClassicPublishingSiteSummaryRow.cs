@@ -1,10 +1,8 @@
 namespace PnP.Scanning.Core.Pipeline.Contracts.Site
 {
     /// <summary>
-    /// Per-site-collection publishing-portal rollup. Mirrors the legacy Modernization Scanner's
-    /// <c>ModernizationPublishingSiteScanResults.csv</c> (one row per publishing portal), consolidating the
-    /// publishing webs + publishing pages of a site collection into a single readiness line. Built in
-    /// <see cref="StorageManager.PopulatePublishingSiteSummaryAsync"/> during post-scan processing.
+    /// Carries publishing-site web and page counts, used layouts and the latest saved page update date.
+    /// <para>Evolved from <c>Storage/Model/ClassicPublishingSiteSummary.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
     /// </summary>
 
     internal sealed class ClassicPublishingSiteSummaryRow

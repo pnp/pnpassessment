@@ -30,6 +30,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
     /// 1.0.1911.0 walk left, which under-counted these as mappable parts). That analyzer only emits those
     /// two media types from wiki content; <c>WikiEmbedPart</c> (a DocumentEmbed) is never produced by the
     /// wiki walk, so it is intentionally not emitted here.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
     /// </summary>
     internal static class WikiContentParser
     {
@@ -56,6 +57,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// <summary>
         /// Parses the supplied wiki field HTML into its inline text blocks and embedded web part
         /// placeholders. Never returns null; an empty/whitespace input yields an empty result.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
         /// </summary>
         internal static WikiContentParseResult Parse(string wikiFieldHtml)
         {
@@ -110,6 +112,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
 
         // Ported from BasePage.AnalyzeWikiContentBlock — walks one content host's child nodes, emitting
         // interleaved WikiText parts and web part placeholders in document order.
+        /// <summary>
+        /// Walks a wiki content cell, separates text from web part placeholders, and records the corresponding row and column positions.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
+        /// </summary>
         private static void AnalyzeWikiContentBlock(HtmlParser parser, WikiContentParseResult result, IHtmlDocument htmlDoc,
                                                     int rowCount, int colCount, int startOrder, IElement content)
         {
@@ -232,6 +238,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// text. Text and media are emitted in document order; <paramref name="order"/> is advanced for
         /// each part and the final value is returned. With no embedded media the behaviour is identical to
         /// the original single-text-block flush.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
         /// </summary>
         private static int FlushTextBlock(WikiContentParseResult result, HtmlParser parser, string html,
                                           int row, int col, int order)
@@ -306,6 +313,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
 
         // Emits a single WikiText part for a leftover html segment, after re-parsing it to repair the
         // tag boundaries broken by the marker split and to drop segments that hold no visible text.
+        /// <summary>
+        /// Parses and cleans a nonempty HTML segment before adding it as a wiki text web part.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
+        /// </summary>
         private static int AddTextSegment(WikiContentParseResult result, HtmlParser parser, string segmentHtml,
                                           int row, int col, int order)
         {
@@ -329,6 +340,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         // Builds a fully-resolved media WebPartEntity from an embedded image or iframe node, mirroring the
         // property projection of the PnP.Framework wiki analyzer (img -> WikiImagePart, iframe -> WikiVideoPart).
         // Row/Column/Order are filled in by the caller. No CSOM is involved — everything comes from the HTML.
+        /// <summary>
+        /// Converts a recognized image or iframe element into a detached wiki image or video web part entity.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
+        /// </summary>
         private static WebPartEntity CreateMediaPart(IElement element)
         {
             if (element is IHtmlImageElement image)
@@ -402,6 +417,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// <summary>
         /// Check if this element is nested in another already processed element...this needs to be
         /// skipped to avoid content duplication and possible processing errors.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
         /// </summary>
         private static bool IsNestedLayoutsZoneOuter(IElement contentHost)
         {
@@ -422,6 +438,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         }
 
         // Stores text content as a fake web part. Ported from BasePage.CreateWikiTextPart.
+        /// <summary>
+        /// Creates a wiki text inventory entity with its HTML and one-based layout coordinates.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
+        /// </summary>
         private static WebPartEntity CreateWikiTextPart(string wikiTextPartContent, int row, int col, int order)
         {
             return new WebPartEntity
@@ -439,6 +459,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
             };
         }
 
+        /// <summary>
+        /// Removes wiki editing and placeholder markup while retaining the content required by the inventory.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
+        /// </summary>
         private static void CleanHtml(IElement element, IHtmlDocument document)
         {
             foreach (var node in element.QuerySelectorAll("*").ToList())
@@ -457,6 +481,10 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
             }
         }
 
+        /// <summary>
+        /// Detects block elements that must remain within a wiki text segment rather than becoming a separate media part.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
+        /// </summary>
         private static bool IsUntransformableBlockElement(IElement element)
         {
             var tag = element.TagName.ToLower();
@@ -491,6 +519,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
 
         /// <summary>
         /// Does the tree of nodes somewhere contain a web part?
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
         /// </summary>
         private static bool ContainsWebPart(HtmlParser parser, IHtmlElement element)
         {
@@ -509,6 +538,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// <summary>
         /// Strips the div holding the web part from the html, replacing it with a marker so the
         /// surrounding text can be recovered.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
         /// </summary>
         private static string StripWebPart(HtmlParser parser, IHtmlElement element)
         {
@@ -546,6 +576,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
     /// <summary>
     /// Result of parsing a wiki page's HTML: the inline text blocks and the placeholders for the
     /// embedded web parts (which still need a CSOM round-trip to resolve their type/properties).
+    /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
     /// </summary>
     internal sealed class WikiContentParseResult
     {
@@ -570,6 +601,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
     /// <summary>
     /// A reference to a web part embedded in wiki content. Carries the position and the server side
     /// control id needed to look the web part up via <c>LimitedWebPartManager.WebParts.GetByControlId</c>.
+    /// <para>Evolved from <c>Scanners/Classic/Pages/WikiContentParser.cs</c> to reuse wiki parsing within offline page analysis.</para>
     /// </summary>
     internal sealed class WikiWebPartPlaceholder
     {

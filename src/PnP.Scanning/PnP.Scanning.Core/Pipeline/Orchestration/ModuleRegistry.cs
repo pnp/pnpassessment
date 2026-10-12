@@ -5,20 +5,31 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Orchestration;
 
+/// <summary>
+/// Binds a collector factory to its module key, fixed input version and preflight validation callbacks.
+/// </summary>
 internal sealed record CollectionRegistration(string ModuleKey, string InputVersion,
     Func<ICollectionModule> Create, Action<VersionedJson>? ValidateParameters = null, Action<PnP.Scanning.Core.Services.StartRequest>? ValidateOptions = null);
 
+/// <summary>
+/// Binds an analyzer factory to an explicit rule version, supported input versions and parameter validation or pinning callbacks.
+/// </summary>
 internal sealed record AnalysisRegistration(string ModuleKey, string RuleVersion,
     IReadOnlyCollection<string> InputVersions, Func<IAnalysisModule> Create,
     Action<VersionedJson>? ValidateParameters = null, Func<VersionedJson, VersionedJson>? PinParameters = null);
 
-/// <summary>Immutable host composition. Fixtures are registered by the test host, never by production.</summary>
+/// <summary>
+/// Validates immutable module registrations and resolves collectors or rules without creating online services.
+/// </summary>
 internal sealed class ModuleRegistry
 {
     private readonly Dictionary<string, CollectionRegistration> collectors;
     private readonly Dictionary<(string, string), AnalysisRegistration> analyzers;
     private readonly Dictionary<string, string> currentRules;
 
+    /// <summary>
+    /// Copies and validates host registrations, builds lookup indexes and checks that every current rule can be resolved.
+    /// </summary>
     public ModuleRegistry(IEnumerable<CollectionRegistration>? collection = null,
         IEnumerable<AnalysisRegistration>? analysis = null, IReadOnlyDictionary<string, string>? current = null)
     {
@@ -34,6 +45,9 @@ internal sealed class ModuleRegistry
         foreach (var entry in currentRules) _ = GetAnalyzer(entry.Key, entry.Value);
     }
 
+    /// <summary>
+    /// Resolves the requested collector and rejects unsupported modules or unavailable pinned input versions.
+    /// </summary>
     public CollectionRegistration GetCollector(string key, string? inputVersion = null)
     {
         if (!collectors.TryGetValue(key, out var registration))
@@ -43,6 +57,9 @@ internal sealed class ModuleRegistry
         return registration;
     }
 
+    /// <summary>
+    /// Resolves the specified or current rule and checks that it can consume the pinned input version.
+    /// </summary>
     public AnalysisRegistration GetAnalyzer(string key, string? ruleVersion = null, string? inputVersion = null)
     {
         if (string.IsNullOrEmpty(ruleVersion) && !currentRules.TryGetValue(key, out ruleVersion))
@@ -54,5 +71,8 @@ internal sealed class ModuleRegistry
         return registration;
     }
 
+    /// <summary>
+    /// Normalizes module keys for case-insensitive analyzer lookup while preserving exact rule-version matching.
+    /// </summary>
     private static string Normalize(string key) => key.ToLowerInvariant();
 }

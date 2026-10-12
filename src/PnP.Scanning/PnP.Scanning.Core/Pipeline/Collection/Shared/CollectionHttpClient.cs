@@ -1,8 +1,13 @@
 namespace PnP.Scanning.Core.Pipeline.Collection.Shared;
 
-/// <summary>CSOM's legacy executor has no SendAsync token parameter. Bind cancellation at the collection transport boundary.</summary>
+/// <summary>
+/// Binds collection cancellation to the existing PnP HTTP transport used by CSOM.
+/// </summary>
 internal sealed class CollectionHttpClient(HttpClient sharedClient, CancellationToken collectionToken) : HttpMessageHandler
 {
+    /// <summary>
+    /// Forwards a request with the caller and collection cancellation tokens linked for its lifetime.
+    /// </summary>
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(collectionToken, cancellationToken);

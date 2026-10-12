@@ -2,8 +2,8 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 
 /// <summary>
-/// One discovered physical ASPX or one acquisition-evidence row owned by the Classic assessment.
-/// Scope rows never represent invented pages. Page existence survives enrichment failures.
+/// Carries detached discovery evidence and assessment dispositions in the existing discovery report shape.
+/// <para>Evolved from <c>Storage/Model/ClassicPageDiscovery.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
 /// </summary>
 internal sealed class ClassicPageDiscoveryRow : ClassicPageBaseRow
 {

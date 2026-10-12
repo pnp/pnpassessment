@@ -13,6 +13,9 @@ using System.CommandLine.Help;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Binds existing assessment options and routes Classic Pages or registered modules to collection and analysis while preserving legacy start.
+    /// </summary>
     internal class StartCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -52,6 +55,9 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> testNumberOfSitesOption;
 #endif
 
+        /// <summary>
+        /// Creates start or collect options and binds the scanner manager, protected configuration and defaults.
+        /// </summary>
         public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance, string commandName = "start")
         {
             processManager = processManagerInstance;
@@ -432,7 +438,7 @@ namespace PnP.Scanning.Process.Commands
         }
 
         /// <summary>
-        /// https://github.com/dotnet/command-line-api/blob/main/docs/model-binding.md#more-complex-types
+        /// Validates the parsed option combinations and dispatches a pipeline collection request or the existing legacy start handler.
         /// </summary>
         /// <returns></returns>
         public Command Create()
@@ -527,6 +533,10 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Converts typed command options and configured cloud scope into a collect request without initializing authentication.
+        /// <para>Evolved from <c>Commands/Handlers/StartCommandHandler.cs (HandleStartAsync)</c> to reuse command option binding while deferring authentication to the collection phase.</para>
+        /// </summary>
         private CollectRequest CreatePipelineRequest(StartOptions arguments)
         {
             var options = new StartRequest

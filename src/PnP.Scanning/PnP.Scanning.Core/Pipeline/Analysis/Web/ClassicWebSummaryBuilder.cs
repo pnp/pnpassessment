@@ -6,8 +6,16 @@ using PnP.Scanning.Core.Pipeline.Contracts.Web;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Web;
 
+/// <summary>
+/// Builds a web summary from saved web metadata and the analyzed page inventory.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> and <c>Scanners/Classic/ClassicScanner.cs</c> to calculate web rollups after offline page analysis.</para>
+/// </summary>
 internal static class ClassicWebSummaryBuilder
 {
+    /// <summary>
+    /// Calculates page type totals, home-page and web part readiness counts, and site remediation flags for one web.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> and <c>Scanners/Classic/ClassicScanner.cs</c> to calculate web rollups after offline page analysis.</para>
+    /// </summary>
     internal static ClassicWebSummary Build(Guid assessmentId, ClassicPageWebSource source, IReadOnlyList<ClassicPage> pages, int modernPages)
     {
         var withParts = pages.Where(x => x.WebPartCount > 0).ToArray();

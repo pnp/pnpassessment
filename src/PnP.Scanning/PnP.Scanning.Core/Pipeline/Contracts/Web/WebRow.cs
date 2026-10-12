@@ -3,6 +3,10 @@ using PnP.Scanning.Core.Pipeline.Contracts.Site;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Web
 {
 
+    /// <summary>
+    /// Carries web identity, template, acquisition status and error details in the existing web report shape.
+    /// <para>Evolved from <c>Storage/Model/Web.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
+    /// </summary>
     internal sealed class WebRow : ClassicPageBaseRow
     {
         public string WebUrlAbsolute { get; set; }

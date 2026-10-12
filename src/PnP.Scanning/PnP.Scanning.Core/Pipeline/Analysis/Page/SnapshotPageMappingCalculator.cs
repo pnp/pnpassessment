@@ -17,6 +17,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
     /// generation): the lookup keys on the assembly-qualified type, the unmapped list carries the
     /// de-duplicated short (class) names in page-layout order, and an empty page counts as 100%.
     /// </para>
+    /// <para>Evolved from <c>Scanners/Classic/Pages/PageMappingCalculator.cs</c> to calculate readiness from detached report rows in offline analysis.</para>
     /// </summary>
     internal static class SnapshotPageMappingCalculator
     {
@@ -25,6 +26,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// both <paramref name="page"/> (sets <see cref="ClassicPageRow.WebPartCount"/>,
         /// <see cref="ClassicPageRow.MappingPercentage"/>, <see cref="ClassicPageRow.UnmappedWebParts"/>) and
         /// each web part (sets <see cref="ClassicPageWebPartRow.IsMappable"/>).
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageMappingCalculator.cs</c> to calculate readiness from detached report rows in offline analysis.</para>
         /// </summary>
         /// <param name="page">The classic page whose rollups are computed.</param>
         /// <param name="webParts">The page's extracted web part rows (may be null or empty).</param>

@@ -28,9 +28,14 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
     /// <c>PublishingPageLayout</c> field, not a derived <see cref="PageLayout"/> enum value. That field read
     /// is captured during collection and read by <see cref="GetPublishingPageLayoutName"/>.
     /// </para>
+    /// <para>Evolved from <c>Scanners/Classic/Pages/PageLayoutDetector.cs</c> to detect page layouts from captured fields and HTML in offline analysis.</para>
     /// </summary>
     internal static class PageLayoutDetector
     {
+        /// <summary>
+        /// Reads the friendly description of a captured publishing layout URL field, returning empty when the description is unavailable.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageWebPartExtractor.cs</c> to resolve publishing layout names from saved URL fields without CSOM.</para>
+        /// </summary>
         internal static string GetPublishingPageLayoutName(IReadOnlyDictionary<string, SourceField> fieldValues)
         {
             if (fieldValues == null || !fieldValues.TryGetValue("PublishingPageLayout", out var field) ||
@@ -45,6 +50,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// one-column layout (parity with the legacy scanner). Ported verbatim from
         /// <c>WikiPage.GetLayout</c>: read the <c>layoutsdata</c> span, then fall back to counting the
         /// layout-table columns for pages (e.g. community-template pages) that omit a recognized span value.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageLayoutDetector.cs</c> to detect page layouts from captured fields and HTML in offline analysis.</para>
         /// </summary>
         internal static PageLayout DetectWikiLayout(string wikiFieldHtml)
         {
@@ -172,6 +178,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// Detects the web part page layout from the page file's <c>vti_setuppath</c> value. Ported from
         /// <c>WebPartPage.GetLayout</c>: each built-in smart-page template maps to a known multi-zone
         /// layout; everything else (including a null/empty setup path) is a custom layout.
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageLayoutDetector.cs</c> to detect page layouts from captured fields and HTML in offline analysis.</para>
         /// </summary>
         /// <param name="setupPath">The <c>vti_setuppath</c> page property value, or null if absent.</param>
         internal static PageLayout DetectWebPartPageLayout(string setupPath)
@@ -195,6 +202,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page
         /// <summary>
         /// Renders a <see cref="PageLayout"/> to the short string persisted on <c>ClassicPage.Layout</c>,
         /// matching the legacy scanner's page CSV (the <c>Wiki_</c> / <c>WebPart_</c> prefix is dropped).
+        /// <para>Evolved from <c>Scanners/Classic/Pages/PageLayoutDetector.cs</c> to detect page layouts from captured fields and HTML in offline analysis.</para>
         /// </summary>
         internal static string ToLayoutString(PageLayout layout)
         {

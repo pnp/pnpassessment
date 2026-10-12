@@ -2,6 +2,10 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page
 {
 
+    /// <summary>
+    /// Carries a detached Classic page assessment, identity, layout, readiness and remediation projection.
+    /// <para>Evolved from <c>Storage/Model/ClassicPage.cs</c> to preserve report fields while removing EF entities from offline analysis.</para>
+    /// </summary>
     internal class ClassicPageRow : ClassicPageBaseRow
     {
         public string PageUrl { get; set; }

@@ -7,7 +7,10 @@ using PnP.Scanning.Core.Pipeline.Collection.Module;
 
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 {
-    /// <summary>Tests page classification and editor values detached from SDK objects.</summary>
+    /// <summary>
+    /// Verifies saved-field page classification and editor projection without retaining SDK objects in analysis.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+    /// </summary>
     public class ClassicPageRulesTests
     {
         // SharePoint internal field names (used by the collection query and analysis rules).
@@ -17,6 +20,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
         private const string BSNField = "BSN";
         private const string ModifiedByField = "Editor";
 
+        /// <summary>
+        /// Verifies classification of a saved point-publishing item as a Delve blog page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void GetPageType_DelveBlogItem_ReturnsDelveBlog()
         {
@@ -29,6 +36,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             ClassicPageRules.GetPageType(fields).Should().Be(ClassicPageRules.DelveBlogPage);
         }
 
+        /// <summary>
+        /// Verifies case-insensitive recognition of the Delve blog file type.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void GetPageType_DelveBlogFileType_IsCaseInsensitive()
         {
@@ -40,6 +51,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             ClassicPageRules.GetPageType(fields).Should().Be(ClassicPageRules.DelveBlogPage);
         }
 
+        /// <summary>
+        /// Verifies that other captured file types are not classified as Delve blog pages.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void GetPageType_NonDelveItem_DoesNotReturnDelveBlog()
         {
@@ -68,6 +83,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             ClassicPageRules.GetPageType(wikiPage).Should().Be(ClassicPageRules.WikiPage);
         }
 
+        /// <summary>
+        /// Verifies that the saved editor email is preferred for the page author projection.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void ModifiedBy_EditorField_ReturnsEmail()
         {
@@ -80,6 +99,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(fields), skipUserInformation: false).Should().Be("jane.doe@contoso.com");
         }
 
+        /// <summary>
+        /// Verifies editor display-value fallback when a captured user has no email.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void ModifiedBy_EditorField_FallsBackToLookupValue_WhenEmailEmpty()
         {
@@ -91,6 +114,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(fields), skipUserInformation: false).Should().Be("John Smith");
         }
 
+        /// <summary>
+        /// Verifies that excluding user information suppresses the projected editor value.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void ModifiedBy_SkipUserInformation_IsNull()
         {
@@ -102,6 +129,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             ClassicPageProjection.ModifiedBy(ClassicPageOnlineSource.Fields(fields), skipUserInformation: true).Should().BeNull();
         }
 
+        /// <summary>
+        /// Verifies a null editor projection when the source contains no Editor field.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+        /// </summary>
         [Fact]
         public void ModifiedBy_NoEditorField_IsNull()
         {
@@ -109,11 +140,15 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
         }
 
         /// <summary>
-        /// Minimal stand-in for the user value a list-item user field exposes. Only the members the
-        /// ModifiedBy parser reads (LookupValue, Title) are meaningful; the rest satisfy the interface.
+        /// Supplies a modeled user value so collection field capture can be tested against SDK user metadata.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
         /// </summary>
         private sealed class FakeUserValue : IFieldUserValue
         {
+            /// <summary>
+            /// Binds the email and lookup identity returned by the modeled test user.
+            /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/PageScanComponentTests.cs</c> to test pure page classification and detached editor projection after splitting the scanner.</para>
+            /// </summary>
             public FakeUserValue(string email = null, string lookupValue = null, string title = null)
             {
                 Email = email;

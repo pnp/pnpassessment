@@ -8,6 +8,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
     /// pages; it does not transform them, so only the mapping lookup is carried over from the legacy
     /// Modernization Scanner — the actual transform/function engine is intentionally left behind. We
     /// only need to decide <em>mappable vs unmapped</em>.
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingManager.cs</c> to load the unchanged embedded mapping in the analysis module.</para>
     /// </summary>
     public class WebPartMappingManager
     {
@@ -29,6 +30,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
 
         /// <summary>
         /// Creates a manager backed by the embedded <c>webpartmapping.xml</c>.
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingManager.cs</c> to load the unchanged embedded mapping in the analysis module.</para>
         /// </summary>
         public WebPartMappingManager()
         {
@@ -56,6 +58,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
         /// Is the given web part type known to the mapping file <em>and</em> backed by a modern
         /// mapping? This is the parity definition of "mappable" used by the legacy scanner when it
         /// computed a page's mapping percentage.
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingManager.cs</c> to load the unchanged embedded mapping in the analysis module.</para>
         /// </summary>
         /// <param name="webPartType">The assembly-qualified web part type.</param>
         public bool IsMappable(string webPartType)
@@ -71,6 +74,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
         /// <summary>
         /// Is the given web part type present in the mapping file at all (regardless of whether it
         /// has a modern mapping)? Mirrors the legacy <c>UniqueWebParts.csv</c> "InMappingFile" column.
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingManager.cs</c> to load the unchanged embedded mapping in the analysis module.</para>
         /// </summary>
         /// <param name="webPartType">The assembly-qualified web part type.</param>
         public bool InMappingFile(string webPartType)
@@ -85,6 +89,7 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping
 
         /// <summary>
         /// Loads the web part mapping model from the embedded <c>webpartmapping.xml</c> resource.
+        /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/WebPartMappingManager.cs</c> to load the unchanged embedded mapping in the analysis module.</para>
         /// </summary>
         private static WebPartMappingModel LoadMappingModel()
         {

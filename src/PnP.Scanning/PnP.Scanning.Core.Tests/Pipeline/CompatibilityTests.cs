@@ -14,12 +14,18 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Verifies published-schema upgrades, legacy report parity and startup recovery independent of online services.
+/// </summary>
 [Trait("Category", "Pipeline")]
 public sealed class CompatibilityTests
 {
     private const string MainMigration = "20260918022217_ClassicAspxDiscovery";
     private const string HistoricalMigration = "20260928091529_ClassicPublishingLayoutTypeEvidence";
 
+    /// <summary>
+    /// Verifies local legacy startup settlement without changing pipeline phases or resolving online services.
+    /// </summary>
     [Fact]
     public async Task Startup_recovery_settles_legacy_running_rows_without_touching_pipeline_phases_or_online_services()
     {
@@ -42,6 +48,9 @@ public sealed class CompatibilityTests
         Assert.Equal(6, await pipelineRead.SourceObservations.CountAsync());
     }
 
+    /// <summary>
+    /// Verifies published-schema upgrade and reopen preserve legacy rows, report bytes, counts and historical extra columns.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -139,6 +148,9 @@ public sealed class CompatibilityTests
         }, columns);
     }
 
+    /// <summary>
+    /// Exports the existing Classic CSV set and captures file bytes for before-and-after migration comparison.
+    /// </summary>
     private static async Task<Dictionary<string, byte[]>> ExportAsync(PipelineStore store, Guid id, string directory)
     {
         Directory.CreateDirectory(directory);
@@ -147,6 +159,9 @@ public sealed class CompatibilityTests
         return Directory.GetFiles(directory).ToDictionary(x => System.IO.Path.GetFileName(x), File.ReadAllBytes);
     }
 
+    /// <summary>
+    /// Reads the exported CSV header to verify the existing column order.
+    /// </summary>
     private static string[] ReadHeader(string file)
     {
         using var reader = new StreamReader(file);

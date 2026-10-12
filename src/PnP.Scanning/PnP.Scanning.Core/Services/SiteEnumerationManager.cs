@@ -11,6 +11,9 @@ using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Enumerates selected site collections and webs and returns discovery coverage evidence for collection or legacy scans.
+    /// </summary>
     internal sealed class SiteEnumerationManager
     {
         private readonly IPnPContextFactory contextFactory;
@@ -23,6 +26,9 @@ namespace PnP.Scanning.Core.Services
 
         internal StorageManager StorageManager { get; private set; }
 
+        /// <summary>
+        /// Resolves the declared or tenant scope into sites and records selection or acquisition evidence while observing cancellation.
+        /// </summary>
         internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback,
             ICollection<ClassicPageDiscovery> discoveryEvidence = null, CancellationToken cancellationToken = default)
         {
@@ -174,6 +180,9 @@ namespace PnP.Scanning.Core.Services
             return list;
         }
 
+        /// <summary>
+        /// Enumerates webs and templates using the selected context identity key for pipeline collection or legacy resume.
+        /// </summary>
         internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart,
             CancellationToken cancellationToken = default, string contextPropertyKey = Constants.PnPContextPropertyScanId)
         {

@@ -4,8 +4,16 @@ using PnP.Scanning.Core.Discovery;
 using System.Text.Json;
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Reduces saved discovery scope and gap evidence to an assessment coverage verdict.
+/// <para>Evolved from <c>Discovery/AssessmentDiscoveryWriter.cs</c> to calculate coverage from detached snapshot evidence without querying or updating legacy tables.</para>
+/// </summary>
 internal static class ClassicPageCoverage
 {
+    /// <summary>
+    /// Builds the coverage summary row while preserving declared-subset, incomplete and unknown outcomes.
+    /// <para>Evolved from <c>Discovery/AssessmentDiscoveryWriter.cs</c> to calculate coverage from detached snapshot evidence without querying or updating legacy tables.</para>
+    /// </summary>
     internal static ClassicPageDiscovery Create(Guid scanId, IReadOnlyList<ClassicPageDiscovery> allRows, DateTime observedAtUtc)
     {
             var coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();

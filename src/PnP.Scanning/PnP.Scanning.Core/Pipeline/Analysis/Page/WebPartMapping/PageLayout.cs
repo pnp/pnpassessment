@@ -4,6 +4,7 @@
     /// Possible layouts used by wiki or webpart pages.
     /// Ported verbatim from the SharePoint Modernization Scanner
     /// (SharePointPnP.Modernization.Framework\Pages\PageLayout.cs).
+    /// <para>Evolved from <c>Scanners/Classic/WebPartMapping/PageLayout.cs</c> to keep layout classifications with the offline mapping rules.</para>
     /// </summary>
     public enum PageLayout
     {

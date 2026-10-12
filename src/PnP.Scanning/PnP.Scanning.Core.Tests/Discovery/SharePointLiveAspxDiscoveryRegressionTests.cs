@@ -10,6 +10,9 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
 
+/// <summary>
+/// Verifies physical ASPX discovery, scope coverage and identity handling using recorded SharePoint response behavior.
+/// </summary>
 [Trait("Category", "ClassicDiscoveryIntegration")]
 public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<ScanContextFixture>
 {
@@ -98,6 +101,9 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         row.LibraryHidden.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Verifies that unavailable welcome-page reads preserve an already known home-page disposition.
+    /// </summary>
     [Fact]
     public void Assessment_home_page_state_falls_back_without_erasing_a_known_value()
     {

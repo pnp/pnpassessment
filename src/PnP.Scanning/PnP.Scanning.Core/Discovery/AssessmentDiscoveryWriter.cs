@@ -8,8 +8,7 @@ using System.Text.Json;
 namespace PnP.Scanning.Core.Discovery;
 
 /// <summary>
-/// Classic-assessment acquisition persistence. Network work happens outside the writer gate. A fresh context per
-/// commit avoids sharing EF/SQLite state between the existing TPL Web workers.
+/// Persists and reconciles acquisition evidence through either legacy SQLite writes or an injected collection source sink.
 /// </summary>
 internal sealed class AssessmentDiscoveryWriter
 {
@@ -17,11 +16,17 @@ internal sealed class AssessmentDiscoveryWriter
     private readonly Func<ScanContext> createContext;
     private readonly Func<IEnumerable<ClassicPageDiscovery>, CancellationToken, Task> sourceSink;
 
+    /// <summary>
+    /// Binds the discovery writer to a collection source sink so provider evidence can be captured without legacy table writes.
+    /// </summary>
     internal AssessmentDiscoveryWriter(Func<IEnumerable<ClassicPageDiscovery>, CancellationToken, Task> sourceSink) => this.sourceSink = sourceSink;
 
     internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId)) { }
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
+    /// <summary>
+    /// Writes discovered rows to the configured source sink or serializes legacy database reconciliation and persistence.
+    /// </summary>
     internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
     {
         if (sourceSink != null) { await sourceSink(rows, cancellationToken); return; }
@@ -91,6 +96,9 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    /// <summary>
+    /// Builds the shared coverage projection from legacy evidence rows and persists the final legacy coverage verdict.
+    /// </summary>
     internal async Task<DiscoveryVerdict> FinalizeScanAsync(Guid scanId,
         CancellationToken cancellationToken = default)
     {
@@ -114,6 +122,9 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    /// <summary>
+    /// Preserves richer observed file metadata and reports identity conflicts when discovery surfaces return the same record.
+    /// </summary>
     internal static void Reconcile(ClassicPageDiscovery previous, ClassicPageDiscovery row)
     {
                     // Observing the same file through Forms/Views and raw files must not erase

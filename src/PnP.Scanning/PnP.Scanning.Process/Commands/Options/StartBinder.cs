@@ -5,6 +5,9 @@ using System.CommandLine.Binding;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Binds parsed start and collection options into the shared typed StartOptions value.
+    /// </summary>
     internal sealed class StartBinder : BinderBase<StartOptions>
     {
         private readonly Option<Mode> mode;
@@ -36,6 +39,9 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<int> testNumberOfSites;
 #endif
 
+        /// <summary>
+        /// Stores command option definitions used to bind scope, authentication, module selection and page-specific settings.
+        /// </summary>
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
                            Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput,
                            Option<string> moduleInput, Option<string> ruleVersionInput, Option<string> parametersJsonInput, Option<string> analysisParametersJsonInput
@@ -83,8 +89,14 @@ namespace PnP.Scanning.Process.Commands
 #endif
         }
 
+        /// <summary>
+        /// Exposes typed binding for the command handler using the supplied parse context.
+        /// </summary>
         internal StartOptions Bind(BindingContext bindingContext) => GetBoundValue(bindingContext);
 
+        /// <summary>
+        /// Reads the parsed options into StartOptions, including fixed pipeline module, rule and JSON parameters.
+        /// </summary>
         protected override StartOptions GetBoundValue(BindingContext bindingContext) =>
             new()
             {

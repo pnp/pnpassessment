@@ -6,8 +6,14 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Implements atomic source commits, snapshot sealing and manifest-validated detached observation reads.
+/// </summary>
 internal sealed partial class PipelineStore
 {
+    /// <summary>
+    /// Commits source facts, content, progress and the collector checkpoint atomically, accepting only identical replay of an existing observation.
+    /// </summary>
     private Task<bool> CommitObservationAsync(Guid assessmentId, Guid snapshotId, Guid collectionRunId,
         CollectionRecord record, CancellationToken token) => WriteAsync(assessmentId, async db =>
     {
@@ -63,6 +69,9 @@ internal sealed partial class PipelineStore
         return true;
     }, token);
 
+    /// <summary>
+    /// Validates saved content and record counts, fixes the manifest and marks collection complete in the same transaction.
+    /// </summary>
     private Task<SnapshotInfo> SealAsync(Guid assessmentId, Guid snapshotId, Guid collectionRunId, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {
@@ -96,9 +105,15 @@ internal sealed partial class PipelineStore
             return manifest.Info();
         }, token);
 
+    /// <summary>
+    /// Returns selected snapshot information only after full sealed-input integrity validation.
+    /// </summary>
     internal async Task<SnapshotInfo> OpenSnapshotAsync(Guid assessmentId, Guid snapshotId, CancellationToken token = default)
         => (await OpenManifestAsync(assessmentId, snapshotId, token)).Info();
 
+    /// <summary>
+    /// Opens and validates the selected sealed manifest in a consistent read transaction.
+    /// </summary>
     private async Task<SnapshotManifest> OpenManifestAsync(Guid assessmentId, Guid snapshotId, CancellationToken token)
     {
         await EnsureDatabaseAsync(assessmentId, token);
@@ -109,6 +124,9 @@ internal sealed partial class PipelineStore
         return await ValidateSnapshotAsync(db, snapshot, token);
     }
 
+    /// <summary>
+    /// Checks the seal, manifest digest, fixed membership and every saved content length and hash.
+    /// </summary>
     private static async Task<SnapshotManifest> ValidateSnapshotAsync(ScanContext db, SourceSnapshotRow snapshot, CancellationToken token)
     {
         if (!snapshot.IsSealed || snapshot.SealedAtUtc == null || snapshot.ManifestJson == null || snapshot.MemberIdsJson == null ||
@@ -123,6 +141,9 @@ internal sealed partial class PipelineStore
         return actual;
     }
 
+    /// <summary>
+    /// Reads one observation in a transaction against the previously pinned manifest.
+    /// </summary>
     private async Task<SourceRecord> ReadObservationAsync(Guid assessmentId, Guid snapshotId, Guid observationId, PinnedManifest pinned, CancellationToken token)
     {
         await EnsureDatabaseAsync(assessmentId, token);
@@ -132,6 +153,9 @@ internal sealed partial class PipelineStore
         return await ReadSelectedObservationAsync(db, snapshot, observationId, pinned, token);
     }
 
+    /// <summary>
+    /// Validates source ownership, metadata and content against its sealed manifest member before returning a detached record.
+    /// </summary>
     private static async Task<SourceRecord> ReadSelectedObservationAsync(ScanContext db, SourceSnapshotRow snapshot,
         Guid observationId, PinnedManifest pinned, CancellationToken token)
     {
@@ -154,6 +178,9 @@ internal sealed partial class PipelineStore
             observation.AcquisitionError);
     }
 
+    /// <summary>
+    /// Streams saved observations, validates each BLOB and retains only metadata for manifest construction.
+    /// </summary>
     private static async Task<List<SourceObservationRow>> ReadAndValidateObservationsAsync(ScanContext db, Guid snapshotId, CancellationToken token)
     {
         var observations = new List<SourceObservationRow>();
@@ -167,6 +194,9 @@ internal sealed partial class PipelineStore
         return observations;
     }
 
+    /// <summary>
+    /// Compares acquired byte arrays while preserving the distinction between null and an empty BLOB.
+    /// </summary>
     private static bool SameBytes(byte[]? first, byte[]? second) =>
         first == null ? second == null : second != null && first.AsSpan().SequenceEqual(second);
 }

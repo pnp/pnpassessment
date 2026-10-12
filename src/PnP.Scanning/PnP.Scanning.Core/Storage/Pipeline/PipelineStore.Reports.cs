@@ -6,17 +6,38 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Exposes bound collection receipts and read-only results, and persists immutable report publication.
+/// </summary>
 internal sealed partial class PipelineStore
 {
+    /// <summary>
+    /// Creates a receipt journal capability for the selected collection snapshot and phase.
+    /// </summary>
     internal ICollectionJournal CollectionJournal(Guid assessmentId, Guid snapshotId, Guid runId) =>
         new CollectionJournalCapability(this, assessmentId, snapshotId, runId);
+    /// <summary>
+    /// Creates a read-only result capability for the selected analysis run.
+    /// </summary>
     internal IAnalysisResultReader ResultReader(Guid assessmentId, Guid runId) => new ResultReadCapability(this, assessmentId, runId);
+    /// <summary>
+    /// Creates a report publication capability bound to the selected analysis run.
+    /// </summary>
     internal IAnalysisReportWriter ReportWriter(Guid assessmentId, Guid runId) => new ReportWriteCapability(this, assessmentId, runId);
 
+    /// <summary>
+    /// Provides receipt commits and saved observation reads for one collection run.
+    /// </summary>
     private sealed class CollectionJournalCapability(PipelineStore store, Guid assessmentId, Guid snapshotId, Guid runId) : ICollectionJournal
     {
+        /// <summary>
+        /// Commits the supplied receipt and checkpoint through the bound collection writer.
+        /// </summary>
         public Task CommitAsync(CollectionRecord record, CancellationToken cancellationToken) =>
             store.CommitObservationAsync(assessmentId, snapshotId, runId, record, cancellationToken);
+        /// <summary>
+        /// Reads saved receipts in source identity order, optionally selecting metadata without the BLOB column.
+        /// </summary>
         public async Task<IReadOnlyList<CollectedObservation>> ReadCommittedAsync(CancellationToken cancellationToken, bool metadataOnly = false)
         {
             using var db = store.CreateContext(assessmentId);
@@ -35,6 +56,9 @@ internal sealed partial class PipelineStore
                     new VersionedJson(x.MetadataJson), x.RawBytes?.ToArray(), x.AcquisitionError);
             }).ToArray();
         }
+        /// <summary>
+        /// Reads and validates one committed observation and returns detached fields and content bytes.
+        /// </summary>
         public async Task<CollectedObservation> ReadAsync(Guid observationId, CancellationToken cancellationToken)
         {
             using var db = store.CreateContext(assessmentId);
@@ -45,8 +69,14 @@ internal sealed partial class PipelineStore
         }
     }
 
+    /// <summary>
+    /// Restricts result reads to the committed payloads of one analysis run.
+    /// </summary>
     private sealed class ResultReadCapability(PipelineStore store, Guid assessmentId, Guid runId) : IAnalysisResultReader
     {
+        /// <summary>
+        /// Returns detached committed results ordered by source observation ID.
+        /// </summary>
         public async Task<IReadOnlyList<AnalysisResult>> ReadAsync(CancellationToken cancellationToken)
         {
             using var db = store.CreateContext(assessmentId);
@@ -56,8 +86,14 @@ internal sealed partial class PipelineStore
         }
     }
 
+    /// <summary>
+    /// Restricts report publication to a running analysis with complete source results and a valid sealed input.
+    /// </summary>
     private sealed class ReportWriteCapability(PipelineStore store, Guid assessmentId, Guid runId) : IAnalysisReportWriter
     {
+        /// <summary>
+        /// Atomically publishes fixed report rows and their checkpoint digest, allowing only identical replay of an existing publication.
+        /// </summary>
         public Task PublishAsync(IReadOnlyList<AnalysisReportRow> rows, CancellationToken cancellationToken) =>
             store.WriteAsync(assessmentId, async db =>
             {

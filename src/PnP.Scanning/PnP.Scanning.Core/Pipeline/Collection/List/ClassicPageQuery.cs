@@ -1,8 +1,16 @@
 using PnP.Scanning.Core.Pipeline.Analysis.Page;
 namespace PnP.Scanning.Core.Pipeline.Collection.List;
 
+/// <summary>
+/// Builds CAML requests for physical page metadata and paged blog item collection.
+/// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to keep online list query construction in collection while moving classification into analysis.</para>
+/// </summary>
 internal static class ClassicPageQuery
 {
+    /// <summary>
+    /// Selects the required page fields and adds either an exact item filter or an ASPX filter, respecting user-information exclusions.
+    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to keep online list query construction in collection while moving classification into analysis.</para>
+    /// </summary>
     internal static string Create(List<string> extraFields, bool filterOnASPXPages = true,
         int? itemId = null, bool skipUserInformation = false)
     {

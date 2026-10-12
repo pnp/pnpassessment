@@ -25,10 +25,16 @@ using PnP.Scanning.Process.Services;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Hosts the actual CLI handlers and loopback gRPC service with injected modules and counters that reject legacy service resolution.
+/// </summary>
 internal sealed class NativePipelineHost : IAsyncDisposable
 {
     private readonly IHost host;
     private readonly GrpcChannel channel;
+    /// <summary>
+    /// Binds the running host and loopback channel, exposes service counters, and builds the actual CLI parser for verification.
+    /// </summary>
     private NativePipelineHost(IHost host, string address, ForbiddenOnlineEnvironment environment,
         PipelineCoordinator? coordinator, LegacyOnlyScanner? legacy, ResolutionCounter counter)
     {
@@ -49,6 +55,9 @@ internal sealed class NativePipelineHost : IAsyncDisposable
     internal Parser Parser { get; }
     internal ResolutionCounter Counter { get; }
 
+    /// <summary>
+    /// Starts the native scanner host on an available loopback port with the requested test composition.
+    /// </summary>
     internal static async Task<NativePipelineHost> StartAsync(PipelineStore store, ModuleRegistry registry,
         ForbiddenOnlineEnvironment environment, bool legacyOnly = false)
     {
@@ -85,6 +94,9 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         return new NativePipelineHost(host, address, environment, coordinator, legacy, counter);
     }
 
+    /// <summary>
+    /// Parses and executes real command arguments, captures output and returns a decoded pipeline ticket when one is printed.
+    /// </summary>
     internal async Task<(int ExitCode, PhaseReply? Ticket, string Output, string Error)> InvokeAsync(params string[] arguments)
     {
         // Initialize Spectre against the stable test-runner writer before temporarily
@@ -111,6 +123,9 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Captures native command output and error streams for binding and RPC assertions.
+    /// </summary>
     private sealed class CaptureConsole(TextWriter output, TextWriter error) : System.CommandLine.IConsole
     {
         public System.CommandLine.IO.IStandardStreamWriter Out { get; } = new CaptureWriter(output);
@@ -118,12 +133,21 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         public bool IsOutputRedirected => true;
         public bool IsErrorRedirected => true;
         public bool IsInputRedirected => true;
+        /// <summary>
+        /// Adapts a string builder to the command-line console writer interface.
+        /// </summary>
         private sealed class CaptureWriter(TextWriter writer) : System.CommandLine.IO.IStandardStreamWriter
         {
+            /// <summary>
+            /// Appends command output to the captured stream.
+            /// </summary>
             public void Write(string? value) => writer.Write(value);
         }
     }
 
+    /// <summary>
+    /// Stops the native host and disposes its client channel and service resources.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         channel.Dispose();
@@ -131,9 +155,15 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         host.Dispose();
     }
 
+    /// <summary>
+    /// Counts forbidden legacy or online service construction during pipeline commands.
+    /// </summary>
     internal sealed class ResolutionCounter
     {
         internal int Calls;
+        /// <summary>
+        /// Records a forbidden resolution attempt and throws so tests cannot silently initialize legacy services.
+        /// </summary>
         internal T Reject<T>()
         {
             Interlocked.Increment(ref Calls);
@@ -142,17 +172,29 @@ internal sealed class NativePipelineHost : IAsyncDisposable
     }
 }
 
+/// <summary>
+/// Simulates a service that supports the existing scan RPCs but lacks the dedicated pipeline methods.
+/// </summary>
 internal sealed class LegacyOnlyScanner : PnPScanner.PnPScannerBase
 {
     internal int StartCalls;
     internal int StopCalls;
+    /// <summary>
+    /// Reports an available old service without advertising pipeline RPC support.
+    /// </summary>
     public override Task<PingReply> Ping(Empty request, ServerCallContext context) =>
         Task.FromResult(new PingReply { UpAndRunning = true, ProcessId = Environment.ProcessId });
+    /// <summary>
+    /// Counts any fallback to the legacy start RPC so pipeline commands can assert that no downgrade occurred.
+    /// </summary>
     public override Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
     {
         Interlocked.Increment(ref StartCalls);
         return responseStream.WriteAsync(new StartStatus { Status = "legacy start was called" });
     }
+    /// <summary>
+    /// Completes the old-service stop response used by the native compatibility host.
+    /// </summary>
     public override Task<Empty> Stop(StopRequest request, ServerCallContext context)
     {
         Interlocked.Increment(ref StopCalls);

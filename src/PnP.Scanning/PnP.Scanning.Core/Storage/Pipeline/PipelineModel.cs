@@ -4,6 +4,9 @@ using PnP.Scanning.Core.Pipeline.Contracts.Module;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Stores a collection snapshot scope, module input version, fixed member manifest and sealed integrity digest.
+/// </summary>
 internal sealed class SourceSnapshotRow
 {
     public Guid SnapshotId { get; set; }
@@ -20,6 +23,9 @@ internal sealed class SourceSnapshotRow
     public string? ManifestDigest { get; set; }
 }
 
+/// <summary>
+/// Stores one source identity, acquisition metadata, raw BLOB, saved length and SHA-256 within its owning snapshot.
+/// </summary>
 internal sealed class SourceObservationRow
 {
     public Guid ObservationId { get; set; }
@@ -34,6 +40,9 @@ internal sealed class SourceObservationRow
     public string? Sha256 { get; set; }
 }
 
+/// <summary>
+/// Stores a root or child phase lifecycle, fixed inputs, progress, diagnostics and collector or analyzer recovery checkpoint.
+/// </summary>
 internal sealed class PhaseRunRow
 {
     public Guid RunId { get; set; }
@@ -62,6 +71,9 @@ internal sealed class PhaseRunRow
     public DateTime? EndedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Pins one analysis identity to a snapshot, rule version, parameters and manifest digest.
+/// </summary>
 internal sealed class AnalysisRunRow
 {
     public Guid AnalysisRunId { get; set; }
@@ -73,6 +85,9 @@ internal sealed class AnalysisRunRow
     public DateTime CreatedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Stores the immutable outcome, reason and payload for one observation in one analysis run.
+/// </summary>
 internal sealed class AnalysisResultRow
 {
     public Guid AnalysisRunId { get; set; }
@@ -84,6 +99,9 @@ internal sealed class AnalysisResultRow
     public DateTime CommittedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Stores one published Classic Pages report projection under its analysis run, report kind and stable row key.
+/// </summary>
 internal sealed class ClassicPageReportRow
 {
     public Guid AnalysisRunId { get; set; }
@@ -93,8 +111,14 @@ internal sealed class ClassicPageReportRow
     public string PayloadJson { get; set; } = null!;
 }
 
+/// <summary>
+/// Configures the six pipeline tables, keys and restrictive ownership relationships in the existing assessment database.
+/// </summary>
 internal static class PipelineModel
 {
+    /// <summary>
+    /// Adds pipeline entity mappings and uniqueness constraints to the assessment EF model.
+    /// </summary>
     internal static void Configure(ModelBuilder model)
     {
         model.Entity<ClassicPageReportRow>(e =>

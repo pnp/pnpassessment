@@ -10,6 +10,9 @@ using Serilog;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Emits assessment telemetry and aggregates the existing legacy report metrics.
+    /// </summary>
     internal sealed class TelemetryManager
     {
         private bool skipTelemetry;

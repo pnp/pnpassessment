@@ -6,15 +6,17 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 {
     /// <summary>
-    /// T7 — page layout detection. Pure (no CSOM) parsing of the wiki <c>WikiField</c> HTML, the web part
-    /// page <c>vti_setuppath</c> property string, and the constant publishing-page layout, plus the
-    /// rendering of a <see cref="PageLayout"/> to the short string stored on <c>ClassicPage.Layout</c>.
-    /// One case per representative layout family.
+    /// Verifies wiki, web part and publishing layout recognition from detached page fields and markup.
+    /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
     /// </summary>
     public class PageLayoutDetectorTests
     {
         // --- Wiki layout: from the layoutsdata span (the primary path) -----------------------------------
 
+        /// <summary>
+        /// Verifies recognition of supported wiki layout families from saved layouts data.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Theory]
         // OneColumn needs no width hint.
         [InlineData("false,false,1", null, PageLayout.Wiki_OneColumn)]
@@ -33,6 +35,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             PageLayoutDetector.DetectWikiLayout(html).Should().Be(expected);
         }
 
+        /// <summary>
+        /// Verifies the one-column layout convention for an empty wiki page.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Theory]
         [InlineData(null)]
         [InlineData("")]
@@ -42,6 +48,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             PageLayoutDetector.DetectWikiLayout(html).Should().Be(PageLayout.Wiki_OneColumn);
         }
 
+        /// <summary>
+        /// Verifies a custom layout classification when wiki markup has no layouts data.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Layout_WikiNoLayoutsData_IsCustom()
         {
@@ -50,6 +60,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
                 .Should().Be(PageLayout.Wiki_Custom);
         }
 
+        /// <summary>
+        /// Verifies column-count fallback for unrecognized wiki layouts data.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Fact]
         public void Layout_WikiUnrecognizedSpan_FallsBackToColumnCount()
         {
@@ -63,6 +77,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         // --- Web part page layout: from the vti_setuppath property ---------------------------------------
 
+        /// <summary>
+        /// Verifies recognition of known web part layout templates from their setup paths.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Theory]
         [InlineData(@"1033\STS\doctemp\smartpgs\spstd1.aspx", PageLayout.WebPart_FullPageVertical)]
         [InlineData(@"1033\STS\doctemp\smartpgs\spstd2.aspx", PageLayout.WebPart_HeaderFooterThreeColumns)]
@@ -78,6 +96,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
             PageLayoutDetector.DetectWebPartPageLayout(setupPath).Should().Be(expected);
         }
 
+        /// <summary>
+        /// Verifies custom layout classification for an unknown web part setup path.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Theory]
         [InlineData(null)]
         [InlineData("")]
@@ -92,6 +114,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         // --- Layout string rendering (what lands on ClassicPage.Layout for wiki / web part pages) --------
 
+        /// <summary>
+        /// Verifies the existing report layout names after removing wiki and web part enum prefixes.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         [Theory]
         [InlineData(PageLayout.Wiki_OneColumn, "OneColumn")]
         [InlineData(PageLayout.Wiki_TwoColumnsWithSidebar, "TwoColumnsWithSidebar")]
@@ -104,6 +130,10 @@ namespace PnP.Scanning.Core.Tests.Pipeline.Analysis.Page
 
         // Builds a minimal wiki HTML page carrying a layoutsdata span and an optional set of styled
         // columns (only the first td's style matters to the detector, but the fallback counts all of them).
+        /// <summary>
+        /// Provides recorded wiki layout markup and the expected layout classification for parameterized tests.
+        /// <para>Evolved from <c>PnP.Scanning.Core.Tests/Scanners/Pages/PageLayoutDetectorTests.cs</c> to keep saved-markup layout regressions with offline page analysis.</para>
+        /// </summary>
         private static string WikiWithLayoutsData(string layoutsData, params string[] tdStyles)
         {
             var tds = string.Concat(tdStyles

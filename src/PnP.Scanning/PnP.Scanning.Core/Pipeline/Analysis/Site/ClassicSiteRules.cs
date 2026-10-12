@@ -1,7 +1,15 @@
 namespace PnP.Scanning.Core.Pipeline.Analysis.Site;
 
+/// <summary>
+/// Classifies site templates for Classic Pages summaries and remediation codes.
+/// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> to share site classification with offline analysis without depending on the scanner.</para>
+/// </summary>
 internal static class ClassicSiteRules
 {
+        /// <summary>
+        /// Maps a web template to modern, publishing, blog or other site categories.
+        /// <para>Evolved from <c>Scanners/Classic/ClassicScanner.cs</c> to share site classification with offline analysis without depending on the scanner.</para>
+        /// </summary>
         internal static SiteType GetSiteType(string webTemplate)
         {
             return webTemplate.ToUpper() switch
