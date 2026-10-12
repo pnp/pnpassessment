@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Analysis.Page;
-using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Storage
 {
@@ -50,7 +49,7 @@ namespace PnP.Scanning.Core.Storage
         public string RemediationCode { get; set; }
 
         /// <summary>
-        /// Includes only the supported classic physical page types in the legacy assessment table.
+        /// Excludes modern pages from the legacy classic page assessment table.
         /// </summary>
         public bool AddToDatabase()
         {

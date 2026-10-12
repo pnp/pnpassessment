@@ -1,7 +1,4 @@
 #nullable enable
-using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPageRow;
-using System.Text.Json;
-using System.Security.Cryptography;
 using PnP.Scanning.Core.Pipeline.Analysis.Audit;
 using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Pipeline.Contracts.Audit;
@@ -9,7 +6,6 @@ using PnP.Scanning.Core.Pipeline.Contracts.List;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
 using PnP.Scanning.Core.Pipeline.Contracts.Page;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
-using PnP.Scanning.Core.Pipeline.Contracts.Web;
 using PnP.Scanning.Core.Pipeline.Analysis.Page.WebPartMapping;
 
 
@@ -61,7 +57,7 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
         {
             var input = ClassicPageSourceJson.Read<ClassicPageBlogBatchSource>(source.Artifact.GetBytes());
             var web = index.Webs[ClassicPageSourceJson.WebKey(input.SiteUrl, input.WebUrl)];
-            var pages = input.Items.Select(fields => BlogPage(input, fields, web)).Where(x => x != null).ToArray();
+            var pages = input.Items.Select(fields => ClassicBlogPageProjection.Analyze(assessmentId, input, fields, web, index.Scope.Options)).Where(x => x != null).ToArray();
             return Task.FromResult(new AnalysisResult(source.ObservationId, AnalysisOutcome.Analyzed, "Blog items projected", VersionedJson.From(new { kind, pages })));
         }
         if (kind == "AuditPage")
@@ -73,24 +69,6 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
         var success = source.AcquisitionStatus == AcquisitionStatus.Complete;
         return Task.FromResult(new AnalysisResult(source.ObservationId, success ? AnalysisOutcome.NotApplicable : AnalysisOutcome.Unknown,
             source.AcquisitionError ?? (success ? "Source evidence retained for finalization" : source.AcquisitionStatus.ToString()), VersionedJson.From(new { kind })));
-    }
-    /// <summary>
-    /// Projects one saved blog item into a page report row while applying the pinned home-page and user-information options.
-    /// <para>Evolved from <c>Scanners/Classic/PageScanComponent.cs</c> to separate page classification and enrichment from authenticated collection.</para>
-    /// </summary>
-    private ClassicPage? BlogPage(ClassicPageBlogBatchSource input, Dictionary<string, SourceField> fields, ClassicPageWebSource web)
-    {
-        var url = fields.GetValueOrDefault("FileRef")?.Text ?? fields.GetValueOrDefault("ID")?.Text ?? "";
-        var home = web.WelcomePageState.Succeeded ? HomePageDetector.IsHomePage(url, web.WelcomePage) : (bool?)null;
-        if (index.Scope.Options.HomePageOnly && home != true) return null;
-        return new ClassicPage
-        {
-            ScanId = assessmentId, SiteUrl = input.SiteUrl, WebUrl = input.WebUrl, PageUrl = url, PageName = fields.GetValueOrDefault("Title")?.Text ?? "",
-            ListId = input.ListId, ListTitle = input.ListTitle, ListUrl = input.ListUrl,
-            ModifiedAt = fields.TryGetValue("Modified", out var modified) && modified.ToValue() is DateTime date ? date : default,
-            ModifiedBy = index.Scope.Options.SkipUserInformation ? null : ClassicPageProjection.ModifiedBy(fields),
-            PageType = ClassicPageRules.BlogPage, HomePage = home, RemediationCode = "CP4",
-        };
     }
     /// <summary>
     /// Combines committed per-source results into Classic Pages report rows for this run.

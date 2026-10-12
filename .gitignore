@@ -349,7 +349,7 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 
-# Reproducible local acceptance artifacts
+# Temporary files
 .temp/
 
 # mac OS

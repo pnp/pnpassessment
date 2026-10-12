@@ -5,7 +5,7 @@ Running the classic pages assessment is just like running any other module of th
 Use `--mode Classic` when you want to include other classic components, such as Lists or InfoPath, in the same assessment. `ClassicPage` supports the Pages component and allows you to collect and analyze its data separately.
 
 > [!NOTE]
-> The classic pages assessment is available as of **version 1.15.0** of the Microsoft 365 Assessment tool. Within a Classic assessment the Azure ACS and SharePoint Add-Ins components are skipped (they are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module).
+> The `Pages` component in `Classic` mode is available as of **version 1.15.0** of the Microsoft 365 Assessment tool. The `ClassicPage` examples on this page require a version that supports separate collection and analysis. With earlier versions, use `--mode Classic --classicinclude Pages`. Within a Classic assessment the Azure ACS and SharePoint Add-Ins components are skipped (they are provided by the dedicated [`--mode AddInsACS`](../addinsacs/readme.md) module).
 
 ## Quick start
 
