@@ -542,13 +542,13 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PageCustomizedPageStatus")
+                    b.Property<string>("CustomizedPageStatus")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PageLayoutCustomizedPageStatus")
+                    b.Property<string>("LayoutCustomizedPageStatus")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PageLayoutUrl")
+                    b.Property<string>("LayoutUrl")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PageName")
@@ -689,7 +689,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<int?>("ObservedChildCount")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("PageCustomizedPageStatus")
+                    b.Property<string>("CustomizedPageStatus")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PageType")

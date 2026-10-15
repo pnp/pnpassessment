@@ -46,9 +46,9 @@ namespace PnP.Scanning.Core.Tests.Storage
             var page = await context.ClassicPages.SingleAsync();
             page.ScanId.Should().Be(scan);
             page.WebPartCount.Should().Be(2);
-            page.PageCustomizedPageStatus.Should().BeNull();
-            page.PageLayoutUrl.Should().BeNull();
-            page.PageLayoutCustomizedPageStatus.Should().BeNull();
+            page.CustomizedPageStatus.Should().BeNull();
+            page.LayoutUrl.Should().BeNull();
+            page.LayoutCustomizedPageStatus.Should().BeNull();
 
             await migrator.MigrateAsync(previous);
             await migrator.MigrateAsync();
@@ -79,7 +79,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                     HomePage = true,
                     UncustomizedHomePage = true,
                     ModifiedBy = "Jane Doe",
-                    PageCustomizedPageStatus = "Uncustomized",
+                    CustomizedPageStatus = "Uncustomized",
                 });
 
                 context.ClassicPageWebParts.Add(new ClassicPageWebPart
@@ -123,9 +123,9 @@ namespace PnP.Scanning.Core.Tests.Storage
                 page.HomePage.Should().BeTrue();
                 page.UncustomizedHomePage.Should().BeTrue();
                 page.ModifiedBy.Should().Be("Jane Doe");
-                page.PageCustomizedPageStatus.Should().Be("Uncustomized");
-                page.PageLayoutUrl.Should().BeNull();
-                page.PageLayoutCustomizedPageStatus.Should().BeNull();
+                page.CustomizedPageStatus.Should().Be("Uncustomized");
+                page.LayoutUrl.Should().BeNull();
+                page.LayoutCustomizedPageStatus.Should().BeNull();
 
                 var webPart = context.ClassicPageWebParts.Single(wp =>
                     wp.ScanId == scanId && wp.PageUrl == pageUrl && wp.WebPartIndex == 0);

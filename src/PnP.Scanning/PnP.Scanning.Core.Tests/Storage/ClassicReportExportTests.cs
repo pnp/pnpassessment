@@ -228,14 +228,14 @@ namespace PnP.Scanning.Core.Tests.Storage
                 {
                     ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
                     PageUrl = "/sites/a/Pages/publishing.aspx", PageType = "PublishingPage",
-                    PageCustomizedPageStatus = "Customized",
-                    PageLayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
+                    CustomizedPageStatus = "Customized",
+                    LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
                 },
                 new ClassicPage
                 {
                     ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
                     PageUrl = "/sites/a/SitePages/wiki.aspx", PageType = "WikiPage",
-                    PageCustomizedPageStatus = "Uncustomized",
+                    CustomizedPageStatus = "Uncustomized",
                 },
                 new ClassicPage
                 {
@@ -258,22 +258,22 @@ namespace PnP.Scanning.Core.Tests.Storage
                 var file = Path.Join(directory, "classicpages.csv");
                 ReadHeader(file).Should().Contain(new[]
                 {
-                    nameof(ClassicPage.PageCustomizedPageStatus),
-                    nameof(ClassicPage.PageLayoutUrl),
-                    nameof(ClassicPage.PageLayoutCustomizedPageStatus),
+                    nameof(ClassicPage.CustomizedPageStatus),
+                    nameof(ClassicPage.LayoutUrl),
+                    nameof(ClassicPage.LayoutCustomizedPageStatus),
                 });
                 var rows = ReadRecords<ClassicPage>(file).ToArray();
                 var publishing = rows.Single(page => page.PageUrl.EndsWith("/publishing.aspx"));
-                publishing.PageCustomizedPageStatus.Should().Be("Customized");
-                publishing.PageLayoutUrl.Should().Be(pages[0].PageLayoutUrl);
-                publishing.PageLayoutCustomizedPageStatus.Should().Be("Uncustomized");
+                publishing.CustomizedPageStatus.Should().Be("Customized");
+                publishing.LayoutUrl.Should().Be(pages[0].LayoutUrl);
+                publishing.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
                 var wiki = rows.Single(page => page.PageType == "WikiPage");
-                wiki.PageCustomizedPageStatus.Should().Be("Uncustomized");
-                wiki.PageLayoutUrl.Should().BeNullOrEmpty();
-                wiki.PageLayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+                wiki.CustomizedPageStatus.Should().Be("Uncustomized");
+                wiki.LayoutUrl.Should().BeNullOrEmpty();
+                wiki.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
                 var unknown = rows.Single(page => page.PageUrl.EndsWith("/unknown.aspx"));
-                unknown.PageCustomizedPageStatus.Should().BeNullOrEmpty();
-                unknown.PageLayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+                unknown.CustomizedPageStatus.Should().BeNullOrEmpty();
+                unknown.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
             }
             finally { DeleteTempDir(directory); }
         }

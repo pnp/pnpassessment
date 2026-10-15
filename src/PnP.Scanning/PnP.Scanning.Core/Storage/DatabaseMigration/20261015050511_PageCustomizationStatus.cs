@@ -11,25 +11,25 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "PageCustomizedPageStatus",
+                name: "CustomizedPageStatus",
                 table: "ClassicPages",
                 type: "TEXT",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
-                name: "PageLayoutCustomizedPageStatus",
+                name: "LayoutCustomizedPageStatus",
                 table: "ClassicPages",
                 type: "TEXT",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
-                name: "PageLayoutUrl",
+                name: "LayoutUrl",
                 table: "ClassicPages",
                 type: "TEXT",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
-                name: "PageCustomizedPageStatus",
+                name: "CustomizedPageStatus",
                 table: "ClassicPageDiscoveries",
                 type: "TEXT",
                 nullable: true);
@@ -39,19 +39,19 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "PageCustomizedPageStatus",
+                name: "CustomizedPageStatus",
                 table: "ClassicPages");
 
             migrationBuilder.DropColumn(
-                name: "PageLayoutCustomizedPageStatus",
+                name: "LayoutCustomizedPageStatus",
                 table: "ClassicPages");
 
             migrationBuilder.DropColumn(
-                name: "PageLayoutUrl",
+                name: "LayoutUrl",
                 table: "ClassicPages");
 
             migrationBuilder.DropColumn(
-                name: "PageCustomizedPageStatus",
+                name: "CustomizedPageStatus",
                 table: "ClassicPageDiscoveries");
         }
     }

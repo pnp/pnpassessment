@@ -208,8 +208,8 @@ namespace PnP.Scanning.Core.Scanners
                             AssessmentWebDiscovery.ErrorDetail(ex));
                         await discoveryWriter.WriteAsync(new[] { discovered }).ConfigureAwait(false);
                     }
-                    scannerBase.Logger.Warning(ex, "Failed to read publishing layout status for {PageUrl} using {PageLayoutUrl}",
-                        page.PageUrl, page.PageLayoutUrl);
+                    scannerBase.Logger.Warning(ex, "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
+                        page.PageUrl, page.LayoutUrl);
                 }
             }
 
@@ -361,7 +361,7 @@ namespace PnP.Scanning.Core.Scanners
             page.HomePage = found.HomePage ?? page.HomePage;
             page.DiscoveryStatus = found.DiscoveryStatus;
             page.AssessmentStatus = found.AssessmentStatus;
-            page.PageCustomizedPageStatus = found.PageCustomizedPageStatus;
+            page.CustomizedPageStatus = found.CustomizedPageStatus;
         }
 
         internal static bool? ResolveHomePageState(string pageUrl, string welcomePage,

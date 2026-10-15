@@ -209,7 +209,7 @@ internal sealed class AssessmentWebDiscovery
         };
         try
         {
-            row.PageCustomizedPageStatus = FileCustomizationStatus.Normalize(record.CustomizedPageStatusRaw);
+            row.CustomizedPageStatus = FileCustomizationStatus.Normalize(record.CustomizedPageStatusRaw);
         }
         catch (InvalidDataException ex)
         {

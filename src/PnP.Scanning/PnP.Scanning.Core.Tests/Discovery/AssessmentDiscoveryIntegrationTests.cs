@@ -70,7 +70,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
                 nameof(ClassicPageDiscovery.FileUniqueId),
                 nameof(ClassicPageDiscovery.ListItemId),
                 nameof(ClassicPageDiscovery.FileName),
-                nameof(ClassicPageDiscovery.PageCustomizedPageStatus),
+                nameof(ClassicPageDiscovery.CustomizedPageStatus),
                 nameof(ClassicPageDiscovery.HomePage),
                 nameof(ClassicPageDiscovery.LibraryHidden),
                 nameof(ClassicPageDiscovery.ObservationMethod),
@@ -117,7 +117,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         rows.Should().ContainSingle();
         rows[0].ListItemId.Should().Be(7);
         rows[0].HomePage.Should().BeTrue();
-        rows[0].PageCustomizedPageStatus.Should().Be("Uncustomized");
+        rows[0].CustomizedPageStatus.Should().Be("Uncustomized");
         rows[0].DiscoveryStatus.Should().Be("Discovered");
         rows[0].AssessmentStatus.Should().Be("Failed");
         rows[0].ErrorCodes.Should().Contain("HTTP403");
@@ -135,9 +135,9 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         await Writer().WriteAsync(new[] { first });
         await Writer().WriteAsync(new[] { second });
         var row = (await Writer().ReadPagesAsync(scan, Site, "/")).Single();
-        row.PageCustomizedPageStatus.Should().Be("Customized");
+        row.CustomizedPageStatus.Should().Be("Customized");
         row.ErrorCodes.Should().Contain(DiscoveryGapCodes.ChangedDuringScan);
-        row.ErrorDetail.Should().Contain("PageCustomizedPageStatus");
+        row.ErrorDetail.Should().Contain("CustomizedPageStatus");
     }
 
     [Theory]
@@ -155,11 +155,11 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
             DiscoverySourceKind.RawListLibraryFiles, "/pages", "test");
         var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", scope,
             File(Guid.NewGuid(), "a.aspx") with { CustomizedPageStatusRaw = raw });
-        row.PageCustomizedPageStatus.Should().Be(expected);
+        row.CustomizedPageStatus.Should().Be(expected);
         row.ErrorCodes.Should().BeNull();
         var page = new ClassicPage();
         Core.Scanners.PageScanComponent.ApplyDiscoveryState(page, row);
-        page.PageCustomizedPageStatus.Should().Be(expected);
+        page.CustomizedPageStatus.Should().Be(expected);
     }
 
     [Theory]
@@ -171,7 +171,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
             DiscoverySourceKind.RawListLibraryFiles, "/pages", "test");
         var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", scope,
             File(Guid.NewGuid(), "a.aspx") with { CustomizedPageStatusRaw = raw });
-        row.PageCustomizedPageStatus.Should().BeNull();
+        row.CustomizedPageStatus.Should().BeNull();
         row.DiscoveryStatus.Should().Be("Discovered");
         row.ErrorCodes.Should().Contain("InvalidCustomizedPageStatus");
     }

@@ -29,22 +29,22 @@ internal sealed class PublishingLayoutStatusReader
 
     internal async Task EnrichAsync(ClassicPage page)
     {
-        page.PageLayoutCustomizedPageStatus = null;
+        page.LayoutCustomizedPageStatus = null;
         if (page.PageType != PageScanComponent.PublishingPage)
         {
-            page.PageLayoutUrl = null;
+            page.LayoutUrl = null;
             return;
         }
-        if (string.IsNullOrWhiteSpace(page.PageLayoutUrl)) return;
+        if (string.IsNullOrWhiteSpace(page.LayoutUrl)) return;
 
-        var url = ResolveServerRelativeUrl(page.PageLayoutUrl);
+        var url = ResolveServerRelativeUrl(page.LayoutUrl);
         if (!statuses.TryGetValue(url, out var status))
         {
             // Cache failures too: a denied/missing shared layout must not trigger one request per page.
             status = ReadNormalizedStatusAsync(url);
             statuses.Add(url, status);
         }
-        page.PageLayoutCustomizedPageStatus = await status.ConfigureAwait(false);
+        page.LayoutCustomizedPageStatus = await status.ConfigureAwait(false);
     }
 
     private async Task<string> ReadNormalizedStatusAsync(string url)

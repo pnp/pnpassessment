@@ -21,16 +21,16 @@ public class PublishingLayoutStatusReaderTests
         });
         var first = Page("https://contoso.sharepoint.com" + LayoutUrl);
         var second = Page(LayoutUrl);
-        first.PageCustomizedPageStatus = "Customized";
+        first.CustomizedPageStatus = "Customized";
 
         await reader.EnrichAsync(first);
         await reader.EnrichAsync(second);
 
         requests.Should().Equal(LayoutUrl);
-        first.PageLayoutCustomizedPageStatus.Should().Be("Uncustomized");
-        second.PageLayoutCustomizedPageStatus.Should().Be("Uncustomized");
-        first.PageCustomizedPageStatus.Should().Be("Customized", "page and layout are separate files");
-        first.PageLayoutUrl.Should().Be("https://contoso.sharepoint.com" + LayoutUrl);
+        first.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
+        second.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
+        first.CustomizedPageStatus.Should().Be("Customized", "page and layout are separate files");
+        first.LayoutUrl.Should().Be("https://contoso.sharepoint.com" + LayoutUrl);
     }
 
     [Theory]
@@ -44,12 +44,12 @@ public class PublishingLayoutStatusReaderTests
         var reader = new PublishingLayoutStatusReader(WebUrl, _ => throw new InvalidOperationException("Unexpected request"));
         var page = Page(LayoutUrl);
         page.PageType = pageType;
-        page.PageLayoutCustomizedPageStatus = "Uncustomized";
+        page.LayoutCustomizedPageStatus = "Uncustomized";
 
         await reader.EnrichAsync(page);
 
-        page.PageLayoutUrl.Should().BeNull();
-        page.PageLayoutCustomizedPageStatus.Should().BeNull();
+        page.LayoutUrl.Should().BeNull();
+        page.LayoutCustomizedPageStatus.Should().BeNull();
     }
 
     [Theory]
@@ -60,7 +60,7 @@ public class PublishingLayoutStatusReaderTests
         var reader = new PublishingLayoutStatusReader(WebUrl, _ => throw new InvalidOperationException("Unexpected request"));
         var page = Page(url);
         await reader.EnrichAsync(page);
-        page.PageLayoutCustomizedPageStatus.Should().BeNull();
+        page.LayoutCustomizedPageStatus.Should().BeNull();
     }
 
     [Theory]
@@ -72,7 +72,7 @@ public class PublishingLayoutStatusReaderTests
         var reader = new PublishingLayoutStatusReader(WebUrl, _ => Task.FromResult(returned));
         var page = Page(LayoutUrl);
         await reader.EnrichAsync(page);
-        page.PageLayoutCustomizedPageStatus.Should().Be(expected);
+        page.LayoutCustomizedPageStatus.Should().Be(expected);
     }
 
     [Theory]
@@ -85,7 +85,7 @@ public class PublishingLayoutStatusReaderTests
         var page = Page(url);
         var enrich = () => reader.EnrichAsync(page);
         await enrich.Should().ThrowAsync<InvalidDataException>();
-        page.PageLayoutCustomizedPageStatus.Should().BeNull();
+        page.LayoutCustomizedPageStatus.Should().BeNull();
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class PublishingLayoutStatusReaderTests
             page.WebPartCount = 3;
             var enrich = () => reader.EnrichAsync(page);
             await enrich.Should().ThrowAsync<UnauthorizedAccessException>();
-            page.PageLayoutCustomizedPageStatus.Should().BeNull();
+            page.LayoutCustomizedPageStatus.Should().BeNull();
             page.WebPartCount.Should().Be(3);
         }
         requests.Should().Be(1);
@@ -136,12 +136,12 @@ public class PublishingLayoutStatusReaderTests
         await first.EnrichAsync(custom);
         await second.EnrichAsync(Page(LayoutUrl));
         requests.Should().Be(3);
-        custom.PageLayoutCustomizedPageStatus.Should().Be("Customized");
+        custom.LayoutCustomizedPageStatus.Should().Be("Customized");
     }
 
     private static ClassicPage Page(string url) => new()
     {
         PageType = PageScanComponent.PublishingPage,
-        PageLayoutUrl = url,
+        LayoutUrl = url,
     };
 }

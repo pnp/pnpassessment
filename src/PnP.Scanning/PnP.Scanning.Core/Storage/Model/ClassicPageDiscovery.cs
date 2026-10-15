@@ -20,7 +20,7 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     public Guid? FileUniqueId { get; set; }
     public int? ListItemId { get; set; }
     public string FileName { get; set; }
-    public string PageCustomizedPageStatus { get; set; }
+    public string CustomizedPageStatus { get; set; }
 
     [Ignore]
     public string PageType { get; set; }
