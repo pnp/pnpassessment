@@ -30,6 +30,12 @@ namespace PnP.Scanning.Core.Storage
         // Page transformation readiness enrichment (ported from the Modernization Scanner)
         public string Layout { get; set; }
 
+        public string PageCustomizedPageStatus { get; set; }
+
+        public string PageLayoutUrl { get; set; }
+
+        public string PageLayoutCustomizedPageStatus { get; set; }
+
         public bool? HomePage { get; set; }
 
         public bool UncustomizedHomePage { get; set; }

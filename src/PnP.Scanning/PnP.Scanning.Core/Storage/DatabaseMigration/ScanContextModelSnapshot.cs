@@ -539,6 +539,15 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PageCustomizedPageStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageLayoutCustomizedPageStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PageLayoutUrl")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PageName")
                         .HasColumnType("TEXT");
 
@@ -638,10 +647,10 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ErrorDetail")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EvidenceJson")
+                    b.Property<string>("ErrorStage")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ErrorStage")
+                    b.Property<string>("EvidenceJson")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("ExpectedChildCount")
@@ -676,6 +685,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<int?>("ObservedChildCount")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("PageCustomizedPageStatus")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PageType")
                         .HasColumnType("TEXT");
@@ -1701,24 +1713,32 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                 {
                     b.Property<Guid>("ScanId")
                         .HasColumnType("TEXT");
+
                     b.Property<string>("SiteUrl")
                         .HasColumnType("TEXT");
+
                     b.Property<string>("WebUrl")
                         .HasColumnType("TEXT");
+
                     b.Property<int>("Delay1")
                         .HasColumnType("INTEGER");
+
                     b.Property<int>("Delay2")
                         .HasColumnType("INTEGER");
+
                     b.Property<int>("Delay3")
                         .HasColumnType("INTEGER");
+
                     b.Property<string>("WebIdString")
                         .HasColumnType("TEXT");
+
                     b.HasKey("ScanId", "SiteUrl", "WebUrl");
+
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl")
                         .IsUnique();
+
                     b.ToTable("TestDelays");
                 });
-
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Web", b =>
                 {

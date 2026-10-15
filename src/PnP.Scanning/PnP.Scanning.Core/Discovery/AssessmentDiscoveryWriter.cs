@@ -39,6 +39,8 @@ internal sealed class AssessmentDiscoveryWriter
                         if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");
                         if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage) changed.Add("HomePage");
                         if (previous.ContentTypeId != null && row.ContentTypeId != null && previous.ContentTypeId != row.ContentTypeId) changed.Add("ContentTypeId");
+                        if (previous.PageCustomizedPageStatus != null && row.PageCustomizedPageStatus != null &&
+                            previous.PageCustomizedPageStatus != row.PageCustomizedPageStatus) changed.Add("PageCustomizedPageStatus");
                         if (changed.Count != 0)
                             AssessmentWebDiscovery.AddError(row, "DiscoveryMetadata", DiscoveryGapCodes.ChangedDuringScan,
                                 "Repeated file identity changed: " + string.Join(", ", changed));
@@ -49,6 +51,7 @@ internal sealed class AssessmentDiscoveryWriter
                         row.PageType ??= previous.PageType;
                         row.HomePage ??= previous.HomePage;
                         row.LibraryHidden ??= previous.LibraryHidden;
+                        row.PageCustomizedPageStatus ??= previous.PageCustomizedPageStatus;
                         row.AssessmentStatus ??= previous.AssessmentStatus;
                     }
                     else if (row.RowType == "Reference")

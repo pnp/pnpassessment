@@ -263,6 +263,7 @@ namespace PnP.Scanning.Core.Scanners
             // (e.g. "ArticleLeft") read from the PublishingPageLayout field — not the transform engine's
             // PublishingPage_AutoDetect placeholder (which the legacy scanner discards for publishing pages).
             page.Layout = GetPublishingPageLayoutName(listItem.FieldValues);
+            page.PageLayoutUrl = GetPublishingPageLayoutUrl(listItem.FieldValues);
 
             // Export the web part XML for the parts that allow it (gives the most reliable type).
             var exportedXml = new Dictionary<Guid, ClientResult<string>>();
@@ -404,6 +405,14 @@ namespace PnP.Scanning.Core.Scanners
             if (HasAll(properties, "CatalogIconImageUrl", "AllowEdit", "TitleIconImageUrl", "ExportMode")) return SPUserCodeType;
 
             return UnsupportedWebPartType;
+        }
+
+        internal static string GetPublishingPageLayoutUrl(IDictionary<string, object> fieldValues)
+        {
+            return fieldValues != null &&
+                fieldValues.TryGetValue(PublishingPageLayoutField, out var value) &&
+                value is FieldUrlValue url && !string.IsNullOrWhiteSpace(url.Url)
+                ? url.Url : null;
         }
 
         // Reads the publishing page layout name from the page list item's PublishingPageLayout field.

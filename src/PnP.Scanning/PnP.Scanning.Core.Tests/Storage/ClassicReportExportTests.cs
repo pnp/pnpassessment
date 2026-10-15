@@ -3,6 +3,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using FluentAssertions;
 using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -215,6 +216,66 @@ namespace PnP.Scanning.Core.Tests.Storage
             {
                 DeleteTempDir(exportDir);
             }
+        }
+
+        [Fact]
+        public async Task Csv_Page_and_layout_customization_statuses_round_trip_independently()
+        {
+            var scan = Guid.NewGuid();
+            var pages = new[]
+            {
+                new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
+                    PageUrl = "/sites/a/Pages/publishing.aspx", PageType = "PublishingPage",
+                    PageCustomizedPageStatus = "Customized",
+                    PageLayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
+                },
+                new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
+                    PageUrl = "/sites/a/SitePages/wiki.aspx", PageType = "WikiPage",
+                    PageCustomizedPageStatus = "Uncustomized",
+                },
+                new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
+                    PageUrl = "/sites/a/Pages/unknown.aspx", PageType = "PublishingPage",
+                },
+            };
+            var reader = new PublishingLayoutStatusReader(new Uri("https://contoso.sharepoint.com/sites/a"),
+                _ => Task.FromResult("Uncustomized"));
+            foreach (var page in pages) await reader.EnrichAsync(page);
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPages.AddRange(pages);
+                await context.SaveChangesAsync();
+            }
+            var directory = NewTempDir();
+            try
+            {
+                await ExportAsync(scan, directory);
+                var file = Path.Join(directory, "classicpages.csv");
+                ReadHeader(file).Should().Contain(new[]
+                {
+                    nameof(ClassicPage.PageCustomizedPageStatus),
+                    nameof(ClassicPage.PageLayoutUrl),
+                    nameof(ClassicPage.PageLayoutCustomizedPageStatus),
+                });
+                var rows = ReadRecords<ClassicPage>(file).ToArray();
+                var publishing = rows.Single(page => page.PageUrl.EndsWith("/publishing.aspx"));
+                publishing.PageCustomizedPageStatus.Should().Be("Customized");
+                publishing.PageLayoutUrl.Should().Be(pages[0].PageLayoutUrl);
+                publishing.PageLayoutCustomizedPageStatus.Should().Be("Uncustomized");
+                var wiki = rows.Single(page => page.PageType == "WikiPage");
+                wiki.PageCustomizedPageStatus.Should().Be("Uncustomized");
+                wiki.PageLayoutUrl.Should().BeNullOrEmpty();
+                wiki.PageLayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+                var unknown = rows.Single(page => page.PageUrl.EndsWith("/unknown.aspx"));
+                unknown.PageCustomizedPageStatus.Should().BeNullOrEmpty();
+                unknown.PageLayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+            }
+            finally { DeleteTempDir(directory); }
         }
 
         [Fact]

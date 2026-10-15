@@ -194,7 +194,7 @@ internal sealed class AssessmentWebDiscovery
         var fileId = Guid.TryParse(record.FileUniqueId, out var parsed) && parsed != Guid.Empty ? parsed : (Guid?)null;
         var siteIdentity = record.SiteCollectionId?.ToString("D") ?? siteUrl.ToLowerInvariant();
         var webIdentity = record.WebId?.ToString("D") ?? webUrl.ToLowerInvariant();
-        return new()
+        var row = new ClassicPageDiscovery
         {
             ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
             RecordKey = "page:" + DiscoveryHash.Of(siteIdentity, webIdentity,
@@ -207,6 +207,15 @@ internal sealed class AssessmentWebDiscovery
             LibraryHidden = record.LibraryHidden, ObservationMethod = record.ObservationMethod ?? scope.SourceKind?.ToString(),
             DiscoveryStatus = "Discovered", ObservedAtUtc = DateTime.UtcNow,
         };
+        try
+        {
+            row.PageCustomizedPageStatus = FileCustomizationStatus.Normalize(record.CustomizedPageStatusRaw);
+        }
+        catch (InvalidDataException ex)
+        {
+            AddError(row, "PageCustomizationMetadata", "InvalidCustomizedPageStatus", ex.Message);
+        }
+        return row;
     }
 
     internal static void AddError(ClassicPageDiscovery row, string stage, string code, string detail)
