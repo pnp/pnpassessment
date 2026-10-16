@@ -25,6 +25,33 @@ public class SetupPathClassifierTests
         Classify(@"Features\BlogContent\Post.aspx").Should().Be(SetupPathPageFamily.BlogPost);
     }
 
+    /// <summary>
+    /// A web's root default.aspx ghosts from a site-definition home page template. These are the web part
+    /// page layouts the server itself treats as convertible, so missing them leaves the entry page of every
+    /// team site, document workspace and project site classified as an unrecognised template.
+    /// </summary>
+    [Theory]
+    [InlineData(@"SiteTemplates\STS\default.aspx")]
+    [InlineData(@"SiteTemplates\STS\defaultdws.aspx")]
+    [InlineData(@"SiteTemplates\PROJECTSITE\default.aspx")]
+    [InlineData(@"Features\BDR\default.aspx")]
+    public void Site_definition_home_page_template_is_a_web_part_page(string setupPath)
+    {
+        Classify(setupPath).Should().Be(SetupPathPageFamily.WebPartPage);
+        // Observed live values carry no prefix, but the server's own paths do, so both must match.
+        Classify(@"15\TEMPLATE\" + setupPath).Should().Be(SetupPathPageFamily.WebPartPage);
+    }
+
+    [Fact]
+    public void Default_and_defaultdws_templates_do_not_collide()
+    {
+        // 'defaultdws.aspx' must not be swallowed by the 'default.aspx' suffix, and neither may claim a
+        // same-named page from an unrelated site definition.
+        Classify(@"SiteTemplates\STS\defaultdws.aspx").Should().Be(SetupPathPageFamily.WebPartPage);
+        Classify(@"SiteTemplates\CONTOSO\default.aspx").Should().Be(SetupPathPageFamily.Unknown);
+        Classify(@"Features\CONTOSO\default.aspx").Should().Be(SetupPathPageFamily.Unknown);
+    }
+
     [Fact]
     public void Classification_ignores_case()
     {
@@ -45,7 +72,7 @@ public class SetupPathClassifierTests
     {
         // Custom site definitions and third-party provisioning ghost from templates the server does not know.
         Classify(@"Features\SitePagePublishing\Home.aspx").Should().Be(SetupPathPageFamily.Unknown);
-        Classify(@"SiteTemplates\STS\default.aspx").Should().Be(SetupPathPageFamily.Unknown);
+        Classify(@"Features\GroupHomepage\Home.aspx").Should().Be(SetupPathPageFamily.Unknown);
         // 'myform.aspx' only means a list form when it ghosts from the pages\form.aspx template.
         Classify(@"contoso\templates\myform.aspx").Should().Be(SetupPathPageFamily.Unknown);
     }

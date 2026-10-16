@@ -23,6 +23,11 @@ internal enum SetupPathPageFamily
 /// template a ghosted file was provisioned from and survives customization, so it is the only client-visible
 /// signal that separates a system list form or view from a user content page.
 /// </summary>
+/// <remarks>
+/// The web part page templates match the set the server itself treats as convertible web part page layouts
+/// (<c>ClassicPageLayout.SupportedWebPartPageLayouts</c>): the eight standard <c>spstd</c> layouts, the basic
+/// <c>bpstd</c> layout, and the four site-definition home pages.
+/// </remarks>
 internal static class SetupPathClassifier
 {
     // Suffix matching mirrors the server classifier: real values carry a provisioning prefix such as
@@ -32,6 +37,7 @@ internal static class SetupPathClassifier
         (@"pages\viewpage.aspx", SetupPathPageFamily.ListView),
         (@"pages\form.aspx", SetupPathPageFamily.ListForm),
         (@"wkpstd.aspx", SetupPathPageFamily.WikiPage),
+        // The standard web part page templates, keyed by bare file name as the server keys them.
         (@"spstd1.aspx", SetupPathPageFamily.WebPartPage),
         (@"spstd2.aspx", SetupPathPageFamily.WebPartPage),
         (@"spstd3.aspx", SetupPathPageFamily.WebPartPage),
@@ -41,6 +47,13 @@ internal static class SetupPathClassifier
         (@"spstd7.aspx", SetupPathPageFamily.WebPartPage),
         (@"spstd8.aspx", SetupPathPageFamily.WebPartPage),
         (@"bpstd.aspx", SetupPathPageFamily.WebPartPage),
+        // The site-definition home pages, keyed by their full template path as the server keys them.
+        // A web's root default.aspx ghosts from one of these, so without them the entry page of every
+        // team site, document workspace and project site falls through as an unrecognised template.
+        (@"sitetemplates\sts\default.aspx", SetupPathPageFamily.WebPartPage),
+        (@"sitetemplates\sts\defaultdws.aspx", SetupPathPageFamily.WebPartPage),
+        (@"sitetemplates\projectsite\default.aspx", SetupPathPageFamily.WebPartPage),
+        (@"features\bdr\default.aspx", SetupPathPageFamily.WebPartPage),
         (@"Features\BlogContent\Post.aspx", SetupPathPageFamily.BlogPost),
     };
 
