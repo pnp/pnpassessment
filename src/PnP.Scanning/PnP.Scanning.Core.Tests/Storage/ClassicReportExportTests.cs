@@ -3,6 +3,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using FluentAssertions;
 using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -215,6 +216,118 @@ namespace PnP.Scanning.Core.Tests.Storage
             {
                 DeleteTempDir(exportDir);
             }
+        }
+
+        [Fact]
+        public async Task Csv_Page_and_layout_customization_statuses_round_trip_independently()
+        {
+            var scan = Guid.NewGuid();
+            var pages = new[]
+            {
+                new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
+                    PageUrl = "/sites/a/Pages/publishing.aspx", PageType = "PublishingPage",
+                    CustomizedPageStatus = "Customized",
+                    LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
+                },
+                new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
+                    PageUrl = "/sites/a/SitePages/wiki.aspx", PageType = "WikiPage",
+                    CustomizedPageStatus = "Uncustomized",
+                },
+                new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
+                    PageUrl = "/sites/a/Pages/unknown.aspx", PageType = "PublishingPage",
+                },
+            };
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPages.AddRange(pages);
+                context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
+                {
+                    ScanId = scan, SiteUrl = pages[0].SiteUrl, WebUrl = "/", RecordKey = "layout",
+                    RowType = "Page", Url = pages[0].LayoutUrl, CustomizedPageStatus = "Uncustomized",
+                    DiscoveryStatus = "Discovered",
+                });
+                await context.SaveChangesAsync();
+                await PublishingLayoutStatusReader.EnrichSiteAsync(context, scan, pages[0].SiteUrl,
+                    _ => throw new InvalidOperationException("Layout should come from discovery"),
+                    (error, _) => throw new InvalidOperationException("Unexpected layout failure", error));
+            }
+            var directory = NewTempDir();
+            try
+            {
+                await ExportAsync(scan, directory);
+                var file = Path.Join(directory, "classicpages.csv");
+                ReadHeader(file).Should().Contain(new[]
+                {
+                    nameof(ClassicPage.CustomizedPageStatus),
+                    nameof(ClassicPage.LayoutUrl),
+                    nameof(ClassicPage.LayoutCustomizedPageStatus),
+                });
+                var rows = ReadRecords<ClassicPage>(file).ToArray();
+                var publishing = rows.Single(page => page.PageUrl.EndsWith("/publishing.aspx"));
+                publishing.CustomizedPageStatus.Should().Be("Customized");
+                publishing.LayoutUrl.Should().Be(pages[0].LayoutUrl);
+                publishing.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
+                var wiki = rows.Single(page => page.PageType == "WikiPage");
+                wiki.CustomizedPageStatus.Should().Be("Uncustomized");
+                wiki.LayoutUrl.Should().BeNullOrEmpty();
+                wiki.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+                var unknown = rows.Single(page => page.PageUrl.EndsWith("/unknown.aspx"));
+                unknown.CustomizedPageStatus.Should().BeNullOrEmpty();
+                unknown.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+            }
+            finally { DeleteTempDir(directory); }
+        }
+
+        [Fact]
+        public async Task Csv_Layout_failure_preserves_complete_page_and_exports_discovery_error()
+        {
+            var scan = Guid.NewGuid();
+            const string site = "https://contoso.sharepoint.com/sites/a";
+            const string pageUrl = "/sites/a/Pages/home.aspx";
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPages.Add(new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = site, WebUrl = "/", PageUrl = pageUrl,
+                    PageType = "PublishingPage", AssessmentStatus = "Complete",
+                    LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
+                    WebPartCount = 3, MappingPercentage = 100,
+                });
+                context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
+                {
+                    ScanId = scan, SiteUrl = site, WebUrl = "/", RecordKey = "page",
+                    RowType = "Page", Url = pageUrl, DiscoveryStatus = "Discovered",
+                    AssessmentStatus = "Complete",
+                });
+                await context.SaveChangesAsync();
+                var failures = new List<Exception>();
+                await PublishingLayoutStatusReader.EnrichSiteAsync(context, scan, site,
+                    _ => throw new UnauthorizedAccessException("Layout denied"),
+                    (error, _) => failures.Add(error));
+                failures.Should().ContainSingle();
+            }
+            var directory = NewTempDir();
+            try
+            {
+                await ExportAsync(scan, directory);
+                var page = ReadRecords<ClassicPage>(Path.Join(directory, "classicpages.csv")).Single();
+                page.AssessmentStatus.Should().Be("Complete");
+                page.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+                page.WebPartCount.Should().Be(3);
+                page.MappingPercentage.Should().Be(100);
+                var discovery = ReadRecords<ClassicPageDiscovery>(Path.Join(directory, "discovery.csv")).Single();
+                discovery.AssessmentStatus.Should().Be("Complete");
+                discovery.ErrorStage.Should().Be("PageLayoutMetadata");
+                discovery.ErrorCodes.Should().Be("UnauthorizedAccessException");
+                discovery.ErrorDetail.Should().Contain("Layout denied");
+            }
+            finally { DeleteTempDir(directory); }
         }
 
         [Fact]

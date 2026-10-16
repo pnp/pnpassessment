@@ -525,6 +525,7 @@ namespace PnP.Scanning.Core.Scanners
             page.HomePage = found.HomePage ?? page.HomePage;
             page.DiscoveryStatus = found.DiscoveryStatus;
             page.AssessmentStatus = found.AssessmentStatus;
+            page.CustomizedPageStatus = found.CustomizedPageStatus;
         }
 
         internal static bool? ResolveHomePageState(string pageUrl, string welcomePage,
