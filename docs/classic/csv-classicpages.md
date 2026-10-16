@@ -4,6 +4,8 @@
 
 This csv file contains one row for every classic page (wiki, web part, publishing, blog or ASPX page) that was discovered and assessed, including its page-modernization-readiness columns.
 
+A page whose list item could not be read — a web's root `default.aspx` and other files that have no backing list item at all — is still assessed from its file alone: its web parts are read through the file's web part manager. The columns that come from the list item (`ListUrl`, `ListTitle`, `ListId`, `ListItemId`, `ModifiedAt`, `ModifiedBy`) are then empty rather than filled with a stand-in, and [discovery.csv](csv-discovery.md) records why in `ErrorCodes`.
+
 ## Columns
 
 The following columns are included:
@@ -28,7 +30,7 @@ HomePage | True when this page is the web's home (welcome) page, False when it i
 UncustomizedHomePage | True when this home page is still the default, uncustomized home page (only meaningful when `HomePage` is true)
 ModifiedBy | Display name of the user who last modified the page (empty when `--skipuserinformation` was specified)
 WebPartCount | Number of web parts found on the page
-MappingPercentage | Percentage (0-100) of the page's web parts that have a known modern mapping. A page with no web parts is reported as 100%
+MappingPercentage | Percentage (0-100) of the page's web parts that have a known modern mapping. A page with no web parts is reported as 100%, except for a page assessed from its file alone: only its web part zones were read, so an empty result is left uncomputed rather than scored as fully mappable. An uncomputed value is written as 0 — read it together with `WebPartCount`: `WebPartCount` 0 with 0% means the rollup was withheld, while any `WebPartCount` above 0 with 0% means the page's web parts genuinely have no known modern mapping
 UnmappedWebParts | Comma-separated list of the (short) web part type names on the page that do not have a known modern mapping
 RemediationCode | The remediation code for this page type (`CP1`-`CP5`)
 ScanId | Id of the assessment

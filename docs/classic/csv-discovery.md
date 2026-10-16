@@ -40,11 +40,12 @@ FolderUniqueId | Unique id of the owning or inspected folder when available.
 FileUniqueId | Unique id of the discovered file for Page rows when available.
 ListItemId | List item id of the discovered file when the page is list-backed.
 FileName | File name of the discovered page.
+SetupPath | The file's `vti_setuppath`: the on-disk template a ghosted file was provisioned from. Empty means the file is unghosted, so it is user authored or user uploaded.
 HomePage | True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
 ObservationMethod | API surface or adapter that observed the page or scope.
 DiscoveryStatus | Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on `RowType`. The Summary values and their conditions are defined in Summary coverage verdicts.
-AssessmentStatus | Page enrichment result: `Complete`, `NotSelected`, `NotApplicable` or `Failed`. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as `NotSelected`.
+AssessmentStatus | Page enrichment result: `Complete`, `NotSelected`, `NotApplicable` or `Failed`. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as `NotSelected`. A file whose list item could not be read is still assessed from the file alone, with the inapplicable item-dependent operations recorded in `ErrorCodes`: `list_association_absent` when the file belongs to no list, which is the normal state of a web-root file; `list_item_absent` for a confirmed absence of any backing item; `owning_list_unresolved` when the file names an owning list that was not matched in the web, which leaves the assessment `Failed` because the item metadata may exist and was simply unreachable; and `system_page_template` when `SetupPath` proves the file ghosts from the stock list view or list form template and therefore carries no page content of its own. The first two are confirmed structural absences and do not make the page a failure.
 ExpectedChildCount | Number of child scopes or objects expected when the source can provide a reliable count.
 ObservedChildCount | Number of child scopes or objects that were observed.
 ErrorStage | Discovery or assessment stage that produced an error or coverage gap.
