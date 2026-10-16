@@ -37,7 +37,3 @@ RemediationCode | The remediation code for this page type (`CP1`-`CP5`)
 ScanId | Id of the assessment
 SiteUrl | Fully qualified site collection URL
 WebUrl | Relative URL of this web
-
-Page-file and layout-file customization are independent. An out-of-the-box layout name does not establish either status. These fields do not replace `UncustomizedHomePage`, which identifies a default home page rather than file ghosting.
-
-Layout status is read once per distinct layout URL within each web assessment. Failed reads leave the status empty, retain the page and its web-part inventory, and record `PageLayoutMetadata` errors in `discovery.csv` with a failed page assessment. Existing scans remain empty for these new fields until pages are rescanned.
