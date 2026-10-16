@@ -56,6 +56,19 @@ namespace PnP.Scanning.Core.Scanners
         // The localized default home page resource (e.g. "Home") used to recognize an uncustomized STS#0 home page.
         private const string WikiHomePageResource = "$Resources:WikiPageHomePageName";
 
+        // Assessment stage recorded on a page whose list-item surface could not be opened.
+        private const string ItemMetadataStage = "PageItemMetadata";
+
+        // Three different facts, never collapsed into one. The first two are confirmed structural
+        // absences — a web-root file belongs to no list, and a file can exist without a backing item —
+        // while the third is a read gap: the file names an owning list the web did not return.
+        internal const string ListAssociationAbsentCode = "list_association_absent";
+        internal const string ListItemAbsentCode = "list_item_absent";
+        internal const string OwningListUnresolvedCode = "owning_list_unresolved";
+
+        // The file's vti_setuppath proves it ghosts from a stock list view/form template.
+        internal const string SystemPageTemplateCode = "system_page_template";
+
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext,
             IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {
@@ -107,9 +120,9 @@ namespace PnP.Scanning.Core.Scanners
                 var list = lists.FirstOrDefault(value => value.Id == row.ListId);
                 if (list == null || row.ListItemId == null)
                 {
-                    // Forms/Views and root files may not have a list item. Their physical
-                    // discovery is still valid; do not pretend that zero extracted WPs is a pass.
-                    row.AssessmentStatus = "NotApplicable";
+                    // Only the item-dependent reads are unavailable here, not the page itself: a file
+                    // still resolves by URL alone, so it is assessed at file level instead of skipped.
+                    AddFileLevelPage(discovery, row, IsOwningListUnresolved(row, listMatched: list != null));
                     continue;
                 }
                 try
@@ -138,9 +151,10 @@ namespace PnP.Scanning.Core.Scanners
             await discoveryWriter.UpdateExistingAsync(discoveredPages).ConfigureAwait(false);
 
             // Enrich the discovered classic pages with their web part inventory, mapping readiness, page
-            // layout and (for the home page) the uncustomized-home-page verdict. Only web part / wiki /
-            // publishing pages carry a transformable web part surface, so only those were captured for
-            // enrichment. Per-page failures are logged and skipped — a single bad page must not fail the web.
+            // layout and (for the home page) the uncustomized-home-page verdict. Captured for enrichment
+            // are the item-backed web part / wiki / publishing pages plus every page assessed from its
+            // file alone. Per-page failures are logged and skipped — a single bad page must not fail the
+            // web — and are recorded as a failure rather than as an empty web part inventory.
             List<ClassicPageWebPart> webPartsList = new();
             foreach (var input in enrichmentInputs)
             {
@@ -149,7 +163,10 @@ namespace PnP.Scanning.Core.Scanners
                     var pageWebParts = await ExtractWebPartsAsync(csomContext, input, options.ExportWebPartProperties).ConfigureAwait(false);
 
                     // Stamps IsMappable per web part + WebPartCount / MappingPercentage / UnmappedWebParts on the page.
-                    PageMappingCalculator.ApplyMapping(input.Page, pageWebParts, MappingManager);
+                    if (ShouldRollUpMapping(input, pageWebParts.Count))
+                    {
+                        PageMappingCalculator.ApplyMapping(input.Page, pageWebParts, MappingManager);
+                    }
 
                     webPartsList.AddRange(pageWebParts);
 
@@ -567,6 +584,115 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
+        // Assesses a discovered file whose list-item surface is unavailable, whether because the file is
+        // not list-backed at all, because it has no backing item, or because its owning list was not
+        // matched. What is lost is the item-dependent reads (item field values, ModifiedAt/ModifiedBy,
+        // WikiField, publishing fields), not the page: PageWebPartExtractor.ExtractFromWebPartPageAsync
+        // resolves the page through Web.GetFileByServerRelativeUrl and reads its LimitedWebPartManager,
+        // with no list item involved. Verified on a live tenant: a web's root default.aspx, newsfeed.aspx
+        // and GettingStarted.aspx belong to no list and have no list item, yet both their vti_setuppath
+        // and their web parts read from the file alone.
+        internal static void AddFileLevelPage(PageDiscovery disc, ClassicPageDiscovery row, bool owningListUnresolved)
+        {
+            // Recorded as separate limitations so the conditions stay distinguishable downstream.
+            if (owningListUnresolved)
+            {
+                AssessmentWebDiscovery.AddError(row, ItemMetadataStage, OwningListUnresolvedCode,
+                    "The file names an owning list that was not matched in this web, so its list-item association could not be read.");
+            }
+            else if (row.ListId == null)
+            {
+                AssessmentWebDiscovery.AddError(row, ItemMetadataStage, ListAssociationAbsentCode,
+                    "The file is not list-backed: no owning list is recorded, so no list-item surface exists to read.");
+            }
+            if (row.ListItemId == null)
+            {
+                AssessmentWebDiscovery.AddError(row, ItemMetadataStage, ListItemAbsentCode,
+                    "The file has no backing list item: item field values, ModifiedAt/ModifiedBy and WikiField are not applicable.");
+            }
+
+            var family = SetupPathClassifier.Classify(row.SetupPath);
+            string pageType = FileLevelPageType(family);
+            if (pageType == null)
+            {
+                // A server-recorded provisioning fact, not a guess from the URL or from an empty item:
+                // the file ghosts from the single view/form template every list provisions, so it is a
+                // system surface carrying no page content of its own.
+                AssessmentWebDiscovery.AddError(row, ItemMetadataStage, SystemPageTemplateCode,
+                    $"The file ghosts from the stock {family} template '{row.SetupPath}'.");
+                row.AssessmentStatus = "NotApplicable";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(row.Url) || !row.Url.StartsWith('/'))
+            {
+                // Everything below opens the page by URL alone, so without one there is no surface to read.
+                AssessmentWebDiscovery.AddError(row, ItemMetadataStage, DiscoveryGapCodes.IdentityMissing,
+                    "The discovered file has no server-relative URL, so no file-level page surface could be opened.");
+                row.AssessmentStatus = "Failed";
+                return;
+            }
+
+            var page = new ClassicPage
+            {
+                ScanId = row.ScanId,
+                SiteUrl = row.SiteUrl,
+                WebUrl = row.WebUrl,
+                PageUrl = row.Url,
+                PageName = Path.GetFileNameWithoutExtension(string.IsNullOrEmpty(row.FileName) ? row.Url : row.FileName),
+                SiteCollectionId = row.SiteCollectionId,
+                WebId = row.WebId,
+                FileUniqueId = row.FileUniqueId,
+                // ListId/ListItemId, ListUrl/ListTitle and the Modified* values come from the list item
+                // that was never read; they stay unset rather than being filled with a stand-in.
+                PageType = pageType,
+                HomePage = row.HomePage,
+                RemediationCode = (pageType == WebPartPage ? RemediationCodes.CP1 : RemediationCodes.CP5).ToString(),
+            };
+            row.PageType = pageType;
+            disc.Pages.Add(page);
+            disc.RemediationCodes.Add(page.RemediationCode);
+            disc.EnrichmentInputs.Add(new PageEnrichmentInput
+            {
+                Page = page,
+                FileLeafRef = row.FileName,
+                FileLevelOnly = true,
+            });
+
+            // Only an unmatched owning list leaves the page assessment incomplete — its item metadata may
+            // well exist and simply was not reachable. A confirmed-absent list association or item does
+            // not: everything that can be assessed about such a file is assessed here, with the
+            // inapplicable item-dependent operations recorded above.
+            row.AssessmentStatus = owningListUnresolved ? "Failed" : "Complete";
+        }
+
+        // Separates the two ways a file can reach the assessment without an owning list. A row with no
+        // ListId belongs to no list at all — the normal state of a web-root file, and a confirmed
+        // structural fact of the same class as a null ListItemId. Only a row that names a list the web's
+        // loaded (unfiltered) list set did not return is a genuine read gap. Collapsing the two fails
+        // exactly the web-root entry pages this route exists to assess.
+        internal static bool IsOwningListUnresolved(ClassicPageDiscovery row, bool listMatched) =>
+            row.ListId != null && !listMatched;
+
+        // Classifies a file-level page only as far as choosing an applicable extractor. The stock list
+        // view/form templates have no page content surface to read, a proven web part page template is
+        // reported as one (its zones and layout then read exactly), and anything else — an unghosted
+        // user-authored file or an unrecognised template such as SiteTemplates\STS\default.aspx — stays
+        // the residual ASPXPage and is still read, rather than being guessed into a system-page or wiki
+        // conclusion. Deciding what such a page is actually for is deliberately not done here.
+        internal static string FileLevelPageType(SetupPathPageFamily family) => family switch
+        {
+            SetupPathPageFamily.ListView or SetupPathPageFamily.ListForm => null,
+            SetupPathPageFamily.WebPartPage => WebPartPage,
+            _ => ASPXPage,
+        };
+
+        // The legacy "no web parts means 100% mappable" convention assumes a page's whole content surface
+        // was read. A file-level assessment reads only the file's web part zones, so an empty result there
+        // is not evidence that the page converts without loss; its readiness rollup is left uncomputed and
+        // the recorded item-metadata limitation carries the reason instead.
+        internal static bool ShouldRollUpMapping(PageEnrichmentInput input, int extractedWebParts) =>
+            extractedWebParts > 0 || !input.FileLevelOnly;
+
         private static void AddPublishingPage(PageDiscovery disc, PageEnrichmentInput input)
         {
             input.Page.RemediationCode = RemediationCodes.CP3.ToString();
@@ -580,8 +706,17 @@ namespace PnP.Scanning.Core.Scanners
 
         // Dispatches a discovered page to the right web part extractor. Web part / wiki / publishing
         // pages each have a dedicated CSOM extraction path; anything else yields no web parts.
-        private static async Task<List<ClassicPageWebPart>> ExtractWebPartsAsync(ClientContext csomContext, PageEnrichmentInput input, bool exportWebPartProperties)
+        internal static async Task<List<ClassicPageWebPart>> ExtractWebPartsAsync(ClientContext csomContext, PageEnrichmentInput input, bool exportWebPartProperties)
         {
+            // A file-level page has no list item, so there is no WikiField or publishing field to resolve
+            // placeholders against. The web part manager read is the one extractor that needs nothing but
+            // the file URL, so it is used whatever the page type: never the "no web parts" arm below,
+            // which would report an unread page as empty.
+            if (input.FileLevelOnly)
+            {
+                return await PageWebPartExtractor.ExtractFromWebPartPageAsync(csomContext, input.Page, exportWebPartProperties).ConfigureAwait(false);
+            }
+
             switch (input.Page.PageType)
             {
                 case WebPartPage:
@@ -875,7 +1010,7 @@ namespace PnP.Scanning.Core.Scanners
         }
 
         // Cross-cutting state threaded through the per-web page discovery branches.
-        private sealed class PageDiscovery
+        internal sealed class PageDiscovery
         {
             public ScannerBase ScannerBase { get; init; }
 
@@ -906,6 +1041,9 @@ namespace PnP.Scanning.Core.Scanners
             public string WikiFieldHtml { get; init; }
 
             public string FileLeafRef { get; init; }
+
+            // Set when the page was assessed from its file alone because no list item was readable.
+            public bool FileLevelOnly { get; init; }
         }
     }
 }

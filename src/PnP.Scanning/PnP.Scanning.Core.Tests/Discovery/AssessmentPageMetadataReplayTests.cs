@@ -171,6 +171,26 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     }
 
     [Fact]
+    public async Task Item_backed_page_keeps_its_list_identity_and_its_item_sourced_extraction()
+    {
+        // The file-level route exists only for files whose list item cannot be read. A page that does
+        // have one must still take the item path: full list identity, the item's wiki HTML, and an
+        // enrichment input that dispatches on page type rather than on the file-level web part read.
+        var fixture = new MetadataFixture(Guid.NewGuid(), "WikiPages/wiki.aspx", new() { ["WikiField"] = "<p>body</p>" });
+
+        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+
+        loaded.FileLevelOnly.Should().BeFalse();
+        loaded.WikiFieldHtml.Should().Be("<p>body</p>");
+        loaded.Page.PageType.Should().Be("WikiPage");
+        loaded.Page.ListId.Should().Be(fixture.Row.ListId.Value);
+        loaded.Page.ListTitle.Should().Be("WikiPages");
+        loaded.Page.ListUrl.Should().Be(Web + "/WikiPages");
+        PageScanComponent.ShouldRollUpMapping(loaded, 0).Should().BeTrue();
+        fixture.Row.ErrorCodes.Should().BeNullOrEmpty("no item-metadata limitation applies to a page with an item");
+    }
+
+    [Fact]
     public async Task Publishing_type_can_fall_back_to_discovered_content_type()
     {
         var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/enterprise.aspx", new());
