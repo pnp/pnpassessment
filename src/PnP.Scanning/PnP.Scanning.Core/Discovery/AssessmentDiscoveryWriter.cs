@@ -47,6 +47,7 @@ internal sealed class AssessmentDiscoveryWriter
                         row.ListItemId ??= previous.ListItemId;
                         row.ContentTypeId ??= previous.ContentTypeId;
                         row.PageType ??= previous.PageType;
+                        row.SetupPath ??= previous.SetupPath;
                         row.HomePage ??= previous.HomePage;
                         row.LibraryHidden ??= previous.LibraryHidden;
                         row.AssessmentStatus ??= previous.AssessmentStatus;

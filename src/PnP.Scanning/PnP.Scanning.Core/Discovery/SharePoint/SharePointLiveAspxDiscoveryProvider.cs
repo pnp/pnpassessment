@@ -14,7 +14,10 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl";
     private const string FormsSelect = "Id,ServerRelativeUrl,FormType";
     private const string ViewsSelect = "Id,ServerRelativeUrl,Hidden,DefaultView,PersonalView,Title";
-    private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId,Length";
+    private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId,Length,Properties";
+    private const string FilesExpand = "ListItemAllFields,Properties";
+    // REST encodes the '_' of a property bag name as '_x005f_', so vti_setuppath arrives under this name.
+    private const string RestSetupPathProperty = "vti_x005f_setuppath";
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
     private readonly SharePointLiveAspxDiscoveryOptions options;
     private readonly ISharePointAspxRestClientFactory clientFactory;
@@ -243,6 +246,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                     HomePage: IsHomePage(scope, item.ServerRelativeUrl),
                     LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
                     CustomizedPageStatusRaw: item.CustomizedPageStatus,
+                    SetupPath: item.SetupPath,
                     ObservationMethod: modeled.Provider + ":" + modeled.Operation,
                     WelcomePageStatus: HomePageStatus(scope, item.ServerRelativeUrl),
                     SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
@@ -256,7 +260,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 yield break;
             }
         }
-        var endpoint = FolderEndpoint(scope, "Files", FilesSelect, "ListItemAllFields");
+        var endpoint = FolderEndpoint(scope, "Files", FilesSelect, FilesExpand);
         var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
             "files:" + scope.ScopeKey, endpoint, FilesSelect, string.Empty,
             AspxSurfaceApplicability.Applicable, scope.Role == "physical-forms"
@@ -280,6 +284,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 PageType: InferPageType(NestedString(item, "ListItemAllFields", "ContentTypeId")),
                 LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
                 CustomizedPageStatusRaw: PropertyString(item, "CustomizedPageStatus"),
+                SetupPath: NestedString(item, "Properties", RestSetupPathProperty),
                 ObservationMethod: "SharePoint REST folder files",
                 WelcomePageStatus: HomePageStatus(scope, PropertyString(item, "ServerRelativeUrl")),
                 SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
@@ -553,7 +558,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var observed = files ? result.Files.Count : result.Folders.Count;
         var known = result.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty;
         var outcome = known && observed == 0 ? DiscoveryTerminalOutcome.Empty : result.Outcome;
-        var select = files ? "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus"
+        var select = files ? "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,Properties"
             : "UniqueId,Name,ServerRelativeUrl";
         var surfaceId = (files ? "web-root-files:" : "web-root-folders:") + scope.ScopeKey;
         var row = SurfaceRow(scope.ScopeKey, scope.ParentScopeKey, surfaceId, scope.FolderUrl,

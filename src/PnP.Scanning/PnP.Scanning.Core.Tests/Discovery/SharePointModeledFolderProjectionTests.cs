@@ -88,11 +88,22 @@ public sealed class SharePointModeledFolderProjectionTests
             return proxy;
         }
 
-        protected override object Invoke(MethodInfo targetMethod, object[] args) =>
-            targetMethod.Name.StartsWith("get_", StringComparison.Ordinal) &&
-            values.TryGetValue(targetMethod.Name[4..], out var value)
-                ? value
-                : throw new NotSupportedException(targetMethod.Name);
+        protected override object Invoke(MethodInfo targetMethod, object[] args)
+        {
+            // The projection asks whether an optional property was expanded before reading it, so
+            // the proxy answers from whichever values this instance was given.
+            if (targetMethod.Name == nameof(IDataModel<TModel>.IsPropertyAvailable))
+                return MemberName(args[0] as LambdaExpression) is string member && values.ContainsKey(member);
+
+            return targetMethod.Name.StartsWith("get_", StringComparison.Ordinal) &&
+                values.TryGetValue(targetMethod.Name[4..], out var value)
+                    ? value
+                    : throw new NotSupportedException(targetMethod.Name);
+        }
+
+        private static string MemberName(LambdaExpression expression) =>
+            (expression?.Body is UnaryExpression unary ? unary.Operand : expression?.Body)
+                is MemberExpression member ? member.Member.Name : null;
     }
 
     /// <summary>

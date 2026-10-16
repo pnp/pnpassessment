@@ -90,7 +90,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "AlertId")
                         .IsUnique();
 
-                    b.ToTable("Alerts");
+                    b.ToTable("Alerts", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Cache", b =>
@@ -109,7 +109,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "Key")
                         .IsUnique();
 
-                    b.ToTable("Cache");
+                    b.ToTable("Cache", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicACSPrincipal", b =>
@@ -155,7 +155,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "AppIdentifier")
                         .IsUnique();
 
-                    b.ToTable("ClassicACSPrincipals");
+                    b.ToTable("ClassicACSPrincipals", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicACSPrincipalSite", b =>
@@ -174,7 +174,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "AppIdentifier", "ServerRelativeUrl")
                         .IsUnique();
 
-                    b.ToTable("classicACSPrincipalSites");
+                    b.ToTable("classicACSPrincipalSites", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicACSPrincipalSiteScopedPermissions", b =>
@@ -208,7 +208,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "AppIdentifier", "ServerRelativeUrl", "SiteId", "WebId", "ListId", "Right")
                         .IsUnique();
 
-                    b.ToTable("ClassicACSPrincipalSiteScopedPermissions");
+                    b.ToTable("ClassicACSPrincipalSiteScopedPermissions", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicACSPrincipalTenantScopedPermissions", b =>
@@ -239,7 +239,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "AppIdentifier", "ProductFeature", "Scope", "Right", "ResourceId")
                         .IsUnique();
 
-                    b.ToTable("ClassicACSPrincipalTenantScopedPermissions");
+                    b.ToTable("ClassicACSPrincipalTenantScopedPermissions", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicAddIn", b =>
@@ -342,7 +342,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "AppInstanceId")
                         .IsUnique();
 
-                    b.ToTable("ClassicAddIns");
+                    b.ToTable("ClassicAddIns", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicExtensibility", b =>
@@ -388,7 +388,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl")
                         .IsUnique();
 
-                    b.ToTable("ClassicExtensibilities");
+                    b.ToTable("ClassicExtensibilities", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicInfoPath", b =>
@@ -434,7 +434,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
                         .IsUnique();
 
-                    b.ToTable("ClassicInfoPath");
+                    b.ToTable("ClassicInfoPath", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicList", b =>
@@ -486,7 +486,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
                         .IsUnique();
 
-                    b.ToTable("ClassicLists");
+                    b.ToTable("ClassicLists", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPage", b =>
@@ -568,7 +568,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl")
                         .IsUnique();
 
-                    b.ToTable("ClassicPages");
+                    b.ToTable("ClassicPages", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPageAuditUsage", b =>
@@ -611,7 +611,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.HasKey("ScanId", "SiteUrl", "PageUrl");
 
-                    b.ToTable("ClassicPageAuditUsages");
+                    b.ToTable("ClassicPageAuditUsages", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPageDiscovery", b =>
@@ -638,10 +638,10 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ErrorDetail")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EvidenceJson")
+                    b.Property<string>("ErrorStage")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ErrorStage")
+                    b.Property<string>("EvidenceJson")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("ExpectedChildCount")
@@ -690,6 +690,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ScopeType")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SetupPath")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("SiteCollectionId")
                         .HasColumnType("TEXT");
 
@@ -709,7 +712,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl");
 
-                    b.ToTable("ClassicPageDiscoveries");
+                    b.ToTable("ClassicPageDiscoveries", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPageWebPart", b =>
@@ -767,7 +770,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "PageUrl", "WebPartIndex")
                         .IsUnique();
 
-                    b.ToTable("ClassicPageWebParts");
+                    b.ToTable("ClassicPageWebParts", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicPublishingSiteSummary", b =>
@@ -801,7 +804,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl")
                         .IsUnique();
 
-                    b.ToTable("ClassicPublishingSiteSummaries");
+                    b.ToTable("ClassicPublishingSiteSummaries", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicSiteSummary", b =>
@@ -892,7 +895,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl")
                         .IsUnique();
 
-                    b.ToTable("ClassicSiteSummaries");
+                    b.ToTable("ClassicSiteSummaries", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicUserCustomAction", b =>
@@ -962,7 +965,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "Id")
                         .IsUnique();
 
-                    b.ToTable("ClassicUserCustomActions");
+                    b.ToTable("ClassicUserCustomActions", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebPartUnique", b =>
@@ -984,7 +987,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "WebPartType")
                         .IsUnique();
 
-                    b.ToTable("ClassicWebPartUniques");
+                    b.ToTable("ClassicWebPartUniques", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicWebSummary", b =>
@@ -1096,7 +1099,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl")
                         .IsUnique();
 
-                    b.ToTable("ClassicWebSummaries");
+                    b.ToTable("ClassicWebSummaries", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.History", b =>
@@ -1122,7 +1125,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "Event", "EventDate")
                         .IsUnique();
 
-                    b.ToTable("History");
+                    b.ToTable("History", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Property", b =>
@@ -1144,7 +1147,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "Name")
                         .IsUnique();
 
-                    b.ToTable("Properties");
+                    b.ToTable("Properties", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Scan", b =>
@@ -1209,7 +1212,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.HasKey("ScanId");
 
-                    b.ToTable("Scans");
+                    b.ToTable("Scans", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SiteCollection", b =>
@@ -1243,7 +1246,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl")
                         .IsUnique();
 
-                    b.ToTable("SiteCollections");
+                    b.ToTable("SiteCollections", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexContentType", b =>
@@ -1291,7 +1294,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId")
                         .IsUnique();
 
-                    b.ToTable("SyntexContentTypes");
+                    b.ToTable("SyntexContentTypes", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexContentTypeField", b =>
@@ -1337,7 +1340,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "ContentTypeId", "FieldId")
                         .IsUnique();
 
-                    b.ToTable("SyntexContentTypeFields");
+                    b.ToTable("SyntexContentTypeFields", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexContentTypeSummary", b =>
@@ -1404,7 +1407,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "ContentTypeId")
                         .IsUnique();
 
-                    b.ToTable("SyntexContentTypeOverview");
+                    b.ToTable("SyntexContentTypeOverview", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexField", b =>
@@ -1447,7 +1450,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "FieldId")
                         .IsUnique();
 
-                    b.ToTable("SyntexFields");
+                    b.ToTable("SyntexFields", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexFileType", b =>
@@ -1477,7 +1480,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId", "FileType")
                         .IsUnique();
 
-                    b.ToTable("SyntexFileTypes");
+                    b.ToTable("SyntexFileTypes", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexList", b =>
@@ -1571,7 +1574,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "ListId")
                         .IsUnique();
 
-                    b.ToTable("SyntexLists");
+                    b.ToTable("SyntexLists", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexModelUsage", b =>
@@ -1613,7 +1616,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "Classifier", "TargetSiteId", "TargetWebId", "TargetListId");
 
-                    b.ToTable("SyntexModelUsage");
+                    b.ToTable("SyntexModelUsage", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.SyntexTermSet", b =>
@@ -1635,7 +1638,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "TermSetId")
                         .IsUnique();
 
-                    b.ToTable("SyntexTermSets");
+                    b.ToTable("SyntexTermSets", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.TempClassicACSPrincipal", b =>
@@ -1675,7 +1678,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "AppIdentifier", "ServerRelativeUrl")
                         .IsUnique();
 
-                    b.ToTable("TempClassicACSPrincipals");
+                    b.ToTable("TempClassicACSPrincipals", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.TempClassicACSPrincipalValidUntil", b =>
@@ -1694,31 +1697,39 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "AppIdentifier")
                         .IsUnique();
 
-                    b.ToTable("TempClassicACSPrincipalValidUntils");
+                    b.ToTable("TempClassicACSPrincipalValidUntils", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.TestDelay", b =>
                 {
                     b.Property<Guid>("ScanId")
                         .HasColumnType("TEXT");
+
                     b.Property<string>("SiteUrl")
                         .HasColumnType("TEXT");
+
                     b.Property<string>("WebUrl")
                         .HasColumnType("TEXT");
+
                     b.Property<int>("Delay1")
                         .HasColumnType("INTEGER");
+
                     b.Property<int>("Delay2")
                         .HasColumnType("INTEGER");
+
                     b.Property<int>("Delay3")
                         .HasColumnType("INTEGER");
+
                     b.Property<string>("WebIdString")
                         .HasColumnType("TEXT");
+
                     b.HasKey("ScanId", "SiteUrl", "WebUrl");
+
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl")
                         .IsUnique();
-                    b.ToTable("TestDelays");
-                });
 
+                    b.ToTable("TestDelays", (string)null);
+                });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Web", b =>
                 {
@@ -1760,7 +1771,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl")
                         .IsUnique();
 
-                    b.ToTable("Webs");
+                    b.ToTable("Webs", (string)null);
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Workflow", b =>
@@ -1869,7 +1880,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.HasIndex("ScanId", "SiteUrl", "WebUrl", "DefinitionId", "SubscriptionId")
                         .IsUnique();
 
-                    b.ToTable("Workflows");
+                    b.ToTable("Workflows", (string)null);
                 });
 #pragma warning restore 612, 618
         }
