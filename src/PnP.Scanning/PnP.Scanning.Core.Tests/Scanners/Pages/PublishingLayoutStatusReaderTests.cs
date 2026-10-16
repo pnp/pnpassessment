@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -123,25 +124,72 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     }
 
     [Fact]
-    public async Task Conflicting_discovery_statuses_are_reported_without_selecting_one_or_fetching_again()
+    public async Task Discovery_query_only_materializes_referenced_layouts_and_publishing_pages()
     {
         var scan = Guid.NewGuid();
         using var db = fixture.CreateContext();
-        var page = StoredPage(scan, "/first", LayoutUrl);
-        db.ClassicPages.Add(page);
-        db.ClassicPageDiscoveries.AddRange(
-            Discovered(scan, LayoutUrl, "Uncustomized"), Discovered(scan, LayoutUrl, "Customized"));
+        var page = StoredPage(scan, "/first", "https://contoso.sharepoint.com" + LayoutUrl.ToLowerInvariant());
+        var invalid = StoredPage(scan, "/second", "/sites/other/_catalogs/masterpage/Basic.aspx");
+        db.ClassicPages.AddRange(page, invalid);
+        var layout = Discovered(scan, LayoutUrl, "Uncustomized");
+        var pageRow = Discovered(scan, page.PageUrl, "Customized");
+        pageRow.WebUrl = page.WebUrl;
+        var invalidRow = Discovered(scan, invalid.PageUrl.ToUpperInvariant(), "Customized");
+        invalidRow.WebUrl = invalid.WebUrl;
+        db.ClassicPageDiscoveries.AddRange(layout, pageRow, invalidRow,
+            Discovered(scan, invalid.LayoutUrl, "Customized"));
+        db.ClassicPageDiscoveries.AddRange(Enumerable.Range(0, 2000).Select(index =>
+            Discovered(scan, $"/sites/a/unrelated/{index}.aspx", "Uncustomized")));
         await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
         var errors = new List<Exception>();
 
         await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            _ => throw new InvalidOperationException("Conflicting observations should not trigger a request"),
+            _ => throw new InvalidOperationException("No fallback should be needed"),
             (error, _) => errors.Add(error));
 
-        errors.Should().ContainSingle().Which.Should().BeOfType<InvalidDataException>()
-            .Which.Message.Should().Contain("conflicting");
-        page.LayoutCustomizedPageStatus.Should().BeNull();
-        page.AssessmentStatus.Should().Be("Complete");
+        errors.Should().ContainSingle().Which.Should().BeOfType<InvalidDataException>();
+        db.ChangeTracker.Entries<ClassicPageDiscovery>().Select(entry => entry.Entity.RecordKey)
+            .Should().BeEquivalentTo(new[] { layout.RecordKey, pageRow.RecordKey, invalidRow.RecordKey });
+        (await db.ClassicPages.SingleAsync(value => value.ScanId == scan && value.PageUrl == page.PageUrl))
+            .LayoutCustomizedPageStatus.Should().Be("Uncustomized");
+        (await db.ClassicPageDiscoveries.FindAsync(scan, invalidRow.RecordKey))
+            .ErrorStage.Should().Be("PageLayoutMetadata");
+    }
+
+    [Theory]
+    [InlineData("Uncustomized", "Customized")]
+    [InlineData("Customized", "Uncustomized")]
+    [InlineData("Customized", "None")]
+    public async Task Conflicting_discovery_retains_latest_status_and_records_changed_during_scan(string previous, string current)
+    {
+        var scan = Guid.NewGuid();
+        using var db = fixture.CreateContext();
+        db.ClassicPages.AddRange(StoredPage(scan, "/first", LayoutUrl),
+            StoredPage(scan, "/second", "https://contoso.sharepoint.com" + LayoutUrl));
+        var older = Discovered(scan, LayoutUrl, previous);
+        older.ObservedAtUtc = new DateTime(2026, 10, 16, 1, 0, 0, DateTimeKind.Utc);
+        var latest = Discovered(scan, "https://contoso.sharepoint.com" + LayoutUrl, current);
+        latest.ObservedAtUtc = older.ObservedAtUtc.AddMinutes(1);
+        latest.ErrorCodes = "existing_evidence";
+        db.ClassicPageDiscoveries.AddRange(latest, older);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+            _ => throw new InvalidOperationException("Conflicting observations should not trigger a request"),
+            (error, _) => throw new InvalidOperationException("Discovery changes are not layout failures", error));
+
+        db.ChangeTracker.Clear();
+        var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
+        pages.Should().HaveCount(2).And.OnlyContain(page =>
+            page.LayoutCustomizedPageStatus == current && page.AssessmentStatus == "Complete");
+        var saved = await db.ClassicPageDiscoveries.FindAsync(scan, latest.RecordKey);
+        saved.CustomizedPageStatus.Should().Be(current);
+        saved.DiscoveryStatus.Should().Be("Discovered");
+        saved.ErrorStage.Should().Be("DiscoveryMetadata");
+        saved.ErrorCodes.Should().Contain(DiscoveryGapCodes.ChangedDuringScan).And.Contain("existing_evidence");
+        saved.ErrorDetail.Should().Contain("latest observed value " + current);
     }
 
     [Theory]

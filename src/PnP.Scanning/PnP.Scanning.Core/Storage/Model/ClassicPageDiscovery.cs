@@ -28,6 +28,12 @@ internal sealed class ClassicPageDiscovery : BaseScanResult
     [Ignore]
     public string ContentTypeId { get; set; }
 
+    /// <summary>
+    /// The file's <c>vti_setuppath</c> value: the on-disk template a ghosted file was provisioned from.
+    /// Empty means the file is unghosted (user authored or uploaded).
+    /// </summary>
+    public string SetupPath { get; set; }
+
     public bool? HomePage { get; set; }
     public bool? LibraryHidden { get; set; }
     public string ObservationMethod { get; set; }

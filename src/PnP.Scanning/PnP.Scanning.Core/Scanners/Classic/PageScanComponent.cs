@@ -86,22 +86,10 @@ namespace PnP.Scanning.Core.Scanners
             var lists = context.Web.Lists.AsRequested().ToList();
             var discoveryWriter = new AssessmentDiscoveryWriter(scannerBase.ScanId);
 
-            if (scannerBase.WebTemplate == "BLOG#0")
-            {
-                // Load the blog pages library
-                var blogList = lists.FirstOrDefault(l => l.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.Posts);
-                if (blogList != null)
-                {
-                    // Load the blog pages
-                    await QueryListAsync(blogList, PageQuery(new List<string> { }, filterOnASPXPages: false), (IEnumerable<IListItem> listItems) =>
-                    {
-                        foreach (var listItem in listItems)
-                        {
-                            AddBlogPage(discovery, blogList, listItem);
-                        }
-                    }).ConfigureAwait(false);
-                }
-            }
+            // Pages that own no .aspx file of their own: a list item rendered through a shared display
+            // form as "<displayForm>?ID=<n>" (blog posts are the canonical case). The physical discovery
+            // provider cannot see these because they have no document row to enumerate.
+            await AddDisplayFormPagesAsync(discovery, context, lists, discoveryWriter).ConfigureAwait(false);
             // The provider has already found the physical pages in the requested page scope. Do not
             // rediscover selected libraries or gate their existence on publishing features/template.
             foreach (var row in discoveredPages)
@@ -198,7 +186,7 @@ namespace PnP.Scanning.Core.Scanners
                 foreach (var page in pagesList)
                 {
                     var found = discoveredPages.FirstOrDefault(row => string.Equals(row.Url, page.PageUrl, StringComparison.OrdinalIgnoreCase));
-                    if (found == null) continue; // Blog posts are list items, not physical ASPX files.
+                    if (found == null) continue; // Display form pages are list items, not physical ASPX files.
                     ApplyDiscoveryState(page, found);
                 }
                 await scannerBase.StorageManager.StorePageInformationAsync(scannerBase.ScanId, pagesList);
@@ -242,34 +230,235 @@ namespace PnP.Scanning.Core.Scanners
                                                                    discovery.ModernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
         }
 
-        private static void AddBlogPage(PageDiscovery disc, IList blogList, IListItem listItem)
+        // Discovers the pages that exist only as a list item. Such an item has no file of its own; it is
+        // rendered through a shared display form with its id in the query string, so one physical form
+        // file serves N pages and the page identity is (ListId, ItemId) rather than a file. SharePoint
+        // resolves that form in two tiers (ListFormWebPart.ComputeServerRelativePageUrl): the item's
+        // content type DisplayFormUrl when it is set, otherwise the list's DefaultDisplayFormUrl. Neither
+        // the web template nor the list template takes part in that resolution, so neither gates this.
+        private static async Task AddDisplayFormPagesAsync(PageDiscovery disc, PnPContext context, List<IList> lists,
+            AssessmentDiscoveryWriter discoveryWriter)
         {
-            string pageUrl = GetFieldValue(listItem, FileRefField, $"{listItem.Id}");
-            var homePage = ResolveHomePageState(pageUrl, disc.WelcomePage, disc.WelcomePageKnown, null);
+            // The two roots a form URL token can be relative to. The web comes from the context URI, which
+            // the SDK always sets; Site.Url is not loaded by default, so the site collection root is taken
+            // from the scan's own site URL instead of triggering an extra server call per web.
+            string webServerRelativeUrl = context.Uri.AbsolutePath;
+            string siteServerRelativeUrl = Uri.TryCreate(disc.ScannerBase.SiteUrl, UriKind.Absolute, out Uri siteUri)
+                ? siteUri.AbsolutePath
+                : webServerRelativeUrl;
 
-            if (disc.HomePageOnly && homePage != true)
+            foreach (var list in lists)
             {
-                return;
+                // This route's premise is that the items have no file of their own. A document library
+                // violates it: its items are files, already inventoried by the physical discovery with a
+                // real FileUniqueId, and its DispForm.aspx shows an item's metadata form rather than page
+                // content. Skipped before resolving a form or querying any item.
+                if (list.BaseType == PnP.Core.Model.SharePoint.ListBaseType.DocumentLibrary)
+                {
+                    continue;
+                }
+
+                // Ordered longest content type id first so the most specific type in the id hierarchy wins.
+                var contentTypeForms = list.ContentTypes.AsRequested()
+                    .Where(contentType => !string.IsNullOrEmpty(contentType.Id))
+                    .Select(contentType => (ContentTypeId: contentType.Id, FormUrl: ToServerRelativeFormUrl(
+                        contentType.DisplayFormUrl, webServerRelativeUrl, siteServerRelativeUrl)))
+                    .Where(candidate => candidate.FormUrl != null)
+                    .OrderByDescending(candidate => candidate.ContentTypeId.Length)
+                    .ToList();
+                string listForm = ToServerRelativeFormUrl(list.DefaultDisplayFormUrl, webServerRelativeUrl,
+                    siteServerRelativeUrl);
+
+                // A list whose every candidate form is the stock list form holds ordinary data rows
+                // (announcements, tasks, contacts) viewed through a system form, not content pages.
+                // Enumerating those would report every list item in the tenant as a page.
+                if (!contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm).Any(IsContentPageForm))
+                {
+                    continue;
+                }
+
+                var rows = new List<ClassicPageDiscovery>();
+                await QueryListAsync(list, PageQuery(new List<string> { }, filterOnASPXPages: false), (IEnumerable<IListItem> listItems) =>
+                {
+                    foreach (var listItem in listItems)
+                    {
+                        string displayForm = ResolveDisplayFormUrl(contentTypeForms, listForm,
+                            GetFieldValue(listItem, ContentTypeIdField, string.Empty));
+                        if (!IsContentPageForm(displayForm))
+                        {
+                            continue;
+                        }
+
+                        rows.Add(AddDisplayFormPage(disc, list, listItem, displayForm));
+                    }
+                }).ConfigureAwait(false);
+
+                if (rows.Count > 0)
+                {
+                    await discoveryWriter.WriteAsync(rows).ConfigureAwait(false);
+                }
+            }
+        }
+
+        // Records one item-only page: the ClassicPage row the report consumes plus the ClassicPageDiscovery
+        // row that carries it through the coverage/evidence model like every physically discovered page.
+        private static ClassicPageDiscovery AddDisplayFormPage(PageDiscovery disc, IList list, IListItem listItem,
+            string displayFormUrl)
+        {
+            string pageUrl = $"{displayFormUrl}?ID={listItem.Id}";
+            // A list display form is never the web's welcome page, so --homepageonly deliberately keeps
+            // none of these pages: a web's welcome page is always a physical file.
+            var homePage = ResolveHomePageState(pageUrl, disc.WelcomePage, disc.WelcomePageKnown, null);
+            bool selected = !disc.HomePageOnly || homePage == true;
+            bool blogPost = list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.Posts;
+            string pageType = blogPost ? BlogPage : ASPXPage;
+            string remediationCode = (blogPost ? RemediationCodes.CP4 : RemediationCodes.CP5).ToString();
+
+            if (selected)
+            {
+                disc.Pages.Add(new ClassicPage
+                {
+                    ScanId = disc.ScannerBase.ScanId,
+                    SiteUrl = disc.ScannerBase.SiteUrl,
+                    WebUrl = disc.ScannerBase.WebUrl,
+                    PageUrl = pageUrl,
+                    PageName = GetFieldValue(listItem, TitleField, ""),
+                    ListUrl = list.RootFolder.ServerRelativeUrl,
+                    ListTitle = list.Title,
+                    ListId = list.Id,
+                    ListItemId = listItem.Id,
+                    ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
+                    ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
+                    PageType = pageType,
+                    HomePage = homePage,
+                    DiscoveryStatus = "Discovered",
+                    AssessmentStatus = "Complete",
+                    RemediationCode = remediationCode,
+                });
+
+                disc.RemediationCodes.Add(remediationCode);
             }
 
-            disc.Pages.Add(new ClassicPage
+            // The web parts of such a page live on the shared display form, not on the item, so there is
+            // no per-item web part inventory to extract: these pages are not added to EnrichmentInputs.
+            return new ClassicPageDiscovery
             {
                 ScanId = disc.ScannerBase.ScanId,
                 SiteUrl = disc.ScannerBase.SiteUrl,
                 WebUrl = disc.ScannerBase.WebUrl,
-                PageUrl = pageUrl,
-                PageName = GetFieldValue(listItem, TitleField, ""),
-                ListUrl = blogList.RootFolder.ServerRelativeUrl,
-                ListTitle = blogList.Title,
-                ListId = blogList.Id,
-                ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
-                PageType = BlogPage,
+                RecordKey = "page:" + DiscoveryHash.Of(disc.ScannerBase.SiteUrl?.ToLowerInvariant(),
+                    disc.ScannerBase.WebUrl?.ToLowerInvariant(), list.Id.ToString("D") + ":" +
+                    listItem.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                RowType = "Page",
+                ScopeType = "ListItem",
+                Url = pageUrl,
+                FileName = Path.GetFileName(displayFormUrl),
+                ListId = list.Id,
+                ListItemId = listItem.Id,
+                ContentTypeId = GetFieldValue<string>(listItem, ContentTypeIdField),
                 HomePage = homePage,
-                RemediationCode = RemediationCodes.CP4.ToString(),
-            });
+                PageType = pageType,
+                LibraryHidden = list.Hidden,
+                ObservationMethod = DiscoverySourceKind.ListItemDisplayFormPages.ToString(),
+                DiscoveryStatus = "Discovered",
+                AssessmentStatus = selected ? "Complete" : "NotSelected",
+                ObservedAtUtc = DateTime.UtcNow,
+            };
+        }
 
-            disc.RemediationCodes.Add(RemediationCodes.CP4.ToString());
+        private static string ResolveDisplayFormUrl(List<(string ContentTypeId, string FormUrl)> contentTypeForms,
+            string listForm, string itemContentTypeId)
+        {
+            if (!string.IsNullOrEmpty(itemContentTypeId))
+            {
+                foreach (var candidate in contentTypeForms)
+                {
+                    if (itemContentTypeId.StartsWith(candidate.ContentTypeId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return candidate.FormUrl;
+                    }
+                }
+            }
+
+            return listForm;
+        }
+
+        internal static bool IsContentPageForm(string formUrl) => formUrl != null && !IsStockListForm(formUrl);
+
+        // Heuristic. The server truth is the form's ghosted setup path ("pages\form.aspx"), which the list
+        // and content type APIs do not expose; the client only sees the resolved form URL. A stock form is
+        // therefore recognized by its leaf name or by living under _layouts. The limitation is twofold: a
+        // customized form that kept the name DispForm.aspx is treated as stock (its items are skipped), and
+        // a stock form reached through a content type override that renamed it is treated as a content page.
+        // Because a list's own DefaultDisplayFormUrl is DispForm.aspx for all but a handful of templates,
+        // the content type tier is in practice the only one that ever names a content page form, which is
+        // why its URL must be normalized rather than discarded. This becomes exact once the form file's
+        // setup path is collected: a form still ghosted to "pages\form.aspx" is the stock form regardless
+        // of its name, and anything else is a real page.
+        internal static bool IsStockListForm(string formUrl)
+        {
+            string path = formUrl.Split('?')[0];
+            return path.Contains("/_layouts/", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(Path.GetFileName(path), "DispForm.aspx", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // "~sitecollectionlayouts/" is tested before "~sitecollection/" because it also starts with it.
+        private static readonly (string Token, bool SiteScoped, bool Layouts)[] FormUrlTokens =
+        {
+            ("~sitecollectionlayouts/", true, true),
+            ("~sitecollection/", true, false),
+            ("~layouts/", false, true),
+            ("~site/", false, false),
+        };
+
+        private const string LayoutsFolder = "_layouts/15";
+
+        // The two display form tiers are not stored in the same shape. A list's DefaultDisplayFormUrl comes
+        // back server-relative (occasionally absolute), but a content type's DisplayFormUrl is returned
+        // exactly as the content type definition wrote it: web-relative ("Lists/Posts/Post.aspx", the stock
+        // blog Post content type) or behind one of the tokens ListFormWebPart.ComputeServerRelativePageUrl
+        // expands. Both are normalized to a server-relative URL here so the tiers can be compared, matched
+        // against the stock form and stored as one page location. An unrecognized token is not a path, so it
+        // yields null instead of a guessed location.
+        internal static string ToServerRelativeFormUrl(string formUrl, string webServerRelativeUrl,
+            string siteServerRelativeUrl)
+        {
+            if (string.IsNullOrWhiteSpace(formUrl))
+            {
+                return null;
+            }
+
+            string value = formUrl.Trim();
+
+            if (Uri.TryCreate(value, UriKind.Absolute, out Uri absolute) &&
+                (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps))
+            {
+                return absolute.AbsolutePath;
+            }
+
+            if (value.StartsWith('/'))
+            {
+                return value;
+            }
+
+            foreach (var token in FormUrlTokens)
+            {
+                if (value.StartsWith(token.Token, StringComparison.OrdinalIgnoreCase))
+                {
+                    string root = token.SiteScoped ? siteServerRelativeUrl : webServerRelativeUrl;
+                    return CombineServerRelative(token.Layouts ? CombineServerRelative(root, LayoutsFolder) : root,
+                        value[token.Token.Length..]);
+                }
+            }
+
+            return value.StartsWith('~') ? null : CombineServerRelative(webServerRelativeUrl, value);
+        }
+
+        private static string CombineServerRelative(string root, string relative)
+        {
+            string left = string.IsNullOrWhiteSpace(root) ? string.Empty : root.TrimEnd('/');
+            string right = relative.TrimStart('/');
+            return right.Length == 0 ? (left.Length == 0 ? "/" : left) : $"{left}/{right}";
         }
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection

@@ -31,6 +31,7 @@ namespace PnP.Scanning.Core.Tests.Storage
             using var context = new ScanContext(options);
             var migrator = context.GetService<IMigrator>();
             var previous = context.Database.GetMigrations().Last(name => !name.EndsWith("_PageCustomizationStatus"));
+            context.Database.GetMigrations().Last().Should().EndWith("_PageCustomizationStatus");
             await migrator.MigrateAsync(previous);
             var scan = Guid.NewGuid();
             var list = Guid.NewGuid();
@@ -39,6 +40,12 @@ namespace PnP.Scanning.Core.Tests.Storage
                 INSERT INTO ClassicPages
                     (ScanId, SiteUrl, WebUrl, PageUrl, ListId, ModifiedAt, UncustomizedHomePage, WebPartCount, MappingPercentage)
                 VALUES ({scan}, 'https://contoso.sharepoint.com/sites/a', '/', '/Pages/a.aspx', {list}, {modified}, 0, 2, 100)
+                """);
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO ClassicPageDiscoveries
+                    (ScanId, SiteUrl, WebUrl, RecordKey, RowType, Url, DiscoveryStatus, ObservedAtUtc, SetupPath)
+                VALUES ({scan}, 'https://contoso.sharepoint.com/sites/a', '/', 'existing-page', 'Page',
+                    '/Pages/a.aspx', 'Discovered', {modified}, 'STS\default.aspx')
                 """);
 
             await migrator.MigrateAsync();
@@ -49,11 +56,15 @@ namespace PnP.Scanning.Core.Tests.Storage
             page.CustomizedPageStatus.Should().BeNull();
             page.LayoutUrl.Should().BeNull();
             page.LayoutCustomizedPageStatus.Should().BeNull();
+            var discovered = await context.ClassicPageDiscoveries.SingleAsync();
+            discovered.SetupPath.Should().Be(@"STS\default.aspx");
+            discovered.CustomizedPageStatus.Should().BeNull();
 
             await migrator.MigrateAsync(previous);
             await migrator.MigrateAsync();
             context.ChangeTracker.Clear();
             (await context.ClassicPages.SingleAsync()).WebPartCount.Should().Be(2);
+            (await context.ClassicPageDiscoveries.SingleAsync()).SetupPath.Should().Be(@"STS\default.aspx");
         }
 
         [Fact]

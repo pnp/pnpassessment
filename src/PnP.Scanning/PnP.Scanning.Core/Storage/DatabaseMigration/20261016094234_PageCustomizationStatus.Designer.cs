@@ -11,7 +11,7 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20261015050511_PageCustomizationStatus")]
+    [Migration("20261016094234_PageCustomizationStatus")]
     partial class PageCustomizationStatus
     {
         /// <inheritdoc />
@@ -703,6 +703,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ScopeType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SetupPath")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("SiteCollectionId")

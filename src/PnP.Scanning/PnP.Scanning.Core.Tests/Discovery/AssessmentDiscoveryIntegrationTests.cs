@@ -71,6 +71,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
                 nameof(ClassicPageDiscovery.ListItemId),
                 nameof(ClassicPageDiscovery.FileName),
                 nameof(ClassicPageDiscovery.CustomizedPageStatus),
+                nameof(ClassicPageDiscovery.SetupPath),
                 nameof(ClassicPageDiscovery.HomePage),
                 nameof(ClassicPageDiscovery.LibraryHidden),
                 nameof(ClassicPageDiscovery.ObservationMethod),

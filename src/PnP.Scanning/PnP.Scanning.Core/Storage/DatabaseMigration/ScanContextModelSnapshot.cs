@@ -702,6 +702,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ScopeType")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SetupPath")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("SiteCollectionId")
                         .HasColumnType("TEXT");
 

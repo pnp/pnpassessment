@@ -22,6 +22,7 @@ internal sealed record RawDiscoveryRecord(
     string PageType = null,
     bool? LibraryHidden = null,
     string CustomizedPageStatusRaw = null,
+    string SetupPath = null,
     string ObservationMethod = null,
     string SelectionState = null,
     string WelcomePageStatus = null,

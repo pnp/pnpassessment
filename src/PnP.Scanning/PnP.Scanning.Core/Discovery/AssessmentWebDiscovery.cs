@@ -204,6 +204,7 @@ internal sealed class AssessmentWebDiscovery
             SiteCollectionId = record.SiteCollectionId, WebId = record.WebId, ListId = record.ListId,
             FolderUniqueId = record.FolderUniqueId, ListItemId = record.ListItemId,
             HomePage = record.HomePage, PageType = record.PageType, ContentTypeId = record.ContentTypeId,
+            SetupPath = record.SetupPath,
             LibraryHidden = record.LibraryHidden, ObservationMethod = record.ObservationMethod ?? scope.SourceKind?.ToString(),
             DiscoveryStatus = "Discovered", ObservedAtUtc = DateTime.UtcNow,
         };

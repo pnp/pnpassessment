@@ -105,18 +105,24 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 item => item.Folders.QueryProperties(child => child.UniqueId, child => child.Name,
                     child => child.ServerRelativeUrl),
                 item => item.Files.QueryProperties(file => file.UniqueId, file => file.Name,
-                    file => file.ServerRelativeUrl, file => file.CustomizedPageStatus)).ConfigureAwait(false);
+                    file => file.ServerRelativeUrl, file => file.CustomizedPageStatus,
+                    file => file.Properties)).ConfigureAwait(false);
             if (folder == null)
                 return new(DiscoveryTerminalOutcome.Failed, null, serverRelativeUrl,
                     Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
                     provider, operation, "folder_not_found", provider + ":" + operation,
                     DateTimeOffset.UtcNow);
-            var folders = folder.Folders.Select(child => new SharePointModeledFolder(
-                child.UniqueId.ToString("D"), child.Name, child.ServerRelativeUrl)).ToArray();
-            var files = folder.Files.Select(file => new SharePointModeledFile(
-                file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
-                file.CustomizedPageStatus.ToString())).ToArray();
-            var outcome = folders.Length == 0 && files.Length == 0
+            // An unexpanded collection materialises as zero items, which would be indistinguishable
+            // from a genuinely empty folder and would claim coverage this call never observed.
+            if (!folder.Folders.Requested || !folder.Files.Requested)
+                return new(DiscoveryTerminalOutcome.Failed, folder.UniqueId.ToString("D"),
+                    folder.ServerRelativeUrl, Array.Empty<SharePointModeledFolder>(),
+                    Array.Empty<SharePointModeledFile>(), provider, operation,
+                    "web_root_folder_not_expanded", provider + ":" + operation + ":NotExpanded",
+                    DateTimeOffset.UtcNow);
+            var folders = MapFolders(folder.Folders);
+            var files = MapFiles(folder.Files);
+            var outcome = folders.Count == 0 && files.Count == 0
                 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete;
             return new(outcome, folder.UniqueId.ToString("D"), folder.ServerRelativeUrl, folders, files,
                 provider, operation, null, provider + ":" + operation, DateTimeOffset.UtcNow);
@@ -136,7 +142,26 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
     }
 
+    // PnP Core model collections implement IQueryable<T>, so a bare Select() binds to
+    // Queryable.Select and is handed to the SDK query provider, which supports queries for its own
+    // model type only and fails any projection with an InvalidCastException. AsRequested() exposes
+    // the items the expand already returned, keeping the projection in memory.
+    internal static IReadOnlyList<SharePointModeledFolder> MapFolders(IFolderCollection folders) =>
+        folders.AsRequested().Select(child => new SharePointModeledFolder(
+            child.UniqueId.ToString("D"), child.Name, child.ServerRelativeUrl)).ToArray();
+
+    internal static IReadOnlyList<SharePointModeledFile> MapFiles(IFileCollection files) =>
+        files.AsRequested().Select(file => new SharePointModeledFile(
+            file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
+            file.CustomizedPageStatus.ToString(), SetupPath(file))).ToArray();
+
     public void Dispose() => context.Dispose();
+
+    // PnP Core normalizes the REST '_x005f_' escaping back to '_' when it fills a property bag,
+    // so the modeled surface exposes the setup path under its unescaped vti_setuppath name.
+    private static string SetupPath(IFile file) =>
+        file.IsPropertyAvailable(item => item.Properties)
+            ? file.Properties.GetString("vti_setuppath", null) : null;
 
     private static bool IsDenied(Exception ex) =>
         ex.Message.Contains("403", StringComparison.OrdinalIgnoreCase) ||
