@@ -1,4 +1,6 @@
 ﻿using EFCore.BulkExtensions;
+using EFQuery = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
+using Microsoft.SharePoint.Client;
 using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
@@ -204,12 +206,54 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Pre assessment work done");
         }
 
+        private async Task EnrichPublishingLayoutsAsync()
+        {
+            var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
+            List<string> sites;
+            using (var db = new ScanContext(ScanId))
+            {
+                sites = await EFQuery.ToListAsync(db.ClassicPages.Where(page => page.ScanId == ScanId &&
+                    page.PageType == PageScanComponent.PublishingPage)
+                    .Select(page => page.SiteUrl).Distinct(), token).ConfigureAwait(false);
+            }
+
+            foreach (var siteUrl in sites)
+            {
+                using var db = new ScanContext(ScanId);
+                var siteScanner = new ClassicScanner(ScanManager, StorageManager, PnPContextFactory,
+                    ScanId, siteUrl, "/", null, Options);
+                PnPContext context = null;
+                ClientContext csomContext = null;
+                try
+                {
+                    await PublishingLayoutStatusReader.EnrichSiteAsync(db, ScanId, siteUrl, async url =>
+                    {
+                        // Create network contexts only when discovery cannot supply the status.
+                        context ??= await siteScanner.GetPnPContextAsync().ConfigureAwait(false);
+                        csomContext ??= siteScanner.GetClientContext(context);
+                        var file = csomContext.Site.RootWeb.GetFileByServerRelativeUrl(url);
+                        csomContext.Load(file, value => value.CustomizedPageStatus);
+                        await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+                        return file.CustomizedPageStatus.ToString();
+                    }, (error, page) => Logger.Warning(error,
+                        "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
+                        page.PageUrl, page.LayoutUrl), token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    csomContext?.Dispose();
+                    context?.Dispose();
+                }
+            }
+        }
+
         internal async override Task PostScanningAsync()
         {
 
             Logger.Information("Post assessment work is starting");
             if (Options.Pages)
             {
+                await EnrichPublishingLayoutsAsync().ConfigureAwait(false);
                 var verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
                     .ConfigureAwait(false);
                 Logger.Information("ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",

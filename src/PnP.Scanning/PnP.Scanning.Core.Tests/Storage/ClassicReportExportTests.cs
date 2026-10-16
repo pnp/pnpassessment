@@ -243,13 +243,19 @@ namespace PnP.Scanning.Core.Tests.Storage
                     PageUrl = "/sites/a/Pages/unknown.aspx", PageType = "PublishingPage",
                 },
             };
-            var reader = new PublishingLayoutStatusReader(new Uri("https://contoso.sharepoint.com/sites/a"),
-                _ => Task.FromResult("Uncustomized"));
-            foreach (var page in pages) await reader.EnrichAsync(page);
             using (var context = fixture.CreateContext())
             {
                 context.ClassicPages.AddRange(pages);
+                context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
+                {
+                    ScanId = scan, SiteUrl = pages[0].SiteUrl, WebUrl = "/", RecordKey = "layout",
+                    RowType = "Page", Url = pages[0].LayoutUrl, CustomizedPageStatus = "Uncustomized",
+                    DiscoveryStatus = "Discovered",
+                });
                 await context.SaveChangesAsync();
+                await PublishingLayoutStatusReader.EnrichSiteAsync(context, scan, pages[0].SiteUrl,
+                    _ => throw new InvalidOperationException("Layout should come from discovery"),
+                    (error, _) => throw new InvalidOperationException("Unexpected layout failure", error));
             }
             var directory = NewTempDir();
             try

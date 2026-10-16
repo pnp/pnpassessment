@@ -188,31 +188,6 @@ namespace PnP.Scanning.Core.Scanners
                 }
             }
 
-            var layoutStatusReader = new PublishingLayoutStatusReader(csomContext);
-            foreach (var page in pagesList.Where(page => page.PageType == PublishingPage))
-            {
-                try
-                {
-                    await layoutStatusReader.EnrichAsync(page).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    if (ex is OperationCanceledException ||
-                        scannerBase.ScanManager.GetCancellationTokenSource(scannerBase.ScanId).IsCancellationRequested) throw;
-                    var discovered = discoveredPages.FirstOrDefault(row =>
-                        string.Equals(row.Url, page.PageUrl, StringComparison.OrdinalIgnoreCase));
-                    if (discovered != null)
-                    {
-                        discovered.AssessmentStatus = "Failed";
-                        AssessmentWebDiscovery.AddError(discovered, "PageLayoutMetadata", AssessmentWebDiscovery.ErrorCode(ex),
-                            AssessmentWebDiscovery.ErrorDetail(ex));
-                        await discoveryWriter.WriteAsync(new[] { discovered }).ConfigureAwait(false);
-                    }
-                    scannerBase.Logger.Warning(ex, "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
-                        page.PageUrl, page.LayoutUrl);
-                }
-            }
-
             // SharePoint Search usage (ViewsRecent / ViewsLifeTime) is intentionally skipped for Classic
             // pages: Search Analytics does not reliably populate these managed properties for classic .aspx
             // pages, producing all-zero results. Audit log usage (ClassicPageViewed / ClassicPageCreated /
