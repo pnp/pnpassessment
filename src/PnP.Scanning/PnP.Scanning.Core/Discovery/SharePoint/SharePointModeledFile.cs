@@ -4,4 +4,5 @@ internal sealed record SharePointModeledFile(
     string UniqueId,
     string Name,
     string ServerRelativeUrl,
-    string CustomizedPageStatus);
+    string CustomizedPageStatus,
+    string SetupPath = null);

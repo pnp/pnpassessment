@@ -51,8 +51,13 @@ namespace PnP.Scanning.Core.Scanners
                                                  r => r.ItemCount,
                                                  r => r.LastItemUserModifiedDate,
                                                  r => r.DocumentTemplate,
+                                                 // Display form resolution for list items that have no file of their own:
+                                                 // the item's content type DisplayFormUrl, else the list default. BaseType
+                                                 // tells whether a list's items can lack a file at all.
+                                                 r => r.BaseType,
+                                                 r => r.DefaultDisplayFormUrl,
                                                  r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl),
-                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl),
+                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl, p => p.DisplayFormUrl),
                                                  r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title),
                                                  r => r.UserCustomActions)
                 }

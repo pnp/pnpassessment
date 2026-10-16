@@ -105,7 +105,8 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 item => item.Folders.QueryProperties(child => child.UniqueId, child => child.Name,
                     child => child.ServerRelativeUrl),
                 item => item.Files.QueryProperties(file => file.UniqueId, file => file.Name,
-                    file => file.ServerRelativeUrl, file => file.CustomizedPageStatus)).ConfigureAwait(false);
+                    file => file.ServerRelativeUrl, file => file.CustomizedPageStatus,
+                    file => file.Properties)).ConfigureAwait(false);
             if (folder == null)
                 return new(DiscoveryTerminalOutcome.Failed, null, serverRelativeUrl,
                     Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
@@ -152,9 +153,15 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     internal static IReadOnlyList<SharePointModeledFile> MapFiles(IFileCollection files) =>
         files.AsRequested().Select(file => new SharePointModeledFile(
             file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
-            file.CustomizedPageStatus.ToString())).ToArray();
+            file.CustomizedPageStatus.ToString(), SetupPath(file))).ToArray();
 
     public void Dispose() => context.Dispose();
+
+    // PnP Core normalizes the REST '_x005f_' escaping back to '_' when it fills a property bag,
+    // so the modeled surface exposes the setup path under its unescaped vti_setuppath name.
+    private static string SetupPath(IFile file) =>
+        file.IsPropertyAvailable(item => item.Properties)
+            ? file.Properties.GetString("vti_setuppath", null) : null;
 
     private static bool IsDenied(Exception ex) =>
         ex.Message.Contains("403", StringComparison.OrdinalIgnoreCase) ||
