@@ -506,6 +506,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("AssessmentStatus")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CustomizedPageStatus")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DiscoveryStatus")
                         .HasColumnType("TEXT");
 
@@ -516,6 +519,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Layout")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LayoutCustomizedPageStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LayoutUrl")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("ListId")
@@ -537,15 +546,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ModifiedBy")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CustomizedPageStatus")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LayoutCustomizedPageStatus")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LayoutUrl")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PageName")
@@ -637,6 +637,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("ContentTypeId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CustomizedPageStatus")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("DiscoveryStatus")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -685,9 +688,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.Property<int?>("ObservedChildCount")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("CustomizedPageStatus")
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("PageType")
                         .HasColumnType("TEXT");

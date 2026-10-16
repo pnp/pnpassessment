@@ -6,13 +6,13 @@ namespace PnP.Scanning.Core.Scanners;
 
 internal sealed class PublishingLayoutStatusReader
 {
-    private readonly Uri webUrl;
+    private readonly Uri siteUrl;
     private readonly Func<string, Task<string>> readStatus;
     private readonly Dictionary<string, Task<string>> statuses = new(StringComparer.OrdinalIgnoreCase);
 
-    internal PublishingLayoutStatusReader(Uri webUrl, Func<string, Task<string>> readStatus)
+    internal PublishingLayoutStatusReader(Uri siteUrl, Func<string, Task<string>> readStatus)
     {
-        this.webUrl = webUrl;
+        this.siteUrl = siteUrl;
         this.readStatus = readStatus;
     }
 
@@ -56,11 +56,9 @@ internal sealed class PublishingLayoutStatusReader
             }
             catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
-                page.AssessmentStatus = "Failed";
                 foreach (var row in byUrl[page.PageUrl].Where(row =>
                     string.Equals(row.WebUrl, page.WebUrl, StringComparison.OrdinalIgnoreCase)))
                 {
-                    row.AssessmentStatus = "Failed";
                     AssessmentWebDiscovery.AddError(row, "PageLayoutMetadata", AssessmentWebDiscovery.ErrorCode(ex),
                         AssessmentWebDiscovery.ErrorDetail(ex));
                 }
@@ -73,17 +71,13 @@ internal sealed class PublishingLayoutStatusReader
     internal async Task EnrichAsync(ClassicPage page)
     {
         page.LayoutCustomizedPageStatus = null;
-        if (page.PageType != PageScanComponent.PublishingPage)
-        {
-            page.LayoutUrl = null;
-            return;
-        }
         if (string.IsNullOrWhiteSpace(page.LayoutUrl)) return;
 
         var url = ResolveServerRelativeUrl(page.LayoutUrl);
         if (!statuses.TryGetValue(url, out var status))
         {
-            // Cache failures too: a denied/missing shared layout must not trigger one request per page.
+            // The fallback transport retries transient HTTP failures before this task faults.
+            // Cache terminal/exhausted failures so shared layouts do not restart that retry budget.
             status = ReadNormalizedStatusAsync(url);
             statuses.Add(url, status);
         }
@@ -97,16 +91,19 @@ internal sealed class PublishingLayoutStatusReader
 
     private string ResolveServerRelativeUrl(string url)
     {
-        if (url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal) && !url.Contains('\\'))
-        {
-            return url;
-        }
-        if (Uri.TryCreate(url, UriKind.Absolute, out var absolute) &&
-            absolute.Scheme == webUrl.Scheme && absolute.Authority.Equals(webUrl.Authority, StringComparison.OrdinalIgnoreCase) &&
+        Uri absolute = null;
+        var validUrl = !url.StartsWith("//", StringComparison.Ordinal) && !url.Contains('\\') &&
+            (url.StartsWith('/') ? Uri.TryCreate(siteUrl, url, out absolute) : Uri.TryCreate(url, UriKind.Absolute, out absolute));
+        if (validUrl && absolute.Scheme == siteUrl.Scheme &&
+            absolute.Authority.Equals(siteUrl.Authority, StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrEmpty(absolute.Query) && string.IsNullOrEmpty(absolute.Fragment))
         {
-            return absolute.AbsolutePath;
+            var path = Uri.UnescapeDataString(absolute.AbsolutePath);
+            var sitePath = Uri.UnescapeDataString(siteUrl.AbsolutePath).TrimEnd('/');
+            if (path.StartsWith(sitePath + "/", StringComparison.OrdinalIgnoreCase) &&
+                !path.Contains('\\') && !path.Split('/').Any(segment => segment is "." or ".."))
+                return absolute.AbsolutePath;
         }
-        throw new InvalidDataException("Publishing page layout must have a server-relative URL or an absolute URL on the scanned origin.");
+        throw new InvalidDataException("Publishing page layout must have a server-relative or absolute URL within the scanned site collection.");
     }
 }

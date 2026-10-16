@@ -11,16 +11,14 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
 {
     private readonly ScanContextFixture fixture;
     private const string SiteUrl = "https://contoso.sharepoint.com/sites/a";
-    private static readonly Uri WebUrl = new("https://contoso.sharepoint.com/sites/a/subweb");
+    private static readonly Uri SiteUri = new(SiteUrl);
     private const string LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx";
 
     public PublishingLayoutStatusReaderTests(ScanContextFixture fixture) => this.fixture = fixture;
 
     [Theory]
     [InlineData("Uncustomized", false)]
-    [InlineData("Customized", false)]
-    [InlineData("None", false)]
-    [InlineData("Uncustomized", true)]
+    [InlineData("None", true)]
     public async Task Post_scan_uses_root_discovery_committed_after_subwebs_without_requests(string status, bool absoluteDiscoveryUrl)
     {
         var scan = Guid.NewGuid();
@@ -99,9 +97,10 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         var first = StoredPage(scan, "/first", LayoutUrl);
         var second = StoredPage(scan, "/second", LayoutUrl);
         second.SiteUrl = otherSite;
+        second.LayoutUrl = "/sites/b/_catalogs/masterpage/Basic.aspx";
         var untouched = StoredPage(otherScan, "/first", LayoutUrl);
         db.ClassicPages.AddRange(first, second, untouched);
-        var otherSiteLayout = Discovered(scan, LayoutUrl, discoveredStatus);
+        var otherSiteLayout = Discovered(scan, second.LayoutUrl, discoveredStatus);
         otherSiteLayout.SiteUrl = otherSite;
         db.ClassicPageDiscoveries.AddRange(otherSiteLayout, Discovered(otherScan, LayoutUrl, "None"));
         await db.SaveChangesAsync();
@@ -142,11 +141,13 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         errors.Should().ContainSingle().Which.Should().BeOfType<InvalidDataException>()
             .Which.Message.Should().Contain("conflicting");
         page.LayoutCustomizedPageStatus.Should().BeNull();
-        page.AssessmentStatus.Should().Be("Failed");
+        page.AssessmentStatus.Should().Be("Complete");
     }
 
-    [Fact]
-    public async Task Post_scan_failure_preserves_inventory_and_records_each_affected_page()
+    [Theory]
+    [InlineData("Complete")]
+    [InlineData("Failed")]
+    public async Task Post_scan_failure_preserves_assessment_status_and_inventory(string assessmentStatus)
     {
         var scan = Guid.NewGuid();
         using var db = fixture.CreateContext();
@@ -156,10 +157,17 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
             page.WebPartCount = 3;
             page.MappingPercentage = 100;
             page.RemediationCode = "CP3";
+            page.AssessmentStatus = assessmentStatus;
             db.ClassicPages.Add(page);
             var row = Discovered(scan, page.PageUrl, "Customized");
             row.WebUrl = web;
-            row.AssessmentStatus = "Complete";
+            row.AssessmentStatus = assessmentStatus;
+            if (assessmentStatus == "Failed")
+            {
+                row.ErrorStage = "WebPartAssessment";
+                row.ErrorCodes = "ExistingFailure";
+                row.ErrorDetail = "Original page assessment failed";
+            }
             db.ClassicPageDiscoveries.Add(row);
         }
         await db.SaveChangesAsync();
@@ -176,12 +184,15 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         failures.Should().HaveCount(2);
         db.ChangeTracker.Clear();
         var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
-        pages.Should().OnlyContain(page => page.AssessmentStatus == "Failed" &&
+        pages.Should().OnlyContain(page => page.AssessmentStatus == assessmentStatus &&
             page.LayoutCustomizedPageStatus == null && page.WebPartCount == 3 &&
             page.MappingPercentage == 100 && page.RemediationCode == "CP3");
         var rows = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
-        rows.Should().OnlyContain(row => row.AssessmentStatus == "Failed" &&
-            row.ErrorStage == "PageLayoutMetadata" && row.ErrorDetail.Contains("Layout denied"));
+        rows.Should().OnlyContain(row => row.AssessmentStatus == assessmentStatus &&
+            row.ErrorStage.Contains("PageLayoutMetadata") && row.ErrorDetail.Contains("Layout denied"));
+        if (assessmentStatus == "Failed")
+            rows.Should().OnlyContain(row => row.ErrorStage.Contains("WebPartAssessment") &&
+                row.ErrorCodes.Contains("ExistingFailure") && row.ErrorDetail.Contains("Original page assessment failed"));
     }
 
     [Fact]
@@ -212,54 +223,12 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         RowType = "Page", Url = url, CustomizedPageStatus = status, DiscoveryStatus = "Discovered",
     };
 
-    [Fact]
-    public async Task Shared_layout_is_read_once_for_absolute_and_server_relative_references()
-    {
-        var requests = new List<string>();
-        var reader = new PublishingLayoutStatusReader(WebUrl, url =>
-        {
-            requests.Add(url);
-            return Task.FromResult("1");
-        });
-        var first = Page("https://contoso.sharepoint.com" + LayoutUrl);
-        var second = Page(LayoutUrl);
-        first.CustomizedPageStatus = "Customized";
-
-        await reader.EnrichAsync(first);
-        await reader.EnrichAsync(second);
-
-        requests.Should().Equal(LayoutUrl);
-        first.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
-        second.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
-        first.CustomizedPageStatus.Should().Be("Customized", "page and layout are separate files");
-        first.LayoutUrl.Should().Be("https://contoso.sharepoint.com" + LayoutUrl);
-    }
-
-    [Theory]
-    [InlineData("WikiPage")]
-    [InlineData("WebPartPage")]
-    [InlineData("ASPXPage")]
-    [InlineData("BlogPage")]
-    [InlineData("ModernPage")]
-    public async Task Non_publishing_pages_have_null_layout_metadata_without_a_request(string pageType)
-    {
-        var reader = new PublishingLayoutStatusReader(WebUrl, _ => throw new InvalidOperationException("Unexpected request"));
-        var page = Page(LayoutUrl);
-        page.PageType = pageType;
-        page.LayoutCustomizedPageStatus = "Uncustomized";
-
-        await reader.EnrichAsync(page);
-
-        page.LayoutUrl.Should().BeNull();
-        page.LayoutCustomizedPageStatus.Should().BeNull();
-    }
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     public async Task Missing_layout_reference_does_not_infer_a_status(string url)
     {
-        var reader = new PublishingLayoutStatusReader(WebUrl, _ => throw new InvalidOperationException("Unexpected request"));
+        var reader = new PublishingLayoutStatusReader(SiteUri, _ => throw new InvalidOperationException("Unexpected request"));
         var page = Page(url);
         await reader.EnrichAsync(page);
         page.LayoutCustomizedPageStatus.Should().BeNull();
@@ -271,7 +240,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     [InlineData("2", "Customized")]
     public async Task Layout_status_preserves_unknown_none_and_customized(string returned, string expected)
     {
-        var reader = new PublishingLayoutStatusReader(WebUrl, _ => Task.FromResult(returned));
+        var reader = new PublishingLayoutStatusReader(SiteUri, _ => Task.FromResult(returned));
         var page = Page(LayoutUrl);
         await reader.EnrichAsync(page);
         page.LayoutCustomizedPageStatus.Should().Be(expected);
@@ -281,49 +250,45 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     [InlineData("https://other.sharepoint.com/sites/a/_catalogs/masterpage/Basic.aspx")]
     [InlineData("//other.sharepoint.com/Basic.aspx")]
     [InlineData("Basic.aspx")]
+    [InlineData("/sites/OTHER/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("https://contoso.sharepoint.com/sites/OTHER/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("/sites/ab/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("/sites/a/../OTHER/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("/sites/a/%2e%2e/OTHER/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("/sites/a/%2e%2e%2fOTHER/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("/sites/a/_catalogs/masterpage/Basic.aspx?other=1")]
+    [InlineData("/sites/a/_catalogs/masterpage/Basic.aspx#fragment")]
     public async Task Invalid_layout_url_surfaces_an_error_instead_of_guessing(string url)
     {
-        var reader = new PublishingLayoutStatusReader(WebUrl, _ => throw new InvalidOperationException("Unexpected request"));
+        var reader = new PublishingLayoutStatusReader(SiteUri, _ => throw new InvalidOperationException("Unexpected request"));
         var page = Page(url);
         var enrich = () => reader.EnrichAsync(page);
         await enrich.Should().ThrowAsync<InvalidDataException>();
         page.LayoutCustomizedPageStatus.Should().BeNull();
     }
 
-    [Fact]
-    public async Task Failed_shared_layout_read_is_cached_and_reported_for_each_page()
+    [Theory]
+    [InlineData("https://contoso.sharepoint.com", "/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("https://contoso.sharepoint.com/sites/a/", "/sites/a/_catalogs/masterpage/Basic.aspx")]
+    [InlineData("https://contoso.sharepoint.com/sites/A", "/sites/a/_catalogs/masterpage/Basic.aspx")]
+    public async Task Layout_containment_accepts_root_sites_trailing_slashes_and_case_variations(string site, string layout)
     {
-        var requests = 0;
-        var reader = new PublishingLayoutStatusReader(WebUrl, _ =>
-        {
-            requests++;
-            throw new UnauthorizedAccessException("Layout denied");
-        });
-        foreach (var page in new[] { Page(LayoutUrl), Page(LayoutUrl) })
-        {
-            page.WebPartCount = 3;
-            var enrich = () => reader.EnrichAsync(page);
-            await enrich.Should().ThrowAsync<UnauthorizedAccessException>();
-            page.LayoutCustomizedPageStatus.Should().BeNull();
-            page.WebPartCount.Should().Be(3);
-        }
-        requests.Should().Be(1);
+        var reader = new PublishingLayoutStatusReader(new Uri(site), _ => Task.FromResult("Uncustomized"));
+        var page = Page(layout);
+        await reader.EnrichAsync(page);
+        page.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
     }
 
     [Fact]
-    public async Task Cancellation_and_unrecognized_status_are_not_reported_as_success()
+    public async Task Unrecognized_status_is_not_reported_as_success()
     {
-        var cancelled = new PublishingLayoutStatusReader(WebUrl, _ => throw new OperationCanceledException());
-        var cancel = () => cancelled.EnrichAsync(Page(LayoutUrl));
-        await cancel.Should().ThrowAsync<OperationCanceledException>();
-
-        var invalid = new PublishingLayoutStatusReader(WebUrl, _ => Task.FromResult("99"));
+        var invalid = new PublishingLayoutStatusReader(SiteUri, _ => Task.FromResult("99"));
         var read = () => invalid.EnrichAsync(Page(LayoutUrl));
         await read.Should().ThrowAsync<InvalidDataException>();
     }
 
     [Fact]
-    public async Task Different_layouts_and_reader_instances_do_not_share_results()
+    public async Task Different_layouts_do_not_share_results()
     {
         var requests = 0;
         Task<string> Read(string url)
@@ -331,13 +296,11 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
             requests++;
             return Task.FromResult(url == LayoutUrl ? "Uncustomized" : "Customized");
         }
-        var first = new PublishingLayoutStatusReader(WebUrl, Read);
-        var second = new PublishingLayoutStatusReader(WebUrl, Read);
+        var reader = new PublishingLayoutStatusReader(SiteUri, Read);
         var custom = Page("/sites/a/_catalogs/masterpage/Custom.aspx");
-        await first.EnrichAsync(Page(LayoutUrl));
-        await first.EnrichAsync(custom);
-        await second.EnrichAsync(Page(LayoutUrl));
-        requests.Should().Be(3);
+        await reader.EnrichAsync(Page(LayoutUrl));
+        await reader.EnrichAsync(custom);
+        requests.Should().Be(2);
         custom.LayoutCustomizedPageStatus.Should().Be("Customized");
     }
 

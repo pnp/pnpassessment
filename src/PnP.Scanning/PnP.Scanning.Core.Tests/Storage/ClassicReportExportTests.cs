@@ -285,6 +285,52 @@ namespace PnP.Scanning.Core.Tests.Storage
         }
 
         [Fact]
+        public async Task Csv_Layout_failure_preserves_complete_page_and_exports_discovery_error()
+        {
+            var scan = Guid.NewGuid();
+            const string site = "https://contoso.sharepoint.com/sites/a";
+            const string pageUrl = "/sites/a/Pages/home.aspx";
+            using (var context = fixture.CreateContext())
+            {
+                context.ClassicPages.Add(new ClassicPage
+                {
+                    ScanId = scan, SiteUrl = site, WebUrl = "/", PageUrl = pageUrl,
+                    PageType = "PublishingPage", AssessmentStatus = "Complete",
+                    LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
+                    WebPartCount = 3, MappingPercentage = 100,
+                });
+                context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
+                {
+                    ScanId = scan, SiteUrl = site, WebUrl = "/", RecordKey = "page",
+                    RowType = "Page", Url = pageUrl, DiscoveryStatus = "Discovered",
+                    AssessmentStatus = "Complete",
+                });
+                await context.SaveChangesAsync();
+                var failures = new List<Exception>();
+                await PublishingLayoutStatusReader.EnrichSiteAsync(context, scan, site,
+                    _ => throw new UnauthorizedAccessException("Layout denied"),
+                    (error, _) => failures.Add(error));
+                failures.Should().ContainSingle();
+            }
+            var directory = NewTempDir();
+            try
+            {
+                await ExportAsync(scan, directory);
+                var page = ReadRecords<ClassicPage>(Path.Join(directory, "classicpages.csv")).Single();
+                page.AssessmentStatus.Should().Be("Complete");
+                page.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
+                page.WebPartCount.Should().Be(3);
+                page.MappingPercentage.Should().Be(100);
+                var discovery = ReadRecords<ClassicPageDiscovery>(Path.Join(directory, "discovery.csv")).Single();
+                discovery.AssessmentStatus.Should().Be("Complete");
+                discovery.ErrorStage.Should().Be("PageLayoutMetadata");
+                discovery.ErrorCodes.Should().Be("UnauthorizedAccessException");
+                discovery.ErrorDetail.Should().Contain("Layout denied");
+            }
+            finally { DeleteTempDir(directory); }
+        }
+
+        [Fact]
         public async Task Csv_ClassicPageAuditUsage_HeaderAndRows()
         {
             var scanId = Guid.NewGuid();
