@@ -55,6 +55,39 @@ public sealed class SharePointModeledFolderProjectionTests
             "projecting an IQueryable model collection is rejected by the PnP Core query provider");
     }
 
+    [Fact]
+    public void Resolved_file_without_an_owning_list_reports_no_list_id()
+    {
+        // IFile.ListId is a non-nullable Guid, so a web-root file that belongs to no list reports the
+        // empty GUID. Carried forward it reads as "names a list", which the page assessment treats as
+        // an unresolved lookup and fails — inverting the verdict for exactly the web-root entry pages.
+        var resolved = PnPContextSharePointAspxRestClient.MapResolvedFile(ResolvableFile(Guid.Empty));
+
+        resolved.ListId.Should().BeNull();
+        resolved.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        resolved.ServerRelativeUrl.Should().Be("/sites/a/default.aspx");
+    }
+
+    [Fact]
+    public void Resolved_file_with_an_owning_list_keeps_its_list_id()
+    {
+        var listId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+
+        PnPContextSharePointAspxRestClient.MapResolvedFile(ResolvableFile(listId))
+            .ListId.Should().Be(listId);
+    }
+
+    private static IFile ResolvableFile(Guid listId) =>
+        ModelProxy<IFile>.Create(new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            ["UniqueId"] = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+            ["Name"] = "default.aspx",
+            ["ServerRelativeUrl"] = "/sites/a/default.aspx",
+            ["CustomizedPageStatus"] = CustomizedPageStatus.Uncustomized,
+            ["ListId"] = listId,
+            ["ListItemAllFields"] = null,
+        });
+
     private static IFolder Folder(Guid uniqueId, string name, string serverRelativeUrl) =>
         ModelProxy<IFolder>.Create(new Dictionary<string, object>(StringComparer.Ordinal)
         {
