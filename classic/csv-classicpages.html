@@ -144,6 +144,18 @@
 <td>The detected page layout (e.g. a wiki <code>TwoColumns</code>, a web part page <code>FullPageVertical</code>, or the publishing page layout name such as <code>ArticleLeft</code>)</td>
 </tr>
 <tr>
+<td>CustomizedPageStatus</td>
+<td>SharePoint customization status of the page file: <code>Uncustomized</code> (ghosted), <code>Customized</code> (unghosted), or <code>None</code> (no customization classification). Empty when unavailable; never infer ghosting from an empty value or <code>None</code>.</td>
+</tr>
+<tr>
+<td>LayoutUrl</td>
+<td>URL of the publishing page's referenced layout file, as stored in <code>PublishingPageLayout</code>. Empty for non-publishing pages or when the reference is unavailable.</td>
+</tr>
+<tr>
+<td>LayoutCustomizedPageStatus</td>
+<td>SharePoint customization status of the referenced publishing layout file: <code>Uncustomized</code>, <code>Customized</code>, or <code>None</code>. Populated during post-scanning from referenced discovery rows; missing statuses (including <code>--homepageonly</code>) use a cached fallback with SDK retries. Conflicting observations retain the latest known status and record <code>changed_during_scan</code> in <code>discovery.csv</code>. Empty for non-publishing pages or when unavailable. Layout failures are recorded as <code>PageLayoutMetadata</code> without changing the page's <code>AssessmentStatus</code>.</td>
+</tr>
+<tr>
 <td>HomePage</td>
 <td>True when this page is the web's home (welcome) page, False when it is not, or empty when the web's welcome page could not be resolved</td>
 </tr>

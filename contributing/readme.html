@@ -76,6 +76,19 @@
                     <h1 id="i-want-to-help-">I want to help 🙋‍♂️</h1>
 
 <p>If you want to join our team and help, then feel free to check the issue list for planned work or create an issue with sugggested improvements.</p>
+<h2 id="ef-core-migration-tips">EF Core migration tips</h2>
+<p>Generate migrations, designers, and snapshots with EF tooling rather than hand-editing generated models. Use tooling matching the project's EF Core version and the default Debug configuration.</p>
+<p>From the repository root:</p>
+<pre><code class="lang-powershell">dotnet ef migrations add &lt;Name&gt; `
+    --project .\src\PnP.Scanning\PnP.Scanning.Core `
+    --startup-project .\src\PnP.Scanning\PnP.Scanning.Process `
+    --context ScanContext --output-dir Storage\DatabaseMigration
+</code></pre>
+<ul>
+<li>Regenerate unmerged migrations with <code>migrations remove</code> then <code>add</code>; never force rollback of shared databases or rewrite deployed migrations.</li>
+<li>For schema-equivalent regeneration, preserve the migration ID and filenames when existing scan databases use them.</li>
+<li>Run migration upgrade/downgrade tests (see <a href="running-tests.html">Running the tests</a>) and <code>migrations has-pending-model-changes</code> with the same project/context arguments.</li>
+</ul>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

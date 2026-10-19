@@ -170,6 +170,10 @@
 <td>File name of the discovered page.</td>
 </tr>
 <tr>
+<td>CustomizedPageStatus</td>
+<td>SharePoint page-file customization status: <code>Uncustomized</code> (ghosted), <code>Customized</code> (unghosted), or <code>None</code> (no customization classification). Empty when unavailable or on non-Page rows. Unrecognized values produce <code>PageCustomizationMetadata</code> errors rather than an inferred status. Repeated observations retain known values when a later read omits the status.</td>
+</tr>
+<tr>
 <td>HomePage</td>
 <td>True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.</td>
 </tr>
