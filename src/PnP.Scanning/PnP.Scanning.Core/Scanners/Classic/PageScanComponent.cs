@@ -261,18 +261,19 @@ namespace PnP.Scanning.Core.Scanners
                 // Ordered longest content type id first so the most specific type in the id hierarchy wins.
                 var contentTypeForms = list.ContentTypes.AsRequested()
                     .Where(contentType => !string.IsNullOrEmpty(contentType.Id))
-                    .Select(contentType => (ContentTypeId: contentType.Id, FormUrl: ToServerRelativeFormUrl(
+                    .Select(contentType => (ContentTypeId: contentType.Id, FormUrl: DisplayFormUrlPolicy.ToServerRelative(
                         contentType.DisplayFormUrl, webServerRelativeUrl, siteServerRelativeUrl)))
                     .Where(candidate => candidate.FormUrl != null)
                     .OrderByDescending(candidate => candidate.ContentTypeId.Length)
                     .ToList();
-                string listForm = ToServerRelativeFormUrl(list.DefaultDisplayFormUrl, webServerRelativeUrl,
-                    siteServerRelativeUrl);
+                string listForm = DisplayFormUrlPolicy.ToServerRelative(list.DefaultDisplayFormUrl,
+                    webServerRelativeUrl, siteServerRelativeUrl);
 
                 // A list whose every candidate form is the stock list form holds ordinary data rows
                 // (announcements, tasks, contacts) viewed through a system form, not content pages.
                 // Enumerating those would report every list item in the tenant as a page.
-                if (!contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm).Any(IsContentPageForm))
+                if (!contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm)
+                    .Any(DisplayFormUrlPolicy.IsContentPageForm))
                 {
                     continue;
                 }
@@ -282,9 +283,9 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     foreach (var listItem in listItems)
                     {
-                        string displayForm = ResolveDisplayFormUrl(contentTypeForms, listForm,
+                        string displayForm = DisplayFormUrlPolicy.Resolve(contentTypeForms, listForm,
                             GetFieldValue(listItem, ContentTypeIdField, string.Empty));
-                        if (!IsContentPageForm(displayForm))
+                        if (!DisplayFormUrlPolicy.IsContentPageForm(displayForm))
                         {
                             continue;
                         }
@@ -364,101 +365,6 @@ namespace PnP.Scanning.Core.Scanners
                 AssessmentStatus = selected ? "Complete" : "NotSelected",
                 ObservedAtUtc = DateTime.UtcNow,
             };
-        }
-
-        private static string ResolveDisplayFormUrl(List<(string ContentTypeId, string FormUrl)> contentTypeForms,
-            string listForm, string itemContentTypeId)
-        {
-            if (!string.IsNullOrEmpty(itemContentTypeId))
-            {
-                foreach (var candidate in contentTypeForms)
-                {
-                    if (itemContentTypeId.StartsWith(candidate.ContentTypeId, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return candidate.FormUrl;
-                    }
-                }
-            }
-
-            return listForm;
-        }
-
-        internal static bool IsContentPageForm(string formUrl) => formUrl != null && !IsStockListForm(formUrl);
-
-        // Heuristic. The server truth is the form's ghosted setup path ("pages\form.aspx"), which the list
-        // and content type APIs do not expose; the client only sees the resolved form URL. A stock form is
-        // therefore recognized by its leaf name or by living under _layouts. The limitation is twofold: a
-        // customized form that kept the name DispForm.aspx is treated as stock (its items are skipped), and
-        // a stock form reached through a content type override that renamed it is treated as a content page.
-        // Because a list's own DefaultDisplayFormUrl is DispForm.aspx for all but a handful of templates,
-        // the content type tier is in practice the only one that ever names a content page form, which is
-        // why its URL must be normalized rather than discarded. This becomes exact once the form file's
-        // setup path is collected: a form still ghosted to "pages\form.aspx" is the stock form regardless
-        // of its name, and anything else is a real page.
-        internal static bool IsStockListForm(string formUrl)
-        {
-            string path = formUrl.Split('?')[0];
-            return path.Contains("/_layouts/", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(Path.GetFileName(path), "DispForm.aspx", StringComparison.OrdinalIgnoreCase);
-        }
-
-        // "~sitecollectionlayouts/" is tested before "~sitecollection/" because it also starts with it.
-        private static readonly (string Token, bool SiteScoped, bool Layouts)[] FormUrlTokens =
-        {
-            ("~sitecollectionlayouts/", true, true),
-            ("~sitecollection/", true, false),
-            ("~layouts/", false, true),
-            ("~site/", false, false),
-        };
-
-        private const string LayoutsFolder = "_layouts/15";
-
-        // The two display form tiers are not stored in the same shape. A list's DefaultDisplayFormUrl comes
-        // back server-relative (occasionally absolute), but a content type's DisplayFormUrl is returned
-        // exactly as the content type definition wrote it: web-relative ("Lists/Posts/Post.aspx", the stock
-        // blog Post content type) or behind one of the tokens ListFormWebPart.ComputeServerRelativePageUrl
-        // expands. Both are normalized to a server-relative URL here so the tiers can be compared, matched
-        // against the stock form and stored as one page location. An unrecognized token is not a path, so it
-        // yields null instead of a guessed location.
-        internal static string ToServerRelativeFormUrl(string formUrl, string webServerRelativeUrl,
-            string siteServerRelativeUrl)
-        {
-            if (string.IsNullOrWhiteSpace(formUrl))
-            {
-                return null;
-            }
-
-            string value = formUrl.Trim();
-
-            if (Uri.TryCreate(value, UriKind.Absolute, out Uri absolute) &&
-                (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps))
-            {
-                return absolute.AbsolutePath;
-            }
-
-            if (value.StartsWith('/'))
-            {
-                return value;
-            }
-
-            foreach (var token in FormUrlTokens)
-            {
-                if (value.StartsWith(token.Token, StringComparison.OrdinalIgnoreCase))
-                {
-                    string root = token.SiteScoped ? siteServerRelativeUrl : webServerRelativeUrl;
-                    return CombineServerRelative(token.Layouts ? CombineServerRelative(root, LayoutsFolder) : root,
-                        value[token.Token.Length..]);
-                }
-            }
-
-            return value.StartsWith('~') ? null : CombineServerRelative(webServerRelativeUrl, value);
-        }
-
-        private static string CombineServerRelative(string root, string relative)
-        {
-            string left = string.IsNullOrWhiteSpace(root) ? string.Empty : root.TrimEnd('/');
-            string right = relative.TrimStart('/');
-            return right.Length == 0 ? (left.Length == 0 ? "/" : left) : $"{left}/{right}";
         }
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
