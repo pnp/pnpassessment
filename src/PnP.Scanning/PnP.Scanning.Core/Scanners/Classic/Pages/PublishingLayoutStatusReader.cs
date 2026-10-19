@@ -27,7 +27,10 @@ internal sealed class PublishingLayoutStatusReader
 
         var siteUri = new Uri(siteUrl);
         var origin = siteUri.GetLeftPart(UriPartial.Authority);
-        var urls = new HashSet<string>(pages.Select(page => page.PageUrl), StringComparer.OrdinalIgnoreCase);
+        // Only the distinct layouts are read up front. Seeding this with every page URL as well
+        // would size the prefetch - the IN-list parameter and the tracked result alike - by the
+        // page count of the site collection instead of by the handful of layouts it shares.
+        var urls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var page in pages)
         {
             if (!TryResolveServerRelativeUrl(siteUri, page.LayoutUrl, out var url)) continue;
@@ -37,10 +40,12 @@ internal sealed class PublishingLayoutStatusReader
         var requestedUrls = urls.ToArray();
 
         // Post-scanning runs after all Web workers commit, including the root gallery.
-        var discovered = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
-            row.SiteUrl == siteUrl && row.RowType == "Page" &&
-            requestedUrls.Contains(EF.Functions.Collate(row.Url, "NOCASE")))
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var discovered = requestedUrls.Length == 0
+            ? new List<ClassicPageDiscovery>()
+            : await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
+                row.SiteUrl == siteUrl && row.RowType == "Page" &&
+                requestedUrls.Contains(EF.Functions.Collate(row.Url, "NOCASE")))
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
         var byUrl = discovered.Where(row => !string.IsNullOrWhiteSpace(row.Url))
             .ToLookup(row => row.Url, StringComparer.OrdinalIgnoreCase);
         var reader = new PublishingLayoutStatusReader(siteUri, async url =>
@@ -71,8 +76,14 @@ internal sealed class PublishingLayoutStatusReader
             }
             catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
-                foreach (var row in byUrl[page.PageUrl].Where(row =>
-                    string.Equals(row.WebUrl, page.WebUrl, StringComparison.OrdinalIgnoreCase)))
+                // The page's own discovery rows carry this failure, and nothing else needs them,
+                // so they are read on the failure path rather than prefetched for every page.
+                var failed = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
+                    row.SiteUrl == siteUrl && row.RowType == "Page" &&
+                    EF.Functions.Collate(row.WebUrl, "NOCASE") == page.WebUrl &&
+                    EF.Functions.Collate(row.Url, "NOCASE") == page.PageUrl)
+                    .ToListAsync(cancellationToken).ConfigureAwait(false);
+                foreach (var row in failed)
                 {
                     AssessmentWebDiscovery.AddError(row, "PageLayoutMetadata", AssessmentWebDiscovery.ErrorCode(ex),
                         AssessmentWebDiscovery.ErrorDetail(ex));
