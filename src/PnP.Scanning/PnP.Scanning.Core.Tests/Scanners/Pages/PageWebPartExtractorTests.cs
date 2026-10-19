@@ -104,6 +104,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             };
 
             PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().Be("ArticleLeft");
+            PageWebPartExtractor.GetPublishingPageLayoutUrl(fieldValues).Should().Be("/_catalogs/masterpage/ArticleLeft.aspx");
         }
 
         [Fact]
@@ -115,6 +116,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             };
 
             PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+            PageWebPartExtractor.GetPublishingPageLayoutUrl(fieldValues).Should().BeNull();
         }
 
         [Fact]
@@ -126,6 +128,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             };
 
             PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+            PageWebPartExtractor.GetPublishingPageLayoutUrl(fieldValues).Should().BeNull();
         }
 
         [Fact]
@@ -138,12 +141,14 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             };
 
             PageWebPartExtractor.GetPublishingPageLayoutName(fieldValues).Should().BeEmpty();
+            PageWebPartExtractor.GetPublishingPageLayoutUrl(fieldValues).Should().Be("/_catalogs/masterpage/ArticleLeft.aspx");
         }
 
         [Fact]
         public void GetPublishingPageLayoutName_NullFieldValues_ReturnsEmpty()
         {
             PageWebPartExtractor.GetPublishingPageLayoutName(null).Should().BeEmpty();
+            PageWebPartExtractor.GetPublishingPageLayoutUrl(null).Should().BeNull();
         }
     }
 }

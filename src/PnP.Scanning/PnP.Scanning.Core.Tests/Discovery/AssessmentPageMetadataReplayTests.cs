@@ -59,6 +59,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
 
         foreach (var fixture in fixtures)
         {
+            fixture.Row.CustomizedPageStatus = fixture.Row.Url.EndsWith("/wiki.aspx", StringComparison.Ordinal)
+                ? "Customized" : "Uncustomized";
             var input = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
             fixture.StreamRequests.Should().Be(1, "computed metadata requires explicit native list-stream ViewFields");
             fixture.AllProjectionRequests.Should().Be(0, "$select=* is not complete page metadata");
@@ -100,6 +102,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         stored.Should().OnlyContain(page => page.HomePage == null && page.ModifiedBy == null);
         stored.Select(page => page.PageType).Should().BeEquivalentTo("PublishingPage", "WikiPage", "WebPartPage", "ASPXPage");
         stored.Single(page => page.PageType == "WikiPage").AssessmentStatus.Should().Be("Failed");
+        stored.Single(page => page.PageType == "WikiPage").CustomizedPageStatus.Should().Be("Customized");
+        stored.Should().OnlyContain(page => page.LayoutCustomizedPageStatus == null);
 
         var reportDirectory = Path.Combine(Path.GetTempPath(), "assessment-native-metadata-replay-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(reportDirectory);
@@ -111,6 +115,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             classic.Should().HaveCount(4);
             classic.Single(page => page.PageType == "PublishingPage").PageName.Should().Be("Publishing, \"replay\"\npage");
             classic.Single(page => page.PageType == "WikiPage").AssessmentStatus.Should().Be("Failed");
+            classic.Single(page => page.PageType == "WikiPage").CustomizedPageStatus.Should().Be("Customized");
+            classic.Single(page => page.PageType == "PublishingPage").CustomizedPageStatus.Should().Be("Uncustomized");
             classic.Select(page => page.FileUniqueId).Should().BeEquivalentTo(stored.Select(page => page.FileUniqueId));
             discovery.Where(row => row.RowType == "Page").Should().HaveCount(5);
             discovery.Where(row => row.RowType == "Page").Should().OnlyContain(row => row.DiscoveryStatus == "Discovered");
@@ -118,6 +124,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 .Should().Be("NotApplicable");
             discovery.Single(row => row.Url.EndsWith("/wiki.aspx", StringComparison.Ordinal)).ErrorDetail
                 .Should().Contain("access denied, \"web parts\"\nretained page");
+            discovery.Single(row => row.Url.EndsWith("/wiki.aspx", StringComparison.Ordinal)).CustomizedPageStatus
+                .Should().Be("Customized");
             discovery.Single(row => row.RowType == "Scope").FileUniqueId.Should().BeNull();
             discovery.Should().HaveCount(6);
             Directory.GetFiles(reportDirectory, "*gap*.csv").Should().BeEmpty();

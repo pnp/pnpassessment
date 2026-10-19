@@ -70,6 +70,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
                 nameof(ClassicPageDiscovery.FileUniqueId),
                 nameof(ClassicPageDiscovery.ListItemId),
                 nameof(ClassicPageDiscovery.FileName),
+                nameof(ClassicPageDiscovery.CustomizedPageStatus),
                 nameof(ClassicPageDiscovery.SetupPath),
                 nameof(ClassicPageDiscovery.HomePage),
                 nameof(ClassicPageDiscovery.LibraryHidden),
@@ -104,7 +105,8 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         var file = Guid.NewGuid();
         var record = File(file, "a.aspx");
         var rich = AssessmentWebDiscovery.Page(scan, Site, "/", new("files", null, DiscoveryScopeKind.Folder,
-            DiscoverySourceKind.RawListLibraryFiles, "/pages", "test"), record with { ListItemId = 7, HomePage = true });
+            DiscoverySourceKind.RawListLibraryFiles, "/pages", "test"), record with
+            { ListItemId = 7, HomePage = true, CustomizedPageStatusRaw = "1" });
         rich.AssessmentStatus = "Failed";
         rich.ErrorStage = "PageMetadata";
         rich.ErrorCodes = "HTTP403";
@@ -116,9 +118,63 @@ public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanCont
         rows.Should().ContainSingle();
         rows[0].ListItemId.Should().Be(7);
         rows[0].HomePage.Should().BeTrue();
+        rows[0].CustomizedPageStatus.Should().Be("Uncustomized");
         rows[0].DiscoveryStatus.Should().Be("Discovered");
         rows[0].AssessmentStatus.Should().Be("Failed");
         rows[0].ErrorCodes.Should().Contain("HTTP403");
+    }
+
+    [Fact]
+    public async Task Changed_customization_status_is_preserved_with_a_visible_conflict()
+    {
+        var scan = Guid.NewGuid();
+        var scope = new DiscoveryScopeRegistration("files", null, DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.RawListLibraryFiles, "/pages", "test");
+        var file = File(Guid.NewGuid(), "a.aspx");
+        var first = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { CustomizedPageStatusRaw = "1" });
+        var second = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { CustomizedPageStatusRaw = "2" });
+        await Writer().WriteAsync(new[] { first });
+        await Writer().WriteAsync(new[] { second });
+        var row = (await Writer().ReadPagesAsync(scan, Site, "/")).Single();
+        row.CustomizedPageStatus.Should().Be("Customized");
+        row.ErrorCodes.Should().Contain(DiscoveryGapCodes.ChangedDuringScan);
+        row.ErrorDetail.Should().Contain("CustomizedPageStatus");
+    }
+
+    [Theory]
+    [InlineData("0", "None")]
+    [InlineData("1", "Uncustomized")]
+    [InlineData("2", "Customized")]
+    [InlineData("None", "None")]
+    [InlineData(" uncustomized ", "Uncustomized")]
+    [InlineData("Customized", "Customized")]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    public void Page_customization_status_is_normalized_and_projected(string raw, string expected)
+    {
+        var scope = new DiscoveryScopeRegistration("files", null, DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.RawListLibraryFiles, "/pages", "test");
+        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", scope,
+            File(Guid.NewGuid(), "a.aspx") with { CustomizedPageStatusRaw = raw });
+        row.CustomizedPageStatus.Should().Be(expected);
+        row.ErrorCodes.Should().BeNull();
+        var page = new ClassicPage();
+        Core.Scanners.PageScanComponent.ApplyDiscoveryState(page, row);
+        page.CustomizedPageStatus.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("99")]
+    [InlineData("unknown")]
+    public void Invalid_customization_status_retains_page_and_records_error(string raw)
+    {
+        var scope = new DiscoveryScopeRegistration("files", null, DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.RawListLibraryFiles, "/pages", "test");
+        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", scope,
+            File(Guid.NewGuid(), "a.aspx") with { CustomizedPageStatusRaw = raw });
+        row.CustomizedPageStatus.Should().BeNull();
+        row.DiscoveryStatus.Should().Be("Discovered");
+        row.ErrorCodes.Should().Contain("InvalidCustomizedPageStatus");
     }
 
     [Fact]

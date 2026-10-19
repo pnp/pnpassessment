@@ -40,6 +40,7 @@ FolderUniqueId | Unique id of the owning or inspected folder when available.
 FileUniqueId | Unique id of the discovered file for Page rows when available.
 ListItemId | List item id of the discovered file when the page is list-backed.
 FileName | File name of the discovered page.
+CustomizedPageStatus | SharePoint page-file customization status: `Uncustomized` (ghosted), `Customized` (unghosted), or `None` (no customization classification). Empty when unavailable or on non-Page rows. Unrecognized values produce `PageCustomizationMetadata` errors rather than an inferred status. Repeated observations retain known values when a later read omits the status.
 SetupPath | The file's `vti_setuppath`: the on-disk template a ghosted file was provisioned from. Empty means the file is unghosted, so it is user authored or user uploaded.
 HomePage | True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
