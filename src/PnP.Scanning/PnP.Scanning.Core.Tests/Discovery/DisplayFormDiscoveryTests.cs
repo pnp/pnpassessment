@@ -95,6 +95,40 @@ public sealed class DisplayFormDiscoveryTests
         AspxAdmission.Evaluate(record).IsAspx.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task A_display_form_page_is_recorded_as_a_list_item_not_a_file()
+    {
+        // "File" asserts the row represents a file. One form file backs N of these addresses, so the
+        // page is a ListItem — and the page scanner routes on exactly that, because such a row cannot
+        // be read as a physical file: the item's FileRef is not the form's URL.
+        using var factory = new DisplayFormFactory();
+        using var provider = Provider(factory);
+        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
+        var record = (await ReadRecordsAsync(provider.CreateRawSource(surface))).Single();
+
+        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), SiteUrl.AbsoluteUri, "/", surface, record);
+
+        row.ScopeType.Should().Be("ListItem");
+        Core.Scanners.PageScanComponent.IsDisplayFormPage(row).Should().BeTrue();
+        row.Url.Should().Be("/sites/a/Lists/Posts/Post.aspx?ID=7");
+        row.ListItemId.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task A_physically_discovered_page_stays_a_file()
+    {
+        using var factory = new DisplayFormFactory();
+        using var provider = Provider(factory);
+        var scope = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.First();
+        var file = new RawDiscoveryRecord(Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"),
+            "container", "default.aspx", "/sites/a/default.aspx", true, "test");
+
+        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), SiteUrl.AbsoluteUri, "/", scope, file);
+
+        row.ScopeType.Should().Be("File");
+        Core.Scanners.PageScanComponent.IsDisplayFormPage(row).Should().BeFalse();
+    }
+
     private static async Task<DiscoveryScopeRegistration> DisplayFormSurfaceAsync(
         SharePointLiveAspxDiscoveryProvider provider, string listTitle)
     {

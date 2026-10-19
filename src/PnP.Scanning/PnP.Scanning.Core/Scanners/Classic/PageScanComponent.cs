@@ -87,13 +87,16 @@ namespace PnP.Scanning.Core.Scanners
             var discoveryWriter = new AssessmentDiscoveryWriter(scannerBase.ScanId);
 
             // Pages that own no .aspx file of their own: a list item rendered through a shared display
-            // form as "<displayForm>?ID=<n>" (blog posts are the canonical case). The physical discovery
-            // provider cannot see these because they have no document row to enumerate.
-            await AddDisplayFormPagesAsync(discovery, context, lists, discoveryWriter).ConfigureAwait(false);
+            // form as "<displayForm>?ID=<n>" (blog posts are the canonical case). Discovery established
+            // which items are pages and at which address; only their report rows are built here.
+            await AddDisplayFormPagesAsync(discovery, lists, discoveredPages).ConfigureAwait(false);
             // The provider has already found the physical pages in the requested page scope. Do not
             // rediscover selected libraries or gate their existence on publishing features/template.
             foreach (var row in discoveredPages)
             {
+                // Already materialized above, and never readable as a physical file: the item's FileRef
+                // is not the form's URL, so the physical metadata path would reject it.
+                if (IsDisplayFormPage(row)) continue;
                 // The discovery provider records a nullable value so an unavailable modeled call is
                 // not mistaken for false. Prefer the later CSOM read when it succeeded; it is also the
                 // value used by the page assessment and keeps --homepageonly from filtering every page
@@ -230,141 +233,88 @@ namespace PnP.Scanning.Core.Scanners
                                                                    discovery.ModernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
         }
 
-        // Discovers the pages that exist only as a list item. Such an item has no file of its own; it is
-        // rendered through a shared display form with its id in the query string, so one physical form
-        // file serves N pages and the page identity is (ListId, ItemId) rather than a file. SharePoint
-        // resolves that form in two tiers (ListFormWebPart.ComputeServerRelativePageUrl): the item's
-        // content type DisplayFormUrl when it is set, otherwise the list's DefaultDisplayFormUrl. Neither
-        // the web template nor the list template takes part in that resolution, so neither gates this.
-        private static async Task AddDisplayFormPagesAsync(PageDiscovery disc, PnPContext context, List<IList> lists,
-            AssessmentDiscoveryWriter discoveryWriter)
+        // A page that exists only as a list item has no file of its own; it is rendered through a shared
+        // display form with its id in the query string, so one physical form file serves N pages and the
+        // page identity is (ListId, ItemId) rather than a file. Which items are such pages, and at which
+        // address, is settled by discovery. What is read here is only the item metadata the report shows,
+        // streamed once per list rather than once per page.
+        private static async Task AddDisplayFormPagesAsync(PageDiscovery disc, List<IList> lists,
+            IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {
-            // The two roots a form URL token can be relative to. The web comes from the context URI, which
-            // the SDK always sets; Site.Url is not loaded by default, so the site collection root is taken
-            // from the scan's own site URL instead of triggering an extra server call per web.
-            string webServerRelativeUrl = context.Uri.AbsolutePath;
-            string siteServerRelativeUrl = Uri.TryCreate(disc.ScannerBase.SiteUrl, UriKind.Absolute, out Uri siteUri)
-                ? siteUri.AbsolutePath
-                : webServerRelativeUrl;
-
-            foreach (var list in lists)
+            foreach (var group in discoveredPages.Where(IsDisplayFormPage).Where(row => row.ListItemId != null)
+                .GroupBy(row => row.ListId))
             {
-                // This route's premise is that the items have no file of their own. A document library
-                // violates it: its items are files, already inventoried by the physical discovery with a
-                // real FileUniqueId, and its DispForm.aspx shows an item's metadata form rather than page
-                // content. Skipped before resolving a form or querying any item.
-                if (list.BaseType == PnP.Core.Model.SharePoint.ListBaseType.DocumentLibrary)
+                var list = lists.FirstOrDefault(value => value.Id == group.Key);
+                if (list == null)
                 {
+                    // The page was discovered through this list, so its absence here is a read gap in the
+                    // web's list set rather than evidence that the page is not assessable.
+                    foreach (var row in group) row.AssessmentStatus = "NotApplicable";
                     continue;
                 }
 
-                // Ordered longest content type id first so the most specific type in the id hierarchy wins.
-                var contentTypeForms = list.ContentTypes.AsRequested()
-                    .Where(contentType => !string.IsNullOrEmpty(contentType.Id))
-                    .Select(contentType => (ContentTypeId: contentType.Id, FormUrl: DisplayFormUrlPolicy.ToServerRelative(
-                        contentType.DisplayFormUrl, webServerRelativeUrl, siteServerRelativeUrl)))
-                    .Where(candidate => candidate.FormUrl != null)
-                    .OrderByDescending(candidate => candidate.ContentTypeId.Length)
-                    .ToList();
-                string listForm = DisplayFormUrlPolicy.ToServerRelative(list.DefaultDisplayFormUrl,
-                    webServerRelativeUrl, siteServerRelativeUrl);
-
-                // A list whose every candidate form is the stock list form holds ordinary data rows
-                // (announcements, tasks, contacts) viewed through a system form, not content pages.
-                // Enumerating those would report every list item in the tenant as a page.
-                if (!contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm)
-                    .Any(DisplayFormUrlPolicy.IsContentPageForm))
-                {
-                    continue;
-                }
-
-                var rows = new List<ClassicPageDiscovery>();
-                await QueryListAsync(list, PageQuery(new List<string> { }, filterOnASPXPages: false), (IEnumerable<IListItem> listItems) =>
+                var byItemId = group.GroupBy(row => row.ListItemId.Value)
+                    .ToDictionary(rows => rows.Key, rows => rows.First());
+                await QueryListAsync(list, PageQuery(new List<string> { }, filterOnASPXPages: false),
+                    (IEnumerable<IListItem> listItems) =>
                 {
                     foreach (var listItem in listItems)
                     {
-                        string displayForm = DisplayFormUrlPolicy.Resolve(contentTypeForms, listForm,
-                            GetFieldValue(listItem, ContentTypeIdField, string.Empty));
-                        if (!DisplayFormUrlPolicy.IsContentPageForm(displayForm))
+                        if (byItemId.TryGetValue(listItem.Id, out var row))
                         {
-                            continue;
+                            AddDisplayFormPage(disc, list, listItem, row);
                         }
-
-                        rows.Add(AddDisplayFormPage(disc, list, listItem, displayForm));
                     }
                 }).ConfigureAwait(false);
 
-                if (rows.Count > 0)
+                // An item the stream did not return no longer exists, or was not readable. Its discovery
+                // stands; only its enrichment is unavailable.
+                foreach (var row in group.Where(row => string.IsNullOrEmpty(row.AssessmentStatus)))
                 {
-                    await discoveryWriter.WriteAsync(rows).ConfigureAwait(false);
+                    row.AssessmentStatus = "Failed";
+                    AssessmentWebDiscovery.AddError(row, "PageMetadata", DiscoveryGapCodes.IdentityMissing,
+                        "The discovered list item was not returned by its list's item stream.");
                 }
             }
         }
 
-        // Records one item-only page: the ClassicPage row the report consumes plus the ClassicPageDiscovery
-        // row that carries it through the coverage/evidence model like every physically discovered page.
-        private static ClassicPageDiscovery AddDisplayFormPage(PageDiscovery disc, IList list, IListItem listItem,
-            string displayFormUrl)
+        // Discovery marks a page addressed through a shared display form as a ListItem rather than a File,
+        // because the row is one of N addresses backed by one form file.
+        internal static bool IsDisplayFormPage(ClassicPageDiscovery row) =>
+            string.Equals(row.ScopeType, "ListItem", StringComparison.Ordinal);
+
+        // Builds the report row for one item-only page from its discovered row plus the item metadata.
+        private static void AddDisplayFormPage(PageDiscovery disc, IList list, IListItem listItem,
+            ClassicPageDiscovery row)
         {
-            string pageUrl = $"{displayFormUrl}?ID={listItem.Id}";
-            // A list display form is never the web's welcome page, so --homepageonly deliberately keeps
-            // none of these pages: a web's welcome page is always a physical file.
-            var homePage = ResolveHomePageState(pageUrl, disc.WelcomePage, disc.WelcomePageKnown, null);
-            bool selected = !disc.HomePageOnly || homePage == true;
             bool blogPost = list.TemplateType == PnP.Core.Model.SharePoint.ListTemplateType.Posts;
             string pageType = blogPost ? BlogPage : ASPXPage;
             string remediationCode = (blogPost ? RemediationCodes.CP4 : RemediationCodes.CP5).ToString();
 
-            if (selected)
+            disc.Pages.Add(new ClassicPage
             {
-                disc.Pages.Add(new ClassicPage
-                {
-                    ScanId = disc.ScannerBase.ScanId,
-                    SiteUrl = disc.ScannerBase.SiteUrl,
-                    WebUrl = disc.ScannerBase.WebUrl,
-                    PageUrl = pageUrl,
-                    PageName = GetFieldValue(listItem, TitleField, ""),
-                    ListUrl = list.RootFolder.ServerRelativeUrl,
-                    ListTitle = list.Title,
-                    ListId = list.Id,
-                    ListItemId = listItem.Id,
-                    ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
-                    ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
-                    PageType = pageType,
-                    HomePage = homePage,
-                    DiscoveryStatus = "Discovered",
-                    AssessmentStatus = "Complete",
-                    RemediationCode = remediationCode,
-                });
+                ScanId = row.ScanId,
+                SiteUrl = row.SiteUrl,
+                WebUrl = row.WebUrl,
+                PageUrl = row.Url,
+                PageName = GetFieldValue(listItem, TitleField, ""),
+                ListUrl = list.RootFolder.ServerRelativeUrl,
+                ListTitle = list.Title,
+                ListId = list.Id,
+                ListItemId = listItem.Id,
+                ModifiedAt = GetFieldValue<DateTime>(listItem, ModifiedField),
+                ModifiedBy = GetModifiedBy(listItem.Values, disc.SkipUserInformation),
+                PageType = pageType,
+                HomePage = row.HomePage,
+                RemediationCode = remediationCode,
+            });
 
-                disc.RemediationCodes.Add(remediationCode);
-            }
+            disc.RemediationCodes.Add(remediationCode);
+            row.PageType = pageType;
+            row.AssessmentStatus = "Complete";
 
             // The web parts of such a page live on the shared display form, not on the item, so there is
             // no per-item web part inventory to extract: these pages are not added to EnrichmentInputs.
-            return new ClassicPageDiscovery
-            {
-                ScanId = disc.ScannerBase.ScanId,
-                SiteUrl = disc.ScannerBase.SiteUrl,
-                WebUrl = disc.ScannerBase.WebUrl,
-                RecordKey = "page:" + DiscoveryHash.Of(disc.ScannerBase.SiteUrl?.ToLowerInvariant(),
-                    disc.ScannerBase.WebUrl?.ToLowerInvariant(), list.Id.ToString("D") + ":" +
-                    listItem.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                RowType = "Page",
-                ScopeType = "ListItem",
-                Url = pageUrl,
-                FileName = Path.GetFileName(displayFormUrl),
-                ListId = list.Id,
-                ListItemId = listItem.Id,
-                ContentTypeId = GetFieldValue<string>(listItem, ContentTypeIdField),
-                HomePage = homePage,
-                PageType = pageType,
-                LibraryHidden = list.Hidden,
-                ObservationMethod = DiscoverySourceKind.ListItemDisplayFormPages.ToString(),
-                DiscoveryStatus = "Discovered",
-                AssessmentStatus = selected ? "Complete" : "NotSelected",
-                ObservedAtUtc = DateTime.UtcNow,
-            };
         }
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
