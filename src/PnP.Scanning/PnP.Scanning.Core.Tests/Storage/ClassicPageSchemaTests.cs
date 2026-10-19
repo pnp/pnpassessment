@@ -1,5 +1,8 @@
 ﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Data.Sqlite;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -17,6 +20,51 @@ namespace PnP.Scanning.Core.Tests.Storage
         public ClassicPageSchemaTests(ScanContextFixture fixture)
         {
             this.fixture = fixture;
+        }
+
+        [Fact]
+        public async Task Customization_migration_preserves_existing_pages_with_unknown_statuses()
+        {
+            using var connection = new SqliteConnection("Filename=:memory:");
+            await connection.OpenAsync();
+            var options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options;
+            using var context = new ScanContext(options);
+            var migrator = context.GetService<IMigrator>();
+            var previous = context.Database.GetMigrations().Last(name => !name.EndsWith("_PageCustomizationStatus"));
+            context.Database.GetMigrations().Last().Should().EndWith("_PageCustomizationStatus");
+            await migrator.MigrateAsync(previous);
+            var scan = Guid.NewGuid();
+            var list = Guid.NewGuid();
+            var modified = new DateTime(2026, 1, 1);
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO ClassicPages
+                    (ScanId, SiteUrl, WebUrl, PageUrl, ListId, ModifiedAt, UncustomizedHomePage, WebPartCount, MappingPercentage)
+                VALUES ({scan}, 'https://contoso.sharepoint.com/sites/a', '/', '/Pages/a.aspx', {list}, {modified}, 0, 2, 100)
+                """);
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO ClassicPageDiscoveries
+                    (ScanId, SiteUrl, WebUrl, RecordKey, RowType, Url, DiscoveryStatus, ObservedAtUtc, SetupPath)
+                VALUES ({scan}, 'https://contoso.sharepoint.com/sites/a', '/', 'existing-page', 'Page',
+                    '/Pages/a.aspx', 'Discovered', {modified}, 'STS\default.aspx')
+                """);
+
+            await migrator.MigrateAsync();
+
+            var page = await context.ClassicPages.SingleAsync();
+            page.ScanId.Should().Be(scan);
+            page.WebPartCount.Should().Be(2);
+            page.CustomizedPageStatus.Should().BeNull();
+            page.LayoutUrl.Should().BeNull();
+            page.LayoutCustomizedPageStatus.Should().BeNull();
+            var discovered = await context.ClassicPageDiscoveries.SingleAsync();
+            discovered.SetupPath.Should().Be(@"STS\default.aspx");
+            discovered.CustomizedPageStatus.Should().BeNull();
+
+            await migrator.MigrateAsync(previous);
+            await migrator.MigrateAsync();
+            context.ChangeTracker.Clear();
+            (await context.ClassicPages.SingleAsync()).WebPartCount.Should().Be(2);
+            (await context.ClassicPageDiscoveries.SingleAsync()).SetupPath.Should().Be(@"STS\default.aspx");
         }
 
         [Fact]
@@ -42,6 +90,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                     HomePage = true,
                     UncustomizedHomePage = true,
                     ModifiedBy = "Jane Doe",
+                    CustomizedPageStatus = "Uncustomized",
                 });
 
                 context.ClassicPageWebParts.Add(new ClassicPageWebPart
@@ -85,6 +134,9 @@ namespace PnP.Scanning.Core.Tests.Storage
                 page.HomePage.Should().BeTrue();
                 page.UncustomizedHomePage.Should().BeTrue();
                 page.ModifiedBy.Should().Be("Jane Doe");
+                page.CustomizedPageStatus.Should().Be("Uncustomized");
+                page.LayoutUrl.Should().BeNull();
+                page.LayoutCustomizedPageStatus.Should().BeNull();
 
                 var webPart = context.ClassicPageWebParts.Single(wp =>
                     wp.ScanId == scanId && wp.PageUrl == pageUrl && wp.WebPartIndex == 0);
