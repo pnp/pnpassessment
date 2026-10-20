@@ -174,6 +174,10 @@
 <td>SharePoint page-file customization status: <code>Uncustomized</code> (ghosted), <code>Customized</code> (unghosted), or <code>None</code> (no customization classification). Empty when unavailable or on non-Page rows. Unrecognized values produce <code>PageCustomizationMetadata</code> errors rather than an inferred status. Repeated observations retain known values when a later read omits the status.</td>
 </tr>
 <tr>
+<td>SetupPath</td>
+<td>The file's <code>vti_setuppath</code>: the on-disk template a ghosted file was provisioned from. Empty means the file is unghosted, so it is user authored or user uploaded.</td>
+</tr>
+<tr>
 <td>HomePage</td>
 <td>True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.</td>
 </tr>
@@ -191,7 +195,7 @@
 </tr>
 <tr>
 <td>AssessmentStatus</td>
-<td>Page enrichment result: <code>Complete</code>, <code>NotSelected</code>, <code>NotApplicable</code> or <code>Failed</code>. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as <code>NotSelected</code>.</td>
+<td>Page enrichment result: <code>Complete</code>, <code>NotSelected</code>, <code>NotApplicable</code> or <code>Failed</code>. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as <code>NotSelected</code>. A file whose list item could not be read is still assessed from the file alone, with the inapplicable item-dependent operations recorded in <code>ErrorCodes</code>: <code>list_association_absent</code> when the file belongs to no list, which is the normal state of a web-root file; <code>list_item_absent</code> for a confirmed absence of any backing item; <code>owning_list_unresolved</code> when the file names an owning list that was not matched in the web; <code>list_association_unknown</code> when the file lies inside a loaded list, so it is list-backed, but no observation of it reported a list association — the identity is unknown rather than absent; and <code>system_page_template</code> when <code>SetupPath</code> proves the file ghosts from the stock list view or list form template and therefore carries no page content of its own. The first two are confirmed structural absences and do not make the page a failure. The next two are read gaps and leave the assessment <code>Failed</code>, because the item metadata may exist and was simply unreachable.</td>
 </tr>
 <tr>
 <td>ExpectedChildCount</td>
