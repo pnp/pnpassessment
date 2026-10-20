@@ -475,7 +475,11 @@ namespace PnP.Scanning.Core.Scanners
                     "The file has no backing list item: item field values, ModifiedAt/ModifiedBy and WikiField are not applicable.");
             }
 
-            var family = SetupPathClassifier.Classify(row.SetupPath);
+            // The analyzer is the only reader of the setup path, so the provisioning fact is
+            // established once and the page type below is a projection of it rather than a second,
+            // independently drifting reading.
+            var provisioning = ProvisioningTemplateAnalyzer.Observe(row);
+            var family = ProvisioningTemplateAnalyzer.FamilyOf(provisioning);
             string pageType = FileLevelPageType(family);
             if (pageType == null)
             {

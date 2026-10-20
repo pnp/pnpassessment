@@ -27,7 +27,10 @@ namespace PnP.Scanning.Core.Scanners
     /// </remarks>
     internal sealed class ClassicPageWebContext
     {
-        private ClassicPageWebContext() { }
+        // Internal rather than private so a test can construct the empty context an analyzer that
+        // reads no per-web surface never touches. CreateAsync remains the only way to get a
+        // populated one, which is the invariant that matters.
+        internal ClassicPageWebContext() { }
 
         internal ScannerBase Scanner { get; private init; }
 
