@@ -115,6 +115,29 @@ public sealed class DisplayFormDiscoveryTests
     }
 
     [Fact]
+    public async Task The_assessment_loop_must_route_a_display_form_page_before_classifying_its_list()
+    {
+        // Ordering guard. A display-form address lives inside its list's root folder, so the
+        // file-level route's containment check would read its null-free identity as a list-backed
+        // file whose association went unobserved, and fail it. The loop must therefore recognise the
+        // row as a display-form page before it reaches ClassifyListAssociation.
+        using var factory = new DisplayFormFactory();
+        using var provider = Provider(factory);
+        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
+        var record = (await ReadRecordsAsync(provider.CreateRawSource(surface))).Single();
+        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), SiteUrl.AbsoluteUri, "/", surface, record);
+
+        Core.Scanners.PageScanComponent.IsDisplayFormPage(row)
+            .Should().BeTrue("the loop skips on this before any list classification runs");
+
+        // What the file-level route would have concluded had the guard not run first.
+        Core.Scanners.PageScanComponent.ClassifyListAssociation(row, listMatched: false,
+                new[] { "/sites/a/Lists/Posts" })
+            .Should().Be(Core.Scanners.PageScanComponent.ListAssociationState.OwningListUnresolved,
+                "which AddFileLevelPage records as Failed - the verdict the guard exists to prevent");
+    }
+
+    [Fact]
     public async Task A_physically_discovered_page_stays_a_file()
     {
         using var factory = new DisplayFormFactory();
