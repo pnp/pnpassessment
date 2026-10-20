@@ -59,12 +59,14 @@ namespace PnP.Scanning.Core.Scanners
         // Assessment stage recorded on a page whose list-item surface could not be opened.
         private const string ItemMetadataStage = "PageItemMetadata";
 
-        // Three different facts, never collapsed into one. The first two are confirmed structural
+        // Four different facts, never collapsed into one. The first two are confirmed structural
         // absences — a web-root file belongs to no list, and a file can exist without a backing item —
-        // while the third is a read gap: the file names an owning list the web did not return.
+        // while the last two are read gaps: the file names an owning list the web did not return, or it
+        // lies inside a loaded list whose association this assessment never observed.
         internal const string ListAssociationAbsentCode = "list_association_absent";
         internal const string ListItemAbsentCode = "list_item_absent";
         internal const string OwningListUnresolvedCode = "owning_list_unresolved";
+        internal const string ListAssociationUnknownCode = "list_association_unknown";
 
         // The file's vti_setuppath proves it ghosts from a stock list view/form template.
         internal const string SystemPageTemplateCode = "system_page_template";
@@ -97,6 +99,10 @@ namespace PnP.Scanning.Core.Scanners
             };
 
             var lists = context.Web.Lists.AsRequested().ToList();
+            // A file inside one of these folders is list-backed even when its discovery record carries no
+            // list identity, which separates an unobserved association from an absent one below.
+            var listRootFolderUrls = lists.Select(value => value.RootFolder?.ServerRelativeUrl)
+                .Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
             var discoveryWriter = new AssessmentDiscoveryWriter(scannerBase.ScanId);
 
             // Pages that own no .aspx file of their own: a list item rendered through a shared display
@@ -122,7 +128,8 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     // Only the item-dependent reads are unavailable here, not the page itself: a file
                     // still resolves by URL alone, so it is assessed at file level instead of skipped.
-                    AddFileLevelPage(discovery, row, IsOwningListUnresolved(row, listMatched: list != null));
+                    AddFileLevelPage(discovery, row, ClassifyListAssociation(row, listMatched: list != null,
+                        listRootFolderUrls));
                     continue;
                 }
                 try
@@ -593,13 +600,20 @@ namespace PnP.Scanning.Core.Scanners
         // with no list item involved. Verified on a live tenant: a web's root default.aspx, newsfeed.aspx
         // and GettingStarted.aspx belong to no list and have no list item, yet both their vti_setuppath
         // and their web parts read from the file alone.
-        internal static void AddFileLevelPage(PageDiscovery disc, ClassicPageDiscovery row, bool owningListUnresolved)
+        internal static void AddFileLevelPage(PageDiscovery disc, ClassicPageDiscovery row,
+            ListAssociationState association)
         {
             // Recorded as separate limitations so the conditions stay distinguishable downstream.
-            if (owningListUnresolved)
+            if (association == ListAssociationState.OwningListUnresolved)
             {
                 AssessmentWebDiscovery.AddError(row, ItemMetadataStage, OwningListUnresolvedCode,
                     "The file names an owning list that was not matched in this web, so its list-item association could not be read.");
+            }
+            else if (association == ListAssociationState.Unknown)
+            {
+                AssessmentWebDiscovery.AddError(row, ItemMetadataStage, ListAssociationUnknownCode,
+                    "The file lies inside a loaded list, so it is list-backed, but no observation of this file reported its " +
+                    "list association: the identity is unknown rather than absent.");
             }
             else if (row.ListId == null)
             {
@@ -659,20 +673,68 @@ namespace PnP.Scanning.Core.Scanners
                 FileLevelOnly = true,
             });
 
-            // Only an unmatched owning list leaves the page assessment incomplete — its item metadata may
+            // Only an unresolved association leaves the page assessment incomplete — its item metadata may
             // well exist and simply was not reachable. A confirmed-absent list association or item does
             // not: everything that can be assessed about such a file is assessed here, with the
             // inapplicable item-dependent operations recorded above.
-            row.AssessmentStatus = owningListUnresolved ? "Failed" : "Complete";
+            row.AssessmentStatus = association == ListAssociationState.Resolved ? "Complete" : "Failed";
         }
 
-        // Separates the two ways a file can reach the assessment without an owning list. A row with no
-        // ListId belongs to no list at all — the normal state of a web-root file, and a confirmed
-        // structural fact of the same class as a null ListItemId. Only a row that names a list the web's
-        // loaded (unfiltered) list set did not return is a genuine read gap. Collapsing the two fails
-        // exactly the web-root entry pages this route exists to assess.
-        internal static bool IsOwningListUnresolved(ClassicPageDiscovery row, bool listMatched) =>
-            row.ListId != null && !listMatched;
+        // How much is actually known about a file's owning list, kept distinguishable because the three
+        // conditions carry different evidence and must not share one verdict.
+        internal enum ListAssociationState
+        {
+            // A confirmed structural fact: the file belongs to no list, so there is no item surface.
+            Resolved,
+            // The file names a list the web's loaded (unfiltered) set did not return.
+            OwningListUnresolved,
+            // The file lies inside a loaded list, so an association must exist, but no observation of
+            // this file reported one.
+            Unknown,
+        }
+
+        // Separates the ways a file can reach the assessment without a usable owning list.
+        //
+        // A null ListId is not self-evidently an absent association. The modeled web-root traversal
+        // recursively visits every folder under the web root, including library folders, and
+        // ISharePointAspxRestClient.ReadFolderAsync does not request list or item identity, so its
+        // records always carry null IDs. While the richer per-list observation also succeeds the two
+        // merge and the identity is restored, but when that observation is denied or fails the modeled
+        // null is all that survives. Treating it as confirmed absence would report a list-backed page as
+        // fully assessed while its item content was never read.
+        //
+        // The file's own URL settles it against the same loaded list set already used above: a file
+        // inside a list's root folder is list-backed whatever the discovery record says, so a null there
+        // is unknown rather than absent. A file outside every list root folder - the normal state of the
+        // web-root entry pages this route exists to assess - keeps its confirmed-absence verdict.
+        internal static ListAssociationState ClassifyListAssociation(ClassicPageDiscovery row,
+            bool listMatched, IEnumerable<string> listRootFolderUrls)
+        {
+            if (row.ListId != null)
+                return listMatched ? ListAssociationState.Resolved : ListAssociationState.OwningListUnresolved;
+            return IsInsideAnyListRootFolder(row.Url, listRootFolderUrls)
+                ? ListAssociationState.Unknown : ListAssociationState.Resolved;
+        }
+
+        // Containment is matched on a folder boundary so that a sibling such as "/PagesArchive" is never
+        // read as living inside "/Pages".
+        internal static bool IsInsideAnyListRootFolder(string url, IEnumerable<string> listRootFolderUrls)
+        {
+            if (string.IsNullOrWhiteSpace(url) || listRootFolderUrls == null) return false;
+            var path = url.TrimEnd('/');
+            foreach (var root in listRootFolderUrls)
+            {
+                if (string.IsNullOrWhiteSpace(root)) continue;
+                var prefix = root.TrimEnd('/');
+                if (prefix.Length == 0) continue;
+                if (path.Length > prefix.Length && path[prefix.Length] == '/' &&
+                    path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         // Classifies a file-level page only as far as choosing an applicable extractor. The stock list
         // view/form templates have no page content surface to read, a proven web part page template is

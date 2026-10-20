@@ -30,7 +30,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             var disc = Discovery();
             var row = ListBacked(Row("newsfeed.aspx", @"Features\SiteFeed\newsfeed.aspx"));
 
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
 
             row.AssessmentStatus.Should().Be("Complete").And.NotBe("NotApplicable");
             row.DiscoveryStatus.Should().Be("Discovered", "the file's established existence survives");
@@ -54,7 +54,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             var row = Row(fileName, setupPath);
             row.ListId.Should().BeNull();
 
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
 
             row.AssessmentStatus.Should().Be("Complete").And.NotBe("Failed");
             row.ErrorCodes.Should().Contain(PageScanComponent.ListAssociationAbsentCode)
@@ -69,12 +69,14 @@ namespace PnP.Scanning.Core.Tests.Scanners
             // The defect this guards: both cases reach the page loop as a failed list match, and
             // collapsing them marked every web-root file Failed. In the scoped scan all 25 item-less
             // rows without a list were of the first kind, and none of the second.
-            PageScanComponent.IsOwningListUnresolved(Row("default.aspx", ""), listMatched: false)
-                .Should().BeFalse("a null ListId means the file belongs to no list, not that a lookup missed");
-            PageScanComponent.IsOwningListUnresolved(ListBacked(Row("page.aspx", "")), listMatched: false)
-                .Should().BeTrue("a named list the web did not return is a real inconsistency");
-            PageScanComponent.IsOwningListUnresolved(ListBacked(Row("page.aspx", "")), listMatched: true)
-                .Should().BeFalse();
+            PageScanComponent.ClassifyListAssociation(Row("default.aspx", ""), listMatched: false, NoLists)
+                .Should().Be(PageScanComponent.ListAssociationState.Resolved,
+                    "a null ListId on a file outside every list means it belongs to no list, not that a lookup missed");
+            PageScanComponent.ClassifyListAssociation(ListBacked(Row("page.aspx", "")), listMatched: false, NoLists)
+                .Should().Be(PageScanComponent.ListAssociationState.OwningListUnresolved,
+                    "a named list the web did not return is a real inconsistency");
+            PageScanComponent.ClassifyListAssociation(ListBacked(Row("page.aspx", "")), listMatched: true, NoLists)
+                .Should().Be(PageScanComponent.ListAssociationState.Resolved);
         }
 
         [Fact]
@@ -82,16 +84,16 @@ namespace PnP.Scanning.Core.Tests.Scanners
         {
             // 1. The file belongs to no list at all.
             var noList = Row("newsfeed.aspx", @"Features\SiteFeed\newsfeed.aspx");
-            PageScanComponent.AddFileLevelPage(Discovery(), noList, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(Discovery(), noList, PageScanComponent.ListAssociationState.Resolved);
 
             // 2. The file names an owning list that the web did not return, and does carry an item id.
             var unresolvedList = ListBacked(Row("default.aspx", @"SiteTemplates\STS\default.aspx"));
             unresolvedList.ListItemId = 12;
-            PageScanComponent.AddFileLevelPage(Discovery(), unresolvedList, owningListUnresolved: true);
+            PageScanComponent.AddFileLevelPage(Discovery(), unresolvedList, PageScanComponent.ListAssociationState.OwningListUnresolved);
 
             // 3. The owning list was matched; the server confirmed there is no backing item.
             var absentItem = ListBacked(Row("page.aspx", ""));
-            PageScanComponent.AddFileLevelPage(Discovery(), absentItem, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(Discovery(), absentItem, PageScanComponent.ListAssociationState.Resolved);
 
             noList.ErrorCodes.Should().Contain(PageScanComponent.ListAssociationAbsentCode)
                 .And.NotContain(PageScanComponent.OwningListUnresolvedCode);
@@ -113,7 +115,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         {
             var row = ListBacked(Row("GettingStarted.aspx", @"Features\GettingStarted\GettingStarted.aspx"));
 
-            PageScanComponent.AddFileLevelPage(Discovery(), row, owningListUnresolved: true);
+            PageScanComponent.AddFileLevelPage(Discovery(), row, PageScanComponent.ListAssociationState.OwningListUnresolved);
 
             row.ErrorCodes.Should().Contain(PageScanComponent.OwningListUnresolvedCode)
                 .And.Contain(PageScanComponent.ListItemAbsentCode)
@@ -130,7 +132,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             var disc = Discovery();
             var row = Row("AllItems.aspx", setupPath);
 
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
 
             // NotApplicable here is a server-recorded provisioning fact, carried as its own evidence code.
             row.AssessmentStatus.Should().Be("NotApplicable");
@@ -156,7 +158,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             var disc = Discovery();
             var row = Row("default.aspx", setupPath);
 
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
 
             row.AssessmentStatus.Should().Be("Complete").And.NotBe("NotApplicable");
             row.ErrorCodes.Should().NotContain(PageScanComponent.SystemPageTemplateCode);
@@ -179,7 +181,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         {
             var disc = Discovery();
 
-            PageScanComponent.AddFileLevelPage(disc, Row("page.aspx", setupPath), owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, Row("page.aspx", setupPath), PageScanComponent.ListAssociationState.Resolved);
 
             disc.Pages.Should().ContainSingle().Which.PageType.Should().Be(PageScanComponent.WebPartPage);
             disc.RemediationCodes.Should().Equal("CP1");
@@ -192,7 +194,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             var row = Row("GettingStarted.aspx", @"Features\GettingStarted\GettingStarted.aspx");
             row.HomePage = true;
 
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
 
             var page = disc.Pages.Should().ContainSingle().Subject;
             page.ScanId.Should().Be(row.ScanId);
@@ -221,7 +223,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             var row = Row("orphan.aspx", "");
             row.Url = null;
 
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
 
             row.AssessmentStatus.Should().Be("Failed");
             row.ErrorCodes.Should().Contain(DiscoveryGapCodes.IdentityMissing);
@@ -263,7 +265,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         {
             var disc = Discovery();
             var row = Row("default.aspx", @"SiteTemplates\STS\default.aspx");
-            PageScanComponent.AddFileLevelPage(disc, row, owningListUnresolved: false);
+            PageScanComponent.AddFileLevelPage(disc, row, PageScanComponent.ListAssociationState.Resolved);
             var page = disc.Pages.Single();
 
             // Replay what the enrichment loop does when the web part read throws: the readiness rollup is
@@ -297,6 +299,84 @@ namespace PnP.Scanning.Core.Tests.Scanners
         public void File_level_page_type_selects_only_an_applicable_extractor(string setupPath, string expected)
         {
             PageScanComponent.FileLevelPageType(SetupPathClassifier.Classify(setupPath)).Should().Be(expected);
+        }
+
+        // A web whose Pages library was loaded, used to prove a file inside it is list-backed even when
+        // its own discovery record carries no list identity.
+        private static readonly string[] PagesLibrary = { Web + "/Pages" };
+        private static readonly string[] NoLists = Array.Empty<string>();
+
+        [Fact]
+        public void A_modeled_observation_inside_a_loaded_list_reports_an_unknown_association_not_an_absent_one()
+        {
+            // The gap this guards: the modeled web-root traversal recurses into library folders, and
+            // ReadFolderAsync requests no list or item identity, so its records always carry null IDs.
+            // While the per-list observation also succeeds the two merge and the identity is restored;
+            // when that observation is denied the modeled null is all that survives. Reading it as a
+            // confirmed absence would report a list-backed page as fully assessed without ever opening
+            // its item.
+            var row = Row("foo.aspx", "");
+            row.Url = Web + "/Pages/foo.aspx";
+
+            var state = PageScanComponent.ClassifyListAssociation(row, listMatched: false, PagesLibrary);
+
+            state.Should().Be(PageScanComponent.ListAssociationState.Unknown);
+
+            // The row alone is indistinguishable from a web-root file; only the loaded list set settles
+            // it. Without that set this same row still classifies as a confirmed absence, which is the
+            // verdict this test exists to prevent.
+            PageScanComponent.ClassifyListAssociation(row, listMatched: false, NoLists)
+                .Should().Be(PageScanComponent.ListAssociationState.Resolved);
+
+            PageScanComponent.AddFileLevelPage(Discovery(), row, state);
+
+            row.ErrorCodes.Should().Contain(PageScanComponent.ListAssociationUnknownCode)
+                .And.NotContain(PageScanComponent.ListAssociationAbsentCode);
+            row.AssessmentStatus.Should().Be("Failed",
+                "an unobserved association must not be reported as a completed assessment");
+        }
+
+        [Fact]
+        public void A_web_root_file_outside_every_loaded_list_keeps_its_confirmed_absence()
+        {
+            // The counterpart the fix above must not regress: these are the entry pages this route
+            // exists to assess, and their null ListId is a genuine structural fact.
+            var row = Row("default.aspx", @"SiteTemplates\STS\default.aspx");
+
+            var state = PageScanComponent.ClassifyListAssociation(row, listMatched: false, PagesLibrary);
+
+            state.Should().Be(PageScanComponent.ListAssociationState.Resolved);
+
+            PageScanComponent.AddFileLevelPage(Discovery(), row, state);
+
+            row.ErrorCodes.Should().Contain(PageScanComponent.ListAssociationAbsentCode)
+                .And.NotContain(PageScanComponent.ListAssociationUnknownCode);
+            row.AssessmentStatus.Should().Be("Complete");
+        }
+
+        [Theory]
+        // Inside the library, at its root and nested.
+        [InlineData(Web + "/Pages/foo.aspx", true)]
+        [InlineData(Web + "/Pages/sub/foo.aspx", true)]
+        [InlineData(Web + "/PAGES/foo.aspx", true)]
+        // A sibling folder sharing the library's prefix is not inside it.
+        [InlineData(Web + "/PagesArchive/foo.aspx", false)]
+        // The web root itself, and the folder entry rather than a file within it.
+        [InlineData(Web + "/default.aspx", false)]
+        [InlineData(Web + "/Pages", false)]
+        public void List_containment_is_matched_on_a_folder_boundary(string url, bool inside)
+        {
+            PageScanComponent.IsInsideAnyListRootFolder(url, PagesLibrary).Should().Be(inside);
+        }
+
+        [Fact]
+        public void List_containment_tolerates_missing_urls_and_empty_list_sets()
+        {
+            PageScanComponent.IsInsideAnyListRootFolder(null, PagesLibrary).Should().BeFalse();
+            PageScanComponent.IsInsideAnyListRootFolder(Web + "/Pages/foo.aspx", null).Should().BeFalse();
+            PageScanComponent.IsInsideAnyListRootFolder(Web + "/Pages/foo.aspx", NoLists).Should().BeFalse();
+            PageScanComponent.IsInsideAnyListRootFolder(Web + "/Pages/foo.aspx", new[] { "", "   " })
+                .Should().BeFalse();
         }
 
         private static PageScanComponent.PageDiscovery Discovery() => new()
