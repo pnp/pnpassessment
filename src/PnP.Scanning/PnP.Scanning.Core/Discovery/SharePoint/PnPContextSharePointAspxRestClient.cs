@@ -50,10 +50,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             if (file == null)
                 return new(DiscoveryTerminalOutcome.Failed, null, null, serverRelativeUrl, null,
                     "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", "locator_not_found");
-            return new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
-                file.ServerRelativeUrl, file.CustomizedPageStatus.ToString(),
-                "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", null,
-                file.ListId, file.ListItemAllFields?.Id, null);
+            return MapResolvedFile(file);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -66,6 +63,21 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 denied ? "locator_denied" : "locator_resolution_failed");
         }
     }
+
+    /// <summary>
+    /// Projects a resolved <see cref="IFile"/> onto the discovery record, normalizing the owning list.
+    /// </summary>
+    /// <remarks>
+    /// <c>IFile.ListId</c> is a non-nullable <see cref="Guid"/>, so a file that belongs to no list — the
+    /// normal state of a web-root file — reports <see cref="Guid.Empty"/> rather than an absent value.
+    /// Carrying that sentinel forward would make "this file has no owning list" indistinguishable from
+    /// "this file names a list", and the assessment treats the latter as an unresolved lookup.
+    /// </remarks>
+    internal static SharePointResolvedFile MapResolvedFile(IFile file) =>
+        new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
+            file.ServerRelativeUrl, file.CustomizedPageStatus.ToString(),
+            "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", null,
+            file.ListId == Guid.Empty ? null : file.ListId, file.ListItemAllFields?.Id, null);
 
     public async Task<SharePointModeledValue> ReadWelcomePageAsync(
         CancellationToken cancellationToken = default)
