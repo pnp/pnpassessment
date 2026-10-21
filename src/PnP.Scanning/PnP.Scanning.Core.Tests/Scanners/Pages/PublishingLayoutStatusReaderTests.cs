@@ -124,7 +124,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     }
 
     [Fact]
-    public async Task Discovery_query_only_materializes_referenced_layouts_and_publishing_pages()
+    public async Task Discovery_query_only_materializes_referenced_layouts_and_failed_pages()
     {
         var scan = Guid.NewGuid();
         using var db = fixture.CreateContext();
@@ -149,8 +149,12 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
             (error, _) => errors.Add(error));
 
         errors.Should().ContainSingle().Which.Should().BeOfType<InvalidDataException>();
+        // The prefetch covers layouts only. A page's own discovery row is read solely to carry a
+        // failure, so the successfully enriched page never materializes one.
         db.ChangeTracker.Entries<ClassicPageDiscovery>().Select(entry => entry.Entity.RecordKey)
-            .Should().BeEquivalentTo(new[] { layout.RecordKey, pageRow.RecordKey, invalidRow.RecordKey });
+            .Should().BeEquivalentTo(new[] { layout.RecordKey, invalidRow.RecordKey });
+        db.ChangeTracker.Entries<ClassicPageDiscovery>().Select(entry => entry.Entity.RecordKey)
+            .Should().NotContain(pageRow.RecordKey);
         (await db.ClassicPages.SingleAsync(value => value.ScanId == scan && value.PageUrl == page.PageUrl))
             .LayoutCustomizedPageStatus.Should().Be("Uncustomized");
         (await db.ClassicPageDiscoveries.FindAsync(scan, invalidRow.RecordKey))
