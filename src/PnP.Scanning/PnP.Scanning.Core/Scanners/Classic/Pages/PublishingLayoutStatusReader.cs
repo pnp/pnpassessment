@@ -6,6 +6,7 @@ namespace PnP.Scanning.Core.Scanners;
 
 internal sealed class PublishingLayoutStatusReader
 {
+    private const int FailureLookupBatchSize = 256;
     private readonly Uri siteUrl;
     private readonly Func<string, Task<string>> readStatus;
     private readonly Dictionary<string, Task<string>> statuses = new(StringComparer.OrdinalIgnoreCase);
@@ -67,6 +68,7 @@ internal sealed class PublishingLayoutStatusReader
             return await readMissingStatus(url).ConfigureAwait(false);
         });
 
+        var failures = new List<LayoutFailure>();
         foreach (var page in pages)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -76,23 +78,53 @@ internal sealed class PublishingLayoutStatusReader
             }
             catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
-                // The page's own discovery rows carry this failure, and nothing else needs them,
-                // so they are read on the failure path rather than prefetched for every page.
-                var failed = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
-                    row.SiteUrl == siteUrl && row.RowType == "Page" &&
-                    EF.Functions.Collate(row.WebUrl, "NOCASE") == page.WebUrl &&
-                    EF.Functions.Collate(row.Url, "NOCASE") == page.PageUrl)
-                    .ToListAsync(cancellationToken).ConfigureAwait(false);
-                foreach (var row in failed)
-                {
-                    AssessmentWebDiscovery.AddError(row, "PageLayoutMetadata", AssessmentWebDiscovery.ErrorCode(ex),
-                        AssessmentWebDiscovery.ErrorDetail(ex));
-                }
+                failures.Add(new LayoutFailure(page.PageUrl, page.WebUrl,
+                    AssessmentWebDiscovery.ErrorCode(ex), AssessmentWebDiscovery.ErrorDetail(ex)));
                 logFailure(ex, page);
             }
         }
+        await RecordFailuresAsync(db, scanId, siteUrl, failures, cancellationToken).ConfigureAwait(false);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    private static async Task RecordFailuresAsync(ScanContext db, Guid scanId, string siteUrl,
+        IReadOnlyList<LayoutFailure> failures, CancellationToken cancellationToken)
+    {
+        if (failures.Count == 0) return;
+
+        var failuresByUrl = failures.ToLookup(failure => failure.PageUrl, StringComparer.OrdinalIgnoreCase);
+        var failuresByRecordKey = new Dictionary<string, List<LayoutFailure>>(StringComparer.Ordinal);
+        // URL/NOCASE lookups cannot use the existing primary key. Locate the failed identities in one
+        // lightweight scan instead of rescanning the site for every page (or every URL chunk).
+        var identities = db.ClassicPageDiscoveries.AsNoTracking()
+            .Where(row => row.ScanId == scanId && row.SiteUrl == siteUrl && row.RowType == "Page")
+            .Select(row => new { row.RecordKey, row.WebUrl, row.Url });
+        await foreach (var row in identities.AsAsyncEnumerable().WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            var matching = failuresByUrl[row.Url].Where(failure =>
+                string.Equals(failure.WebUrl, row.WebUrl, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matching.Count > 0) failuresByRecordKey.Add(row.RecordKey, matching);
+        }
+
+        // Only failed rows are tracked, with bounded parameters and indexed (ScanId, RecordKey) reads.
+        // The keys above are already site/type scoped; keep those checks in memory so SQLite does not
+        // choose the broader site index over the primary key. Tracking also preserves pending layout errors.
+        foreach (var keys in failuresByRecordKey.Keys.Chunk(FailureLookupBatchSize))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var rows = await db.ClassicPageDiscoveries
+                .Where(row => row.ScanId == scanId && keys.Contains(row.RecordKey))
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                if (row.SiteUrl != siteUrl || row.RowType != "Page") continue;
+                foreach (var failure in failuresByRecordKey[row.RecordKey])
+                    AssessmentWebDiscovery.AddError(row, "PageLayoutMetadata", failure.Code, failure.Detail);
+            }
+        }
+    }
+
+    private sealed record LayoutFailure(string PageUrl, string WebUrl, string Code, string Detail);
 
     internal async Task EnrichAsync(ClassicPage page)
     {
