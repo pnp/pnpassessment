@@ -165,11 +165,19 @@ internal sealed class PublishingLayoutStatusReader
             string.IsNullOrEmpty(absolute.Query) && string.IsNullOrEmpty(absolute.Fragment))
         {
             var path = Uri.UnescapeDataString(absolute.AbsolutePath);
+            // The containment checks below inspect a single decode, so a multiply-encoded
+            // reference such as %252e%252e would satisfy them and still escape the site
+            // collection once SharePoint decodes the value again. Require decoding to be
+            // idempotent so that what is validated here is what the file APIs receive.
+            if (!string.Equals(Uri.UnescapeDataString(path), path, StringComparison.Ordinal)) return false;
             var sitePath = Uri.UnescapeDataString(siteUrl.AbsolutePath).TrimEnd('/');
             if (path.StartsWith(sitePath + "/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains('\\') && !path.Split('/').Any(segment => segment is "." or ".."))
             {
-                resolved = absolute.AbsolutePath;
+                // Match SharePoint's unencoded ServerRelativeUrl from discovery and use
+                // that same canonical spelling for the cache key and fallback argument.
+                // Do not assume that every server rejects an escaped fallback argument.
+                resolved = path;
                 return true;
             }
         }
