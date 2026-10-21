@@ -21,6 +21,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
     private readonly SharePointLiveAspxDiscoveryOptions options;
     private readonly ISharePointAspxRestClientFactory clientFactory;
+    private readonly SharePointListMetadataSnapshot sharedLists;
     private readonly Dictionary<string, LiveScope> scopes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RawDiscoveryRecord> targetedFiles = new(StringComparer.Ordinal);
@@ -28,7 +29,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private bool disposed;
 
     internal SharePointLiveAspxDiscoveryProvider(SharePointLiveAspxDiscoveryOptions options,
-        ISharePointAspxRestClientFactory clientFactory, AspxWebAcquisitionContext web)
+        ISharePointAspxRestClientFactory clientFactory, AspxWebAcquisitionContext web,
+        SharePointListMetadataSnapshot sharedLists = null)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         this.clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
@@ -36,6 +38,13 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         if (!web.SiteUrl.IsAbsoluteUri || web.SiteUrl.Scheme != Uri.UriSchemeHttps ||
             !web.WebUrl.IsAbsoluteUri || web.WebUrl.Scheme != Uri.UriSchemeHttps)
             throw new ArgumentException("Site and Web URLs must be absolute HTTPS URLs.", nameof(web));
+        // A snapshot never authorizes reuse for another Web, including a descendant or sibling.
+        this.sharedLists = sharedLists != null && sharedLists.SupportsFields(AllListsSelect) &&
+            string.Equals(sharedLists.WebUrl.GetLeftPart(UriPartial.Authority),
+                web.WebUrl.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(sharedLists.WebUrl.AbsolutePath.TrimEnd('/'), web.WebUrl.AbsolutePath.TrimEnd('/'),
+                StringComparison.Ordinal) && string.IsNullOrEmpty(web.WebUrl.Query) &&
+            string.IsNullOrEmpty(web.WebUrl.Fragment) ? sharedLists : null;
         var root = new LiveScope(Key("web", web.WebUrl.AbsoluteUri), null, DiscoveryScopeKind.Web, null,
             web.WebUrl.AbsoluteUri.TrimEnd('/'), "web", web.WebUrl, null, null, null,
             new Dictionary<string, string>
@@ -106,18 +115,32 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             return Result(parent, new[] { target }, DiscoveryTerminalOutcome.Complete);
         }
 
-        var endpoint = Endpoint(parent.WebUrl,
-            $"_api/web/lists?$select={AllListsSelect}&$expand=RootFolder");
-        var listResult = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
-            "lists:" + parent.ScopeKey, endpoint, AllListsSelect, string.Empty,
-            AspxSurfaceApplicability.Applicable, "AllListsAuthority", cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<JsonElement> listItems;
+        DiscoveryTerminalOutcome listOutcome;
+        if (sharedLists != null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            listItems = sharedLists.Items;
+            listOutcome = listItems.Count == 0 ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete;
+            RecordSharedListsSurface(parent, listOutcome);
+        }
+        else
+        {
+            var endpoint = Endpoint(parent.WebUrl,
+                $"_api/web/lists?$select={AllListsSelect}&$expand=RootFolder");
+            var listResult = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
+                "lists:" + parent.ScopeKey, endpoint, AllListsSelect, string.Empty,
+                AspxSurfaceApplicability.Applicable, "AllListsAuthority", cancellationToken).ConfigureAwait(false);
+            listItems = listResult.Items;
+            listOutcome = listResult.Validation.Outcome;
+        }
         var containers = new List<LiveScope>
         {
             Add(new LiveScope(Key("web-root", parent.WebUrl.AbsoluteUri), parent.ScopeKey,
                 DiscoveryScopeKind.Container, null, parent.WebUrl.AbsoluteUri, "web-root", parent.WebUrl,
                 null, null, null, parent.Metadata)),
         };
-        foreach (var item in listResult.Items)
+        foreach (var item in listItems)
         {
             var listId = PropertyGuid(item, "Id");
             var baseType = PropertyInt(item, "BaseType");
@@ -144,7 +167,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             containers.Add(scope);
             RecordListApplicability(parent, scope, template);
         }
-        return Result(parent, containers, listResult.Validation.Outcome);
+        return Result(parent, containers, listOutcome);
     }
 
     private Task<DiscoveryChildEnumerationResult> EnumerateContainerAsync(LiveScope parent,
@@ -462,6 +485,28 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         return new(resolved.Outcome, absolutePath, physical, resolved.Candidate.ReasonCode);
     }
 
+    private void RecordSharedListsSurface(LiveScope web, DiscoveryTerminalOutcome outcome)
+    {
+        var digest = DiscoveryHash.Of(sharedLists.Items.Select(item => item.GetRawText()).ToArray());
+        const string operation = "PnP.Core:Web.Lists(raw Web response projection)";
+        var row = SurfaceRow(web.ScopeKey, web.ScopeKey, "lists:" + web.ScopeKey,
+            operation, AllListsSelect, string.Empty, "PnPCoreSharedListMetadataAuthority",
+            AspxSurfaceApplicability.Applicable, outcome, sharedLists.Items.Count,
+            AspxExpectedCountState.Known, sharedLists.Items.Count,
+            DiscoveryHash.Of(sharedLists.WebUrl.AbsoluteUri, digest), 0,
+            new[] { "shared-sdk-web-lists:" + digest, "provider=PnP.Core", "operation=Web.Lists",
+                "complete-raw-expansion;no-continuation-markers;discovery-fields-projected" },
+            "AllListsAuthority", outcome == DiscoveryTerminalOutcome.Empty ? "AuthorityTerminalZero" : null,
+            outcome == DiscoveryTerminalOutcome.Empty ? sharedLists.WebUrl.AbsoluteUri : null) with
+        {
+            ActualMethod = "MODEL",
+            ActualEndpoint = operation,
+            AsOfUtc = sharedLists.ReceivedAtUtc,
+        };
+        // There was no new REST request, so do not manufacture HTTP pagination receipts.
+        ReferenceCollector.AddSurface(row, Array.Empty<AspxPaginationPageReceipt>());
+    }
+
     private void RecordListApplicability(LiveScope web, LiveScope list, int? template)
     {
         var decision = AspxListApplicabilityPolicy.Evaluate(list.BaseType);
@@ -485,7 +530,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             expectedState == AspxExpectedCountState.Known ? 1 : null, expectedState,
             1, DiscoveryHash.Of("list-applicability", list.ScopeKey), 0, evidence,
             applicability == AspxSurfaceApplicability.Applicable ? "raw-files+physical-forms+forms+views"
-                : "forms+views"), Array.Empty<AspxPaginationPageReceipt>(),
+                : "forms+views") with
+            {
+                ActualMethod = sharedLists == null ? "GET" : "MODEL",
+                ActualEndpoint = sharedLists == null ? list.Locator : "PnP.Core:Web.Lists(raw Web response projection)",
+                AsOfUtc = sharedLists?.ReceivedAtUtc ?? DateTimeOffset.UtcNow,
+            }, Array.Empty<AspxPaginationPageReceipt>(),
             outcome == DiscoveryTerminalOutcome.Unknown
                 ? new[] { counterexample == AspxRuntimeCounterexampleState.Observed
                     ? "not_applicable_runtime_counterexample" : "invalid_or_unspecified_base_type" }

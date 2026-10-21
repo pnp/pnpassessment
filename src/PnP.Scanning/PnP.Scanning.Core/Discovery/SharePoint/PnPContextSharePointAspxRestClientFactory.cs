@@ -10,11 +10,14 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
     private readonly Dictionary<string, ISharePointAspxRestClient> clients = new(StringComparer.OrdinalIgnoreCase);
 
     internal PnPContextSharePointAspxRestClientFactory(IPnPContextFactory contextFactory,
-        IAuthenticationProvider authenticationProvider, Guid? scanId = null)
+        IAuthenticationProvider authenticationProvider, Guid? scanId = null, PnPContext sharedContext = null)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         this.authenticationProvider = authenticationProvider ?? throw new ArgumentNullException(nameof(authenticationProvider));
         this.scanId = scanId;
+        if (sharedContext != null)
+            clients.Add(sharedContext.Uri.AbsoluteUri.TrimEnd('/'),
+                new PnPContextSharePointAspxRestClient(sharedContext, ownsContext: false));
     }
 
     public async Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,

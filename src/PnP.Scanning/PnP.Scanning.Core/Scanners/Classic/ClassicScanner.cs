@@ -27,12 +27,6 @@ namespace PnP.Scanning.Core.Scanners
         {
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
-            // Persist existence and discovery failures before feature-dependent enrichment loads.
-            // Each existing TPL Web worker owns its own acquisition provider and PnP contexts.
-            var discoveredPages = Options.Pages
-                ? await ClassicPageDiscoveryComponent.ExecuteAsync(this).ConfigureAwait(false)
-                : null;
-
             // Define extra Web/Site data that we want to load when the context is inialized
             // This will not require extra server roundtrips
             PnPContextOptions options = new()
@@ -46,6 +40,7 @@ namespace PnP.Scanning.Core.Scanners
                     w => w.LastItemUserModifiedDate,                 
                     w => w.Lists.QueryProperties(r => r.Title, 
                                                  r => r.Hidden,
+                                                 r => r.IsCatalog,
                                                  r => r.DefaultViewUrl,
                                                  r => r.TemplateType,
                                                  r => r.TemplateFeatureId,
@@ -58,7 +53,7 @@ namespace PnP.Scanning.Core.Scanners
                                                  // tells whether a list's items can lack a file at all.
                                                  r => r.BaseType,
                                                  r => r.DefaultDisplayFormUrl,
-                                                 r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl),
+                                                 r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl, p => p.UniqueId),
                                                  r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl, p => p.DisplayFormUrl),
                                                  r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title),
                                                  r => r.UserCustomActions)
@@ -81,9 +76,27 @@ namespace PnP.Scanning.Core.Scanners
                                                                                                                                                w => w.MasterUrl });
             }
 
-            using (var context = await GetAssessmentContextAsync(options))
+            using (var context = await CreateWebContextAsync(options))
             using (var csomContext = GetClientContext(context))
             {
+                List<ClassicPageDiscovery> discoveredPages = null;
+                if (Options.Pages)
+                {
+                    var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
+                    var writer = new AssessmentDiscoveryWriter(ScanId);
+                    discoveredPages = await ClassicAssessmentMetadata.AcquirePagesAsync(Options.HomePageOnly,
+                        () => ClassicAssessmentInitialization.ExecuteAsync(
+                            () => ClassicAssessmentMetadata.LoadAsync(context, options, token),
+                            writer, ScanId, SiteUrl, WebUrl, token,
+                            (attempt, error) => Logger.Warning(error,
+                                "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
+                                SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1),
+                            beforeFailureFinalization: Options.HomePageOnly ? null :
+                                _ => ClassicPageDiscoveryComponent.ExecuteAsync(this, context)),
+                        sharedLists => ClassicPageDiscoveryComponent.ExecuteAsync(this, context, sharedLists))
+                        .ConfigureAwait(false);
+                }
+
                 if (Options.Workflow)
                 {
                     Logger.Information("Starting classic Workflow assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
@@ -175,15 +188,18 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
-        private Task<PnPContext> GetAssessmentContextAsync(PnPContextOptions options)
+        private Task<PnPContext> CreateWebContextAsync(PnPContextOptions assessmentOptions)
         {
-            if (!Options.Pages) return GetPnPContextAsync(options);
-            return ClassicAssessmentInitialization.ExecuteAsync(() => GetPnPContextAsync(options),
-                new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl,
-                ScanManager.GetCancellationTokenSource(ScanId).Token,
-                (attempt, error) => Logger.Warning(error,
-                    "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
-                    SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1));
+            if (!Options.Pages) return GetPnPContextAsync(assessmentOptions);
+            // One owner for identity, discovery and assessment. Rich metadata is hydrated into
+            // this context once; a failed hydration still gets a raw discovery fallback.
+            return GetPnPContextAsync(new PnPContextOptions
+            {
+                AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
+                {
+                    web => web.ServerRelativeUrl,
+                },
+            });
         }
 
         internal async override Task PreScanningAsync()
