@@ -174,9 +174,9 @@ internal sealed class PublishingLayoutStatusReader
             if (path.StartsWith(sitePath + "/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains('\\') && !path.Split('/').Any(segment => segment is "." or ".."))
             {
-                // Discovery stores SharePoint's unencoded ServerRelativeUrl and CSOM's
-                // GetFileByServerRelativeUrl treats an escape sequence as literal text, so
-                // both consumers need the decoded spelling rather than AbsolutePath.
+                // Match SharePoint's unencoded ServerRelativeUrl from discovery and use
+                // that same canonical spelling for the cache key and fallback argument.
+                // Do not assume that every server rejects an escaped fallback argument.
                 resolved = path;
                 return true;
             }

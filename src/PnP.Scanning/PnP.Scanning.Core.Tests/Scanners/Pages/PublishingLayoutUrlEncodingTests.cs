@@ -11,10 +11,11 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages;
 /// Covers how <see cref="PublishingLayoutStatusReader"/> resolves a layout reference whose file
 /// name needs percent-encoding.
 ///
-/// Both consumers of the resolved value expect a decoded server-relative URL: discovery stores
-/// <c>File.ServerRelativeUrl</c> verbatim from SharePoint REST, and CSOM's
-/// <c>GetFileByServerRelativeUrl</c> treats an escape sequence as literal text. Returning the
-/// escaped form therefore misses the discovery fast path and then fails the network fallback.
+/// Discovery stores <c>File.ServerRelativeUrl</c> verbatim from SharePoint REST, so resolving
+/// a reference to its escaped form misses the discovery fast path. Use one decoded canonical
+/// spelling for discovery lookup, the shared-layout cache key, and the CSOM fallback argument.
+/// Live SharePoint accepted escaped fallback arguments in the test environment as well; these
+/// tests establish the decoded URL contract, not a claim that escaped CSOM requests must fail.
 ///
 /// Decoding is only safe while it is idempotent. The containment checks run on a single decode,
 /// so a multiply-encoded reference such as <c>%252e%252e</c> survives them; handing the
