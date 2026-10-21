@@ -222,7 +222,8 @@ namespace PnP.Scanning.Core.Scanners
                     .Select(page => page.SiteUrl).Distinct(), token).ConfigureAwait(false);
             }
 
-            foreach (var siteUrl in sites)
+            var failedPages = 0;
+            var failedSites = await EnrichSitesAsync(sites, async siteUrl =>
             {
                 using var db = new ScanContext(ScanId);
                 var siteScanner = new ClassicScanner(ScanManager, StorageManager, PnPContextFactory,
@@ -240,16 +241,57 @@ namespace PnP.Scanning.Core.Scanners
                         csomContext.Load(file, value => value.CustomizedPageStatus);
                         await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
                         return file.CustomizedPageStatus.ToString();
-                    }, (error, page) => Logger.Warning(error,
-                        "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
-                        page.PageUrl, page.LayoutUrl), token).ConfigureAwait(false);
+                    }, (error, page) =>
+                    {
+                        failedPages++;
+                        Logger.Warning(error,
+                            "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
+                            page.PageUrl, page.LayoutUrl);
+                    }, token).ConfigureAwait(false);
                 }
                 finally
                 {
                     csomContext?.Dispose();
                     context?.Dispose();
                 }
+            }, (error, siteUrl) => Logger.Warning(error,
+                "Publishing layout enrichment failed for site collection {SiteUrl}", siteUrl),
+                token).ConfigureAwait(false);
+
+            if (failedSites > 0 || failedPages > 0)
+            {
+                Logger.Warning("Publishing layout enrichment completed with {FailedPages} page failures; " +
+                    "{FailedSites} of {SiteCount} site collections failed outright",
+                    failedPages, failedSites, sites.Count);
             }
+        }
+
+        /// <summary>
+        /// Runs the per-site layout enrichment, keeping one site collection's failure from ending the
+        /// loop. Layout status is an enrichment, so an unreachable site must not cost the remaining
+        /// sites their status nor the assessment its coverage verdict. Cancellation still propagates.
+        /// </summary>
+        /// <returns>The number of site collections that failed outright.</returns>
+        internal static async Task<int> EnrichSitesAsync(IReadOnlyList<string> sites,
+            Func<string, Task> enrichSite, Action<Exception, string> onSiteFailure,
+            CancellationToken cancellationToken = default)
+        {
+            var failedSites = 0;
+            foreach (var siteUrl in sites)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await enrichSite(siteUrl).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException &&
+                    !cancellationToken.IsCancellationRequested)
+                {
+                    failedSites++;
+                    onSiteFailure(ex, siteUrl);
+                }
+            }
+            return failedSites;
         }
 
         internal async override Task PostScanningAsync()
@@ -258,7 +300,16 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Post assessment work is starting");
             if (Options.Pages)
             {
-                await EnrichPublishingLayoutsAsync().ConfigureAwait(false);
+                try
+                {
+                    await EnrichPublishingLayoutsAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Layout status is optional enrichment; the coverage verdict below is the
+                    // assessment's contract and must still be computed and recorded.
+                    Logger.Warning(ex, "Publishing layout enrichment did not complete for assessment {ScanId}", ScanId);
+                }
                 var verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
                     .ConfigureAwait(false);
                 Logger.Information("ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",
