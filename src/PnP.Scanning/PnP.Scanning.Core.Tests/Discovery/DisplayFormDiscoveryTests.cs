@@ -2,6 +2,7 @@ using FluentAssertions;
 using PnP.Scanning.Core.Discovery;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery;
@@ -152,6 +153,65 @@ public sealed class DisplayFormDiscoveryTests
         Core.Scanners.PageScanComponent.IsDisplayFormPage(row).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Expanded_content_type_ids_resolve_the_item_specific_form(bool wrappedContentTypes, bool stringContentTypeIds)
+    {
+        // SP.ContentType.Id is an SP.ContentTypeId object with StringValue. Also retain support
+        // for already-flattened string identifiers; OData may wrap the expanded collection in results.
+        using var factory = new DisplayFormFactory(wrappedContentTypes, stringContentTypeIds);
+        using var provider = Provider(factory);
+        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
+
+        var records = await ReadRecordsAsync(provider.CreateRawSource(surface));
+
+        records.Should().ContainSingle().Which.PhysicalLocator.Should().Be("/sites/a/Lists/Posts/Post.aspx?ID=7");
+        records[0].ContentTypeId.Should().Be("0x0110007C4E8A");
+        factory.Client.ResponseSchemaFlavors.Should().OnlyContain(flavor =>
+            flavor == (wrappedContentTypes ? "odata-verbose" : "odata-nometadata"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Object_content_type_ids_keep_the_most_specific_form_first(bool wrappedContentTypes)
+    {
+        const string forms = """
+            [{ "Id": { "StringValue": "0x0110" }, "DisplayFormUrl": "Lists/Posts/Post.aspx" },
+             { "Id": { "StringValue": "0x0110007C4E" }, "DisplayFormUrl": "Lists/Posts/Special.aspx" }]
+            """;
+        using var factory = new DisplayFormFactory(wrappedContentTypes, postContentTypesJson: forms);
+        using var provider = Provider(factory);
+        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
+
+        var records = await ReadRecordsAsync(provider.CreateRawSource(surface));
+
+        records.Should().ContainSingle().Which.PhysicalLocator.Should().Be("/sites/a/Lists/Posts/Special.aspx?ID=7");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("{\"StringValue\":null}")]
+    [InlineData("{\"StringValue\":123}")]
+    [InlineData("[]")]
+    [InlineData("123")]
+    [InlineData("true")]
+    public async Task Missing_or_non_string_content_type_ids_do_not_invent_a_display_form_surface(string idJson)
+    {
+        var form = new JsonObject { ["DisplayFormUrl"] = "Lists/Posts/Post.aspx" };
+        if (idJson != null) form["Id"] = JsonNode.Parse(idJson);
+        var forms = new JsonArray(form);
+        using var factory = new DisplayFormFactory(postContentTypesJson: forms.ToJsonString());
+        using var provider = Provider(factory);
+
+        (await DisplayFormSurfaceAsync(provider, "Posts")).Should().BeNull();
+    }
+
     private static async Task<DiscoveryScopeRegistration> DisplayFormSurfaceAsync(
         SharePointLiveAspxDiscoveryProvider provider, string listTitle)
     {
@@ -175,7 +235,12 @@ public sealed class DisplayFormDiscoveryTests
 
     private sealed class DisplayFormFactory : ISharePointAspxRestClientFactory
     {
-        internal DisplayFormClient Client { get; } = new();
+        internal DisplayFormClient Client { get; }
+
+        internal DisplayFormFactory(bool wrappedContentTypes = false, bool stringContentTypeIds = false,
+            string postContentTypesJson = null) =>
+            Client = new DisplayFormClient(wrappedContentTypes, stringContentTypeIds, postContentTypesJson);
+
         public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
             CancellationToken cancellationToken = default) => Task.FromResult<ISharePointAspxRestClient>(Client);
         public void Dispose() => Client.Dispose();
@@ -196,7 +261,7 @@ public sealed class DisplayFormDiscoveryTests
               "Hidden": false,
               "IsCatalog": false,
               "DefaultDisplayFormUrl": "/sites/a/Shared Documents/Forms/DispForm.aspx",
-              "ContentTypes": [{ "Id": "0x0101", "DisplayFormUrl": "Lists/Posts/Post.aspx" }],
+              "ContentTypes": [{ "Id": { "StringValue": "0x0101" }, "DisplayFormUrl": "Lists/Posts/Post.aspx" }],
               "RootFolder": { "ServerRelativeUrl": "/sites/a/Shared Documents", "UniqueId": "aaaaaaaa-1111-1111-1111-111111111111" }
             },{
               "Id": "22222222-2222-2222-2222-222222222222",
@@ -206,7 +271,7 @@ public sealed class DisplayFormDiscoveryTests
               "Hidden": false,
               "IsCatalog": false,
               "DefaultDisplayFormUrl": "/sites/a/Lists/Posts/DispForm.aspx",
-              "ContentTypes": [{ "Id": "0x0110", "DisplayFormUrl": "Lists/Posts/Post.aspx" }],
+              "ContentTypes": [{ "Id": { "StringValue": "0x0110" }, "DisplayFormUrl": "Lists/Posts/Post.aspx" }],
               "RootFolder": { "ServerRelativeUrl": "/sites/a/Lists/Posts", "UniqueId": "aaaaaaaa-2222-2222-2222-222222222222" }
             },{
               "Id": "33333333-3333-3333-3333-333333333333",
@@ -216,7 +281,7 @@ public sealed class DisplayFormDiscoveryTests
               "Hidden": false,
               "IsCatalog": false,
               "DefaultDisplayFormUrl": "/sites/a/Lists/Announcements/DispForm.aspx",
-              "ContentTypes": [{ "Id": "0x0104", "DisplayFormUrl": "" }],
+              "ContentTypes": [{ "Id": { "StringValue": "0x0104" }, "DisplayFormUrl": "" }],
               "RootFolder": { "ServerRelativeUrl": "/sites/a/Lists/Announcements", "UniqueId": "aaaaaaaa-3333-3333-3333-333333333333" }
             }]
             """;
@@ -226,18 +291,34 @@ public sealed class DisplayFormDiscoveryTests
              { "Id": 9, "ContentTypeId": "0x0100ABCDEF" }]
             """;
 
+        private readonly bool wrappedContentTypes;
+        private readonly bool stringContentTypeIds;
+        private readonly string postContentTypesJson;
+
+        internal DisplayFormClient(bool wrappedContentTypes, bool stringContentTypeIds, string postContentTypesJson)
+        {
+            this.wrappedContentTypes = wrappedContentTypes;
+            this.stringContentTypeIds = stringContentTypeIds;
+            this.postContentTypesJson = postContentTypesJson;
+        }
+
         internal List<Uri> Requests { get; } = new();
+        internal List<string> ResponseSchemaFlavors { get; } = new();
         public Uri WebUrl => SiteUrl;
 
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
             CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
-            var json = requestUri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase) ? ItemsJson
-                : requestUri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase) ? ListsJson
-                : "[]";
-            return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK, Items(json), null,
-                new string('b', 64), "odata-nometadata", DiscoveryTerminalOutcome.Complete));
+            var items = requestUri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase) ? ListItems()
+                : Items(requestUri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase) ? ItemsJson : "[]");
+            // Exercise the real response parser, not just a hand-built SharePointRestPage.
+            var body = wrappedContentTypes
+                ? JsonSerializer.SerializeToUtf8Bytes(new { d = new { results = items } })
+                : JsonSerializer.SerializeToUtf8Bytes(new { value = items });
+            var page = SharePointRestResponseParser.Parse(requestUri, HttpStatusCode.OK, body, "application/json");
+            ResponseSchemaFlavors.Add(page.SchemaFlavor);
+            return Task.FromResult(page);
         }
 
         public Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
@@ -256,6 +337,23 @@ public sealed class DisplayFormDiscoveryTests
                 "fake", "folder", null, "fake:folder", DateTimeOffset.UtcNow));
 
         public void Dispose() { }
+
+        private IReadOnlyList<JsonElement> ListItems()
+        {
+            var lists = JsonNode.Parse(ListsJson).AsArray();
+            foreach (var list in lists)
+            {
+                if (postContentTypesJson != null && list["Title"].GetValue<string>() == "Posts")
+                    list["ContentTypes"] = JsonNode.Parse(postContentTypesJson);
+                var contentTypes = list["ContentTypes"].AsArray();
+                if (stringContentTypeIds)
+                    foreach (var contentType in contentTypes)
+                        contentType["Id"] = contentType["Id"]["StringValue"].GetValue<string>();
+                if (wrappedContentTypes)
+                    list["ContentTypes"] = new JsonObject { ["results"] = contentTypes.DeepClone() };
+            }
+            return Items(lists.ToJsonString());
+        }
 
         private static IReadOnlyList<JsonElement> Items(string json) =>
             JsonDocument.Parse(json).RootElement.EnumerateArray().Select(item => item.Clone()).ToArray();

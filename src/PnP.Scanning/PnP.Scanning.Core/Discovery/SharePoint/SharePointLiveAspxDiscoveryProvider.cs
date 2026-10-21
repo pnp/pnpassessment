@@ -932,13 +932,24 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private static ListDisplayForms ReadDisplayForms(JsonElement item)
     {
         var contentTypeForms = NestedArray(item, "ContentTypes")
-            .Select(contentType => new ContentTypeForm(PropertyString(contentType, "Id"),
+            .Select(contentType => new ContentTypeForm(ReadContentTypeId(contentType),
                 PropertyString(contentType, "DisplayFormUrl")))
             .Where(form => !string.IsNullOrWhiteSpace(form.ContentTypeId) &&
                 !string.IsNullOrWhiteSpace(form.FormUrl))
             .OrderByDescending(form => form.ContentTypeId.Length)
             .ToArray();
         return new ListDisplayForms(PropertyString(item, "DefaultDisplayFormUrl"), contentTypeForms);
+    }
+
+    private static string ReadContentTypeId(JsonElement contentType)
+    {
+        if (!PnPContextSharePointAspxRestClient.TryProperty(contentType, "Id", out var id)) return null;
+        // REST exposes SP.ContentTypeId as { StringValue: "0x..." }; it is not the list item's
+        // string-valued ContentTypeId field. Retain support for already-flattened identifiers.
+        if (id.ValueKind == JsonValueKind.Object)
+            return PnPContextSharePointAspxRestClient.TryProperty(id, "StringValue", out var value) &&
+                value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        return id.ValueKind == JsonValueKind.String ? id.GetString() : null;
     }
 
     // A $expand'ed collection arrives either as a bare array or wrapped in a "results" array,
