@@ -199,7 +199,11 @@ internal sealed class AssessmentWebDiscovery
             ScanId = scanId, SiteUrl = siteUrl, WebUrl = webUrl,
             RecordKey = "page:" + DiscoveryHash.Of(siteIdentity, webIdentity,
                 fileId?.ToString("D") ?? record.PhysicalLocator?.ToLowerInvariant() ?? record.SourceObjectId),
-            RowType = "Page", ScopeType = "File", ParentScopeKey = "scope:" + scope.ScopeKey,
+            // "File" asserts the row represents a file. A page addressed through a shared display form
+            // does not: it is one of N addresses backed by one form file, so it is a ListItem.
+            RowType = "Page",
+            ScopeType = record.LocatorIsGuaranteedPhysicalFilePath ? "File" : "ListItem",
+            ParentScopeKey = "scope:" + scope.ScopeKey,
             Url = record.PhysicalLocator, FileName = record.FileName, FileUniqueId = fileId,
             SiteCollectionId = record.SiteCollectionId, WebId = record.WebId, ListId = record.ListId,
             FolderUniqueId = record.FolderUniqueId, ListItemId = record.ListItemId,

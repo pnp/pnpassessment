@@ -1,11 +1,11 @@
 using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
+using PnP.Scanning.Core.Discovery;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Scanners
+namespace PnP.Scanning.Core.Tests.Discovery
 {
     /// <summary>
-    /// Display form resolution for the item-only page route (AddDisplayFormPagesAsync). The route resolves a
+    /// Display form resolution for the item-only page route (the display-form discovery surface). The route resolves a
     /// list item's page in two tiers: the item's content type DisplayFormUrl when set, otherwise the list's
     /// DefaultDisplayFormUrl. The two tiers are not returned in the same URL shape, and the regression this
     /// covers is that a route which only accepted already-server-relative values discarded the entire content
@@ -16,27 +16,27 @@ namespace PnP.Scanning.Core.Tests.Scanners
     /// web-relative) or "~layouts/WrkTaskIP.aspx", while list DefaultDisplayFormUrl values came back
     /// server-relative and, for 9401 of 9947 lists, named DispForm.aspx.
     /// </summary>
-    public class PageScanComponentDisplayFormTests
+    public class DisplayFormUrlPolicyTests
     {
         private const string WebUrl = "/sites/team/blog";
         private const string SiteUrl = "/sites/team";
 
         [Fact]
-        public void ToServerRelativeFormUrl_StockBlogPostContentType_ResolvesAndCountsAsContentPage()
+        public void ToServerRelative_StockBlogPostContentType_ResolvesAndCountsAsContentPage()
         {
             // The regression. SharePoint stores the blog Post content type's display form web-relative, with
             // no leading slash. Discarding it collapsed resolution onto the list default (DispForm.aspx),
             // which the stock-form heuristic skips, so every list in every tenant was skipped.
-            string resolved = PageScanComponent.ToServerRelativeFormUrl("Lists/Posts/Post.aspx", WebUrl, SiteUrl);
+            string resolved = DisplayFormUrlPolicy.ToServerRelative("Lists/Posts/Post.aspx", WebUrl, SiteUrl);
 
             resolved.Should().Be("/sites/team/blog/Lists/Posts/Post.aspx");
-            PageScanComponent.IsContentPageForm(resolved).Should().BeTrue();
+            DisplayFormUrlPolicy.IsContentPageForm(resolved).Should().BeTrue();
         }
 
         [Fact]
-        public void ToServerRelativeFormUrl_WebRelativeValue_OnRootWeb_DoesNotDoubleSlash()
+        public void ToServerRelative_WebRelativeValue_OnRootWeb_DoesNotDoubleSlash()
         {
-            PageScanComponent.ToServerRelativeFormUrl("Lists/Posts/Post.aspx", "/", "/")
+            DisplayFormUrlPolicy.ToServerRelative("Lists/Posts/Post.aspx", "/", "/")
                 .Should().Be("/Lists/Posts/Post.aspx");
         }
 
@@ -47,21 +47,21 @@ namespace PnP.Scanning.Core.Tests.Scanners
         [InlineData("~sitecollection/Lists/Posts/Post.aspx", "/sites/team/Lists/Posts/Post.aspx")]
         [InlineData("~layouts/WrkTaskIP.aspx", "/sites/team/blog/_layouts/15/WrkTaskIP.aspx")]
         [InlineData("~sitecollectionlayouts/WrkTaskIP.aspx", "/sites/team/_layouts/15/WrkTaskIP.aspx")]
-        public void ToServerRelativeFormUrl_ExpandsTokens(string formUrl, string expected)
+        public void ToServerRelative_ExpandsTokens(string formUrl, string expected)
         {
-            PageScanComponent.ToServerRelativeFormUrl(formUrl, WebUrl, SiteUrl).Should().Be(expected);
+            DisplayFormUrlPolicy.ToServerRelative(formUrl, WebUrl, SiteUrl).Should().Be(expected);
         }
 
         [Fact]
-        public void ToServerRelativeFormUrl_ServerRelativeAndAbsoluteValues_AreNormalizedToOneShape()
+        public void ToServerRelative_ServerRelativeAndAbsoluteValues_AreNormalizedToOneShape()
         {
             // A list's DefaultDisplayFormUrl is normally already server-relative...
-            PageScanComponent.ToServerRelativeFormUrl("/sites/team/Lists/Announcements/DispForm.aspx", WebUrl, SiteUrl)
+            DisplayFormUrlPolicy.ToServerRelative("/sites/team/Lists/Announcements/DispForm.aspx", WebUrl, SiteUrl)
                 .Should().Be("/sites/team/Lists/Announcements/DispForm.aspx");
 
             // ...but the User Information List returns an absolute URL, which must not be treated as a
             // web-relative path and appended to the web.
-            PageScanComponent.ToServerRelativeFormUrl(
+            DisplayFormUrlPolicy.ToServerRelative(
                 "https://contoso.sharepoint.com/_layouts/15/userdisp.aspx", WebUrl, SiteUrl)
                 .Should().Be("/_layouts/15/userdisp.aspx");
         }
@@ -72,10 +72,10 @@ namespace PnP.Scanning.Core.Tests.Scanners
         [InlineData("   ")]
         // An unrecognized token is not a path; resolving it would invent a page location.
         [InlineData("~unknowntoken/Post.aspx")]
-        public void ToServerRelativeFormUrl_UnusableValues_AreNull(string formUrl)
+        public void ToServerRelative_UnusableValues_AreNull(string formUrl)
         {
-            PageScanComponent.ToServerRelativeFormUrl(formUrl, WebUrl, SiteUrl).Should().BeNull();
-            PageScanComponent.IsContentPageForm(PageScanComponent.ToServerRelativeFormUrl(formUrl, WebUrl, SiteUrl))
+            DisplayFormUrlPolicy.ToServerRelative(formUrl, WebUrl, SiteUrl).Should().BeNull();
+            DisplayFormUrlPolicy.IsContentPageForm(DisplayFormUrlPolicy.ToServerRelative(formUrl, WebUrl, SiteUrl))
                 .Should().BeFalse();
         }
 
@@ -88,8 +88,8 @@ namespace PnP.Scanning.Core.Tests.Scanners
         [InlineData("/sites/team/_layouts/15/WrkTaskIP.aspx")]
         public void IsStockListForm_SystemForms_AreStock(string formUrl)
         {
-            PageScanComponent.IsStockListForm(formUrl).Should().BeTrue();
-            PageScanComponent.IsContentPageForm(formUrl).Should().BeFalse();
+            DisplayFormUrlPolicy.IsStockListForm(formUrl).Should().BeTrue();
+            DisplayFormUrlPolicy.IsContentPageForm(formUrl).Should().BeFalse();
         }
 
         [Theory]
@@ -97,14 +97,14 @@ namespace PnP.Scanning.Core.Tests.Scanners
         [InlineData("/sites/team/Lists/Requests/CustomDisplay.aspx")]
         public void IsStockListForm_ContentPageForms_AreNotStock(string formUrl)
         {
-            PageScanComponent.IsStockListForm(formUrl).Should().BeFalse();
-            PageScanComponent.IsContentPageForm(formUrl).Should().BeTrue();
+            DisplayFormUrlPolicy.IsStockListForm(formUrl).Should().BeFalse();
+            DisplayFormUrlPolicy.IsContentPageForm(formUrl).Should().BeTrue();
         }
 
         [Fact]
         public void IsStockListForm_IgnoresQueryString()
         {
-            PageScanComponent.IsStockListForm("/sites/team/Lists/Announcements/DispForm.aspx?ID=7")
+            DisplayFormUrlPolicy.IsStockListForm("/sites/team/Lists/Announcements/DispForm.aspx?ID=7")
                 .Should().BeTrue();
         }
     }
