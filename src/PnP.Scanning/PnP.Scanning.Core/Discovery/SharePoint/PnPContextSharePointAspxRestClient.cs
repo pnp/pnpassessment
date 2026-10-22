@@ -1,8 +1,10 @@
+using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace PnP.Scanning.Core.Discovery;
 
@@ -39,6 +41,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     public async Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
         CancellationToken cancellationToken = default)
     {
+        var stage = "FileRequest";
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -49,19 +52,31 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 .ConfigureAwait(false);
             if (file == null)
                 return new(DiscoveryTerminalOutcome.Failed, null, null, serverRelativeUrl, null,
-                    "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", "locator_not_found");
+                    "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", "locator_not_found",
+                    ErrorStage: stage, ErrorDetail: "The SDK returned no physical file.");
+            stage = "FileMetadataProjection";
             return MapResolvedFile(file);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var denied = ex.Message.Contains("403", StringComparison.OrdinalIgnoreCase) ||
-                ex.Message.Contains("Access denied", StringComparison.OrdinalIgnoreCase) ||
-                ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase);
+            var denied = AssessmentWebDiscovery.Classify(ex) == DiscoveryTerminalOutcome.Denied || IsDenied(ex);
             return new(denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
                 null, null, serverRelativeUrl, null,
                 "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync",
-                denied ? "locator_denied" : "locator_resolution_failed");
+                denied ? "locator_denied" : "locator_resolution_failed",
+                ErrorStage: stage, ErrorDetail: ResolutionErrorDetail(ex));
         }
+    }
+
+    private static string ResolutionErrorDetail(Exception error)
+    {
+        // Persist the failure, not authentication objects, response headers, or stack traces.
+        var detail = $"{error.GetType().FullName}: {AssessmentWebDiscovery.ErrorCode(error)}; {AssessmentWebDiscovery.ErrorDetail(error)}";
+        detail = Regex.Replace(detail, @"\bBearer\s+\S+", "Bearer [redacted]", RegexOptions.IgnoreCase);
+        detail = Regex.Replace(detail, @"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[redacted-token]");
+        detail = Regex.Replace(detail, @"(access_token|refresh_token|client_secret|password)\s*[:=]\s*[^&\s;]+", "$1=[redacted]", RegexOptions.IgnoreCase);
+        detail = detail.Replace('\r', ' ').Replace('\n', ' ');
+        return detail.Length > 1024 ? detail[..1024] : detail;
     }
 
     /// <summary>
@@ -73,11 +88,19 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     /// Carrying that sentinel forward would make "this file has no owning list" indistinguishable from
     /// "this file names a list", and the assessment treats the latter as an unresolved lookup.
     /// </remarks>
-    internal static SharePointResolvedFile MapResolvedFile(IFile file) =>
-        new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
+    internal static SharePointResolvedFile MapResolvedFile(IFile file)
+    {
+        // A physical form/view can exist without a backing list item. The SDK returns an
+        // unloaded model for that missing expansion, so ?.Id is not an availability check.
+        Guid? listId = file.IsPropertyAvailable(value => value.ListId) && file.ListId != Guid.Empty
+            ? file.ListId : null;
+        var item = file.IsPropertyAvailable(value => value.ListItemAllFields) ? file.ListItemAllFields : null;
+        int? itemId = item != null && item.IsPropertyAvailable(value => value.Id) && item.Id > 0
+            ? item.Id : null;
+        return new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
             file.ServerRelativeUrl, file.CustomizedPageStatus.ToString(),
-            "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", null,
-            file.ListId == Guid.Empty ? null : file.ListId, file.ListItemAllFields?.Id, null);
+            "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync", null, listId, itemId, null);
+    }
 
     public async Task<SharePointModeledValue> ReadWelcomePageAsync(
         CancellationToken cancellationToken = default)

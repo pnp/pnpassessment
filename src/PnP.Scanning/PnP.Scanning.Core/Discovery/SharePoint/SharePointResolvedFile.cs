@@ -10,4 +10,6 @@ internal sealed record SharePointResolvedFile(
     string ErrorCode = null,
     Guid? ListId = null,
     int? ListItemId = null,
-    string ContentTypeId = null);
+    string ContentTypeId = null,
+    string ErrorStage = null,
+    string ErrorDetail = null);
