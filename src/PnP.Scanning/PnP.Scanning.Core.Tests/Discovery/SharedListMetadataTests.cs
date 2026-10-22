@@ -38,16 +38,15 @@ public sealed class SharedListMetadataTests
     {
         var snapshot = SharePointListMetadataSnapshot.TryCreate(WebUrl, empty ? WebJson() : WebJson(ListRow()));
 
-        snapshot.SupportsFields("Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl")
+        snapshot.SupportsFields("Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl,DefaultDisplayFormUrl,ContentTypes/Id,ContentTypes/DisplayFormUrl")
             .Should().BeTrue();
         snapshot.SupportsFields(" RootFolder/UniqueId , Id ").Should().BeTrue();
     }
 
     [Theory]
-    [InlineData("DefaultDisplayFormUrl")]
-    [InlineData("ContentTypes/Id")]
-    [InlineData("Id,DefaultDisplayFormUrl")]
-    [InlineData("Id,ContentTypes/Id")]
+    [InlineData("Fields/SchemaXml")]
+    [InlineData("ContentTypes/Name")]
+    [InlineData("Id,ContentTypes/StringId")]
     [InlineData("*")]
     [InlineData("RootFolder")]
     [InlineData(null)]
@@ -57,7 +56,7 @@ public sealed class SharedListMetadataTests
     {
         var row = ListRow();
         row["DefaultDisplayFormUrl"] = "/sites/a/Documents/Forms/DispForm.aspx";
-        row["ContentTypes"] = new[] { new { Id = "0x01" } };
+        row["ContentTypes"] = new[] { new { Id = "0x01", DisplayFormUrl = "" } };
         var snapshot = SharePointListMetadataSnapshot.TryCreate(WebUrl, WebJson(row));
 
         snapshot.Should().NotBeNull();
@@ -69,7 +68,7 @@ public sealed class SharedListMetadataTests
     {
         var row = ListRow();
         row["Fields"] = new[] { new { InternalName = "Title", SchemaXml = "large assessment metadata" } };
-        row["ContentTypes"] = new[] { new { Id = "0x01", Name = "Item" } };
+        row["ContentTypes"] = new[] { new { Id = new { StringValue = "0x01" }, DisplayFormUrl = "", Name = "Item" } };
         ((Dictionary<string, object>)row["RootFolder"])["Files"] = new[] { new { Name = "not-discovery-data" } };
 
         var snapshot = SharePointListMetadataSnapshot.TryCreate(WebUrl, WebJson(row), ReceivedAt);
@@ -79,12 +78,16 @@ public sealed class SharedListMetadataTests
         item.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(new[]
         {
             "Id", "Title", "BaseType", "BaseTemplate", "Hidden", "IsCatalog", "RootFolder", "DefaultViewUrl",
+            "DefaultDisplayFormUrl", "ContentTypes",
         });
         item.GetProperty("RootFolder").EnumerateObject().Select(property => property.Name).Should()
             .BeEquivalentTo(new[] { "ServerRelativeUrl", "UniqueId" });
         item.GetProperty("Id").GetGuid().Should().Be(ListId);
         item.GetProperty("DefaultViewUrl").ValueKind.Should().Be(JsonValueKind.Null);
-        item.GetRawText().Should().NotContain("SchemaXml").And.NotContain("ContentTypes");
+        item.GetRawText().Should().NotContain("SchemaXml").And.NotContain("Item");
+        var contentType = item.GetProperty("ContentTypes").EnumerateArray().Should().ContainSingle().Which;
+        contentType.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo("Id", "DisplayFormUrl");
+        contentType.GetProperty("Id").GetProperty("StringValue").GetString().Should().Be("0x01");
     }
 
     [Theory]
@@ -119,6 +122,72 @@ public sealed class SharedListMetadataTests
         provider.ReferenceCollector.ReadPaginationEvidence().Should().BeEmpty();
         provider.ReferenceCollector.ReadSurfaceEvidence().Should().NotContain(row => row.ActualMethod == "GET");
         if (empty) authority.AbsenceProofKind.Should().Be("AuthorityTerminalZero");
+    }
+
+    [Theory]
+    [InlineData("array", false)]
+    [InlineData("array", true)]
+    [InlineData("results", false)]
+    [InlineData("results", true)]
+    [InlineData("value", false)]
+    public async Task Shared_content_type_forms_discover_item_pages_without_a_duplicate_all_lists_request(
+        string shape, bool flattenedId)
+    {
+        var row = ListRow(title: "Posts", path: "/sites/a/Lists/Posts", baseType: 0, template: 100);
+        row["DefaultDisplayFormUrl"] = "/sites/a/Lists/Posts/DispForm.aspx";
+        var forms = new[]
+        {
+            new Dictionary<string, object> { ["Id"] = flattenedId ? "0x0110" : new { StringValue = "0x0110" },
+                ["DisplayFormUrl"] = "Lists/Posts/Post.aspx" },
+            new Dictionary<string, object> { ["Id"] = flattenedId ? "0x0110007C4E" : new { StringValue = "0x0110007C4E" },
+                ["DisplayFormUrl"] = "Lists/Posts/Special.aspx" },
+        };
+        row["ContentTypes"] = shape == "array" ? forms : new Dictionary<string, object>
+        {
+            [shape] = forms, ["@odata.count"] = 2,
+        };
+        var snapshot = SharePointListMetadataSnapshot.TryCreate(WebUrl, WebJson(row));
+        snapshot.Should().NotBeNull();
+        using var factory = new CountingFactory();
+        factory.Client.Items = new[]
+        {
+            JsonSerializer.SerializeToElement(new { Id = 7, ContentTypeId = "0x0110007C4E8A" }),
+            JsonSerializer.SerializeToElement(new { Id = 9, ContentTypeId = "0x01" }),
+        };
+        using var provider = Provider(factory, snapshot);
+        var list = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren
+            .Single(scope => scope.Metadata["role"] == "list");
+        var surface = (await provider.EnumerateChildrenAsync(list)).ObservedChildren
+            .Single(scope => scope.SourceKind == DiscoverySourceKind.ListItemDisplayFormPages);
+        var records = new List<RawDiscoveryRecord>();
+        await foreach (var batch in provider.CreateRawSource(surface).ReadBatchesAsync()) records.AddRange(batch.Records);
+
+        var page = records.Should().ContainSingle().Which;
+        page.PhysicalLocator.Should().Be("/sites/a/Lists/Posts/Special.aspx?ID=7");
+        page.ListItemId.Should().Be(7);
+        page.ContentTypeId.Should().Be("0x0110007C4E8A");
+        page.FileUniqueId.Should().BeNull();
+        page.LocatorIsGuaranteedPhysicalFilePath.Should().BeFalse();
+        AssessmentWebDiscovery.Page(Guid.NewGuid(), WebUrl.AbsoluteUri, "/", surface, page).ScopeType.Should().Be("ListItem");
+        factory.Client.AllListReads.Should().Be(0);
+        factory.Client.Requests.Should().ContainSingle().Which.AbsolutePath.Should().EndWith("/items");
+        ListAuthority(provider).ActualMethod.Should().Be("MODEL");
+    }
+
+    [Theory]
+    [InlineData("array")]
+    [InlineData("results")]
+    [InlineData("value")]
+    public void Explicit_empty_content_types_are_complete_for_every_supported_wrapper(string shape)
+    {
+        var row = ListRow();
+        row["ContentTypes"] = shape == "array" ? Array.Empty<object>() : new Dictionary<string, object>
+        {
+            [shape] = Array.Empty<object>(), ["__count"] = "0",
+        };
+        var snapshot = SharePointListMetadataSnapshot.TryCreate(WebUrl, WebJson(row));
+        snapshot.Should().NotBeNull();
+        snapshot.Items[0].GetProperty("ContentTypes").EnumerateArray().Should().BeEmpty();
     }
 
     [Theory]
@@ -270,7 +339,7 @@ public sealed class SharedListMetadataTests
             "{\"d\":{\"Lists\":[]},\"value\":{\"Lists\":[]}}" })
             yield return new object[] { "missing, malformed, ambiguous or partial collection", json };
 
-        foreach (var field in new[] { "Id", "Title", "BaseType", "BaseTemplate", "Hidden", "IsCatalog", "RootFolder", "DefaultViewUrl" })
+        foreach (var field in new[] { "Id", "Title", "BaseType", "BaseTemplate", "Hidden", "IsCatalog", "RootFolder", "DefaultViewUrl", "DefaultDisplayFormUrl", "ContentTypes" })
         {
             var missing = ListRow();
             missing.Remove(field);
@@ -280,6 +349,7 @@ public sealed class SharedListMetadataTests
         {
             ("Id", "not-a-guid"), ("Id", Guid.Empty), ("Title", null), ("BaseType", "1"), ("BaseTemplate", 101.5),
             ("Hidden", "false"), ("IsCatalog", 0), ("RootFolder", null), ("DefaultViewUrl", false),
+            ("DefaultDisplayFormUrl", false), ("ContentTypes", null), ("ContentTypes", new { }),
         })
         {
             var invalid = ListRow();
@@ -295,6 +365,27 @@ public sealed class SharedListMetadataTests
             ((Dictionary<string, object>)invalid["RootFolder"])[field] = value;
             yield return new object[] { "invalid RootFolder." + field, WebJson(invalid) };
         }
+        foreach (var contentTypes in new object[]
+        {
+            new[] { new { Id = "0x01" } },
+            new[] { new { DisplayFormUrl = "Lists/Posts/Post.aspx" } },
+            new[] { new { Id = new { StringValue = (string)null }, DisplayFormUrl = "" } },
+            new[] { new { Id = 123, DisplayFormUrl = "" } },
+            new[] { new { Id = "", DisplayFormUrl = "" } },
+            new[] { new { Id = "0x01", DisplayFormUrl = false } },
+            new[] { new { Id = "0x01", DisplayFormUrl = "" }, new { Id = "0X01", DisplayFormUrl = "" } },
+            new { results = Array.Empty<object>(), value = Array.Empty<object>() },
+            new Dictionary<string, object> { ["results"] = Array.Empty<object>(), ["__count"] = "1" },
+            new Dictionary<string, object> { ["value"] = Array.Empty<object>(), ["@odata.count"] = 1 },
+        })
+        {
+            var partial = ListRow();
+            partial["ContentTypes"] = contentTypes;
+            yield return new object[] { "invalid or partial content-type form metadata", WebJson(partial) };
+        }
+        var partialCount = ListRow();
+        partialCount["ContentTypes@odata.count"] = 1;
+        yield return new object[] { "partial content types count on parent list", WebJson(partialCount) };
         foreach (var marker in new[] { "__next", "odata.nextLink", "@odata.nextLink", "Lists@odata.nextLink", "NextHref", "continuationToken" })
         {
             yield return new object[] { "Web continuation " + marker,
@@ -304,7 +395,13 @@ public sealed class SharedListMetadataTests
             var nested = ListRow();
             nested["Fields"] = new Dictionary<string, object> { ["results"] = Array.Empty<object>(), [marker] = "next" };
             yield return new object[] { "nested child continuation " + marker, WebJson(nested) };
+            var continuedForms = ListRow();
+            continuedForms["ContentTypes"] = new Dictionary<string, object> { ["results"] = Array.Empty<object>(), [marker] = "next" };
+            yield return new object[] { "content types continuation " + marker, WebJson(continuedForms) };
         }
+        var parentContinuation = ListRow();
+        parentContinuation["ContentTypes@odata.nextLink"] = "next";
+        yield return new object[] { "content types parent continuation", WebJson(parentContinuation) };
     }
 
     private static Dictionary<string, object> ListRow(Guid? id = null, string title = "Documents",
@@ -313,7 +410,7 @@ public sealed class SharedListMetadataTests
         ["Id"] = id ?? ListId, ["Title"] = title, ["BaseType"] = baseType, ["BaseTemplate"] = template,
         ["Hidden"] = hidden, ["IsCatalog"] = catalog,
         ["RootFolder"] = new Dictionary<string, object> { ["ServerRelativeUrl"] = path, ["UniqueId"] = FolderId },
-        ["DefaultViewUrl"] = null,
+        ["DefaultViewUrl"] = null, ["DefaultDisplayFormUrl"] = null, ["ContentTypes"] = Array.Empty<object>(),
     };
 
     private static string WebJson(params Dictionary<string, object>[] rows) => JsonSerializer.Serialize(new { Lists = rows });
@@ -357,6 +454,7 @@ public sealed class SharedListMetadataTests
         public Uri WebUrl => SharedListMetadataTests.WebUrl;
         internal List<Uri> Requests { get; } = new();
         internal IReadOnlyList<JsonElement> RawLists { get; set; } = new[] { JsonSerializer.SerializeToElement(ListRow()) };
+        internal IReadOnlyList<JsonElement> Items { get; set; } = Array.Empty<JsonElement>();
         internal bool PageLists { get; set; }
         internal bool DenyLists { get; set; }
         internal string WelcomePage { get; set; }
@@ -381,6 +479,7 @@ public sealed class SharedListMetadataTests
                     if (PageLists) next = WebUrl.AbsoluteUri + "/_api/web/lists?$skiptoken=second";
                 }
             }
+            else if (requestUri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase)) items = Items;
             return Task.FromResult(new SharePointRestPage(requestUri,
                 DenyLists ? HttpStatusCode.Forbidden : HttpStatusCode.OK, items, next,
                 DiscoveryHash.Of(requestUri.AbsoluteUri), "odata-nometadata", outcome,

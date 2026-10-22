@@ -54,7 +54,7 @@ namespace PnP.Scanning.Core.Scanners
                                                  r => r.BaseType,
                                                  r => r.DefaultDisplayFormUrl,
                                                  r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl, p => p.UniqueId),
-                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.DocumentTemplateUrl, p => p.DisplayFormUrl),
+                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.StringId, p => p.DocumentTemplateUrl, p => p.DisplayFormUrl),
                                                  r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title),
                                                  r => r.UserCustomActions)
                 }

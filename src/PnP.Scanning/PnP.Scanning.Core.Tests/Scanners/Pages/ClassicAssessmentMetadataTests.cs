@@ -46,7 +46,11 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         snapshot.Items.Should().ContainSingle().Which.GetProperty("Id").GetGuid()
             .Should().Be(SharedDiscoveryContextTests.ListId);
         snapshot.Items[0].TryGetProperty("Fields", out _).Should().BeFalse("discovery must not retain rich assessment payloads");
-        snapshot.Items[0].TryGetProperty("ContentTypes", out _).Should().BeFalse();
+        var contentType = snapshot.Items[0].GetProperty("ContentTypes").EnumerateArray().Should().ContainSingle().Which;
+        contentType.GetProperty("Id").GetProperty("StringValue").GetString().Should().Be("0x0101");
+        contentType.GetProperty("DisplayFormUrl").GetString().Should().Be("/sites/reuse/Documents/Forms/DispForm.aspx");
+        contentType.TryGetProperty("Name", out _).Should().BeFalse();
+        snapshot.Items[0].GetProperty("DefaultDisplayFormUrl").GetString().Should().Be("/sites/reuse/Documents/Forms/DispForm.aspx");
         var list = context.Web.Lists.AsRequested().Should().ContainSingle().Which;
         list.Id.Should().Be(SharedDiscoveryContextTests.ListId);
         list.Title.Should().Be("Documents");
@@ -68,11 +72,52 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Real_sdk_shared_projection_preserves_content_type_item_pages_without_duplicate_all_lists_get()
+    {
+        using var sdk = new OfflineSdk();
+        var context = await sdk.CreateAsync();
+        sdk.Transport.ListResponse = "displayForm";
+        var snapshot = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        snapshot.Should().NotBeNull();
+        using var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication, sharedContext: context);
+        using var provider = new SharePointLiveAspxDiscoveryProvider(
+            new SharePointLiveAspxDiscoveryOptions("test", "sdk-shared-web", "shared-sdk-v1", new string('a', 64)),
+            factory, new AspxWebAcquisitionContext(Guid.Parse(OfflineTransport.SiteId), new Uri(Site),
+                Guid.Parse(OfflineTransport.WebId), new Uri(Site), "/sites/reuse", "STS#0"), snapshot);
+        var list = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren
+            .Single(scope => scope.Metadata["role"] == "list");
+        var surface = (await provider.EnumerateChildrenAsync(list)).ObservedChildren
+            .Single(scope => scope.SourceKind == DiscoverySourceKind.ListItemDisplayFormPages);
+        var records = new List<RawDiscoveryRecord>();
+        await foreach (var batch in provider.CreateRawSource(surface).ReadBatchesAsync()) records.AddRange(batch.Records);
+
+        var page = records.Should().ContainSingle().Which;
+        page.PhysicalLocator.Should().Be("/sites/reuse/Lists/Posts/Post.aspx?ID=7");
+        page.ListItemId.Should().Be(7);
+        page.ContentTypeId.Should().Be("0x0110007C4E8A");
+        page.FileUniqueId.Should().BeNull();
+        AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", surface, page).ScopeType.Should().Be("ListItem");
+        sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
+        sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/web/lists", StringComparison.OrdinalIgnoreCase));
+        sdk.Transport.LogicalRequests.Count(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase)).Should().Be(1);
+        provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.RequiredAdapter == "AllListsAuthority")
+            .ActualMethod.Should().Be("MODEL");
+        context.Web.Lists.AsRequested().Should().ContainSingle().Which.ContentTypes.AsRequested()
+            .Should().ContainSingle().Which.StringId.Should().Be("0x0110");
+        sdk.Created.Should().ContainSingle().Which.Should().BeSameAs(context);
+        sdk.Transport.Unexpected.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("empty", true)]
     [InlineData("missing", false)]
     [InlineData("partial", false)]
     [InlineData("nextLink", false)]
+    [InlineData("emptyContentTypes", true)]
+    [InlineData("missingContentTypes", false)]
+    [InlineData("partialContentTypes", false)]
+    [InlineData("continuedContentTypes", false)]
     public async Task Actual_sdk_responses_only_produce_shared_authority_when_complete(string response, bool complete)
     {
         using var sdk = new OfflineSdk();
@@ -87,9 +132,17 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
 
         if (complete)
         {
-            snapshot.Should().NotBeNull("an explicitly returned empty Lists array is authoritative");
-            snapshot.Items.Should().BeEmpty();
-            context.Web.Lists.AsRequested().Should().BeEmpty();
+            snapshot.Should().NotBeNull("explicitly returned empty collections are authoritative");
+            if (response == "empty")
+            {
+                snapshot.Items.Should().BeEmpty();
+                context.Web.Lists.AsRequested().Should().BeEmpty();
+            }
+            else
+            {
+                snapshot.Items.Should().ContainSingle().Which.GetProperty("ContentTypes").EnumerateArray().Should().BeEmpty();
+                context.Web.Lists.AsRequested().Should().ContainSingle().Which.ContentTypes.AsRequested().Should().BeEmpty();
+            }
         }
         else snapshot.Should().BeNull("missing rows, partial discovery metadata, or a continuation cannot prove completeness");
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
@@ -373,12 +426,12 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         {
             web => web.LastItemUserModifiedDate,
             web => web.Lists.QueryProperties(list => list.Title, list => list.Hidden, list => list.IsCatalog,
-                list => list.BaseType, list => list.TemplateType, list => list.DefaultViewUrl,
+                list => list.BaseType, list => list.TemplateType, list => list.DefaultViewUrl, list => list.DefaultDisplayFormUrl,
                 list => list.RootFolder.QueryProperties(folder => folder.ServerRelativeUrl, folder => folder.UniqueId),
                 list => list.ItemCount,
                 list => list.Fields.QueryProperties(field => field.InternalName, field => field.Title,
                     field => field.FieldTypeKind, field => field.TypeAsString),
-                list => list.ContentTypes.QueryProperties(contentType => contentType.Id,
+                list => list.ContentTypes.QueryProperties(contentType => contentType.Id, contentType => contentType.StringId,
                     contentType => contentType.Name, contentType => contentType.DisplayFormUrl))
         }
     };

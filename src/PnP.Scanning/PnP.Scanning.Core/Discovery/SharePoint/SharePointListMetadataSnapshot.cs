@@ -12,7 +12,8 @@ internal sealed class SharePointListMetadataSnapshot
     private static readonly HashSet<string> ProjectedFields = new(StringComparer.Ordinal)
     {
         "Id", "Title", "BaseType", "BaseTemplate", "Hidden", "IsCatalog",
-        "RootFolder/ServerRelativeUrl", "RootFolder/UniqueId", "DefaultViewUrl",
+        "RootFolder/ServerRelativeUrl", "RootFolder/UniqueId", "DefaultViewUrl", "DefaultDisplayFormUrl",
+        "ContentTypes/Id", "ContentTypes/DisplayFormUrl",
     };
 
     private SharePointListMetadataSnapshot(Uri webUrl, IReadOnlyList<JsonElement> items, DateTimeOffset receivedAtUtc)
@@ -72,7 +73,7 @@ internal sealed class SharePointListMetadataSnapshot
             {
                 // SDK models merge rows by ID; duplicates cannot prove an accurate authority count.
                 if (!ValidList(item) || !listIds.Add(Guid.Parse(item.GetProperty("Id").GetString()))) return null;
-                // Do not retain Fields, ContentTypes, or other large assessment-only expansions.
+                // Retain only discovery columns, including the content-type form routing projection.
                 var projection = new Dictionary<string, object>
                 {
                     ["Id"] = item.GetProperty("Id"),
@@ -87,6 +88,12 @@ internal sealed class SharePointListMetadataSnapshot
                         ["UniqueId"] = item.GetProperty("RootFolder").GetProperty("UniqueId"),
                     },
                     ["DefaultViewUrl"] = item.GetProperty("DefaultViewUrl"),
+                    ["DefaultDisplayFormUrl"] = item.GetProperty("DefaultDisplayFormUrl"),
+                    ["ContentTypes"] = ContentTypes(item).EnumerateArray().Select(contentType => new Dictionary<string, JsonElement>
+                    {
+                        ["Id"] = contentType.GetProperty("Id"),
+                        ["DisplayFormUrl"] = contentType.GetProperty("DisplayFormUrl"),
+                    }).ToArray(),
                 };
                 items.Add(JsonSerializer.SerializeToElement(projection));
             }
@@ -108,8 +115,41 @@ internal sealed class SharePointListMetadataSnapshot
         String(folder, "ServerRelativeUrl") &&
         !string.IsNullOrWhiteSpace(folder.GetProperty("ServerRelativeUrl").GetString()) &&
         folder.GetProperty("ServerRelativeUrl").GetString().StartsWith('/') && ValidGuid(folder, "UniqueId") &&
-        item.TryGetProperty("DefaultViewUrl", out var defaultView) &&
-        defaultView.ValueKind is JsonValueKind.String or JsonValueKind.Null;
+        NullableString(item, "DefaultViewUrl") && NullableString(item, "DefaultDisplayFormUrl") &&
+        ValidContentTypes(item);
+
+    private static bool ValidContentTypes(JsonElement item)
+    {
+        var contentTypes = ContentTypes(item);
+        if (contentTypes.ValueKind != JsonValueKind.Array) return false;
+        var count = contentTypes.GetArrayLength();
+        var wrapper = item.GetProperty("ContentTypes");
+        if (!CountMatches(wrapper, "__count", count) || !CountMatches(wrapper, "odata.count", count) ||
+            !CountMatches(wrapper, "@odata.count", count) || !CountMatches(item, "ContentTypes@odata.count", count)) return false;
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var contentType in contentTypes.EnumerateArray())
+        {
+            if (contentType.ValueKind != JsonValueKind.Object || !contentType.TryGetProperty("Id", out var id) ||
+                !NullableString(contentType, "DisplayFormUrl")) return false;
+            // Preserve REST's SP.ContentTypeId object instead of flattening away StringValue.
+            if (id.ValueKind == JsonValueKind.Object && !id.TryGetProperty("StringValue", out id)) return false;
+            if (id.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(id.GetString()) ||
+                !ids.Add(id.GetString())) return false;
+        }
+        return true;
+    }
+
+    private static JsonElement ContentTypes(JsonElement item)
+    {
+        if (!item.TryGetProperty("ContentTypes", out var contentTypes)) return default;
+        if (contentTypes.ValueKind != JsonValueKind.Object) return contentTypes;
+        var hasResults = contentTypes.TryGetProperty("results", out var results);
+        var hasValue = contentTypes.TryGetProperty("value", out var value);
+        return hasResults == hasValue ? default : hasResults ? results : value;
+    }
+
+    private static bool NullableString(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.String or JsonValueKind.Null;
 
     private static bool ValidGuid(JsonElement item, string name) =>
         String(item, name) && Guid.TryParse(item.GetProperty(name).GetString(), out var id) && id != Guid.Empty;

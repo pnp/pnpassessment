@@ -282,13 +282,19 @@ public sealed class SharedDiscoveryContextTests
                     Id = SiteId, GroupId = Guid.Empty, Features = Array.Empty<object>(),
                     RootWeb = new { Id = WebId, Url = currentWeb, ContentTypes = Array.Empty<object>() }
                 }));
+            if (ListResponse == "displayForm" && endpoint.Equals($"Web/lists(guid'{ListId:D}')/items", StringComparison.OrdinalIgnoreCase))
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new { value = new[]
+                {
+                    new { Id = 7, ContentTypeId = "0x0110007C4E8A" },
+                    new { Id = 9, ContentTypeId = "0x01" },
+                } }));
             if (!endpoint.Equals("Web", StringComparison.OrdinalIgnoreCase)) throw Reject("GET " + uri);
             var web = new Dictionary<string, object>
             {
                 ["Id"] = WebId, ["Url"] = currentWeb, ["ServerRelativeUrl"] = new Uri(currentWeb).AbsolutePath,
                 ["Title"] = "Offline Web", ["WebTemplateConfiguration"] = "STS#0",
                 ["RegionalSettings"] = new { TimeZone = new { Id = 2 } },
-                ["WelcomePage"] = "SitePages/Home.aspx", ["Features"] = Array.Empty<object>(),
+                ["WelcomePage"] = ListResponse == "displayForm" ? "" : "SitePages/Home.aspx", ["Features"] = Array.Empty<object>(),
                 ["LastItemUserModifiedDate"] = "2026-10-20T00:00:00Z"
             };
             if (HasListProjection(uri))
@@ -300,6 +306,7 @@ public sealed class SharedDiscoveryContextTests
                     {
                         ["Id"] = ListId, ["Title"] = "Documents", ["BaseType"] = 1, ["BaseTemplate"] = 101,
                         ["Hidden"] = false, ["IsCatalog"] = false, ["DefaultViewUrl"] = "/sites/reuse/Documents/Forms/AllItems.aspx",
+                        ["DefaultDisplayFormUrl"] = "/sites/reuse/Documents/Forms/DispForm.aspx",
                         ["RootFolder"] = ListResponse == "partial"
                             ? new { ServerRelativeUrl = "/sites/reuse/Documents" }
                             : (object)new { ServerRelativeUrl = "/sites/reuse/Documents", UniqueId = FolderId },
@@ -309,6 +316,22 @@ public sealed class SharedDiscoveryContextTests
                         ["ContentTypes"] = new[] { new { Id = new { StringValue = "0x0101" }, StringId = "0x0101", Name = "Document",
                             DocumentTemplateUrl = "", DisplayFormUrl = "/sites/reuse/Documents/Forms/DispForm.aspx" } }
                     };
+                    if (ListResponse == "displayForm")
+                    {
+                        list["Title"] = "Posts";
+                        list["BaseType"] = 0;
+                        list["BaseTemplate"] = 100;
+                        list["RootFolder"] = new { ServerRelativeUrl = "/sites/reuse/Lists/Posts", UniqueId = FolderId };
+                        list["DefaultDisplayFormUrl"] = "/sites/reuse/Lists/Posts/DispForm.aspx";
+                        list["ContentTypes"] = new[] { new { Id = new { StringValue = "0x0110" }, StringId = "0x0110",
+                            Name = "Post", DisplayFormUrl = "Lists/Posts/Post.aspx" } };
+                    }
+                    if (ListResponse == "emptyContentTypes") list["ContentTypes"] = Array.Empty<object>();
+                    if (ListResponse == "missingContentTypes") list.Remove("ContentTypes");
+                    if (ListResponse == "partialContentTypes")
+                        list["ContentTypes"] = new[] { new { Id = new { StringValue = "0x0101" }, StringId = "0x0101" } };
+                    if (ListResponse == "continuedContentTypes")
+                        list["ContentTypes@odata.nextLink"] = WebUrl + "/_api/Web/Lists/ContentTypes?$skiptoken=next";
                     web["Lists"] = ListResponse == "empty" ? Array.Empty<object>() : new[] { list };
                     if (ListResponse == "nextLink") web["Lists@odata.nextLink"] = WebUrl + "/_api/Web/Lists?$skiptoken=next";
                 }

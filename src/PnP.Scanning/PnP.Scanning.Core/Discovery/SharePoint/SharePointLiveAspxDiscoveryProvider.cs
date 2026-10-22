@@ -11,7 +11,12 @@ namespace PnP.Scanning.Core.Discovery;
 /// </summary>
 internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvider, IAspxReferenceAcquisitionProvider
 {
-    private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl";
+    // DefaultDisplayFormUrl and the per-content-type DisplayFormUrl resolve the pages a list item is
+    // addressed through when it owns no file of its own. They ride along on the existing all-lists
+    // request rather than costing a round trip per list, at the cost of a larger response for webs
+    // whose lists carry many content types.
+    private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl,DefaultDisplayFormUrl,ContentTypes/Id,ContentTypes/DisplayFormUrl";
+    private const string AllListsExpand = "RootFolder,ContentTypes";
     private const string FormsSelect = "Id,ServerRelativeUrl,FormType";
     private const string ViewsSelect = "Id,ServerRelativeUrl,Hidden,DefaultView,PersonalView,Title";
     private const string FilesSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,ListItemAllFields/Id,ListItemAllFields/ContentTypeId,Length,Properties";
@@ -19,12 +24,16 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     // REST encodes the '_' of a property bag name as '_x005f_', so vti_setuppath arrives under this name.
     private const string RestSetupPathProperty = "vti_x005f_setuppath";
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
+    // Only what decides whether an item is a page and where that page lives. The values a report shows
+    // belong to the item, which is read again by the assessment that needs them.
+    private const string ItemsSelect = "Id,ContentTypeId";
     private readonly SharePointLiveAspxDiscoveryOptions options;
     private readonly ISharePointAspxRestClientFactory clientFactory;
     private readonly SharePointListMetadataSnapshot sharedLists;
     private readonly Dictionary<string, LiveScope> scopes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RawDiscoveryRecord> targetedFiles = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ListDisplayForms> displayForms = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> welcomePageByWeb = new(StringComparer.OrdinalIgnoreCase);
     private bool disposed;
 
@@ -85,6 +94,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             "folder" or "physical-forms" or "web-root-folder" => ReadFolderFilesAsync(scope, token),
             "forms" => ReadReferencesAsync(scope, isForm: true, token),
             "views" => ReadReferencesAsync(scope, isForm: false, token),
+            "display-form-items" => ReadDisplayFormItemsAsync(scope, token),
             "welcome-page" => ReadTargetedFileAsync(scope, token),
             _ => throw new InvalidOperationException($"Unsupported live raw surface role '{scope.Role}'."),
         });
@@ -127,7 +137,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         else
         {
             var endpoint = Endpoint(parent.WebUrl,
-                $"_api/web/lists?$select={AllListsSelect}&$expand=RootFolder");
+                $"_api/web/lists?$select={AllListsSelect}&$expand={AllListsExpand}");
             var listResult = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
                 "lists:" + parent.ScopeKey, endpoint, AllListsSelect, string.Empty,
                 AspxSurfaceApplicability.Applicable, "AllListsAuthority", cancellationToken).ConfigureAwait(false);
@@ -164,6 +174,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var scope = Add(new LiveScope(Key("list", parent.WebUrl.AbsoluteUri, listId?.ToString("D") ?? title),
                 parent.ScopeKey, DiscoveryScopeKind.Container, null, rootFolder ?? title, "list", parent.WebUrl,
                 listId, baseType, rootFolder, metadata));
+            displayForms[scope.ScopeKey] = ReadDisplayForms(item);
             containers.Add(scope);
             RecordListApplicability(parent, scope, template);
         }
@@ -204,6 +215,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             parent.ScopeKey, DiscoveryScopeKind.Folder, DiscoverySourceKind.ListViewBackingFiles,
             parent.Locator + "/Views REST objects", "views", parent.WebUrl, parent.ListId,
             parent.BaseType, parent.FolderUrl, parent.Metadata)));
+        if (HasDisplayFormPages(parent))
+            children.Add(Add(new LiveScope(Key("display-form-items", parent.WebUrl.AbsoluteUri,
+                    parent.ListId?.ToString("D") ?? parent.ScopeKey),
+                parent.ScopeKey, DiscoveryScopeKind.Folder, DiscoverySourceKind.ListItemDisplayFormPages,
+                parent.Locator + "/Items REST objects", "display-form-items", parent.WebUrl, parent.ListId,
+                parent.BaseType, parent.FolderUrl, parent.Metadata)));
 
         var outcome = decision.Outcome;
         return Task.FromResult(Result(parent, children, outcome,
@@ -213,7 +230,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private async Task<DiscoveryChildEnumerationResult> EnumerateFolderAsync(LiveScope parent,
         CancellationToken cancellationToken)
     {
-        if (parent.Role is "forms" or "views" or "welcome-page")
+        if (parent.Role is "forms" or "views" or "welcome-page" or "display-form-items")
             return Result(parent, Array.Empty<LiveScope>(), DiscoveryTerminalOutcome.Empty);
         if (parent.SourceKind == DiscoverySourceKind.WebRootFiles)
         {
@@ -372,6 +389,106 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             }
             yield return ToRawBatch(page, records, result.Validation.Outcome);
         }
+    }
+
+    /// <summary>
+    /// Reads the pages a list exposes that own no file of their own: a list item addressed through a
+    /// shared display form as "&lt;displayForm&gt;?ID=&lt;n&gt;".
+    /// </summary>
+    /// <remarks>
+    /// One form file backs N of these pages, so they are acquired from the item stream rather than from
+    /// a physical file enumeration. The form file itself is already inventoried by the file surfaces;
+    /// what is discovered here is the set of addresses that render content through it.
+    /// </remarks>
+    private async IAsyncEnumerable<RawDiscoveryBatch> ReadDisplayFormItemsAsync(LiveScope scope,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        // The forms were read with the owning list, so they are keyed by its scope rather than by this
+        // surface's.
+        var (listForm, contentTypeForms) = ResolveDisplayForms(scopes[scope.ParentScopeKey]);
+        var endpoint = Endpoint(scope.WebUrl,
+            $"_api/web/lists(guid'{scope.ListId:D}')/items?$select={ItemsSelect}");
+        var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
+            "items:" + scope.ScopeKey, endpoint, ItemsSelect, string.Empty,
+            AspxSurfaceApplicability.Applicable, "AllListItemsAuthority", cancellationToken).ConfigureAwait(false);
+        foreach (var page in result.Pages)
+        {
+            var records = new List<RawDiscoveryRecord>();
+            foreach (var item in page.Page.Items)
+            {
+                var itemId = PropertyInt(item, "Id");
+                var contentTypeId = PropertyString(item, "ContentTypeId");
+                var form = DisplayFormUrlPolicy.Resolve(contentTypeForms, listForm, contentTypeId);
+                // An item whose own content type resolves to the stock form is an ordinary data row even
+                // when a sibling content type in the same list names a content page form.
+                if (itemId == null || !DisplayFormUrlPolicy.IsContentPageForm(form)) continue;
+                records.Add(new RawDiscoveryRecord(
+                    scope.ListId?.ToString("D") + ":" + itemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    // No FileUniqueId: the page owns no file. The form file has one, and it belongs to the
+                    // form, not to this address.
+                    null,
+                    scope.ListId?.ToString("D") ?? scope.ScopeKey,
+                    // Admission matches on the leaf name, so it is the form's file name rather than the
+                    // addressed URL, which carries a query string.
+                    Path.GetFileName(form),
+                    $"{form}?ID={itemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+                    LocatorIsGuaranteedPhysicalFilePath: false,
+                    scope.PermissionContext,
+                    EvidenceMetadata(endpoint, ItemsSelect, string.Empty, "pnp-list-item-display-form",
+                        ("displayFormUrl", form), ("listItemId", itemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+                    SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
+                    WebId: MetadataGuid(scope.Metadata, "webId"),
+                    ListId: scope.ListId,
+                    FolderUniqueId: null,
+                    ListItemId: itemId,
+                    // A list display form is never the web's welcome page: a welcome page is always a
+                    // physical file.
+                    HomePage: false,
+                    ContentTypeId: contentTypeId,
+                    PageType: InferPageType(contentTypeId),
+                    LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+                    CustomizedPageStatusRaw: null,
+                    SetupPath: null,
+                    ObservationMethod: DiscoverySourceKind.ListItemDisplayFormPages.ToString()));
+            }
+            yield return ToRawBatch(page, records, result.Validation.Outcome);
+        }
+    }
+
+    /// <summary>
+    /// Whether a list can expose pages that own no file of their own.
+    /// </summary>
+    /// <remarks>
+    /// A document library cannot: its items are files, already inventoried by the physical file surfaces
+    /// with a real FileUniqueId, and its DispForm.aspx shows an item's metadata form rather than page
+    /// content. Nor can a list whose every candidate form is the stock list form — those hold ordinary
+    /// data rows (announcements, tasks, contacts) viewed through a system form, and enumerating them
+    /// would report every list item in the tenant as a page.
+    /// </remarks>
+    private bool HasDisplayFormPages(LiveScope list)
+    {
+        if (list.BaseType == (int)ListBaseType.DocumentLibrary) return false;
+        var (listForm, contentTypeForms) = ResolveDisplayForms(list);
+        return contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm)
+            .Any(DisplayFormUrlPolicy.IsContentPageForm);
+    }
+
+    // Normalizes both display-form tiers to server-relative URLs so they can be compared with each
+    // other and with the stock form. The content-type tier keeps the longest-id-first order it was
+    // read in, so resolving an item by prefix match picks its most specific type.
+    private (string ListForm, IReadOnlyList<(string ContentTypeId, string FormUrl)> ContentTypeForms)
+        ResolveDisplayForms(LiveScope list)
+    {
+        var webRoot = list.WebUrl?.AbsolutePath ?? "/";
+        var siteRoot = Uri.TryCreate(MetadataString(list.Metadata, "siteUrl"), UriKind.Absolute, out var siteUri)
+            ? siteUri.AbsolutePath : webRoot;
+        var forms = displayForms.GetValueOrDefault(list.ScopeKey);
+        var contentTypeForms = (forms?.ContentTypeForms ?? Array.Empty<ContentTypeForm>())
+            .Select(form => (form.ContentTypeId,
+                FormUrl: DisplayFormUrlPolicy.ToServerRelative(form.FormUrl, webRoot, siteRoot)))
+            .Where(candidate => candidate.FormUrl != null)
+            .ToArray();
+        return (DisplayFormUrlPolicy.ToServerRelative(forms?.DefaultFormUrl, webRoot, siteRoot), contentTypeForms);
     }
 
     private async Task<(AspxReferenceCandidate Candidate, RawDiscoveryRecord Physical,
@@ -855,6 +972,49 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             ? value.ValueKind == JsonValueKind.True || bool.Parse(value.ToString()) : null;
     private static Guid? PropertyGuid(JsonElement item, string name) =>
         Guid.TryParse(PropertyString(item, name), out var value) ? value : null;
+    /// <summary>
+    /// Reads the display-form surfaces a list exposes from its all-lists row.
+    /// </summary>
+    /// <remarks>
+    /// Content-type forms are ordered longest content type id first, so resolving an item's form by
+    /// prefix match picks the most specific type in the id hierarchy rather than its ancestor.
+    /// </remarks>
+    private static ListDisplayForms ReadDisplayForms(JsonElement item)
+    {
+        var contentTypeForms = NestedArray(item, "ContentTypes")
+            .Select(contentType => new ContentTypeForm(ReadContentTypeId(contentType),
+                PropertyString(contentType, "DisplayFormUrl")))
+            .Where(form => !string.IsNullOrWhiteSpace(form.ContentTypeId) &&
+                !string.IsNullOrWhiteSpace(form.FormUrl))
+            .OrderByDescending(form => form.ContentTypeId.Length)
+            .ToArray();
+        return new ListDisplayForms(PropertyString(item, "DefaultDisplayFormUrl"), contentTypeForms);
+    }
+
+    private static string ReadContentTypeId(JsonElement contentType)
+    {
+        if (!PnPContextSharePointAspxRestClient.TryProperty(contentType, "Id", out var id)) return null;
+        // REST exposes SP.ContentTypeId as { StringValue: "0x..." }; it is not the list item's
+        // string-valued ContentTypeId field. Retain support for already-flattened identifiers.
+        if (id.ValueKind == JsonValueKind.Object)
+            return PnPContextSharePointAspxRestClient.TryProperty(id, "StringValue", out var value) &&
+                value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        return id.ValueKind == JsonValueKind.String ? id.GetString() : null;
+    }
+
+    // A $expand'ed collection arrives either as a bare array or wrapped in a "results" array,
+    // depending on the OData flavour the response was negotiated with.
+    private static IEnumerable<JsonElement> NestedArray(JsonElement item, string name)
+    {
+        if (!PnPContextSharePointAspxRestClient.TryProperty(item, name, out var nested))
+            return Array.Empty<JsonElement>();
+        if (nested.ValueKind == JsonValueKind.Object &&
+            PnPContextSharePointAspxRestClient.TryProperty(nested, "results", out var results))
+            nested = results;
+        return nested.ValueKind == JsonValueKind.Array
+            ? nested.EnumerateArray().ToArray() : Array.Empty<JsonElement>();
+    }
+
     private static string NestedString(JsonElement item, string parent, string child) =>
         PnPContextSharePointAspxRestClient.TryProperty(item, parent, out var nested) ? PropertyString(nested, child) : null;
     private static int? NestedInt(JsonElement item, string parent, string child) =>
@@ -934,6 +1094,9 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     }
 
     private sealed record LivePage(SharePointRestPage Page, AspxPaginationPageReceipt Receipt);
+    private sealed record ContentTypeForm(string ContentTypeId, string FormUrl);
+    private sealed record ListDisplayForms(string DefaultFormUrl,
+        IReadOnlyList<ContentTypeForm> ContentTypeForms);
     private sealed record WelcomePageAcquisition(
         DiscoveryTerminalOutcome Outcome,
         string Locator,
