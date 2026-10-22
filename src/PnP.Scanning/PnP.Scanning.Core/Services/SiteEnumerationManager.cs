@@ -86,7 +86,7 @@ namespace PnP.Scanning.Core.Services
                                                                         }
                     )))
                 {
-                    // Enumerate all site collections
+                    // Page discovery must not widen the existing non-personal scan scope.
                     VanityUrlOptions vanityUrlOptions = null;
 
                     Log.Information("Vanity URLs passed in: my site host {MySiteHostUrl} and tenant admin {AdminCenterUrl}", start.MySiteHostUrl, start.AdminCenterUrl);
@@ -103,7 +103,7 @@ namespace PnP.Scanning.Core.Services
                     }
 
                     var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
-                        filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
+                        filter: SiteCollectionFilter.ExcludePersonalSites,
                         vanityUrlOptions: vanityUrlOptions);
                     foreach(var siteCollection in siteCollections)
                     {
@@ -204,10 +204,9 @@ namespace PnP.Scanning.Core.Services
                                                                     }),
                                                                     contextOptions))
             {
-                if (options is ClassicOptions { Pages: true } || !context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
+                if (!context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
                 {
-                    webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context,
-                        skipAppWebs: options is not ClassicOptions { Pages: true }));
+                    webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context));
                 }
                 else
                 {
@@ -255,7 +254,7 @@ namespace PnP.Scanning.Core.Services
         }
 
 
-        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context, bool skipAppWebs = true)
+        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context)
         {
             List<EnumeratedWeb> webs = new();
 
@@ -267,7 +266,7 @@ namespace PnP.Scanning.Core.Services
             });
 
             // Get the sub webs from the root web of the site collection
-            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync(skipAppWebs: skipAppWebs);
+            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync(skipAppWebs: true);
 
             foreach(var enumeratedWeb in enumeratedWebs)
             {
