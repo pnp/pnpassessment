@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using Microsoft.SharePoint.Client;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
@@ -11,8 +11,8 @@ namespace PnP.Scanning.Core.Scanners
 {
     internal static class PageScanComponent
     {
-        private static readonly Guid FeatureId_Site_Publishing = new("F6924D36-2FA8-4F0B-B16D-06B7250180FA");
-        private static readonly Guid FeatureId_Web_Publishing = new("94C94CA6-B32F-4DA9-A9E3-1F3D343D7ECB");
+        internal static readonly Guid FeatureId_Site_Publishing = new("F6924D36-2FA8-4F0B-B16D-06B7250180FA");
+        internal static readonly Guid FeatureId_Web_Publishing = new("94C94CA6-B32F-4DA9-A9E3-1F3D343D7ECB");
         private static readonly Guid FeatureId_Web_ModernPage = new("B6917CB1-93A0-4B97-A84D-7CF49975D4EC");
 
         // Home-page modernization opt-out web feature and the group-connected ("groupified") web feature.
@@ -74,23 +74,20 @@ namespace PnP.Scanning.Core.Scanners
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext,
             IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {
-            var options = ((ClassicScanner)scannerBase).Options;
+            // One resolution of everything this web supplies, so the steps below declare what they
+            // need instead of reaching for a context.
+            var web = await ClassicPageWebContext.CreateAsync(scannerBase, context, csomContext).ConfigureAwait(false);
+            var options = web.Options;
 
             List<ClassicPage> pagesList = new();
             List<PageEnrichmentInput> enrichmentInputs = new();
             HashSet<string> remediationCodes = new();
 
-            bool sitePublishingEnabled = FeatureEnabled(context.Site.Features, FeatureId_Site_Publishing);
-            bool webPublishingEnabled = FeatureEnabled(context.Web.Features, FeatureId_Web_Publishing);
-
-            // The web's welcome page drives the HomePage flag and the optional HomePageOnly filter.
-            var (welcomePage, welcomePageKnown) = await GetWelcomePageAsync(csomContext).ConfigureAwait(false);
-
             var discovery = new PageDiscovery
             {
                 ScannerBase = scannerBase,
-                WelcomePage = welcomePage,
-                WelcomePageKnown = welcomePageKnown,
+                WelcomePage = web.WelcomePage,
+                WelcomePageKnown = web.WelcomePageKnown,
                 HomePageOnly = options.HomePageOnly,
                 SkipUserInformation = options.SkipUserInformation,
                 Pages = pagesList,
@@ -98,11 +95,7 @@ namespace PnP.Scanning.Core.Scanners
                 EnrichmentInputs = enrichmentInputs,
             };
 
-            var lists = context.Web.Lists.AsRequested().ToList();
-            // A file inside one of these folders is list-backed even when its discovery record carries no
-            // list identity, which separates an unobserved association from an absent one below.
-            var listRootFolderUrls = lists.Select(value => value.RootFolder?.ServerRelativeUrl)
-                .Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+            var lists = web.Lists;
             var discoveryWriter = new AssessmentDiscoveryWriter(scannerBase.ScanId);
 
             // Pages that own no .aspx file of their own: a list item rendered through a shared display
@@ -120,25 +113,25 @@ namespace PnP.Scanning.Core.Scanners
                 // not mistaken for false. Prefer the later CSOM read when it succeeded; it is also the
                 // value used by the page assessment and keeps --homepageonly from filtering every page
                 // merely because the discovery-specific WelcomePage read failed.
-                row.HomePage = ResolveHomePageState(row.Url, welcomePage, welcomePageKnown, row.HomePage);
+                row.HomePage = ResolveHomePageState(row.Url, web.WelcomePage, web.WelcomePageKnown, row.HomePage);
                 if (options.HomePageOnly && row.HomePage != true)
                 {
                     row.AssessmentStatus = "NotSelected";
                     continue;
                 }
-                var list = lists.FirstOrDefault(value => value.Id == row.ListId);
+                var list = web.FindList(row.ListId);
                 if (list == null || row.ListItemId == null)
                 {
                     // Only the item-dependent reads are unavailable here, not the page itself: a file
                     // still resolves by URL alone, so it is assessed at file level instead of skipped.
                     AddFileLevelPage(discovery, row, ClassifyListAssociation(row, listMatched: list != null,
-                        listRootFolderUrls));
+                        web.ListRootFolderUrls));
                     continue;
                 }
                 try
                 {
-                    var input = await LoadPhysicalPageAsync(list, row, welcomePage,
-                        options.SkipUserInformation, welcomePageKnown).ConfigureAwait(false);
+                    var input = await LoadPhysicalPageAsync(list, row, web.WelcomePage,
+                        options.SkipUserInformation, web.WelcomePageKnown).ConfigureAwait(false);
                     row.PageType = input.Page.PageType;
                     row.HomePage = input.Page.HomePage;
                     if (row.PageType == PublishingPage) AddPublishingPage(discovery, input);
@@ -184,7 +177,7 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         input.Page.UncustomizedHomePage = await DetermineUncustomizedHomePageAsync(
                             scannerBase, context, csomContext, input, pageWebParts,
-                            sitePublishingEnabled, webPublishingEnabled).ConfigureAwait(false);
+                            web.SitePublishingEnabled, web.WebPublishingEnabled).ConfigureAwait(false);
                     }
                 }
                 catch (Exception ex)
@@ -262,7 +255,7 @@ namespace PnP.Scanning.Core.Scanners
         // page identity is (ListId, ItemId) rather than a file. Which items are such pages, and at which
         // address, is settled by discovery. What is read here is only the item metadata the report shows,
         // streamed once per list rather than once per page.
-        private static async Task AddDisplayFormPagesAsync(PageDiscovery disc, List<IList> lists,
+        private static async Task AddDisplayFormPagesAsync(PageDiscovery disc, IReadOnlyList<IList> lists,
             IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {
             foreach (var group in discoveredPages.Where(IsDisplayFormPage).Where(row => row.ListItemId != null)
@@ -482,7 +475,11 @@ namespace PnP.Scanning.Core.Scanners
                     "The file has no backing list item: item field values, ModifiedAt/ModifiedBy and WikiField are not applicable.");
             }
 
-            var family = SetupPathClassifier.Classify(row.SetupPath);
+            // The analyzer is the only reader of the setup path, so the provisioning fact is
+            // established once and the page type below is a projection of it rather than a second,
+            // independently drifting reading.
+            var provisioning = ProvisioningTemplateAnalyzer.Observe(row);
+            var family = ProvisioningTemplateAnalyzer.FamilyOf(provisioning);
             string pageType = FileLevelPageType(family);
             if (pageType == null)
             {
@@ -721,25 +718,6 @@ namespace PnP.Scanning.Core.Scanners
             await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
             return $"{Regex.Replace(result.Value ?? "", @"['´`]", "")}.aspx";
-        }
-
-        // Reads the web's welcome page (server-relative-from-web), used for the HomePage flag and the
-        // HomePageOnly filter. Keep an unavailable read distinct from a successful empty value, because
-        // an empty WelcomePage legitimately means default.aspx while a failed read remains unknown.
-        private static async Task<(string WelcomePage, bool IsKnown)> GetWelcomePageAsync(ClientContext csomContext)
-        {
-            try
-            {
-                var rootFolder = csomContext.Web.RootFolder;
-                csomContext.Load(rootFolder, f => f.WelcomePage);
-                await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
-
-                return (rootFolder.WelcomePage ?? "", true);
-            }
-            catch
-            {
-                return (null, false);
-            }
         }
 
         // Splits a web template like "STS#0" into its template ("STS") and configuration (0). An
