@@ -13,4 +13,6 @@ internal sealed record AspxReferenceCandidate(
     string LinkedFileUniqueId,
     string ContentOrigin,
     string PermissionContext,
-    IReadOnlyList<string> EvidenceRefs);
+    IReadOnlyList<string> EvidenceRefs,
+    string ErrorStage = null,
+    string ErrorDetail = null);

@@ -492,7 +492,11 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var disposition = resolved.Outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed
                 ? AspxReferenceDispositions.ReferenceUnavailable : AspxReferenceDispositions.Unknown;
             return (Candidate(sourceKind, sourceObjectIdentity, method, locator, disposition,
-                resolved.ErrorCode, null, "unavailable", evidenceRef, resolved.EvidenceRef), null, resolved.Outcome);
+                resolved.ErrorCode, null, "unavailable", evidenceRef, resolved.EvidenceRef) with
+                {
+                    ErrorStage = resolved.ErrorStage,
+                    ErrorDetail = resolved.ErrorDetail,
+                }, null, resolved.Outcome);
         }
 
         var ghosted = string.Equals(resolved.CustomizedPageStatus, nameof(CustomizedPageStatus.Uncustomized),

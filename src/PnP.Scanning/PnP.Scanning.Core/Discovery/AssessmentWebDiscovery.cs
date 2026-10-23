@@ -273,6 +273,8 @@ internal sealed class AssessmentWebDiscovery
             ObservationMethod = reference.AcquisitionMethod,
             DiscoveryStatus = status,
             ErrorCodes = status is "Failed" or "Unknown" ? reference.ReasonCode : null,
+            ErrorStage = status is "Failed" or "Unknown" ? reference.ErrorStage : null,
+            ErrorDetail = status is "Failed" or "Unknown" ? reference.ErrorDetail : null,
             EvidenceJson = EvidenceJson(reference),
             ObservedAtUtc = DateTime.UtcNow,
         };
