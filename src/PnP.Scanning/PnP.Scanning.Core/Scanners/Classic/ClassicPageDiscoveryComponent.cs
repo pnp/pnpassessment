@@ -9,23 +9,32 @@ internal static class ClassicPageDiscoveryComponent
 {
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner)
     {
+        using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
+        return await ExecuteAsync(scanner, context).ConfigureAwait(false);
+    }
+
+    internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner,
+        PnP.Core.Services.PnPContext context, SharePointListMetadataSnapshot sharedLists = null)
+    {
         var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
         var writer = new AssessmentDiscoveryWriter(scanner.ScanId);
-        // Use the existing assessment authentication, ScanId and scheduled Web scope.
         var auth = new ExternalAuthenticationProvider((_, scopes) =>
             scanner.ScanManager.GetScanAuthenticationManager(scanner.ScanId).GetAccessTokenAsync(scopes));
-        using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
-        var site = await context.Site.GetAsync(value => value.Id).ConfigureAwait(false);
-        var web = await context.Web.GetAsync(value => value.Id, value => value.Url,
+        // Context creation already loaded Site.Id and Web.Id/Url. Ensure only what is missing.
+        await context.Site.EnsurePropertiesAsync(value => value.Id).ConfigureAwait(false);
+        await context.Web.EnsurePropertiesAsync(value => value.Id, value => value.Url,
             value => value.ServerRelativeUrl).ConfigureAwait(false);
-        using var factory = new PnPContextSharePointAspxRestClientFactory(scanner.PnPContextFactory, auth, scanner.ScanId);
+        var site = context.Site;
+        var web = context.Web;
+        using var factory = new PnPContextSharePointAspxRestClientFactory(scanner.PnPContextFactory, auth,
+            scanner.ScanId, sharedContext: context);
         using var provider = new SharePointLiveAspxDiscoveryProvider(new(
             "assessment:" + scanner.ScanId.ToString("D"), "scheduled-web", "classic-assessment",
             DiscoveryHash.Of("classic-assessment", scanner.ScanId.ToString("D"), site.Id.ToString("D"),
                 web.Id.ToString("D")), Intent: scanner.Options.HomePageOnly
                 ? AspxDiscoveryIntent.HomePageOnly : AspxDiscoveryIntent.FullInventory), factory,
             new AspxWebAcquisitionContext(site.Id, new Uri(scanner.SiteUrl), web.Id, web.Url,
-                web.ServerRelativeUrl, scanner.WebTemplate));
+                web.ServerRelativeUrl, scanner.WebTemplate), sharedLists);
         await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer)
             .RunAsync(provider, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);

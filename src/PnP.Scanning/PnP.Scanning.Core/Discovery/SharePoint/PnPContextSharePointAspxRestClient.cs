@@ -11,9 +11,13 @@ namespace PnP.Scanning.Core.Discovery;
 internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestClient
 {
     private readonly PnPContext context;
+    private readonly bool ownsContext;
 
-    internal PnPContextSharePointAspxRestClient(PnPContext context) =>
+    internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true)
+    {
         this.context = context ?? throw new ArgumentNullException(nameof(context));
+        this.ownsContext = ownsContext;
+    }
 
     public Uri WebUrl => context.Uri;
 
@@ -190,7 +194,10 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
             file.CustomizedPageStatus.ToString(), SetupPath(file))).ToArray();
 
-    public void Dispose() => context.Dispose();
+    public void Dispose()
+    {
+        if (ownsContext) context.Dispose();
+    }
 
     // PnP Core normalizes the REST '_x005f_' escaping back to '_' when it fills a property bag,
     // so the modeled surface exposes the setup path under its unescaped vti_setuppath name.

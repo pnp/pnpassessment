@@ -4,7 +4,7 @@ using System.Net.Http;
 namespace PnP.Scanning.Core.Scanners;
 
 /// <summary>
-/// A bounded retry for the read-only context load between discovery and page assessment.
+/// A bounded retry for read-only assessment metadata initialization.
 /// HttpClient response-body failures can occur outside the SDK's HTTP retry handler.
 /// </summary>
 internal static class ClassicAssessmentInitialization
@@ -14,7 +14,8 @@ internal static class ClassicAssessmentInitialization
     internal static async Task<T> ExecuteAsync<T>(Func<Task<T>> initialize,
         AssessmentDiscoveryWriter writer, Guid scanId, string siteUrl, string webUrl,
         CancellationToken cancellationToken, Action<int, Exception> onRetry = null,
-        Func<TimeSpan, CancellationToken, Task> delay = null)
+        Func<TimeSpan, CancellationToken, Task> delay = null,
+        Func<Exception, Task> beforeFailureFinalization = null)
     {
         delay ??= Task.Delay;
         try
@@ -33,6 +34,11 @@ internal static class ClassicAssessmentInitialization
         }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested)
         {
+            // A shared metadata load can fail before discovery has run. Retain its raw
+            // inventory first, then give those pages the same failed-assessment disposition.
+            if (beforeFailureFinalization != null)
+                await beforeFailureFinalization(error).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             await writer.FailUnassessedPagesAsync(scanId, siteUrl, webUrl, error,
                 "AssessmentInitialization").ConfigureAwait(false);
             throw;
