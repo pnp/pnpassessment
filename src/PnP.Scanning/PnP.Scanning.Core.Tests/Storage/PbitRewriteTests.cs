@@ -47,6 +47,63 @@ namespace PnP.Scanning.Core.Tests.Storage
         }
 
         [Fact]
+        public void ClassicTemplate_UsesInvariantCsvImportCulture()
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+
+            // ReportManager exports CSV values using InvariantCulture (MM/dd/yyyy dates).
+            document.RootElement.GetProperty("model").GetProperty("sourceQueryCulture")
+                .GetString().Should().Be("en-US");
+        }
+
+        [Theory]
+        [InlineData("scans", "StartDate")]
+        [InlineData("scans", "EndDate")]
+        [InlineData("sitecollections", "StartDate")]
+        [InlineData("sitecollections", "EndDate")]
+        [InlineData("history", "EventDate")]
+        [InlineData("webs", "StartDate")]
+        [InlineData("webs", "EndDate")]
+        public void ClassicTemplate_StandardDateColumns_ParseWithExplicitCulture(string tableName, string columnName)
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var table = GetClassicTable(document, tableName);
+            var column = table.GetProperty("columns").EnumerateArray()
+                .Single(value => value.GetProperty("name").GetString() == columnName);
+
+            column.GetProperty("dataType").GetString().Should().Be("dateTime");
+
+            // Assert the culture on the actual conversion, not just elsewhere in the query/model.
+            var conversion = GetQueryLines(table)
+                .Single(line => line.Contains($"{{\"{columnName}\", type datetime}}", StringComparison.Ordinal));
+            conversion.Should().Contain("Table.TransformColumnTypes(");
+            conversion.TrimEnd().TrimEnd(',').Should().EndWith(", \"en-US\")");
+        }
+
+        [Fact]
+        public void ClassicTemplate_ClassicPages_PreservesQuotedLineBreaks()
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var source = GetQueryLines(GetClassicTable(document, "classicpages"))
+                .Single(line => line.Contains("Csv.Document(", StringComparison.Ordinal));
+
+            source.Should().MatchRegex(@"QuoteStyle\s*=\s*QuoteStyle\.Csv");
+            source.Should().NotContain("QuoteStyle.None");
+        }
+
+        [Fact]
+        public void ClassicTemplate_AuthoringCopy_MatchesEmbeddedSchema()
+        {
+            const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
+            using var embedded = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
+            embedded.Should().NotBeNull();
+            var authoringCopy = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ClassicAssessmentReport.pbit");
+
+            File.Exists(authoringCopy).Should().BeTrue();
+            ReadDataModelSchema(authoringCopy).Should().Be(ReadDataModelSchema(embedded));
+        }
+
+        [Fact]
         public void RewriteDataLocationsInPbit_NewCsvSources_PathsRewritten()
         {
             var dir = NewTempDir();
@@ -132,6 +189,26 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
 
             return pbit;
+        }
+
+        private static JsonDocument ReadEmbeddedClassicTemplate()
+        {
+            const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
+            using var pbit = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
+            pbit.Should().NotBeNull();
+            return JsonDocument.Parse(ReadDataModelSchema(pbit));
+        }
+
+        private static JsonElement GetClassicTable(JsonDocument document, string name)
+        {
+            return document.RootElement.GetProperty("model").GetProperty("tables").EnumerateArray()
+                .Single(table => table.GetProperty("name").GetString() == name);
+        }
+
+        private static IEnumerable<string> GetQueryLines(JsonElement table)
+        {
+            return table.GetProperty("partitions")[0].GetProperty("source").GetProperty("expression")
+                .EnumerateArray().Select(line => line.GetString());
         }
 
         private static string ReadDataModelSchema(string pbit)
