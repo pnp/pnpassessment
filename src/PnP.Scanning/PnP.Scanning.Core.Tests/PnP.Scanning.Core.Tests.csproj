@@ -23,6 +23,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\PnP.Scanning.Core\PnP.Scanning.Core.csproj" />
+		<None Include="..\Reports\Classic\ClassicAssessmentReport.pbit" Link="Fixtures\ClassicAssessmentReport.pbit" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>
