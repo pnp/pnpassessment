@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release/1.16.1
   pull_request:
     branches:
       - main
@@ -21,35 +22,23 @@ jobs:
         with:
           path: pnpassessment
 
-      # Always build against the latest published pnpcore release for reproducibility.
-      # If no release can be resolved, fall back to pnpcore's main branch (named "master").
-      - name: Resolve latest pnpcore release tag
-        id: pnpcore_ref
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $tag = ""
-          try { $tag = gh release view --repo pnp/pnpcore --json tagName -q .tagName } catch { $tag = "" }
-          if ([string]::IsNullOrWhiteSpace($tag)) {
-            Write-Host "No pnpcore release found - falling back to master branch"
-            $tag = "master"
-          } else {
-            Write-Host "Using pnpcore release tag: $tag"
-          }
-          "ref=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      # Keep this patch branch on the verified official PnP Core SDK 1.16.0.
+      # Do not resolve latest or fall back to a moving development branch.
 
       - name: Checkout pnpcore (sibling dependency)
         uses: actions/checkout@v4
         with:
           repository: pnp/pnpcore
-          ref: ${{ steps.pnpcore_ref.outputs.ref }}
+          ref: f7a374bed313daa2cef676bec06413924dae32a1 # 1.16.0
           path: pnpcore
 
-      - name: Setup .NET 8
+      # The application/tests target net8.0; the SDK source also declares net10.0.
+      - name: Setup .NET 8 runtime and .NET 10 build SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore pnpassessment/src/PnP.Scanning/PnP.Scanning.Core.Tests/PnP.Scanning.Core.Tests.csproj
