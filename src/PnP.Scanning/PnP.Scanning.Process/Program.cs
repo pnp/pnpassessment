@@ -130,6 +130,16 @@ namespace PnP.Scanning.Process
 
                     Log.Information($"Starting Microsoft 365 Assessment on port {orchestratorPort}");
 
+#if DEBUG
+                    Console.WriteLine(
+                        $"Waiting for debugger attachment. PID={Environment.ProcessId}");
+
+                    while (!System.Diagnostics.Debugger.IsAttached)
+                    {
+                        await Task.Delay(200);
+                    }
+#endif
+
                     // Add and configure needed services
                     var host = ConfigureScannerHost(args, orchestratorPort);
 

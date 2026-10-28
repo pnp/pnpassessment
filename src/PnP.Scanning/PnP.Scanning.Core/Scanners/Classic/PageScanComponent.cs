@@ -71,6 +71,23 @@ namespace PnP.Scanning.Core.Scanners
         // The file's vti_setuppath proves it ghosts from a stock list view/form template.
         internal const string SystemPageTemplateCode = "system_page_template";
 
+        internal static Task<List<ClassicPageDiscovery>> InitializeAsync(ClassicScanner scanner, PnPContext context,
+            PnPContextOptions assessmentOptions)
+        {
+            var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
+            var writer = new AssessmentDiscoveryWriter(scanner.ScanId);
+            return ClassicAssessmentMetadata.AcquirePagesAsync(scanner.Options.HomePageOnly,
+                () => ClassicAssessmentInitialization.ExecuteAsync(
+                    () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
+                    writer, scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token,
+                    (attempt, error) => scanner.Logger.Warning(error,
+                        "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
+                        scanner.SiteUrl, scanner.WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1),
+                    beforeFailureFinalization: scanner.Options.HomePageOnly ? null :
+                        _ => ClassicPageDiscoveryComponent.ExecuteAsync(scanner, context)),
+                sharedLists => ClassicPageDiscoveryComponent.ExecuteAsync(scanner, context, sharedLists));
+        }
+
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext,
             IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {

@@ -306,6 +306,8 @@ namespace PnP.Scanning.Process.Services
         {
             try
             {
+                return;
+
                 var vsProcess = VisualStudioManager.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
 
                 if (vsProcess != null)

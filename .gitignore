@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Local architecture diagrams and generated review artifacts
+.archify/
+
 # User-specific files
 *.rsuser
 *.suo

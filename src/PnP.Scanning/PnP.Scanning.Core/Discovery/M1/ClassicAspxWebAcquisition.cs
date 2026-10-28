@@ -217,8 +217,15 @@ internal sealed class ClassicAspxWebAcquisition
         var state = success && observed == 0 ? DiscoveryTerminalOutcome.Empty : success ? DiscoveryTerminalOutcome.Complete : outcome;
         if (!success && state is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty) state = DiscoveryTerminalOutcome.Unknown;
         await Evidence(Row("Scope", "Surface", scope, state, success ? null : "m1_collection_incomplete",
-            JsonSerializer.Serialize(new { observed, validation.ChainHash, validation.OutstandingTokenCount, validation.GapCodes,
-                ExpectedCount = success ? (int?)observed : null, TerminalComplete = success })), ct);
+            JsonSerializer.Serialize(new
+            {
+                observed,
+                validation.ChainHash,
+                validation.OutstandingTokenCount,
+                validation.GapCodes,
+                ExpectedCount = success ? (int?)observed : null,
+                TerminalComplete = success
+            })), ct);
     }
 
     private async Task<ClassicAspxInventory> Resource(string reference, string source, CancellationToken ct)
@@ -236,13 +243,25 @@ internal sealed class ClassicAspxWebAcquisition
             var entry = entries[0];
             var result = new ClassicAspxInventory
             {
-                ScanId = context.ScanId, AspxKey = ClassicAspxInventory.CreatePlatformKey(context.Catalog.Source, context.Catalog.Version, context.Catalog.Digest, entry.AspxKey),
-                IdentityKind = ClassicAspxIdentityKinds.PlatformCatalog, Url = entry.Path, FileName = entry.Path.Split('/')[^1],
-                CatalogSource = context.Catalog.Source, CatalogVersion = context.Catalog.Version, CatalogDigest = context.Catalog.Digest, CatalogEntryKey = entry.AspxKey,
-                FileReadState = "NotApplicable", HandlerReadState = entry.DeclaredInherits == null ? "NotRequested" : "Available",
-                HandlerParseState = entry.DeclaredInherits == null ? "NotParsed" : "Declared", HandlerSource = "VersionedCatalogReference",
-                HandlerDeclaredType = entry.DeclaredInherits, HandlerNormalizedType = entry.DeclaredInherits?.Trim(), HandlerEffectiveType = entry.DeclaredInherits?.Trim(),
-                CoverageState = "VersionedReference", FirstObservedAtUtc = DateTime.UtcNow, ObservedAtUtc = DateTime.UtcNow,
+                ScanId = context.ScanId,
+                AspxKey = ClassicAspxInventory.CreatePlatformKey(context.Catalog.Source, context.Catalog.Version, context.Catalog.Digest, entry.AspxKey),
+                IdentityKind = ClassicAspxIdentityKinds.PlatformCatalog,
+                Url = entry.Path,
+                FileName = entry.Path.Split('/')[^1],
+                CatalogSource = context.Catalog.Source,
+                CatalogVersion = context.Catalog.Version,
+                CatalogDigest = context.Catalog.Digest,
+                CatalogEntryKey = entry.AspxKey,
+                FileReadState = "NotApplicable",
+                HandlerReadState = entry.DeclaredInherits == null ? "NotRequested" : "Available",
+                HandlerParseState = entry.DeclaredInherits == null ? "NotParsed" : "Declared",
+                HandlerSource = "VersionedCatalogReference",
+                HandlerDeclaredType = entry.DeclaredInherits,
+                HandlerNormalizedType = entry.DeclaredInherits?.Trim(),
+                HandlerEffectiveType = entry.DeclaredInherits?.Trim(),
+                CoverageState = "VersionedReference",
+                FirstObservedAtUtc = DateTime.UtcNow,
+                ObservedAtUtc = DateTime.UtcNow,
                 ProvenanceJson = JsonSerializer.Serialize(new[] { new { source, path, entry.HandlerEvidenceSource } })
             };
             Cache(path, result); await Inventory(result, ct); return result;
@@ -259,8 +278,10 @@ internal sealed class ClassicAspxWebAcquisition
         try { file = await selected.ResolveFileAsync(path, ct).ConfigureAwait(false); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
-        { await FileGap(path, "FileResolution", "file_resolution_" + ex.GetType().Name, DiscoveryTerminalOutcome.Failed, ct,
-            ex.GetType().FullName, resolverWeb: selected.WebUrl); return null; }
+        {
+            await FileGap(path, "FileResolution", "file_resolution_" + ex.GetType().Name, DiscoveryTerminalOutcome.Failed, ct,
+            ex.GetType().FullName, resolverWeb: selected.WebUrl); return null;
+        }
         if (file.Outcome != DiscoveryTerminalOutcome.Complete || !Guid.TryParse(file.FileUniqueId, out var id) || id == Guid.Empty ||
             !TryPath(file.ServerRelativeUrl, out var actual) || !string.Equals(path, actual, StringComparison.OrdinalIgnoreCase))
         {
@@ -278,11 +299,17 @@ internal sealed class ClassicAspxWebAcquisition
         if (!Guid.TryParse(file.FileUniqueId, out var fileId) || fileId == Guid.Empty) return null;
         var selected = await FileClient(path, ct);
         SharePointFileContent content;
-        try { content = selected == null ? SharePointFileContent.Unsupported() :
-            await selected.ReadFileContentAsync(path, context.MaxFileBytes, context.FileReadTimeout ?? TimeSpan.FromSeconds(20), ct).ConfigureAwait(false); }
+        try
+        {
+            content = selected == null ? SharePointFileContent.Unsupported() :
+            await selected.ReadFileContentAsync(path, context.MaxFileBytes, context.FileReadTimeout ?? TimeSpan.FromSeconds(20), ct).ConfigureAwait(false);
+        }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex) { content = new(DiscoveryTerminalOutcome.Failed, Array.Empty<byte>(), false, AspxHandlerSourceKind.Unknown,
-            AspxHandlerReadState.Unavailable, "ReadFileContentAsync:" + ex.GetType().Name, "file_source_read_failed"); }
+        catch (Exception ex)
+        {
+            content = new(DiscoveryTerminalOutcome.Failed, Array.Empty<byte>(), false, AspxHandlerSourceKind.Unknown,
+            AspxHandlerReadState.Unavailable, "ReadFileContentAsync:" + ex.GetType().Name, "file_source_read_failed");
+        }
         if (content.Outcome != DiscoveryTerminalOutcome.Complete || !content.IsComplete || !content.SameAuthorityConfirmed)
             await FileGap(path, "FileSource", content.ErrorCode ?? "file_source_unproved", content.Outcome, ct,
                 evidenceRef: content.EvidenceRef, resolverWeb: selected?.WebUrl);
@@ -296,19 +323,33 @@ internal sealed class ClassicAspxWebAcquisition
             complete, readState);
         var result = new ClassicAspxInventory
         {
-            ScanId = context.ScanId, AspxKey = ClassicAspxInventory.CreateTenantFileKey(context.SiteCollectionId, fileId),
-            SiteCollectionId = context.SiteCollectionId, FileUniqueId = fileId,
+            ScanId = context.ScanId,
+            AspxKey = ClassicAspxInventory.CreateTenantFileKey(context.SiteCollectionId, fileId),
+            SiteCollectionId = context.SiteCollectionId,
+            FileUniqueId = fileId,
             WebId = owningWeb,
-            SiteUrl = context.SiteUrl.AbsoluteUri, WebUrl = owningWeb.HasValue ? context.WebUrl.AbsoluteUri : null,
-            Url = new Uri(context.SiteUrl, path).AbsoluteUri, FileName = file.Name ?? path.Split('/')[^1],
-            PageType = observation?.PageType, ContentTypeId = observation?.ContentTypeId ?? file.ContentTypeId,
-            CustomizedPageStatus = observation?.CustomizedPageStatus ?? file.CustomizedPageStatus, SetupPath = observation?.SetupPath,
-            FileReadState = file.Outcome.ToString(), FileErrorCodes = file.ErrorCode,
-            HandlerDeclaredType = handler.DeclaredInherits, HandlerNormalizedType = handler.NormalizedInherits, HandlerEffectiveType = handler.EffectiveInherits,
-            HandlerReadState = handler.ReadState.ToString(), HandlerParseState = handler.ParseState.ToString(), HandlerSource = handler.Source.ToString(),
+            SiteUrl = context.SiteUrl.AbsoluteUri,
+            WebUrl = owningWeb.HasValue ? context.WebUrl.AbsoluteUri : null,
+            Url = new Uri(context.SiteUrl, path).AbsoluteUri,
+            FileName = file.Name ?? path.Split('/')[^1],
+            PageType = observation?.PageType,
+            ContentTypeId = observation?.ContentTypeId ?? file.ContentTypeId,
+            CustomizedPageStatus = observation?.CustomizedPageStatus ?? file.CustomizedPageStatus,
+            SetupPath = observation?.SetupPath,
+            FileReadState = file.Outcome.ToString(),
+            FileErrorCodes = file.ErrorCode,
+            HandlerDeclaredType = handler.DeclaredInherits,
+            HandlerNormalizedType = handler.NormalizedInherits,
+            HandlerEffectiveType = handler.EffectiveInherits,
+            HandlerReadState = handler.ReadState.ToString(),
+            HandlerParseState = handler.ParseState.ToString(),
+            HandlerSource = handler.Source.ToString(),
             HandlerDefaultProvenance = handler.DefaultProvenance == AspxHandlerDefaultProvenance.None ? null : handler.DefaultProvenance.ToString(),
-            HandlerReasonCode = handler.ReasonCode, HandlerErrorCodes = content.ErrorCode,
-            CoverageState = "Observed", FirstObservedAtUtc = DateTime.UtcNow, ObservedAtUtc = DateTime.UtcNow,
+            HandlerReasonCode = handler.ReasonCode,
+            HandlerErrorCodes = content.ErrorCode,
+            CoverageState = "Observed",
+            FirstObservedAtUtc = DateTime.UtcNow,
+            ObservedAtUtc = DateTime.UtcNow,
             ProvenanceJson = JsonSerializer.Serialize(new[] { new { source, FileEvidence = file.EvidenceRef, ContentEvidence = content.EvidenceRef, path } })
         };
         Cache(path, result); await Inventory(result, ct); return result;
@@ -354,8 +395,14 @@ internal sealed class ClassicAspxWebAcquisition
         string detail = null, string evidenceRef = null, Uri resolverWeb = null)
     {
         var row = Row("Gap", "M1Acquisition", stage + ":" + path + ":" + code, state, code,
-            JsonSerializer.Serialize(new { ReferencePath = path, ResolverWeb = resolverWeb?.AbsoluteUri,
-                EvidenceRef = SafeFileDetail(evidenceRef), ErrorStage = stage, ErrorCode = code }));
+            JsonSerializer.Serialize(new
+            {
+                ReferencePath = path,
+                ResolverWeb = resolverWeb?.AbsoluteUri,
+                EvidenceRef = SafeFileDetail(evidenceRef),
+                ErrorStage = stage,
+                ErrorCode = code
+            }));
         row.Url = new Uri(context.SiteUrl, path).AbsoluteUri;
         row.ErrorStage = stage;
         row.ErrorDetail = SafeFileDetail(detail);
@@ -384,10 +431,21 @@ internal sealed class ClassicAspxWebAcquisition
     {
         bindings.Add(new ClassicAspxItemBinding
         {
-            ScanId = context.ScanId, AspxKey = resource.AspxKey, SiteCollectionId = context.SiteCollectionId, WebId = context.WebId,
-            ListId = list, ItemId = item, ItemGuid = Good(itemGuid) ? itemGuid : null, ItemGuidReadState = Good(itemGuid) ? "Available" : "Unavailable",
-            SiteUrl = context.SiteUrl.AbsoluteUri, WebUrl = context.WebUrl.AbsoluteUri, ItemUrl = itemUrl, ItemTitle = title,
-            ContentTypeId = contentType, BindingKinds = kind, ObservedAtUtc = DateTime.UtcNow,
+            ScanId = context.ScanId,
+            AspxKey = resource.AspxKey,
+            SiteCollectionId = context.SiteCollectionId,
+            WebId = context.WebId,
+            ListId = list,
+            ItemId = item,
+            ItemGuid = Good(itemGuid) ? itemGuid : null,
+            ItemGuidReadState = Good(itemGuid) ? "Available" : "Unavailable",
+            SiteUrl = context.SiteUrl.AbsoluteUri,
+            WebUrl = context.WebUrl.AbsoluteUri,
+            ItemUrl = itemUrl,
+            ItemTitle = title,
+            ContentTypeId = contentType,
+            BindingKinds = kind,
+            ObservedAtUtc = DateTime.UtcNow,
             BindingProvenanceJson = JsonSerializer.Serialize(new[] { new { source, realItemId = item } })
         });
         await MaybeFlush(ct);
@@ -397,11 +455,21 @@ internal sealed class ClassicAspxWebAcquisition
     private Task Gap(string scope, string code, DiscoveryTerminalOutcome state, CancellationToken ct) => Evidence(Row("Gap", "M1Acquisition", scope + ":" + code, state, code), ct);
     private ClassicPageDiscovery Row(string type, string scopeType, string scope, DiscoveryTerminalOutcome state, string error = null, string json = null) => new()
     {
-        ScanId = context.ScanId, RecordKey = "m1:" + type + ":" + DiscoveryHash.Of(context.WebId.ToString("D"), scope), RowType = type,
-        ScopeType = scopeType, ParentScopeKey = "m1:web:" + context.WebId.ToString("D"), SiteUrl = context.SiteUrl.AbsoluteUri,
-        WebUrl = LegacyWeb, SiteCollectionId = context.SiteCollectionId, WebId = context.WebId, DiscoveryStatus = state.ToString(),
-        ObservationMethod = "NativeM1Acquisition", ErrorStage = error == null ? null : scopeType, ErrorCodes = error,
-        EvidenceJson = json, ObservedAtUtc = DateTime.UtcNow
+        ScanId = context.ScanId,
+        RecordKey = "m1:" + type + ":" + DiscoveryHash.Of(context.WebId.ToString("D"), scope),
+        RowType = type,
+        ScopeType = scopeType,
+        ParentScopeKey = "m1:web:" + context.WebId.ToString("D"),
+        SiteUrl = context.SiteUrl.AbsoluteUri,
+        WebUrl = LegacyWeb,
+        SiteCollectionId = context.SiteCollectionId,
+        WebId = context.WebId,
+        DiscoveryStatus = state.ToString(),
+        ObservationMethod = "NativeM1Acquisition",
+        ErrorStage = error == null ? null : scopeType,
+        ErrorCodes = error,
+        EvidenceJson = json,
+        ObservedAtUtc = DateTime.UtcNow
     };
     private Task MaybeFlush(CancellationToken ct) => size >= context.BatchSize ? Flush(ct) : Task.CompletedTask;
     private async Task Flush(CancellationToken ct)

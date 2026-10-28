@@ -82,18 +82,8 @@ namespace PnP.Scanning.Core.Scanners
                 List<ClassicPageDiscovery> discoveredPages = null;
                 if (Options.Pages)
                 {
-                    var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
-                    var writer = new AssessmentDiscoveryWriter(ScanId);
-                    discoveredPages = await ClassicAssessmentMetadata.AcquirePagesAsync(Options.HomePageOnly,
-                        () => ClassicAssessmentInitialization.ExecuteAsync(
-                            () => ClassicAssessmentMetadata.LoadAsync(context, options, token),
-                            writer, ScanId, SiteUrl, WebUrl, token,
-                            (attempt, error) => Logger.Warning(error,
-                                "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
-                                SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1),
-                            beforeFailureFinalization: Options.HomePageOnly ? null :
-                                _ => ClassicPageDiscoveryComponent.ExecuteAsync(this, context)),
-                        sharedLists => ClassicPageDiscoveryComponent.ExecuteAsync(this, context, sharedLists))
+                    // Initialize shared metadata before Workflow and InfoPath consume it.
+                    discoveredPages = await PageScanComponent.InitializeAsync(this, context, options)
                         .ConfigureAwait(false);
                 }
 
