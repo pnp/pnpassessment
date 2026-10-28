@@ -15,6 +15,13 @@ namespace PnP.Scanning.Process.Commands
 {
     internal class StartCommandHandler
     {
+        private static class ClassicAcquisitionOptionText
+        {
+            internal const string TemplateExclusionsHelp = "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.";
+            internal const string PlatformCatalogHelp = "Versioned platform ASPX catalog. Its exact bytes are frozen with this scan.";
+            internal const string PagesComponentRequired = "M1 scope/catalog options require the Pages component.";
+        }
+
         private readonly ScannerManager processManager;
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly ConfigurationOptions configurationOptions;
@@ -49,6 +56,7 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> testNumberOfSitesOption;
 #endif
 
+        /// <summary>Builds start options and their validators, including explicit Classic template-exclusion and frozen-catalog inputs without starting workers or authentication.</summary>
         public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance)
         {
             processManager = processManagerInstance;
@@ -309,15 +317,21 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(classicAuditLogWindowDaysOption);
 
             excludeSiteTemplatesOption = new Option<string>($"--{Constants.StartExcludeSiteTemplates}",
-                "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.");
+                ClassicAcquisitionOptionText.TemplateExclusionsHelp);
             excludeSiteTemplatesOption.AddValidator(result =>
             {
-                try { SiteTemplateExclusionPolicy.Parse(result.GetValueOrDefault<string>()); }
-                catch (ArgumentException ex) { result.ErrorMessage = ex.Message; }
+                try
+                {
+                    SiteTemplateExclusionPolicy.Parse(result.GetValueOrDefault<string>());
+                }
+                catch (ArgumentException ex)
+                {
+                    result.ErrorMessage = ex.Message;
+                }
             });
             cmd.AddOption(excludeSiteTemplatesOption);
             platformAspxCatalogOption = new Option<FileInfo>($"--{Constants.StartPlatformAspxCatalog}",
-                "Versioned platform ASPX catalog. Its exact bytes are frozen with this scan.");
+                ClassicAcquisitionOptionText.PlatformCatalogHelp);
             platformAspxCatalogOption.ExistingOnly();
             cmd.AddOption(platformAspxCatalogOption);
 #if DEBUG
@@ -394,6 +408,7 @@ namespace PnP.Scanning.Process.Commands
             return option;
         }
 
+        /// <summary>Creates a bounded integer Classic option with the established default fallback; cross-option mode validation remains at command level.</summary>
         private Option<int> CreateClassicIntOption(string name, string description, int defaultValue, int min, int max)
         {
             var option = new Option<int>(
@@ -430,7 +445,7 @@ namespace PnP.Scanning.Process.Commands
         }
 
         /// <summary>
-        /// https://github.com/dotnet/command-line-api/blob/main/docs/model-binding.md#more-complex-types
+        /// Attaches cross-option Classic mode/component validation and the unlimited-option binder before returning the start command.
         /// </summary>
         /// <returns></returns>
         public Command Create()
@@ -460,7 +475,7 @@ namespace PnP.Scanning.Process.Commands
                     var m1OptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false } ||
                         result.FindResultFor(platformAspxCatalogOption) is { IsImplicit: false };
                     if (m1OptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
-                        result.ErrorMessage = "M1 scope/catalog options require the Pages component.";
+                        result.ErrorMessage = ClassicAcquisitionOptionText.PagesComponentRequired;
                     return;
                 }
                 foreach (var opt in classicOnlyOptions)
@@ -501,6 +516,7 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>Freezes and validates the local catalog before worker or authentication setup, then sends the existing supported-component start request.</summary>
         private async Task HandleStartAsync(StartOptions arguments)
         {
             // Validate and freeze the explicit local catalog before launching a worker or authenticating.

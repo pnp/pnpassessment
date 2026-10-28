@@ -19,6 +19,9 @@ public class SiteEnumerationManagerScopeTests
     private const string TeamSite = "https://contoso.sharepoint.com/sites/team";
     private const string PersonalSite = "https://contoso-my.sharepoint.com/personal/alex_contoso_com";
 
+    /// <summary>
+    /// Defers M1 tenant-site admission until templates can be evaluated while retaining the legacy non-page personal-host filter.
+    /// </summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -45,6 +48,9 @@ public class SiteEnumerationManagerScopeTests
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Excludes personal roots by template yet lets M1 inspect child templates independently; legacy enumeration still skips the root subtree.
+    /// </summary>
     [Theory]
     [InlineData("SPSPERS#0", false, false)]
     [InlineData("SPSPERS#0", true, false)]
@@ -74,6 +80,9 @@ public class SiteEnumerationManagerScopeTests
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Excludes app webs without losing regular webs and distinguishes M1 child-template inspection from legacy subtree skipping.
+    /// </summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -95,6 +104,9 @@ public class SiteEnumerationManagerScopeTests
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Applies an explicit none policy in the real web enumerator so personal and app templates remain admitted with complete scope evidence.
+    /// </summary>
     [Fact]
     public async Task Sole_none_clears_defaults_in_the_real_web_enumerator()
     {
@@ -106,6 +118,9 @@ public class SiteEnumerationManagerScopeTests
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Replaces built-in exclusions with explicit patterns so only the configured template is filtered from the observed web set.
+    /// </summary>
     [Fact]
     public async Task Explicit_patterns_replace_defaults_instead_of_extending_them()
     {
@@ -118,6 +133,9 @@ public class SiteEnumerationManagerScopeTests
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Continues beneath an excluded app parent and admits a publishing child whose own template is allowed.
+    /// </summary>
     [Fact]
     public async Task An_excluded_app_parent_does_not_prune_an_allowed_publishing_child()
     {
@@ -141,6 +159,9 @@ public class SiteEnumerationManagerScopeTests
         internal readonly EnumerationTransport Transport;
         internal readonly SiteEnumerationManager Manager;
 
+        /// <summary>
+        /// Wires the real SDK and web enumerator to an offline transport with configurable root template and optional allowed app descendant.
+        /// </summary>
         internal OfflineEnumeration(string template, string siteUrl, bool allowedChildUnderApp = false)
         {
             Transport = new EnumerationTransport(template, siteUrl, allowedChildUnderApp);
@@ -174,6 +195,9 @@ public class SiteEnumerationManagerScopeTests
         }
     }
 
+    /// <summary>
+    /// Serves deterministic tenant and web metadata for one root, optionally exposing an allowed child beneath an excluded app web.
+    /// </summary>
     private sealed class EnumerationTransport(string template, string siteUrl, bool allowedChildUnderApp) : HttpMessageHandler
     {
         private const string SiteId = "11111111-1111-1111-1111-111111111111";
@@ -190,6 +214,9 @@ public class SiteEnumerationManagerScopeTests
             });
         }
 
+        /// <summary>
+        /// Records and serves only modeled tenant, identity, and child-web requests, including an independently allowed descendant under an app web.
+        /// </summary>
         private string Payload(Uri uri)
         {
             Requests.Add(uri.AbsoluteUri);
@@ -223,6 +250,9 @@ public class SiteEnumerationManagerScopeTests
             sharepointIds = new { siteId = id, webId = WebId }, root = new { },
         };
 
+        /// <summary>
+        /// Builds deterministic child-web metadata with distinct app and descendant identities and the requested template.
+        /// </summary>
         private object Subweb(string name, string webTemplate) => new
         {
             Id = name == "app" ? "44444444-4444-4444-4444-444444444444" : name == "app/allowed" ? "66666666-6666-6666-6666-666666666666" : "55555555-5555-5555-5555-555555555555",

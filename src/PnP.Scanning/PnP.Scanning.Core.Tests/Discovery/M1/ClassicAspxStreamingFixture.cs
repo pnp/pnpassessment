@@ -19,7 +19,13 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
     private readonly SqliteConnection connection = new("Data Source=:memory:");
     private DbContextOptions<ScanContext> options;
     internal int LargestPublishedBatch, PublishedBatches;
+    /// <summary>
+    /// Opens a fresh EF context over the fixture-owned connection so acquisition and verification share one in-memory database.
+    /// </summary>
     internal ScanContext Open() => new(options);
+    /// <summary>
+    /// Keeps the SQLite connection alive and applies real migrations before exercising acquisition and persistence.
+    /// </summary>
     internal async Task InitializeAsync()
     {
         await connection.OpenAsync();
@@ -27,6 +33,9 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
         using var db = Open();
         await db.Database.MigrateAsync();
     }
+    /// <summary>
+    /// Runs real acquisition and both writers, recording publication bounds and optionally stopping collection traversal after one page.
+    /// </summary>
     internal async Task RunAsync(OnDemandItems client, bool singlePageCap = false)
     {
         var raw = new AssessmentDiscoveryWriter(Open);
@@ -41,13 +50,25 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
             await projection.WriteAsync(batch.Inventory, batch.Bindings, ct);
         });
     }
+    /// <summary>
+    /// Provides an empty asynchronous physical-discovery stream so the scenario isolates REST-derived inventory and item bindings.
+    /// </summary>
     private static async IAsyncEnumerable<ClassicPageDiscovery> EmptyPhysical()
     { await Task.CompletedTask; yield break; }
+    /// <summary>
+    /// Releases the fixture-owned SQLite connection and its in-memory database after all replay attempts.
+    /// </summary>
     public ValueTask DisposeAsync() => connection.DisposeAsync();
 
+    /// <summary>
+    /// Creates an independently counted REST attempt with configurable renderer override, continuation denial, and source truncation.
+    /// </summary>
     internal OnDemandItems Client(string attempt, bool overrideForm = false, bool denySecondItemPage = false,
         bool truncatedSource = false) => new(List, File, attempt, overrideForm, denySecondItemPage, truncatedSource);
 
+    /// <summary>
+    /// Generates item pages lazily for one replay attempt, with independent counters and configurable renderer, denial, and truncation faults.
+    /// </summary>
     internal sealed class OnDemandItems(Guid list, Guid file, string attempt, bool overrideForm,
         bool denySecondItemPage, bool truncatedSource) : ISharePointAspxRestClient
     {
@@ -55,6 +76,9 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
         internal int ResolveCalls, SourceCalls, ItemPageRequests, GeneratedItems, LargestGeneratedPage;
         private string firstItemsUri;
         public Uri WebUrl => Url;
+        /// <summary>
+        /// Generates only the requested item page, tracks its bounds, and can deny the first continuation without materializing the full item set.
+        /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri uri, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
@@ -88,9 +112,15 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
             string next = after + count < ItemCount ? firstItemsUri + "&$skiptoken=" + (after + count) : null;
             return Task.FromResult(Json(uri, rows, next));
         }
+        /// <summary>
+        /// Builds a parsed JSON collection response with an optional continuation using the same response parser as acquisition.
+        /// </summary>
         private static SharePointRestPage Json(Uri uri, object[] rows, string next = null) =>
             SharePointRestResponseParser.Parse(uri, HttpStatusCode.OK, JsonSerializer.SerializeToUtf8Bytes(
                 new Dictionary<string, object> { ["value"] = rows, ["@odata.nextLink"] = next }), "application/json");
+        /// <summary>
+        /// Counts metadata lookups and returns one stable file identity only for the expected shared renderer path.
+        /// </summary>
         public Task<SharePointResolvedFile> ResolveFileAsync(string path, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested(); ResolveCalls++;
@@ -98,6 +128,9 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
             return Task.FromResult(new SharePointResolvedFile(DiscoveryTerminalOutcome.Complete, file.ToString("D"),
                 "DispForm.aspx", path, null, "synthetic-metadata:" + attempt));
         }
+        /// <summary>
+        /// Counts source reads and returns actual handler bytes with either complete or explicitly truncated evidence for the attempt.
+        /// </summary>
         public Task<SharePointFileContent> ReadFileContentAsync(string path, int maxBytes, TimeSpan timeout,
             CancellationToken ct = default)
         {
@@ -107,8 +140,17 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
                 AspxHandlerSourceKind.ActualFileBytes, truncatedSource ? AspxHandlerReadState.Truncated : AspxHandlerReadState.Available,
                 "synthetic-source:" + attempt, truncatedSource ? "synthetic_source_truncated" : null, SameAuthorityConfirmed: true));
         }
+        /// <summary>
+        /// Rejects welcome-page reads because this items-only fixture must not depend on unrelated modeled APIs.
+        /// </summary>
         public Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        /// <summary>
+        /// Rejects folder reads so an unexpected traversal fails instead of silently expanding the synthetic scenario.
+        /// </summary>
         public Task<SharePointModeledFolderResult> ReadFolderAsync(string path, CancellationToken ct = default) => throw new NotSupportedException();
+        /// <summary>
+        /// Leaves the synthetic client with no resources to release; the surrounding fixture owns database lifetime.
+        /// </summary>
         public void Dispose() { }
     }
 }

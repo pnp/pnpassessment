@@ -21,9 +21,21 @@ namespace PnP.Scanning.Core.Tests.Storage;
 public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixture>
 {
     private readonly ScanContextFixture fixture;
+    /// <summary>
+    /// Uses the shared SQLite fixture while each export scenario isolates its rows by a new scan ID.
+    /// </summary>
     public ClassicAspxReportExportTests(ScanContextFixture fixture) => this.fixture = fixture;
+    /// <summary>
+    /// Uses invariant comma-delimited CSV configuration so export assertions do not depend on the machine locale.
+    /// </summary>
     private static CsvConfiguration Configuration() => new(CultureInfo.InvariantCulture) { Delimiter = "," };
+    /// <summary>
+    /// Creates a uniquely named temporary output directory owned by one report scenario.
+    /// </summary>
     private static string DirectoryForTest() => Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "m1-csv-" + Guid.NewGuid().ToString("N"))).FullName;
+    /// <summary>
+    /// Deletes only an output directory guarded by the temporary root and the report-test ownership prefix.
+    /// </summary>
     private static void DeleteOwnDirectory(string directory)
     {
         var full = Path.GetFullPath(directory); var temporary = Path.GetFullPath(Path.GetTempPath());
@@ -31,16 +43,25 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             throw new InvalidOperationException("Not an owned report-test directory.");
         Directory.Delete(full, true);
     }
+    /// <summary>
+    /// Materializes typed CSV records before disposing both readers, using the same invariant configuration as export.
+    /// </summary>
     private static List<T> Read<T>(string file)
     {
         using var reader = new StreamReader(file); using var csv = new CsvReader(reader, Configuration());
         return csv.GetRecords<T>().ToList();
     }
+    /// <summary>
+    /// Reads only the CSV header to verify typed empty exports and their published columns.
+    /// </summary>
     private static string[] Header(string file)
     {
         using var reader = new StreamReader(file); using var csv = new CsvReader(reader, Configuration());
         csv.Read(); csv.ReadHeader(); return csv.HeaderRecord!;
     }
+    /// <summary>
+    /// Builds a tenant-file row with optional stable physical scope, unknown coverage, and explicit observation timestamps.
+    /// </summary>
     private static ClassicAspxInventory Inventory(Guid scan, Guid? site = null, Guid? file = null)
     {
         var sc = site ?? Guid.NewGuid(); var id = file ?? Guid.NewGuid(); var now = DateTime.UtcNow;
@@ -49,16 +70,25 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             FileReadState = "Read", HandlerReadState = "Read", HandlerParseState = "Parsed", CoverageState = "Unknown",
             FirstObservedAtUtc = now, ObservedAtUtc = now, ProvenanceJson = "[]" };
     }
+    /// <summary>
+    /// Builds an observed renderer pair with caller-selected item scope and an unavailable supplementary GUID.
+    /// </summary>
     private static ClassicAspxItemBinding Binding(ClassicAspxInventory inventory, Guid web, Guid list, int item) => new()
     {
         ScanId = inventory.ScanId, AspxKey = inventory.AspxKey, SiteCollectionId = inventory.SiteCollectionId!.Value,
         WebId = web, ListId = list, ItemId = item, ItemGuid = null, ItemGuidReadState = "Unavailable",
         BindingKinds = ClassicAspxBindingKinds.ListFormRenderer, BindingProvenanceJson = "[]", ObservedAtUtc = DateTime.UtcNow
     };
+    /// <summary>
+    /// Stores the native projection marker and declared scan scope as independent golden wire values for report verification.
+    /// </summary>
     private static void Mark(ScanContext context, Guid scan, string scope = "DeclaredFullInventory") => context.Properties.AddRange(
         new Property { ScanId = scan, Name = "M1ProjectionContract", Value = "M1/v1" },
         new Property { ScanId = scan, Name = "M1ScopeMode", Value = scope });
 
+    /// <summary>
+    /// Requires SQL-side left-joined counting and CSV export to retain all one hundred bindings with nullable supplementary GUIDs.
+    /// </summary>
     [Fact]
     public async Task SqlGroupCountUsesLeftJoinAndKeepsOneHundredNullableGuidBindings()
     {
@@ -77,6 +107,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Writes two source reasons through the actual projection writer and verifies they export as one pair counted once.
+    /// </summary>
     [Fact]
     public async Task ActualWriterTwoSourceReasonsExportOneNormalizedPairAndCountOne()
     {
@@ -94,6 +127,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         row.BindingProvenanceJson.Should().Contain("ListForm").And.Contain("ContentType");
     }
 
+    /// <summary>
+    /// Keeps unbound inventory with a zero observed count while preserving its original coverage state and declared-scope count basis.
+    /// </summary>
     [Theory]
     [InlineData("Unknown")]
     [InlineData("Incomplete")]
@@ -107,6 +143,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         row.DistinctItemBindingCount.Should().Be(0); row.CoverageState.Should().Be(coverage); row.BindingCountBasis.Should().Be("DeclaredScanScopeObserved");
     }
 
+    /// <summary>
+    /// Counts real scoped pairs per renderer and scan without collapsing equal integer IDs across webs or lists.
+    /// </summary>
     [Fact]
     public async Task ScopeDifferencesAndMultipleRenderersDoNotCollapseObservedPairCounts()
     {
@@ -124,6 +163,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         (await ClassicAspxReportProjection.Bindings(context, scan).CountAsync()).Should().Be(4);
     }
 
+    /// <summary>
+    /// Round-trips Unicode, quoting, multiline reasons, nullable handlers, and provenance through the typed CSV contract.
+    /// </summary>
     [Fact]
     public async Task TypedCsvPreservesUnicodeEscapingNullableHandlersAndProvenance()
     {
@@ -146,6 +188,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Exports an unbound frozen-catalog reference once, without tenant identifiers, invented handlers, or source payload columns.
+    /// </summary>
     [Fact]
     public async Task FrozenCatalogRowsExportOnceWithoutWebMultiplicationOrPayloadHandlerClaim()
     {
@@ -166,6 +211,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Reports newly observed rows from an unmarked resumed scan without claiming either no acquisition or a known native contract.
+    /// </summary>
     [Fact]
     public async Task ResumedLegacyScanWithNewRowsIsObservedWithoutMarkerNotFalselyNotAcquired()
     {
@@ -183,6 +231,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Separates null, empty, sentinel, and leading-backslash values on the CSV wire while preserving typed fields and database contents.
+    /// </summary>
     [Theory]
     [InlineData(null, @"\N")]
     [InlineData("", "")]
@@ -221,6 +272,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Emits typed headers for empty M1 tables and explains that legacy absence is not evidence that no ASPX exists.
+    /// </summary>
     [Fact]
     public async Task EmptyNativeM1TablesHaveTypedHeadersAndLegacyNotAcquiredInfo()
     {
@@ -237,6 +291,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Exercises native Classic report dispatch, preserving legacy CSV output while adding M1 exports with targeted-scope metadata.
+    /// </summary>
     [Fact]
     public async Task NativeClassicDispatchAddsTwoM1CsvsAndPreservesLegacyCsvs()
     {
@@ -261,6 +318,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Checks canonical CSV aliases byte-for-byte and validates versioned summary counts, coverage limits, lengths, and SHA-256 digests.
+    /// </summary>
     [Fact]
     public async Task CanonicalAliasesPreserveCompatibilityBytesAndVersionedObservedSummaryCounts()
     {
@@ -301,6 +361,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Reports an unbound targeted catalog member with unknown coverage and catalog metadata only, never embedding the frozen payload.
+    /// </summary>
     [Fact]
     public async Task TargetedCatalogZeroMembersSummaryKeepsUnknownAndOnlyCatalogMetadata()
     {
@@ -338,6 +401,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Represents an empty legacy scan as unacquired with unknown scope and catalog state, not as tenant-wide completeness.
+    /// </summary>
     [Fact]
     public async Task LegacyEmptyCanonicalSummaryIsNotAcquiredAndUnknownNotCompleteTenant()
     {
@@ -365,6 +431,9 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    /// <summary>
+    /// Migrates legacy pages without inventing historical M1 rows and preserves legacy export alongside empty typed M1 output.
+    /// </summary>
     [Fact]
     public async Task LegacyMigrationCreatesEmptyM1TablesWithoutHistoricalBackfillAndExportsHeaders()
     {

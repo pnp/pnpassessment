@@ -22,16 +22,31 @@ public sealed class ClassicAspxWebAcquisitionTests
     private static readonly Uri WebUrl = new("https://tenant.invalid/sites/fixture/child");
     private const string Form = "/sites/fixture/child/Lists/hidden/DispForm.aspx";
 
+    /// <summary>
+    /// Builds a pages-enabled acquisition context with configurable publication and traversal bounds and optional frozen catalog.
+    /// </summary>
     private static M1WebAcquisitionContext Context(int batchSize = 7, int maxPages = 8, PlatformAspxCatalog catalog = null) =>
         new(Scan, Site, Web, SiteUrl, WebUrl, new ClassicOptions { Pages = true }, catalog,
             BatchSize: batchSize, MaxCollectionPages: maxPages);
+    /// <summary>
+    /// Creates an OData JSON page through the real response parser, retaining optional continuation evidence.
+    /// </summary>
     private static SharePointRestPage Page(Uri uri, object[] rows, string next = null) =>
         SharePointRestResponseParser.Parse(uri, HttpStatusCode.OK, JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
         { ["value"] = rows, ["@odata.nextLink"] = next }), "application/json");
+    /// <summary>
+    /// Yields caller-provided physical discoveries in order without adding synthetic page or item observations.
+    /// </summary>
     private static async IAsyncEnumerable<ClassicPageDiscovery> Observations(params ClassicPageDiscovery[] rows)
     { foreach (var row in rows) yield return row; await Task.CompletedTask; }
+    /// <summary>
+    /// Returns successful metadata with the supplied real file identity and path for locator-resolution scenarios.
+    /// </summary>
     private static SharePointResolvedFile File(Guid id, string path) => new(DiscoveryTerminalOutcome.Complete, id.ToString("D"),
         path.Split('/')[^1], path, null, "FakeAuthenticatedAPI:FileMetadata");
+    /// <summary>
+    /// Supplies authenticated actual-source evidence while allowing tests to mark the same bytes explicitly denied.
+    /// </summary>
     private static SharePointFileContent Bytes(AspxHandlerReadState read = AspxHandlerReadState.Available) =>
         new(read == AspxHandlerReadState.Denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Complete,
             Encoding.UTF8.GetBytes("<%@ Page Inherits='Example.ActualHandler' %>"), true,
@@ -48,25 +63,55 @@ public sealed class ClassicAspxWebAcquisitionTests
         internal readonly List<string> Resolutions = new();
         internal int ContentReads;
         internal readonly List<string> ContentPaths = new();
+        /// <summary>
+        /// Records collection requests, honors pre-cancellation, and delegates responses to the configured fake authority.
+        /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri uri, CancellationToken ct = default)
         { ct.ThrowIfCancellationRequested(); Requests.Add(uri); return Task.FromResult(Pages?.Invoke(uri) ?? Page(uri, Array.Empty<object>())); }
+        /// <summary>
+        /// Records locator resolutions and returns configured metadata or the stable synthetic renderer identity.
+        /// </summary>
         public Task<SharePointResolvedFile> ResolveFileAsync(string path, CancellationToken ct = default)
         { Resolutions.Add(path); return Task.FromResult(Resolver?.Invoke(path) ?? File(Renderer, path)); }
+        /// <summary>
+        /// Counts and records source reads before returning the scenario-specific complete or failed content evidence.
+        /// </summary>
         public Task<SharePointFileContent> ReadFileContentAsync(string path, int maxBytes, TimeSpan timeout, CancellationToken ct = default)
         { ContentReads++; ContentPaths.Add(path); return Task.FromResult(Content(path)); }
+        /// <summary>
+        /// Fails unexpected welcome-page API access because acquisition scenarios provide their own physical observations.
+        /// </summary>
         public Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        /// <summary>
+        /// Fails unexpected folder API access so tests cannot silently depend on an unmodeled discovery surface.
+        /// </summary>
         public Task<SharePointModeledFolderResult> ReadFolderAsync(string path, CancellationToken ct = default) => throw new NotSupportedException();
+        /// <summary>
+        /// Releases no external resources because this fake client only records in-memory calls.
+        /// </summary>
         public void Dispose() { }
     }
+    /// <summary>
+    /// Returns the supplied root client and records factory requests and disposal without taking ownership of the fake client.
+    /// </summary>
     private sealed class Factory(Client root) : ISharePointAspxRestClientFactory
     {
         internal readonly List<Uri> Requests = new();
         internal bool Disposed;
+        /// <summary>
+        /// Records root-client requests, checks cancellation, and returns the configured client for scope-validation tests.
+        /// </summary>
         public Task<ISharePointAspxRestClient> GetAsync(Uri web, CancellationToken ct = default)
         { ct.ThrowIfCancellationRequested(); Requests.Add(web); return Task.FromResult<ISharePointAspxRestClient>(root); }
+        /// <summary>
+        /// Records factory disposal so tests can detect accidental disposal of a caller-owned root-client factory.
+        /// </summary>
         public void Dispose() => Disposed = true;
     }
 
+    /// <summary>
+    /// Creates a hidden non-document list with configurable real items, content types, and list form renderer.
+    /// </summary>
     private static Client Items(object[] items, object[] types = null, string form = Form) => new()
     {
         Pages = uri => uri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase)
@@ -81,6 +126,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         internal readonly List<ClassicAspxItemBinding> Bindings = new();
         internal readonly List<ClassicPageDiscovery> Evidence = new();
         internal int LargestBatch;
+        /// <summary>
+        /// Collects all three publication streams and records the largest combined batch without altering emitted facts.
+        /// </summary>
         internal Task Publish(M1AcquisitionBatch batch, CancellationToken ct)
         {
             LargestBatch = Math.Max(LargestBatch, batch.Inventory.Count + batch.Bindings.Count + batch.Evidence.Count);
@@ -89,6 +137,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         }
     }
 
+    /// <summary>
+    /// Includes real items from hidden non-document lists, bounds publications, and shares one renderer source read across item bindings.
+    /// </summary>
     [Fact]
     public async Task All_real_items_including_hidden_non_document_lists_are_bounded_and_not_fixture_counted()
     {
@@ -105,6 +156,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Contains(found.Evidence, e => e.RowType == "Scope" && e.DiscoveryStatus == "Complete");
     }
 
+    /// <summary>
+    /// Falls back to the list form when the most-specific matching content type has no override, ignoring a less-specific override.
+    /// </summary>
     [Fact]
     public async Task Most_specific_empty_ct_override_uses_list_default_not_ancestor_override()
     {
@@ -118,6 +172,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Equal(Form, client.Resolutions.Single());
     }
 
+    /// <summary>
+    /// Keeps file-self, metadata-renderer, and parent-layout bindings distinct while preserving physical identities and item-web scope.
+    /// </summary>
     [Fact]
     public async Task Actual_aspx_backing_metadata_renderer_and_shared_parent_layout_keep_real_identity_and_item_web()
     {
@@ -141,6 +198,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Contains(found.Bindings, b => b.ItemId == 22 && b.BindingKinds.HasFlag(ClassicAspxBindingKinds.DocumentMetadataRenderer));
     }
 
+    /// <summary>
+    /// Retains a legacy list-item page pointer as tenant inventory without inventing file-self bindings or catalog identity from SetupPath.
+    /// </summary>
     [Fact]
     public async Task Legacy_listitem_page_pointer_is_not_its_file_self_and_setup_path_is_not_catalog_identity()
     {
@@ -155,6 +215,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Null(physical.WebId);
     }
 
+    /// <summary>
+    /// Preserves observed inventory and item bindings after content denial without supplying a handler or framework-default claim.
+    /// </summary>
     [Fact]
     public async Task Denied_content_keeps_observed_inventory_but_never_handler_default()
     {
@@ -167,6 +230,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Single(found.Bindings);
     }
 
+    /// <summary>
+    /// Retains a denied content-type scope as a coverage gap instead of inventing a list-default renderer binding.
+    /// </summary>
     [Fact]
     public async Task Denied_ct_scope_does_not_invent_a_list_default_renderer()
     {
@@ -181,6 +247,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Contains(found.Evidence, e => e.ErrorCodes == "content_type_scope_incomplete_no_renderer_fallback");
     }
 
+    /// <summary>
+    /// Stops unsafe or bounded-out continuations and records incomplete authority rather than reporting an empty collection.
+    /// </summary>
     [Theory]
     [InlineData("foreign")]
     [InlineData("loop")]
@@ -195,6 +264,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Contains(found.Evidence, e => e.RowType == "Scope" && e.DiscoveryStatus is "Unknown" or "Truncated");
     }
 
+    /// <summary>
+    /// Consumes a valid continuation, rejects nonpositive item IDs, and keeps raw cursor material out of stored pagination evidence.
+    /// </summary>
     [Fact]
     public async Task Actual_continuation_is_consumed_and_invalid_item_ids_do_not_create_bindings()
     {
@@ -210,6 +282,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.All(found.Evidence.Where(e => e.RowType == "Pagination"), e => Assert.False(e.EvidenceJson.Contains("skiptoken=next", StringComparison.OrdinalIgnoreCase)));
     }
 
+    /// <summary>
+    /// Propagates publication failures to the caller instead of misclassifying persistence errors as network coverage gaps.
+    /// </summary>
     [Fact]
     public async Task Storage_callback_failure_is_not_swallowed_as_a_network_gap()
     {
@@ -219,12 +294,18 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Single(client.Requests);
     }
 
+    /// <summary>
+    /// Builds one explicit platform path or two ambiguous candidates for testing catalog-only renderer resolution.
+    /// </summary>
     private static PlatformAspxCatalog Catalog(bool ambiguous = false)
     {
         object Entry(string id) => new { id, deploymentIdentity = id, culture = "en-US", path = "/_layouts/15/listform.aspx" };
         return PlatformAspxCatalog.Parse(JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = "platform-aspx-catalog/v1", catalogVersion = "1", source = "FakeFrozenCatalog", entries = ambiguous ? new[] { Entry("a"), Entry("b") } : new[] { Entry("a") } }));
     }
 
+    /// <summary>
+    /// Binds an observed item only to a unique explicit catalog member and never resolves that platform path as a tenant file.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -237,6 +318,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         else { Assert.Single(found.Bindings); Assert.Equal(ClassicAspxIdentityKinds.PlatformCatalog, Assert.Single(found.Inventory).IdentityKind); Assert.Empty(client.Resolutions); }
     }
 
+    /// <summary>
+    /// Does not publish acquisition bindings or inventory for catalog entries that no observed item references.
+    /// </summary>
     [Fact]
     public async Task Unreferenced_catalog_members_never_make_an_item_binding()
     {
@@ -245,6 +329,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Empty(found.Bindings); Assert.Empty(found.Inventory);
     }
 
+    /// <summary>
+    /// Uses a validated site-root client for shared layout metadata and bytes, preserving item scope or recording root unavailability.
+    /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -277,6 +364,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         }
     }
 
+    /// <summary>
+    /// Rejects foreign-authority and other-collection layouts before requesting a root client, metadata, or source bytes.
+    /// </summary>
     [Theory]
     [InlineData("https://foreign.invalid/sites/fixture/layout.aspx")]
     [InlineData("/sites/other-collection/layout.aspx")]
@@ -289,6 +379,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.DoesNotContain(found.Bindings, b => b.BindingKinds.HasFlag(ClassicAspxBindingKinds.PublishingPageLayout));
     }
 
+    /// <summary>
+    /// Rejects a factory client whose actual web is not the expected site root and records the scope mismatch.
+    /// </summary>
     [Fact]
     public async Task Factory_returning_wrong_web_is_not_used_as_site_root()
     {
@@ -300,6 +393,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Contains(found.Evidence, e => e.ErrorCodes == "same_site_root_client_scope_mismatch");
     }
 
+    /// <summary>
+    /// Keeps separate target evidence for equal layout failures while retaining safe diagnostics and removing bearer secrets.
+    /// </summary>
     [Fact]
     public async Task Equal_failure_codes_for_different_layout_paths_keep_distinct_safe_target_evidence()
     {
@@ -317,6 +413,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.All(gaps, e => { Assert.Equal("MetadataRequest", e.ErrorStage); Assert.Equal("Denied", e.DiscoveryStatus); Assert.DoesNotContain("synthetic-secret", e.ErrorDetail); Assert.Contains("ServerException:-2147024891", e.ErrorDetail); Assert.Contains("ReferencePath", e.EvidenceJson); });
     }
 
+    /// <summary>
+    /// Avoids attributing a legacy physical parent layout to the child worker or inventing a file-self item relation.
+    /// </summary>
     [Fact]
     public async Task Legacy_physical_parent_layout_never_invents_worker_ownership_or_item_self()
     {
@@ -329,6 +428,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Empty(found.Bindings);
     }
 
+    /// <summary>
+    /// Rejects redirects, response-URI drift, and oversized JSON responses after one send without returning successful empty pages.
+    /// </summary>
     [Theory]
     [InlineData("redirect")]
     [InlineData("drift")]
@@ -350,6 +452,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Empty(page.Items); Assert.Equal(1, handler.Sends);
     }
 
+    /// <summary>
+    /// Applies the JSON deadline through body consumption and records timeout truncation rather than empty success.
+    /// </summary>
     [Fact]
     public async Task Bounded_json_deadline_includes_body_and_preserves_no_empty_success()
     {
@@ -368,8 +473,17 @@ public sealed class ClassicAspxWebAcquisitionTests
 
     private sealed class SlowBody : HttpContent
     {
+        /// <summary>
+        /// Leaves response length unknown so bounded readers must enforce their limits while consuming the stream.
+        /// </summary>
         protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        /// <summary>
+        /// Rejects serialization because this fake content is consumed only through its deliberately stalled read stream.
+        /// </summary>
         protected override Task SerializeToStreamAsync(Stream stream, TransportContext context) => throw new NotSupportedException();
+        /// <summary>
+        /// Creates the cancellation-aware stalled stream used to test deadlines after headers have already succeeded.
+        /// </summary>
         protected override Task<Stream> CreateContentReadStreamAsync() => Task.FromResult<Stream>(new SlowRead());
         private sealed class SlowRead : Stream
         {
@@ -378,16 +492,37 @@ public sealed class ClassicAspxWebAcquisitionTests
             public override bool CanWrite => false;
             public override long Length => throw new NotSupportedException();
             public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+            /// <summary>
+            /// Rejects flushing because the stalled body is a read-only asynchronous test stream.
+            /// </summary>
             public override void Flush() => throw new NotSupportedException();
+            /// <summary>
+            /// Rejects synchronous reads so deadline tests must use the cancellation-aware asynchronous path.
+            /// </summary>
             public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+            /// <summary>
+            /// Waits indefinitely until the reader cancels, isolating whether its deadline covers body consumption.
+            /// </summary>
             public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
             { await Task.Delay(Timeout.Infinite, ct); return 0; }
+            /// <summary>
+            /// Rejects seeking because the fake response body is forward-only.
+            /// </summary>
             public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            /// <summary>
+            /// Rejects resizing because the response stream exposes no writable storage.
+            /// </summary>
             public override void SetLength(long value) => throw new NotSupportedException();
+            /// <summary>
+            /// Rejects writes because the response body exists only to stall asynchronous reads.
+            /// </summary>
             public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         }
     }
 
+    /// <summary>
+    /// Requires a successful binary header response with a stalled body to time out as incomplete source after one request.
+    /// </summary>
     [Fact]
     public async Task The_same_deadline_bounds_body_after_successful_headers()
     {
@@ -404,20 +539,35 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.False(result.IsComplete); Assert.Equal(1, handler.Sends);
     }
 
+    /// <summary>
+    /// Runs a supplied in-memory HTTP scenario and counts sends so redirect and timeout tests can enforce request boundaries.
+    /// </summary>
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         internal int Sends;
+        /// <summary>
+        /// Counts HTTP sends before forwarding the exact request and cancellation token to the scenario callback.
+        /// </summary>
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) { Sends++; return send(request, ct); }
     }
+    /// <summary>
+    /// Creates a response tied to the original request with caller-selected status, raw bytes, and optional media type.
+    /// </summary>
     private static HttpResponseMessage Reply(HttpRequestMessage request, HttpStatusCode status, byte[] bytes, string media = "application/octet-stream")
     {
         var response = new HttpResponseMessage(status) { RequestMessage = request, Content = new ByteArrayContent(bytes) };
         if (media != null) response.Content.Headers.ContentType = new MediaTypeHeaderValue(media);
         return response;
     }
+    /// <summary>
+    /// Adds a synthetic bearer header after checking cancellation, without accessing any live authentication service.
+    /// </summary>
     private static Task Authenticate(HttpRequestMessage request, CancellationToken ct)
     { ct.ThrowIfCancellationRequested(); request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "synthetic-only"); return Task.CompletedTask; }
 
+    /// <summary>
+    /// Requires an authenticated raw-value request and complete same-authority bytes before the parser can infer a source-level fallback.
+    /// </summary>
     [Fact]
     public async Task Binary_reader_uses_authenticated_value_api_and_strict_complete_source()
     {
@@ -429,6 +579,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Equal(1, handler.Sends);
     }
 
+    /// <summary>
+    /// Refuses handler defaults for authentication failures, missing files, partial responses, and redirects despite plausible body bytes.
+    /// </summary>
     [Theory]
     [InlineData(401)]
     [InlineData(403)]
@@ -445,6 +598,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Equal(1, handler.Sends);
     }
 
+    /// <summary>
+    /// Prevents rendered, JSON, or untyped bodies from being promoted to actual-source evidence or a framework default.
+    /// </summary>
     [Theory]
     [InlineData("text/html")]
     [InlineData("application/json")]
@@ -458,6 +614,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Null(AspxHandlerParser.Parse(result.Bytes, result.Source, result.IsComplete, result.ReadState).EffectiveInherits);
     }
 
+    /// <summary>
+    /// Enforces the byte cap and declared body length, retaining truncation or incomplete-transfer diagnostics.
+    /// </summary>
     [Fact]
     public async Task Binary_size_and_length_completion_are_enforced()
     {
@@ -470,6 +629,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Equal("file_source_incomplete_body", (await SharePointFileContentReader.ReadAsync(http2, WebUrl, Form, 32, TimeSpan.FromSeconds(1), Authenticate)).ErrorCode);
     }
 
+    /// <summary>
+    /// Rejects response-URI drift and foreign locators without following another authority or issuing a second request.
+    /// </summary>
     [Fact]
     public async Task Response_uri_drift_and_foreign_paths_are_not_followed_or_sent()
     {
@@ -480,6 +642,9 @@ public sealed class ClassicAspxWebAcquisitionTests
         Assert.Equal(1, handler.Sends);
     }
 
+    /// <summary>
+    /// Includes authentication in the total read deadline and lets caller cancellation propagate without an HTTP send.
+    /// </summary>
     [Fact]
     public async Task One_deadline_also_bounds_auth_and_caller_cancellation_propagates()
     {

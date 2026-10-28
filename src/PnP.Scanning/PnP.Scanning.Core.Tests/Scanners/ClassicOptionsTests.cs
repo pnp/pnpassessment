@@ -86,6 +86,9 @@ namespace PnP.Scanning.Core.Tests.Scanners
             options.AuditLogWindowDays.Should().Be(14); // default when not explicitly passed
         }
 
+        /// <summary>
+        /// Round-trips canonical template exclusions through native request properties and requires the stored option to remain string-typed.
+        /// </summary>
         [Theory]
         [InlineData(null, "APP#*,SPSPERS#*")]
         [InlineData("STS#3", "STS#3")]
@@ -100,6 +103,9 @@ namespace PnP.Scanning.Core.Tests.Scanners
             request.Properties.Single(p => p.Property == Constants.StartExcludeSiteTemplates).Type.Should().Be("string");
         }
 
+        /// <summary>
+        /// Passes the already frozen catalog payload through native options without requiring the original filesystem path.
+        /// </summary>
         [Fact]
         public void FrozenCatalogPayloadRoundTripsWithoutReopeningAPath()
         {

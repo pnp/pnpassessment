@@ -71,6 +71,7 @@ namespace PnP.Scanning.Core.Scanners
         // The file's vti_setuppath proves it ghosts from a stock list view/form template.
         internal const string SystemPageTemplateCode = "system_page_template";
 
+        /// <summary>Delegates shared page metadata initialization and discovery with the existing retry and failure-finalization sequence for the requested page scope.</summary>
         internal static Task<List<ClassicPageDiscovery>> InitializeAsync(ClassicScanner scanner, PnPContext context,
             PnPContextOptions assessmentOptions)
         {
@@ -781,6 +782,7 @@ namespace PnP.Scanning.Core.Scanners
             }
         }
 
+        /// <summary>Builds the recursive page-assessment CAML with requested extra fields; an explicit item ID takes precedence over the optional ASPX filter, and user metadata is omitted only when requested.</summary>
         private static string PageQuery(List<string> extraFields, bool filterOnASPXPages = true,
             int? itemId = null, bool skipUserInformation = false)
         {

@@ -20,6 +20,9 @@ public sealed class SharedDiscoveryContextTests
     internal static readonly Guid ListId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     internal static readonly Guid FolderId = Guid.Parse("44444444-4444-4444-4444-444444444444");
 
+    /// <summary>
+    /// Borrows one initialized SDK context for normalized forms of the same web and preserves scanner ownership through client and factory disposal.
+    /// </summary>
     [Fact]
     public async Task Exact_normalized_web_borrows_one_context_and_discovery_disposal_does_not_dispose_it()
     {
@@ -79,6 +82,9 @@ public sealed class SharedDiscoveryContextTests
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Keeps default context ownership for an ordinary client and tolerates repeated client disposal.
+    /// </summary>
     [Fact]
     public async Task Ordinary_client_still_owns_its_context_by_default()
     {
@@ -94,6 +100,9 @@ public sealed class SharedDiscoveryContextTests
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Leaves an explicitly borrowed SDK JSON transport and context usable after discovery-client disposal.
+    /// </summary>
     [Fact]
     public async Task Disposing_discovery_does_not_dispose_explicitly_borrowed_json_transport()
     {
@@ -247,6 +256,9 @@ public sealed class SharedDiscoveryContextTests
         internal string ListResponse { get; set; } = "complete";
         internal bool FailMetadata { get; set; }
 
+        /// <summary>
+        /// Routes only allowed offline GETs or read-only multipart batches, recording logical calls and preserving direct-response request provenance.
+        /// </summary>
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();

@@ -80,6 +80,7 @@ namespace PnP.Scanning.Core.Services
 
         internal static int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
 
+        /// <summary>Creates the scan with frozen options and catalog evidence, handles an authoritative empty selection, then preserves existing prescan and queue startup ordering.</summary>
         internal async Task<Guid> StartScanAsync(StartRequest start, AuthenticationManager authenticationManager, List<string> siteCollectionList,
             IReadOnlyList<ClassicPageDiscovery> discoveryEvidence = null)
         {
@@ -110,7 +111,7 @@ namespace PnP.Scanning.Core.Services
                         DiscoveryStatus = m1Catalog == null ? "Unknown" : "Complete",
                         ExpectedChildCount = m1Catalog?.Entries.Count, ObservedChildCount = m1Catalog?.Entries.Count,
                         ErrorCodes = m1Catalog == null ? "platform_catalog_not_provided" : null,
-                        EvidenceJson = System.Text.Json.JsonSerializer.Serialize(new { version = m1Catalog?.Version, source = m1Catalog?.Source, digest = m1Catalog?.Digest, contract = "M1/v1", runtimeHandlerConfirmed = false }),
+                        EvidenceJson = System.Text.Json.JsonSerializer.Serialize(new { version = m1Catalog?.Version, source = m1Catalog?.Source, digest = m1Catalog?.Digest, contract = ClassicAspxProjectionContract.Version, runtimeHandlerConfirmed = false }),
                         ObservedAtUtc = DateTime.UtcNow
                     }
                 });

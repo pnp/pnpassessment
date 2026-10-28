@@ -1,4 +1,4 @@
-﻿using EFCore.BulkExtensions;
+using EFCore.BulkExtensions;
 using EFQuery = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 using Microsoft.SharePoint.Client;
 using PnP.Core.Model;
@@ -23,6 +23,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal ClassicOptions Options { get; set; }
 
+        /// <summary>Runs selected Classic components in their established order, sharing page initialization metadata before Workflow and InfoPath consume it.</summary>
         internal async override Task ExecuteAsync()
         {
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);

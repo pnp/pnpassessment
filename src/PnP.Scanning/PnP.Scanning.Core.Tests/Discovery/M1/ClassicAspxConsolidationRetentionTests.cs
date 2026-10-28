@@ -10,6 +10,9 @@ namespace PnP.Scanning.Core.Tests.Discovery.M1;
 
 public sealed class ClassicAspxConsolidationRetentionTests
 {
+    /// <summary>
+    /// Exercises the supported restart lifecycle: pending legacy results are cleared while normalized pairs and raw denial evidence survive.
+    /// </summary>
     [Fact]
     public async Task ActualRestartConsolidationClearsPendingLegacyResultsButRetainsNormalizedAndRawFacts()
     {
@@ -78,6 +81,9 @@ public sealed class ClassicAspxConsolidationRetentionTests
         }
     }
 
+    /// <summary>
+    /// Creates an observed renderer binding with the exact item scope needed to distinguish pending and finished webs.
+    /// </summary>
     private static ClassicAspxItemBinding Pair(Guid scan, string key, Guid site, Guid web, Guid list, int id) => new()
     {
         ScanId = scan, AspxKey = key, SiteCollectionId = site, WebId = web, ListId = list, ItemId = id,

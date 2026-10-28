@@ -27,7 +27,7 @@ internal sealed class ClassicAspxInventoryExport
     public string? CustomizedPageStatus { get; set; }
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? SetupPath { get; set; }
-    public string FileReadState { get; set; } = "NotAttempted";
+    public string FileReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? FileErrorCodes { get; set; }
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
@@ -38,7 +38,7 @@ internal sealed class ClassicAspxInventoryExport
     public string? HandlerNormalizedType { get; set; }
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? HandlerEffectiveType { get; set; }
-    public string HandlerReadState { get; set; } = "NotAttempted";
+    public string HandlerReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     public string HandlerParseState { get; set; } = "NotAttempted";
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? HandlerSource { get; set; }
@@ -59,9 +59,9 @@ internal sealed class ClassicAspxInventoryExport
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? CatalogEntryKey { get; set; }
     public string ProvenanceJson { get; set; } = "[]";
-    public string CoverageState { get; set; } = "Unknown";
+    public string CoverageState { get; set; } = ClassicAspxCoverageStates.Unknown;
     public DateTime FirstObservedAtUtc { get; set; }
     public DateTime ObservedAtUtc { get; set; }
     public long DistinctItemBindingCount { get; set; }
-    public string BindingCountBasis { get; set; } = "DeclaredScanScopeObserved";
+    public string BindingCountBasis { get; set; } = ClassicAspxReportProjection.DeclaredScopeBindingCountBasis;
 }

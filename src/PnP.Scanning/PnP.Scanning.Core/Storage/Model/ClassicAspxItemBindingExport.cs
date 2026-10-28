@@ -11,7 +11,7 @@ internal sealed class ClassicAspxItemBindingExport
     public Guid ListId { get; set; }
     public int ItemId { get; set; }
     public Guid? ItemGuid { get; set; }
-    public string ItemGuidReadState { get; set; } = "NotAttempted";
+    public string ItemGuidReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? SiteUrl { get; set; }
     [CsvHelper.Configuration.Attributes.TypeConverter(typeof(ClassicAspxNullableStringConverter))]

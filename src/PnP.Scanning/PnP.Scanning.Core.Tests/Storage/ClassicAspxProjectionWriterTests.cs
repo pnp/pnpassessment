@@ -19,6 +19,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
     private readonly Guid web = Guid.NewGuid();
     private readonly Guid list = Guid.NewGuid();
     private ClassicAspxProjectionWriter Writer => new(() => new ScanContext(options));
+    /// <summary>
+    /// Keeps an in-memory SQLite connection open and applies real migrations before each writer scenario.
+    /// </summary>
     public async Task InitializeAsync()
     {
         await connection.OpenAsync();
@@ -26,7 +29,13 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         using var db = new ScanContext(options);
         await db.Database.MigrateAsync();
     }
+    /// <summary>
+    /// Closes the fixture-owned connection after the test, releasing the shared in-memory database.
+    /// </summary>
     public Task DisposeAsync() => connection.DisposeAsync().AsTask();
+    /// <summary>
+    /// Creates metadata-only tenant inventory with stable fixture scope and an optional distinct physical file identity.
+    /// </summary>
     private ClassicAspxInventory File(Guid? file = null) => new()
     {
         ScanId = scan, IdentityKind = ClassicAspxIdentityKinds.TenantFile,
@@ -37,12 +46,18 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         ProvenanceJson = "[\"file-listing\"]", CoverageState = "Unknown", ObservedAtUtc = DateTime.UtcNow
     };
     private readonly Guid fileId = Guid.NewGuid();
+    /// <summary>
+    /// Creates an observed item pair in the fixture scope with a configurable binding reason and no supplementary item GUID.
+    /// </summary>
     private ClassicAspxItemBinding Pair(string key, int id, ClassicAspxBindingKinds kind = ClassicAspxBindingKinds.ListFormRenderer) => new()
     {
         ScanId = scan, AspxKey = key, SiteCollectionId = site, WebId = web, ListId = list, ItemId = id,
         BindingKinds = kind, BindingProvenanceJson = "[\"observed-item\"]", ObservedAtUtc = DateTime.UtcNow
     };
 
+    /// <summary>
+    /// Replays one hundred renderer bindings idempotently without multiplying physical inventory or distinct item identities.
+    /// </summary>
     [Fact]
     public async Task SharedRendererHasOneInventoryAndOneHundredDistinctItemsAfterReplay()
     {
@@ -55,6 +70,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxItemBindings.Select(x => x.ItemId).Distinct().CountAsync()).Should().Be(100);
     }
 
+    /// <summary>
+    /// Unions file-self and renderer reason flags while canonicalizing equivalent provenance objects into one normalized pair.
+    /// </summary>
     [Fact]
     public async Task SameBackingAndRendererPairMergesReasonFlagsAndCanonicalProvenance()
     {
@@ -71,6 +89,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         json.RootElement.GetArrayLength().Should().Be(2);
     }
 
+    /// <summary>
+    /// Preserves separate pairs for multiple ASPX resources and for the same integer item ID in another web.
+    /// </summary>
     [Fact]
     public async Task SameItemCanBindMultipleAspxAndOtherWebKeysRemainDistinct()
     {
@@ -82,6 +103,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxItemBindings.CountAsync()).Should().Be(3);
     }
 
+    /// <summary>
+    /// Retains a real scoped item binding when its optional supplementary GUID is absent.
+    /// </summary>
     [Fact]
     public async Task MissingOptionalItemGuidDoesNotDropARealScopedItem()
     {
@@ -91,6 +115,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxItemBindings.SingleAsync()).ItemGuid.Should().BeNull();
     }
 
+    /// <summary>
+    /// Keeps unbound files and idempotently seeded catalog entries as inventory without inventing bindings or effective handlers.
+    /// </summary>
     [Fact]
     public async Task UnboundAndCatalogMembersRemainInventoryWithoutFabricatedBindings()
     {
@@ -108,6 +135,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         member.CoverageState.Should().Be("Unknown");
     }
 
+    /// <summary>
+    /// Retains an earlier observed handler when a later read is denied while adding denial and incomplete-coverage evidence.
+    /// </summary>
     [Fact]
     public async Task DeniedReadDoesNotErasePreviouslyObservedHandlerFacts()
     {
@@ -126,6 +156,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         row.CoverageState.Should().Be("Incomplete");
     }
 
+    /// <summary>
+    /// Marks conflicting handler observations as changed during the scan and retains both values under one physical identity.
+    /// </summary>
     [Fact]
     public async Task HandlerChangeRetainsChangeEvidenceInsteadOfCreatingAnotherIdentity()
     {
@@ -141,6 +174,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         row.ProvenanceJson.Should().Contain("First.Handler").And.Contain("Second.Handler");
     }
 
+    /// <summary>
+    /// Rejects unresolved physical identity and a denied-read framework fallback before any inventory can be persisted.
+    /// </summary>
     [Fact]
     public async Task UnresolvedIdentityAndInventedDefaultAreRejectedBeforeWriting()
     {
@@ -152,6 +188,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         using var db = new ScanContext(options); (await db.ClassicAspxInventories.CountAsync()).Should().Be(0);
     }
 
+    /// <summary>
+    /// Rejects invalid item keys and rolls back an unknown-parent failure without partially committing inventory or bindings.
+    /// </summary>
     [Fact]
     public async Task InvalidItemAndUnknownParentCauseNoPartialCommit()
     {
@@ -164,6 +203,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxItemBindings.CountAsync()).Should().Be(0);
     }
 
+    /// <summary>
+    /// Keeps independent concurrent writes of the same file-item pair idempotent.
+    /// </summary>
     [Fact]
     public async Task IndependentConcurrentBatchesRemainIdempotent()
     {
@@ -174,6 +216,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxItemBindings.CountAsync()).Should().Be(1);
     }
 
+    /// <summary>
+    /// Treats equivalent absolute and server-relative URL representations as aliases rather than evidence of source drift.
+    /// </summary>
     [Fact]
     public async Task UrlRepresentationAliasesDoNotInventSourceDrift()
     {
@@ -185,6 +230,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxInventories.SingleAsync()).CoverageState.Should().NotBe("ChangedDuringScan");
     }
 
+    /// <summary>
+    /// Streams all physical observations in keyset batches while allowing projection writes between yielded rows without retained readers.
+    /// </summary>
     [Fact]
     public async Task PhysicalStreamUsesBoundedKeysetBatchesAndReleasesReadersBeforePublishing()
     {
@@ -206,6 +254,9 @@ public sealed class ClassicAspxProjectionWriterTests : IAsyncLifetime
         (await db.ClassicAspxInventories.CountAsync()).Should().Be(1);
     }
 
+    /// <summary>
+    /// Rejects a batch beyond the writer limit without persisting an inventory prefix or silently truncating bindings.
+    /// </summary>
     [Fact]
     public async Task OversizedBatchIsNotMaterializedOrSilentlyTruncated()
     {

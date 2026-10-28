@@ -7,6 +7,9 @@ namespace PnP.Scanning.Core.Tests.Discovery.M1;
 
 public sealed class ClassicAspxLargeReplayTests
 {
+    /// <summary>
+    /// Streams ten thousand distinct items through bounded pages and publication batches while resolving and reading their shared renderer once.
+    /// </summary>
     [Fact]
     public async Task TenThousandOnDemandItemsUseOneRendererBoundedBatchesAndConstantSourceReads()
     {
@@ -31,6 +34,9 @@ public sealed class ClassicAspxLargeReplayTests
             row => row.DiscoveryStatus is "Denied" or "Failed" or "Truncated" or "Unknown");
     }
 
+    /// <summary>
+    /// Replays denied, successful, and truncated acquisitions in one scan, preserving historical gaps and merging renderer reasons without duplicate pairs.
+    /// </summary>
     [Fact]
     public async Task SameScanReplayUnionsSourcesAndRetainsDeniedTruncatedRawScopesAndObservedPairs()
     {

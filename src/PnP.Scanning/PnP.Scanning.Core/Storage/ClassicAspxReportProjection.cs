@@ -18,7 +18,52 @@ internal static class ClassicAspxReportProjection
     internal const string CanonicalInventoryCsv = "aspxinventory.csv";
     internal const string CanonicalBindingsCsv = "aspxitembindings.csv";
     internal const string SummaryJson = "aspxsummary.json";
+    internal const string DeclaredScopeBindingCountBasis = "DeclaredScanScopeObserved";
+    private const string SummarySchemaVersion = "aspx-inventory-summary/v1";
+    private const string SummaryCountBasis = "Observed unique resource and normalized binding keys in the exported declared-scope streams";
 
+    private static class AcquisitionStates
+    {
+        internal const string DeclaredScopeObserved = "DeclaredScopeObserved";
+        internal const string ObservedWithoutNativeMarker = "ObservedWithoutNativeMarker";
+        internal const string NotAcquiredLegacy = "NotAcquired/Legacy";
+    }
+
+    private static class SummaryStates
+    {
+        internal const string Unknown = "Unknown";
+        internal const string FrozenPolicy = "FrozenPolicy";
+        internal const string NotAsserted = "NotAsserted";
+        internal const string VersionedCatalogReference = "VersionedCatalogReference";
+    }
+
+
+
+    private static class ReportInfoText
+    {
+        internal const string NativePrefix = ClassicAspxProjectionContract.PropertyName + "=" +
+            ClassicAspxProjectionContract.Version + "\nAcquisitionState=" + AcquisitionStates.DeclaredScopeObserved +
+            "\n" + ClassicAspxProjectionContract.ScopeModePropertyName + "=";
+        internal const string NativeScopeLimitations =
+            "\nCounts are observed distinct normalized item/resource pairs in this declared scan scope. " +
+            "Zero bindings do not prove complete absence; CoverageState Unknown/Incomplete/Changed is preserved in each inventory row. " +
+            "HomePageOnly is targeted, not full inventory or tenant coverage.\n";
+        internal const string ObservedWithoutMarker =
+            "M1ProjectionContract=UnknownContract\nAcquisitionState=ObservedWithoutNativeMarker\nM1ScopeMode=Unknown\n" +
+            "Normalized rows were observed without a native M1/v1 marker, for example after resuming an older scan. " +
+            "These observations are real but do not establish the M1/v1 acquisition contract or complete coverage. " +
+            "Counts remain declared-scope observations; migration itself never backfills facts.\n";
+        internal const string Legacy =
+            "M1ProjectionContract=NotAcquired/Legacy\nAcquisitionState=NotAcquired\nM1ScopeMode=Unknown\n" +
+            "This scan has no native M1/v1 acquisition marker. Empty upgraded M1 tables are not proof that no ASPX exists. " +
+            "Migration does not backfill historical inventory, bindings or Handler facts.\n";
+        internal const string NullableEncodingPrefix = "M1NullableStringEncoding=" +
+            ClassicAspxNullableStringConverter.EncodingVersion + "; null=";
+        internal const string NullableEncodingLimitations =
+            "; non-null leading backslash is escaped with one extra backslash; empty string stays empty.\n";
+    }
+
+    /// <summary>Builds the ordered SQL projection with distinct normalized item/resource counts, including inventories with no observed binding.</summary>
     internal static IQueryable<ClassicAspxInventoryExport> Inventories(ScanContext context, Guid scanId)
     {
         // Binding PK is the normalized scoped item/resource pair, not (pair, source kind).
@@ -71,15 +116,17 @@ internal static class ClassicAspxReportProjection
                    FirstObservedAtUtc = inventory.FirstObservedAtUtc,
                    ObservedAtUtc = inventory.ObservedAtUtc,
                    DistinctItemBindingCount = count.Count ?? 0L,
-                   BindingCountBasis = "DeclaredScanScopeObserved"
+                   BindingCountBasis = DeclaredScopeBindingCountBasis
                };
     }
 
+    /// <summary>Builds a no-tracking, scan-scoped binding query in deterministic normalized-key order without materializing it.</summary>
     internal static IQueryable<ClassicAspxItemBinding> Bindings(ScanContext context, Guid scanId) =>
         context.ClassicAspxItemBindings.AsNoTracking().Where(row => row.ScanId == scanId)
             .OrderBy(row => row.AspxKey).ThenBy(row => row.SiteCollectionId).ThenBy(row => row.WebId)
             .ThenBy(row => row.ListId).ThenBy(row => row.ItemId);
 
+    /// <summary>Projects ordered bindings to typed CSV rows in SQL while retaining nullable supplementary item GUIDs.</summary>
     internal static IQueryable<ClassicAspxItemBindingExport> BindingRowsForExport(ScanContext context, Guid scanId) =>
         Bindings(context, scanId).Select(binding => new ClassicAspxItemBindingExport
         {
@@ -101,6 +148,7 @@ internal static class ClassicAspxReportProjection
             ObservedAtUtc = binding.ObservedAtUtc,
         });
 
+    /// <summary>Streams each typed projection once, counts the exported observations, and writes explicit acquisition and scope limitations.</summary>
     internal static async Task ExportCsvAsync(ScanContext context, Guid scanId, string exportPath,
         CsvConfiguration configuration, CancellationToken cancellationToken = default)
     {
@@ -109,44 +157,42 @@ internal static class ClassicAspxReportProjection
         var observedInventoryCount = await WriteTypedCsvAsync(Path.Combine(exportPath, InventoryCsv), configuration,
             Inventories(context, scanId).AsAsyncEnumerable(), cancellationToken, row =>
             {
-                if (row.DistinctItemBindingCount == 0) zeroObservedBindingsCount++;
-                var state = row.CoverageState ?? "Unknown";
+                if (row.DistinctItemBindingCount == 0)
+                {
+                    zeroObservedBindingsCount++;
+                }
+                var state = row.CoverageState ?? ClassicAspxCoverageStates.Unknown;
                 observedCoverageStates[state] = observedCoverageStates.GetValueOrDefault(state) + 1;
             }).ConfigureAwait(false);
         var observedDistinctBindingCount = await WriteTypedCsvAsync(Path.Combine(exportPath, BindingsCsv), configuration,
             BindingRowsForExport(context, scanId).AsAsyncEnumerable(), cancellationToken).ConfigureAwait(false);
 
         var contract = await context.Properties.AsNoTracking()
-            .Where(row => row.ScanId == scanId && row.Name == "M1ProjectionContract")
+            .Where(row => row.ScanId == scanId && row.Name == ClassicAspxProjectionContract.PropertyName)
             .Select(row => row.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         var scope = await context.Properties.AsNoTracking()
-            .Where(row => row.ScanId == scanId && row.Name == "M1ScopeMode")
+            .Where(row => row.ScanId == scanId && row.Name == ClassicAspxProjectionContract.ScopeModePropertyName)
             .Select(row => row.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        var observedWithoutMarker = contract != "M1/v1" &&
+        var observedWithoutMarker = contract != ClassicAspxProjectionContract.Version &&
             (await context.ClassicAspxInventories.AsNoTracking().AnyAsync(row => row.ScanId == scanId, cancellationToken).ConfigureAwait(false) ||
              await context.ClassicAspxItemBindings.AsNoTracking().AnyAsync(row => row.ScanId == scanId, cancellationToken).ConfigureAwait(false));
-        var info = contract == "M1/v1"
-            ? "M1ProjectionContract=M1/v1\nAcquisitionState=DeclaredScopeObserved\nM1ScopeMode=" + (scope ?? "Unknown") +
-              "\nCounts are observed distinct normalized item/resource pairs in this declared scan scope. " +
-              "Zero bindings do not prove complete absence; CoverageState Unknown/Incomplete/Changed is preserved in each inventory row. " +
-              "HomePageOnly is targeted, not full inventory or tenant coverage.\n"
+        var info = contract == ClassicAspxProjectionContract.Version
+            ? ReportInfoText.NativePrefix + (scope ?? SummaryStates.Unknown) + ReportInfoText.NativeScopeLimitations
             : observedWithoutMarker
-            ? "M1ProjectionContract=UnknownContract\nAcquisitionState=ObservedWithoutNativeMarker\nM1ScopeMode=Unknown\n" +
-              "Normalized rows were observed without a native M1/v1 marker, for example after resuming an older scan. " +
-              "These observations are real but do not establish the M1/v1 acquisition contract or complete coverage. " +
-              "Counts remain declared-scope observations; migration itself never backfills facts.\n"
-            : "M1ProjectionContract=NotAcquired/Legacy\nAcquisitionState=NotAcquired\nM1ScopeMode=Unknown\n" +
-              "This scan has no native M1/v1 acquisition marker. Empty upgraded M1 tables are not proof that no ASPX exists. " +
-              "Migration does not backfill historical inventory, bindings or Handler facts.\n";
-        info += "M1NullableStringEncoding=BackslashNullV1; null=" + ClassicAspxNullableStringConverter.NullToken +
-            "; non-null leading backslash is escaped with one extra backslash; empty string stays empty.\n";
+                ? ReportInfoText.ObservedWithoutMarker
+                : ReportInfoText.Legacy;
+        info += ReportInfoText.NullableEncodingPrefix + ClassicAspxNullableStringConverter.NullToken +
+            ReportInfoText.NullableEncodingLimitations;
         await File.WriteAllTextAsync(Path.Combine(exportPath, InfoFile), info, new UTF8Encoding(false), cancellationToken)
             .ConfigureAwait(false);
         await WriteCanonicalSummaryAsync(context, scanId, exportPath, contract, scope,
-            observedInventoryCount, observedDistinctBindingCount, zeroObservedBindingsCount,
+            observedInventoryCount,
+            observedDistinctBindingCount,
+            zeroObservedBindingsCount,
             observedCoverageStates, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Copies completed CSV streams to canonical aliases and writes hashed file evidence with observed-scope counts, not tenant completeness.</summary>
     private static async Task WriteCanonicalSummaryAsync(ScanContext context, Guid scanId, string exportPath,
         string? contract, string? scope, long observedInventoryCount, long observedDistinctBindingCount,
         long zeroObservedBindingsCount, IReadOnlyDictionary<string, long> observedCoverageStates,
@@ -161,38 +207,64 @@ internal static class ClassicAspxReportProjection
         var catalogPayload = await context.Properties.AsNoTracking()
             .Where(row => row.ScanId == scanId && row.Name == Constants.StartPlatformAspxCatalogPayload)
             .Select(row => row.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        var catalogState = "Unknown"; string? catalogSource = null; string? catalogVersion = null; string? catalogDigest = null;
+        var catalogState = SummaryStates.Unknown;
+        string? catalogSource = null;
+        string? catalogVersion = null;
+        string? catalogDigest = null;
         if (!string.IsNullOrEmpty(catalogPayload))
         {
             try
             {
                 var catalog = PlatformAspxCatalog.FromFrozenPayload(catalogPayload);
-                catalogState = "VersionedCatalogReference"; catalogSource = catalog.Source;
-                catalogVersion = catalog.Version; catalogDigest = catalog.Digest;
+                catalogState = SummaryStates.VersionedCatalogReference;
+                catalogSource = catalog.Source;
+                catalogVersion = catalog.Version;
+                catalogDigest = catalog.Digest;
             }
             catch (Exception error) when (error is ArgumentException or FormatException or JsonException or KeyNotFoundException or InvalidOperationException)
             {
-                catalogState = "Unknown"; // Invalid/missing evidence is not a claim of no platform ASPX.
+                catalogState = SummaryStates.Unknown; // Invalid/missing evidence is not a claim of no platform ASPX.
             }
         }
-        var acquisitionState = contract == "M1/v1" ? "DeclaredScopeObserved" :
-            observedInventoryCount != 0 || observedDistinctBindingCount != 0 ? "ObservedWithoutNativeMarker" : "NotAcquired/Legacy";
+        var acquisitionState = contract == ClassicAspxProjectionContract.Version ? AcquisitionStates.DeclaredScopeObserved :
+            observedInventoryCount != 0 || observedDistinctBindingCount != 0 ? AcquisitionStates.ObservedWithoutNativeMarker : AcquisitionStates.NotAcquiredLegacy;
         var summary = new
         {
-            schemaVersion = "aspx-inventory-summary/v1", scanId,
-            projectionContract = contract, acquisitionState, scopeMode = scope ?? "Unknown",
-            templateExclusions = new { state = exclusions == null ? "Unknown" : "FrozenPolicy", value = exclusions },
-            catalog = new { state = catalogState, source = catalogSource, version = catalogVersion, digest = catalogDigest },
-            observedInventoryCount, observedDistinctBindingCount, zeroObservedBindingsCount,
-            countBasis = "Observed unique resource and normalized binding keys in the exported declared-scope streams",
-            coverage = new { targeted = scope == "HomePageOnly", tenantCompleteness = "NotAsserted", inventoryStates = observedCoverageStates },
-            nullableStringEncoding = "BackslashNullV1",
+            schemaVersion = SummarySchemaVersion,
+            scanId,
+            projectionContract = contract,
+            acquisitionState,
+            scopeMode = scope ?? SummaryStates.Unknown,
+            templateExclusions = new
+            {
+                state = exclusions == null ? SummaryStates.Unknown : SummaryStates.FrozenPolicy,
+                value = exclusions
+            },
+            catalog = new
+            {
+                state = catalogState,
+                source = catalogSource,
+                version = catalogVersion,
+                digest = catalogDigest
+            },
+            observedInventoryCount,
+            observedDistinctBindingCount,
+            zeroObservedBindingsCount,
+            countBasis = SummaryCountBasis,
+            coverage = new
+            {
+                targeted = scope == ClassicAspxProjectionContract.HomePageOnly,
+                tenantCompleteness = SummaryStates.NotAsserted,
+                inventoryStates = observedCoverageStates
+            },
+            nullableStringEncoding = ClassicAspxNullableStringConverter.EncodingVersion,
             files = new[] { inventoryFile, bindingsFile }
         };
         await File.WriteAllTextAsync(Path.Combine(exportPath, SummaryJson), JsonSerializer.Serialize(summary,
             new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Copies one completed compatibility CSV verbatim and returns its canonical name, byte length, and SHA256 evidence.</summary>
     private static async Task<CanonicalFileEvidence> CopyCanonicalAsync(string exportPath, string compatibilityName,
         string canonicalName, CancellationToken cancellationToken)
     {
@@ -205,6 +277,7 @@ internal static class ClassicAspxReportProjection
 
     private sealed record CanonicalFileEvidence(string name, string compatibilityAlias, long length, string sha256);
 
+    /// <summary>Writes an explicit typed header even for empty input, streams rows with cancellation, and counts only successfully written records.</summary>
     private static async Task<long> WriteTypedCsvAsync<T>(string path, CsvConfiguration configuration,
         IAsyncEnumerable<T> rows, CancellationToken cancellationToken, Action<T>? observed = null)
     {
@@ -218,7 +291,8 @@ internal static class ClassicAspxReportProjection
         {
             csv.WriteRecord(row);
             await csv.NextRecordAsync().ConfigureAwait(false);
-            count++; observed?.Invoke(row);
+            count++;
+            observed?.Invoke(row);
         }
         return count;
     }

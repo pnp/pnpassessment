@@ -7,6 +7,7 @@ namespace PnP.Scanning.Process
 {
     internal class Startup<T> where T : class
     {
+        /// <summary>Registers the existing gRPC services with a finite receive budget large enough for the supported frozen Base64 catalog payload.</summary>
         public void ConfigureServices(IServiceCollection services)
         {
             // The explicit catalog is frozen in StartRequest properties (base64 adds 4/3 overhead).

@@ -1,4 +1,5 @@
 using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -13,6 +14,11 @@ namespace PnP.Scanning.Core.Scanners
     /// </summary>
     internal static class ClassicStartRequestBuilder
     {
+        private const string BooleanPropertyType = "bool";
+        private const string IntegerPropertyType = "int";
+        private const string StringPropertyType = "string";
+
+        /// <summary>Appends Classic component and option properties, declaring the native M1 contract and frozen scope inputs only when Pages is selected.</summary>
         internal static void AddClassicProperties(
             StartRequest request,
             IEnumerable<ClassicComponent> components,
@@ -32,7 +38,7 @@ namespace PnP.Scanning.Core.Scanners
                 request.Properties.Add(new PropertyRequest
                 {
                     Property = $"{classicComponent}",
-                    Type = "bool",
+                    Type = BooleanPropertyType,
                     Value = true.ToString(),
                 });
             }
@@ -44,35 +50,46 @@ namespace PnP.Scanning.Core.Scanners
             request.Properties.Add(new PropertyRequest
             {
                 Property = Constants.StartClassicAuditLogWindowDays,
-                Type = "int",
+                Type = IntegerPropertyType,
                 Value = auditLogWindowDays.ToString(),
             });
             if (selectedComponents.Contains(ClassicComponent.Pages))
             {
-                request.Properties.Add(new PropertyRequest { Property = "M1ProjectionContract", Type = "string", Value = "M1/v1" });
-                request.Properties.Add(new PropertyRequest { Property = "M1ScopeMode", Type = "string", Value = homePageOnly ? "HomePageOnly" : "DeclaredFullInventory" });
+                request.Properties.Add(new PropertyRequest
+                {
+                    Property = ClassicAspxProjectionContract.PropertyName,
+                    Type = StringPropertyType,
+                    Value = ClassicAspxProjectionContract.Version
+                });
+                request.Properties.Add(new PropertyRequest
+                {
+                    Property = ClassicAspxProjectionContract.ScopeModePropertyName,
+                    Type = StringPropertyType,
+                    Value = homePageOnly ? ClassicAspxProjectionContract.HomePageOnly : ClassicAspxProjectionContract.DeclaredFullInventory
+                });
                 request.Properties.Add(new PropertyRequest
                 {
                     Property = Constants.StartExcludeSiteTemplates,
-                    Type = "string",
+                    Type = StringPropertyType,
                     Value = Discovery.M1.SiteTemplateExclusionPolicy.Parse(excludeSiteTemplates).CanonicalValue,
                 });
                 if (platformAspxCatalogPayload != null)
                     request.Properties.Add(new PropertyRequest
                     {
                         Property = Constants.StartPlatformAspxCatalogPayload,
-                        Type = "string",
+                        Type = StringPropertyType,
                         Value = platformAspxCatalogPayload,
                     });
             }
         }
 
+        /// <summary>Appends a Boolean property using the existing request type and value serialization contract.</summary>
         private static void AddBool(StartRequest request, string property, bool value)
         {
             request.Properties.Add(new PropertyRequest
             {
                 Property = property,
-                Type = "bool",
+                Type = BooleanPropertyType,
                 Value = value.ToString(),
             });
         }

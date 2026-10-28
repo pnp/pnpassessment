@@ -12,7 +12,7 @@ internal sealed class ClassicAspxItemBinding
     public int ItemId { get; set; }
     // Supplementary observation only: missing ItemGuid never prevents a real integer item-key binding.
     public Guid? ItemGuid { get; set; }
-    public string ItemGuidReadState { get; set; } = "NotAttempted";
+    public string ItemGuidReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     public string? SiteUrl { get; set; }
     public string? WebUrl { get; set; }
     public string? ItemUrl { get; set; }

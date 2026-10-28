@@ -11,9 +11,15 @@ namespace PnP.Scanning.Core.Tests.Storage;
 
 public sealed class ClassicAspxInventorySchemaTests
 {
+    /// <summary>
+    /// Creates an EF context over the caller-owned SQLite connection so separate contexts verify the same migrated schema.
+    /// </summary>
     private static ScanContext Context(SqliteConnection connection) =>
         new(new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options);
 
+    /// <summary>
+    /// Creates tenant-file inventory from real site and file GUIDs with intentionally independent web and URL metadata.
+    /// </summary>
     private static ClassicAspxInventory Tenant(Guid scan, Guid site, Guid file) => new()
     {
         ScanId = scan, AspxKey = ClassicAspxInventory.CreateTenantFileKey(site, file),
@@ -24,6 +30,9 @@ public sealed class ClassicAspxInventorySchemaTests
         ProvenanceJson = "[]", FirstObservedAtUtc = DateTime.UtcNow, ObservedAtUtc = DateTime.UtcNow
     };
 
+    /// <summary>
+    /// Creates a versioned catalog identity with complete frozen-reference metadata and no invented tenant-file identifiers.
+    /// </summary>
     private static ClassicAspxInventory Platform(Guid scan) => new()
     {
         ScanId = scan, IdentityKind = ClassicAspxIdentityKinds.PlatformCatalog, IdentityVersion = 1,
@@ -34,6 +43,9 @@ public sealed class ClassicAspxInventorySchemaTests
         ProvenanceJson = "[]", FirstObservedAtUtc = DateTime.UtcNow, ObservedAtUtc = DateTime.UtcNow
     };
 
+    /// <summary>
+    /// Creates a renderer binding keyed by real site, web, list, and integer item scope while leaving the supplementary item GUID unavailable.
+    /// </summary>
     private static ClassicAspxItemBinding Binding(ClassicAspxInventory inventory, Guid web, Guid list, int item) => new()
     {
         ScanId = inventory.ScanId, AspxKey = inventory.AspxKey,
@@ -42,6 +54,9 @@ public sealed class ClassicAspxInventorySchemaTests
         BindingProvenanceJson = "[]", ObservedAtUtc = DateTime.UtcNow
     };
 
+    /// <summary>
+    /// Requires tenant identity to depend only on nonempty site-collection and file GUIDs, not mutable paths or worker webs.
+    /// </summary>
     [Fact]
     public void TenantKeyUsesRealSiteAndFileGuidsNotWebOrPath()
     {
@@ -56,6 +71,9 @@ public sealed class ClassicAspxInventorySchemaTests
         missingSite.Should().Throw<ArgumentException>(); missingFile.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Keeps platform identity independent of web context while distinguishing frozen catalog versions and digests.
+    /// </summary>
     [Fact]
     public void PlatformKeyUsesFrozenDeploymentAndEntryNeverWeb()
     {
@@ -68,6 +86,9 @@ public sealed class ClassicAspxInventorySchemaTests
         missing.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Persists an unbound physical ASPX file without fabricating a backing item relation.
+    /// </summary>
     [Fact]
     public async Task RootAspxWithoutBackingItemHasOneInventoryAndNoInventedBinding()
     {
@@ -78,6 +99,9 @@ public sealed class ClassicAspxInventorySchemaTests
         (await context.ClassicAspxItemBindings.CountAsync()).Should().Be(0);
     }
 
+    /// <summary>
+    /// Persists one renderer with one hundred integer item identities even when every supplementary item GUID is unavailable.
+    /// </summary>
     [Fact]
     public async Task OneRendererHasOneHundredRealIntegerBindingsWithoutSupplementaryItemGuids()
     {
@@ -92,6 +116,9 @@ public sealed class ClassicAspxInventorySchemaTests
         bindings.Should().OnlyContain(b => b.ItemGuid == null && b.ItemGuidReadState == "Unavailable");
     }
 
+    /// <summary>
+    /// Round-trips combined renderer reasons and their provenance on one normalized binding key.
+    /// </summary>
     [Fact]
     public async Task SourceFlagsAndProvenanceMergeWithoutMultiplyingTheKey()
     {
@@ -106,6 +133,9 @@ public sealed class ClassicAspxInventorySchemaTests
         saved.BindingProvenanceJson.Should().Be(binding.BindingProvenanceJson);
     }
 
+    /// <summary>
+    /// Preserves nullable handler evidence, read failures, coverage, provenance, and observation timestamps through SQLite round trips.
+    /// </summary>
     [Fact]
     public async Task NullableHandlerSourceDefaultAndCoverageEvidenceRoundTrip()
     {
@@ -129,6 +159,9 @@ public sealed class ClassicAspxInventorySchemaTests
         (await context.ClassicAspxInventories.SingleAsync()).HandlerDefaultProvenance.Should().Be("known-family-default");
     }
 
+    /// <summary>
+    /// Requires database primary keys to reject both duplicate inventory and duplicate normalized item bindings.
+    /// </summary>
     [Fact]
     public async Task PrimaryKeysRejectDuplicateInventoryAndNormalizedBinding()
     {
@@ -147,6 +180,9 @@ public sealed class ClassicAspxInventorySchemaTests
         }
     }
 
+    /// <summary>
+    /// Enforces physical-file uniqueness even if a duplicate row changes its free-text key and URL.
+    /// </summary>
     [Fact]
     public async Task PhysicalFileUniquenessIsNotAUrlOrFreeTextKeyMultiplicity()
     {
@@ -159,6 +195,9 @@ public sealed class ClassicAspxInventorySchemaTests
         Func<Task> insert = () => duplicate.SaveChangesAsync(); await insert.Should().ThrowAsync<DbUpdateException>();
     }
 
+    /// <summary>
+    /// Rejects a binding whose scan scope differs from the inventory referenced by its ASPX key.
+    /// </summary>
     [Fact]
     public async Task CompositeForeignKeyRejectsCrossAssessmentResource()
     {
@@ -169,6 +208,9 @@ public sealed class ClassicAspxInventorySchemaTests
         Func<Task> insert = () => wrong.SaveChangesAsync(); await insert.Should().ThrowAsync<DbUpdateException>();
     }
 
+    /// <summary>
+    /// Enforces nonempty site, web, and list GUIDs and a positive integer item ID at the database boundary.
+    /// </summary>
     [Theory]
     [InlineData("SiteCollectionId")]
     [InlineData("WebId")]
@@ -186,6 +228,9 @@ public sealed class ClassicAspxInventorySchemaTests
         context.Add(inventory); context.Add(binding); Func<Task> insert = () => context.SaveChangesAsync(); await insert.Should().ThrowAsync<DbUpdateException>();
     }
 
+    /// <summary>
+    /// Rejects catalog rows with missing frozen-reference fields instead of allowing SQL NULL semantics to bypass a check constraint.
+    /// </summary>
     [Theory]
     [InlineData("CatalogSource")]
     [InlineData("CatalogVersion")]
@@ -203,6 +248,9 @@ public sealed class ClassicAspxInventorySchemaTests
         context.Add(inventory); Func<Task> insert = () => context.SaveChangesAsync(); await insert.Should().ThrowAsync<DbUpdateException>();
     }
 
+    /// <summary>
+    /// Persists one unbound platform identity without tenant GUIDs and leaves its observed coverage unknown.
+    /// </summary>
     [Fact]
     public async Task PlatformHasNoInventedTenantGuidAndNoPerWebMultiplication()
     {
@@ -214,6 +262,9 @@ public sealed class ClassicAspxInventorySchemaTests
         row.CoverageState.Should().Be("Unknown");
     }
 
+    /// <summary>
+    /// Checks mapped table names, composite keys, the inventory foreign key, and nullable supplementary item GUID against the approved schema.
+    /// </summary>
     [Fact]
     public void SchemaUsesApprovedKeysAndNullableSupplementaryItemGuid()
     {
@@ -227,6 +278,9 @@ public sealed class ClassicAspxInventorySchemaTests
         binding.GetForeignKeys().Single().Properties.Select(p => p.Name).Should().Equal("ScanId", "AspxKey");
     }
 
+    /// <summary>
+    /// Upgrades, downgrades, and reapplies the generated migration without losing legacy pages or backfilling normalized inventory.
+    /// </summary>
     [Fact]
     public async Task ToolGeneratedMigrationUpgradeDowngradePreservesLegacyRowsWithoutBackfill()
     {
@@ -245,6 +299,9 @@ public sealed class ClassicAspxInventorySchemaTests
         (await context.ClassicPages.CountAsync()).Should().Be(1); (await context.ClassicAspxInventories.CountAsync()).Should().Be(0);
     }
 
+    /// <summary>
+    /// Requires the generated model snapshot to match the runtime model without pending schema changes.
+    /// </summary>
     [Fact]
     public void GeneratedSnapshotHasNoPendingModelChanges()
     {

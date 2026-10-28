@@ -15,6 +15,7 @@ namespace PnP.Scanning.Core.Services
 {
     internal sealed class SiteEnumerationManager
     {
+        private const string TemplatePolicyObservationVersion = "M1TemplateExclusions/v1";
         private readonly IPnPContextFactory contextFactory;
 
         public SiteEnumerationManager(StorageManager storageManager, IPnPContextFactory pnpContextFactory)
@@ -25,6 +26,7 @@ namespace PnP.Scanning.Core.Services
 
         internal StorageManager StorageManager { get; private set; }
 
+        /// <summary>Builds the declared or tenant-authoritative site selection and retains enumeration failures and home-page scope evidence without claiming an empty tenant.</summary>
         internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback,
             ICollection<ClassicPageDiscovery> discoveryEvidence = null)
         {
@@ -81,38 +83,38 @@ namespace PnP.Scanning.Core.Services
 
                 try
                 {
-                using (var context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
-                                                                        new ExternalAuthenticationProvider((resourceUri, scopes) =>
-                                                                        {
-                                                                            return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
-                                                                        }
-                    )))
-                {
-                    // Page discovery must not widen the existing non-personal scan scope.
-                    VanityUrlOptions vanityUrlOptions = null;
-
-                    Log.Information("Vanity URLs passed in: my site host {MySiteHostUrl} and tenant admin {AdminCenterUrl}", start.MySiteHostUrl, start.AdminCenterUrl);
-
-                    if (!string.IsNullOrEmpty(start.MySiteHostUrl) && !string.IsNullOrEmpty(start.AdminCenterUrl))
+                    using (var context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
+                                                                            new ExternalAuthenticationProvider((resourceUri, scopes) =>
+                                                                            {
+                                                                                return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
+                                                                            }
+                        )))
                     {
-                        vanityUrlOptions = new VanityUrlOptions
+                        // Page discovery must not widen the existing non-personal scan scope.
+                        VanityUrlOptions vanityUrlOptions = null;
+
+                        Log.Information("Vanity URLs passed in: my site host {MySiteHostUrl} and tenant admin {AdminCenterUrl}", start.MySiteHostUrl, start.AdminCenterUrl);
+
+                        if (!string.IsNullOrEmpty(start.MySiteHostUrl) && !string.IsNullOrEmpty(start.AdminCenterUrl))
                         {
-                            AdminCenterUri = new Uri(start.AdminCenterUrl),
-                            MySiteHostUri = new Uri(start.MySiteHostUrl)
-                        };
+                            vanityUrlOptions = new VanityUrlOptions
+                            {
+                                AdminCenterUri = new Uri(start.AdminCenterUrl),
+                                MySiteHostUri = new Uri(start.MySiteHostUrl)
+                            };
 
-                        Log.Information("VanityUrlOptions instance populated");
-                    }
+                            Log.Information("VanityUrlOptions instance populated");
+                        }
 
-                    var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
-                        // M1 admission is template-based, not a hard-wired personal-host filter.
-                        filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
-                        vanityUrlOptions: vanityUrlOptions);
-                    foreach(var siteCollection in siteCollections)
-                    {
-                        list.Add(siteCollection.Url.ToString());
+                        var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
+                            // M1 admission is template-based, not a hard-wired personal-host filter.
+                            filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
+                            vanityUrlOptions: vanityUrlOptions);
+                        foreach (var siteCollection in siteCollections)
+                        {
+                            list.Add(siteCollection.Url.ToString());
+                        }
                     }
-                }
 
                 }
                 catch (Exception ex) when (fullPageDiscovery && ex is not OperationCanceledException)
@@ -168,7 +170,7 @@ namespace PnP.Scanning.Core.Services
                     discoveryEvidence.Add(new ClassicPageDiscovery
                     {
                         RecordKey = "assessment:page-selection", RowType = "Scope", ScopeType = "PageSelection",
-                        Url = "WelcomePage", DiscoveryStatus = "Complete", ObservationMethod = "HomePageOnly",
+                        Url = "WelcomePage", DiscoveryStatus = "Complete", ObservationMethod = ClassicAspxProjectionContract.HomePageOnly,
                         ObservedAtUtc = DateTime.UtcNow,
                     });
                 }
@@ -177,6 +179,7 @@ namespace PnP.Scanning.Core.Services
             return list;
         }
 
+        /// <summary>Replays pending checkpoints or enumerates all webs before applying each observed template policy, retaining excluded-parent child independence.</summary>
         internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
@@ -224,9 +227,9 @@ namespace PnP.Scanning.Core.Services
                             RecordKey = "m1:template-policy:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                                 System.Text.Encoding.UTF8.GetBytes(absolute.ToLowerInvariant()))).ToLowerInvariant(),
                             RowType = "Scope", ScopeType = "WebTemplatePolicy",
-                            ObservationMethod = "M1TemplateExclusions/v1",
+                            ObservationMethod = TemplatePolicyObservationVersion,
                             DiscoveryStatus = !known ? "Unknown" : excluded ? "PolicyExcluded" : "Complete",
-                            EvidenceJson = JsonSerializer.Serialize(new { policyVersion = "M1TemplateExclusions/v1", policy = policy.CanonicalValue, template = web.WebTemplate, templateObserved = known, excluded }),
+                            EvidenceJson = JsonSerializer.Serialize(new { policyVersion = TemplatePolicyObservationVersion, policy = policy.CanonicalValue, template = web.WebTemplate, templateObserved = known, excluded }),
                             ObservedAtUtc = DateTime.UtcNow,
                         });
                         if (!excluded) webUrlsToScan.Add(web);
@@ -283,6 +286,7 @@ namespace PnP.Scanning.Core.Services
         }
 
 
+        /// <summary>Returns the root web and enumerated descendants as site-relative locators, preserving the caller-selected app-web enumeration policy.</summary>
         private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context, bool skipAppWebs = true)
         {
             List<EnumeratedWeb> webs = new();
@@ -297,7 +301,7 @@ namespace PnP.Scanning.Core.Services
             // Get the sub webs from the root web of the site collection
             var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync(skipAppWebs: skipAppWebs);
 
-            foreach(var enumeratedWeb in enumeratedWebs)
+            foreach (var enumeratedWeb in enumeratedWebs)
             {
                 // Turn server relative url into a site relative url
                 string webUrl;

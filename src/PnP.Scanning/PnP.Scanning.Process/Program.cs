@@ -24,6 +24,7 @@ namespace PnP.Scanning.Process
 {
     internal class Program
     {
+        /// <summary>Runs interactive or one-shot CLI commands, or starts the scanner host; DEBUG scanner startup retains the explicit wait for external debugger attachment.</summary>
         internal static async Task Main(string[] args)
         {
             bool isCliProcess = true;

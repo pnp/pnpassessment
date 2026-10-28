@@ -8,12 +8,14 @@ namespace PnP.Scanning.Core.Scanners;
 
 internal static class ClassicPageDiscoveryComponent
 {
+    /// <summary>Owns a temporary web context while running Classic discovery and native M1 acquisition for the scheduled web.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner)
     {
         using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
         return await ExecuteAsync(scanner, context).ConfigureAwait(false);
     }
 
+    /// <summary>Uses the shared web context to persist raw acquisition evidence before normalized projection writes, retaining fatal storage failures.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner,
         PnP.Core.Services.PnPContext context, SharePointListMetadataSnapshot sharedLists = null)
     {
@@ -54,18 +56,25 @@ internal static class ClassicPageDiscoveryComponent
                     evidence.SiteUrl = scanner.SiteUrl;
                     evidence.WebUrl = scanner.WebUrl;
                 }
-                if (batch.Evidence.Count != 0) await writer.WriteAsync(batch.Evidence, cancellation).ConfigureAwait(false);
+                if (batch.Evidence.Count != 0)
+                {
+                    await writer.WriteAsync(batch.Evidence, cancellation).ConfigureAwait(false);
+                }
                 await projection.WriteAsync(batch.Inventory, batch.Bindings, cancellation).ConfigureAwait(false);
             }, token).ConfigureAwait(false);
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }
 
+    /// <summary>Persists original web-enumeration authority without replacing retained evidence with the pending checkpoint replay queue.</summary>
     internal static async Task RecordWebEnumerationScopeAsync(Guid scanId, string siteUrl,
         WebEnumerationResult enumeration, Exception error = null, AssessmentDiscoveryWriter writer = null)
     {
         // The checkpoint contains only pending work. Do not replace the original authority's
         // child counts (or a retained denial/failure) with the size of this restart queue.
-        if (enumeration.IsCheckpointReplay && error == null) return;
+        if (enumeration.IsCheckpointReplay && error == null)
+        {
+            return;
+        }
         var sink = writer ?? new AssessmentDiscoveryWriter(scanId);
         if (enumeration.ScopeEvidence is { Count: > 0 })
             await sink.WriteAsync(enumeration.ScopeEvidence).ConfigureAwait(false);
@@ -74,6 +83,7 @@ internal static class ClassicPageDiscoveryComponent
             error, children: error == null ? enumeration.Webs.Count : null, stage: "EnumerateWebs", writer: sink).ConfigureAwait(false);
     }
 
+    /// <summary>Creates one durable scope observation with optional failure evidence and writes it through the assessment sink.</summary>
     internal static Task RecordScopeAsync(Guid scanId, string siteUrl, string webUrl, string scopeType,
         string status, Exception error = null, int? children = null, string stage = "Discovery",
         AssessmentDiscoveryWriter writer = null)

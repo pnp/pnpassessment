@@ -6,6 +6,7 @@ namespace PnP.Scanning.Core.Scanners
     {
         internal string Mode { get; set; }
 
+        /// <summary>Restores the selected scanner options from request properties, including the frozen Classic template policy and catalog payload without changing defaults.</summary>
         internal static OptionsBase FromScannerInput(StartRequest request)
         {
             var options = NewOptions(request.Mode);

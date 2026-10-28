@@ -22,6 +22,9 @@ namespace PnP.Scanning.Core.Tests.Storage
             this.fixture = fixture;
         }
 
+        /// <summary>
+        /// Upgrades legacy page and discovery rows with unknown customization metadata, preserving existing facts through downgrade and re-upgrade.
+        /// </summary>
         [Fact]
         public async Task Customization_migration_preserves_existing_pages_with_unknown_statuses()
         {

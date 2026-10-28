@@ -9,9 +9,15 @@ namespace PnP.Scanning.Core.Tests.Discovery.M1;
 
 public sealed class AspxHandlerParserTests
 {
+    /// <summary>
+    /// Parses complete UTF-8 file bytes so lexer cases exercise source evidence rather than rendered HTML.
+    /// </summary>
     private static AspxHandlerEvidence Parse(string text) => AspxHandlerParser.Parse(
         Encoding.UTF8.GetBytes(text), AspxHandlerSourceKind.ActualFileBytes, true);
 
+    /// <summary>
+    /// Checks that unusable evidence retains its reason and optional raw declaration without claiming an effective handler.
+    /// </summary>
     private static void AssertUnknown(AspxHandlerEvidence result, AspxHandlerParseState state, string expectedRawDeclaration = null)
     {
         Assert.Equal(state, result.ParseState);
@@ -22,6 +28,9 @@ public sealed class AspxHandlerParserTests
         Assert.NotEmpty(result.ReasonCode);
     }
 
+    /// <summary>
+    /// Accepts Page directive casing, quoting, and whitespace variations while preserving the literal declared handler.
+    /// </summary>
     [Theory]
     [InlineData("<%@ Page Inherits=\"Example.Handler\" %>")]
     [InlineData("<%@pAgE iNhErItS='Example.Handler'%>")]
@@ -39,6 +48,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal(AspxHandlerDefaultProvenance.None, result.DefaultProvenance);
     }
 
+    /// <summary>
+    /// Keeps CLR spelling and assembly-qualified text intact; normalization removes only surrounding whitespace.
+    /// </summary>
     [Fact]
     public void Normalization_only_trims_and_does_not_change_clr_case_or_load_an_assembly()
     {
@@ -49,6 +61,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal(literal.Trim(), result.EffectiveInherits);
     }
 
+    /// <summary>
+    /// Decodes strict UTF-8 and BOM-marked UTF-16 in both byte orders without losing a Unicode handler name.
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -69,6 +84,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal("Example.页面", result.EffectiveInherits);
     }
 
+    /// <summary>
+    /// Labels the framework fallback as an unresolved configuration assumption only after reading complete actual source.
+    /// </summary>
     [Theory]
     [InlineData("")]
     [InlineData("<html><body>Actual source with no directive</body></html>")]
@@ -85,6 +103,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal(AspxHandlerDefaultProvenance.FrameworkDefaultAssumptionNotConfigResolved, result.DefaultProvenance);
     }
 
+    /// <summary>
+    /// Preserves unsuccessful read states and refuses to infer handlers even when supplied bytes contain a directive.
+    /// </summary>
     [Theory]
     [InlineData((int)AspxHandlerReadState.Denied)]
     [InlineData((int)AspxHandlerReadState.Unavailable)]
@@ -99,6 +120,9 @@ public sealed class AspxHandlerParserTests
         AssertUnknown(result, AspxHandlerParseState.NotParsed);
     }
 
+    /// <summary>
+    /// Rejects incomplete transfers before parsing, including prefixes that already look like complete directives.
+    /// </summary>
     [Theory]
     [InlineData("<%@ Page Language='C#' %>")]
     [InlineData("<%@ Page Inherits='Looks.Complete' %>")]
@@ -109,6 +133,9 @@ public sealed class AspxHandlerParserTests
         AssertUnknown(result, AspxHandlerParseState.NotParsed);
     }
 
+    /// <summary>
+    /// Retains unsupported evidence provenance instead of treating rendered HTML or a locator as actual file bytes.
+    /// </summary>
     [Theory]
     [InlineData((int)AspxHandlerSourceKind.Unknown)]
     [InlineData((int)AspxHandlerSourceKind.RenderedHtml)]
@@ -121,6 +148,9 @@ public sealed class AspxHandlerParserTests
         AssertUnknown(result, AspxHandlerParseState.UnsupportedSource);
     }
 
+    /// <summary>
+    /// Distinguishes absent bytes from a successfully read empty file, preventing an invented framework fallback.
+    /// </summary>
     [Fact]
     public void Missing_bytes_are_unavailable_not_an_empty_complete_file()
     {
@@ -129,6 +159,9 @@ public sealed class AspxHandlerParserTests
         AssertUnknown(result, AspxHandlerParseState.NotParsed);
     }
 
+    /// <summary>
+    /// Ignores directive-shaped text inside server comments, code, and strings but still recognizes a later real directive.
+    /// </summary>
     [Theory]
     [InlineData("<%-- <%@ Page Inherits='Fake.Handler' %> --%>")]
     [InlineData("<% var text = \"<%@ Page Inherits='Fake.Handler' %>\"; %>")]
@@ -147,6 +180,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal(AspxHandlerDefaultProvenance.None, declared.DefaultProvenance);
     }
 
+    /// <summary>
+    /// Skips a directive embedded in a C# raw string so only the following source directive supplies the handler.
+    /// </summary>
     [Fact]
     public void A_raw_server_string_cannot_inject_a_page_directive()
     {
@@ -156,6 +192,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal("Real.Handler", result.EffectiveInherits);
     }
 
+    /// <summary>
+    /// Separates Control and Page directives so a control type cannot become the page handler.
+    /// </summary>
     [Fact]
     public void A_control_inherits_is_not_mistaken_for_page_inherits()
     {
@@ -163,6 +202,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal("Example.Page", result.DeclaredInherits);
     }
 
+    /// <summary>
+    /// Keeps ASP token recognition inside HTML comments distinct from server-comment suppression.
+    /// </summary>
     [Fact]
     public void Html_comments_are_not_server_comments_and_do_not_hide_an_asp_token()
     {
@@ -170,6 +212,9 @@ public sealed class AspxHandlerParserTests
         Assert.Equal("Example.Page", result.DeclaredInherits);
     }
 
+    /// <summary>
+    /// Reports the precise malformed-source reason and withholds normalized or default handlers for ambiguous declarations.
+    /// </summary>
     [Theory]
     [InlineData("<%@ Page Inherits='A'", "UnclosedDirective")]
     [InlineData("<%@ Page Inherits=\"A %>", "UnclosedOrMalformedDirectiveValue")]
@@ -193,12 +238,18 @@ public sealed class AspxHandlerParserTests
         Assert.Equal(reason, result.ReasonCode);
     }
 
+    /// <summary>
+    /// Invalidates otherwise plausible handler evidence when later source contains an unterminated server construct.
+    /// </summary>
     [Fact]
     public void Damage_after_a_declared_directive_does_not_become_a_successful_handler_fact()
     {
         AssertUnknown(Parse("<%@ Page Inherits='Example.Page' %><%--"), AspxHandlerParseState.Malformed);
     }
 
+    /// <summary>
+    /// Supplies invalid byte sequences, unsupported BOMs, replacement characters, and unmarked UTF-16 for decoder rejection.
+    /// </summary>
     public static IEnumerable<object[]> InvalidBytes()
     {
         yield return new object[] { new byte[] { 0xc3, 0x28 } }; // invalid UTF-8
@@ -213,6 +264,9 @@ public sealed class AspxHandlerParserTests
         yield return new object[] { Encoding.Unicode.GetBytes("<%@ Page Inherits='Hidden.By.Nulls' %>") }; // missing BOM
     }
 
+    /// <summary>
+    /// Requires damaged or unsupported encodings to yield diagnostic evidence without a declared handler or fallback.
+    /// </summary>
     [Theory]
     [MemberData(nameof(InvalidBytes))]
     public void Damaged_or_unsupported_encoding_cannot_produce_a_handler_or_default(byte[] bytes)

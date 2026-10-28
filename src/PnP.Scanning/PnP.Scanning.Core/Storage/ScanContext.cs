@@ -134,6 +134,7 @@ namespace PnP.Scanning.Core.Storage
             base.OnConfiguring(optionsBuilder);
         }
 
+        /// <summary>Configures existing compound keys, normalized ASPX relations, and storage indexes without backfilling observations or deriving facts from migration.</summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Extend the model defined via annotations, typically used for defining compound keys

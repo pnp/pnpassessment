@@ -72,6 +72,9 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Reuses the real SDK list projection for content-type item pages, preserving item evidence without another all-lists request.
+    /// </summary>
     [Fact]
     public async Task Real_sdk_shared_projection_preserves_content_type_item_pages_without_duplicate_all_lists_get()
     {

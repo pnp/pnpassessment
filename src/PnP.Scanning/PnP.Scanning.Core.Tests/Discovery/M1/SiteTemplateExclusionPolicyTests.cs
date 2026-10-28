@@ -6,6 +6,9 @@ namespace PnP.Scanning.Core.Tests.Discovery.M1;
 
 public class SiteTemplateExclusionPolicyTests
 {
+    /// <summary>
+    /// Applies personal-site and app-web defaults only when the exclusion option is absent.
+    /// </summary>
     [Theory]
     [InlineData("SPSPERS#0", true)]
     [InlineData("SPSPERS#10", true)]
@@ -15,6 +18,9 @@ public class SiteTemplateExclusionPolicyTests
     public void MissingOptionUsesPersonalAndAppDefaults(string template, bool excluded) =>
         SiteTemplateExclusionPolicy.Parse(null).IsExcluded(template).Should().Be(excluded);
 
+    /// <summary>
+    /// Treats an explicit exclusion list as the complete policy rather than appending built-in defaults.
+    /// </summary>
     [Fact]
     public void ExplicitListReplacesRatherThanExtendsDefaults()
     {
@@ -24,6 +30,9 @@ public class SiteTemplateExclusionPolicyTests
         policy.IsExcluded("APP#0").Should().BeFalse();
     }
 
+    /// <summary>
+    /// Accepts a sole case-insensitive none token as an explicit empty policy and canonicalizes its stored value.
+    /// </summary>
     [Fact]
     public void SoleNoneClearsEveryDefault()
     {
@@ -34,6 +43,9 @@ public class SiteTemplateExclusionPolicyTests
         policy.IsExcluded("APP#0").Should().BeFalse();
     }
 
+    /// <summary>
+    /// Rejects empty, mixed-none, malformed, and URL-shaped explicit policies instead of reverting silently to defaults.
+    /// </summary>
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -47,6 +59,9 @@ public class SiteTemplateExclusionPolicyTests
         parse.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Normalizes, orders, and deduplicates patterns while preserving the policy through canonical-value parsing.
+    /// </summary>
     [Fact]
     public void CanonicalValueRoundTripsAndDeduplicates()
     {
@@ -55,6 +70,9 @@ public class SiteTemplateExclusionPolicyTests
         policy.Patterns.Should().Equal("APP#*", "STS#3");
     }
 
+    /// <summary>
+    /// Reports a missing template as unevaluable without asserting that the web is excluded.
+    /// </summary>
     [Fact]
     public void MissingTemplateIsUnknownRatherThanExcluded()
     {
@@ -62,6 +80,9 @@ public class SiteTemplateExclusionPolicyTests
         excluded.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Evaluates each template independently so excluding one parent template does not exclude a different child template.
+    /// </summary>
     [Fact]
     public void ExcludedParentDoesNotExcludeDifferentChildTemplate()
     {

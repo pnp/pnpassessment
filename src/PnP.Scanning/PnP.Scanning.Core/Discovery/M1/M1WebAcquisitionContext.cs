@@ -7,7 +7,7 @@ internal sealed record M1WebAcquisitionContext(
     Guid ScanId, Guid SiteCollectionId, Guid WebId, Uri SiteUrl, Uri WebUrl,
     ClassicOptions Options, PlatformAspxCatalog Catalog = null,
     int BatchSize = 128, int MaxCollectionPages = 10000, int MaxFileBytes = 2097152,
-    TimeSpan? FileReadTimeout = null, string AuthorityRevision = "M1/v1",
+    TimeSpan? FileReadTimeout = null, string AuthorityRevision = ClassicAspxProjectionContract.Version,
     int MaxContentTypes = 4096, int MaxResourceCacheEntries = 2048);
 
 /// <summary>Bounded incremental observations, not a complete-universe in-memory projection.</summary>

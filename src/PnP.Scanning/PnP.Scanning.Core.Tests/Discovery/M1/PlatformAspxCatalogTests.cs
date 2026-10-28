@@ -8,9 +8,15 @@ namespace PnP.Scanning.Core.Tests.Discovery.M1;
 
 public class PlatformAspxCatalogTests
 {
+    /// <summary>
+    /// Builds synthetic versioned catalog bytes around caller-supplied entries, keeping test wire metadata independent of production constants.
+    /// </summary>
     private static byte[] Catalog(string entries) => Encoding.UTF8.GetBytes("{\"schemaVersion\":\"platform-aspx-catalog/v1\",\"catalogVersion\":\"public-test-v1\",\"source\":\"synthetic-test\",\"entries\":[" + entries + "]}");
     private const string Member = "{\"id\":\"zero-binding\",\"deploymentIdentity\":\"synthetic-deployment\",\"culture\":\"neutral\",\"path\":\"/_layouts/15/example.aspx\"}";
 
+    /// <summary>
+    /// Freezes the input digest, version, and source across caller-buffer mutation and payload restoration.
+    /// </summary>
     [Fact]
     public void ExactInputBytesVersionAndDigestAreFrozen()
     {
@@ -25,6 +31,9 @@ public class PlatformAspxCatalogTests
         restored.Source.Should().Be("synthetic-test");
     }
 
+    /// <summary>
+    /// Keeps an unreferenced catalog entry available for inventory without inventing handler evidence.
+    /// </summary>
     [Fact]
     public void UnreferencedMemberRemainsAnInventoryCandidate()
     {
@@ -35,6 +44,9 @@ public class PlatformAspxCatalogTests
         entry.HandlerEvidenceSource.Should().BeNull();
     }
 
+    /// <summary>
+    /// Preserves separate identities and path resolution for legacy and versioned layout hives.
+    /// </summary>
     [Fact]
     public void LayoutHivesRemainDistinctIdentities()
     {
@@ -46,6 +58,9 @@ public class PlatformAspxCatalogTests
         catalog.ResolvePath("/_layouts/15/example.aspx").Should().ContainSingle();
     }
 
+    /// <summary>
+    /// Rejects unsupported layout namespaces and noncanonical locators rather than fabricating a platform identity.
+    /// </summary>
     [Theory]
     [InlineData("/_layouts/16/example.aspx")]
     [InlineData("/_layouts/14/example.aspx")]
@@ -62,6 +77,9 @@ public class PlatformAspxCatalogTests
         parse.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Rejects an alias crossing layout hives so distinct deployment identities cannot collapse.
+    /// </summary>
     [Fact]
     public void AliasCannotCollapseDifferentHives()
     {
@@ -70,6 +88,9 @@ public class PlatformAspxCatalogTests
         parse.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Resolves an explicit same-hive alias to the existing versioned member instead of creating another identity.
+    /// </summary>
     [Fact]
     public void SameHiveAliasesResolveOneVersionedMember()
     {
@@ -78,6 +99,9 @@ public class PlatformAspxCatalogTests
         catalog.ResolvePath("/_layouts/15/alias.aspx").Single().AspxKey.Should().Be(catalog.Entries.Single().AspxKey);
     }
 
+    /// <summary>
+    /// Rejects case-insensitive duplicate catalog metadata rather than accepting whichever JSON property appears last.
+    /// </summary>
     [Fact]
     public void DuplicateJsonMetadataIsRejectedInsteadOfTakingLastValue()
     {
@@ -86,6 +110,9 @@ public class PlatformAspxCatalogTests
         parse.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Rejects duplicate member identities within one frozen catalog.
+    /// </summary>
     [Fact]
     public void DuplicateMemberIdentityIsRejected()
     {
@@ -93,6 +120,9 @@ public class PlatformAspxCatalogTests
         parse.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Requires a declared catalog handler to carry its own versioned evidence source, not merely a type name.
+    /// </summary>
     [Fact]
     public void HandlerReferenceNeedsItsOwnVersionedEvidenceSource()
     {

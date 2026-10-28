@@ -9,11 +9,13 @@ internal sealed class SiteTemplateExclusionPolicy
     internal const string Cleared = "none";
     private readonly string[] patterns;
 
+    /// <summary>Retains the canonical per-scan pattern array used by exclusion evaluation.</summary>
     private SiteTemplateExclusionPolicy(string[] patterns) => this.patterns = patterns;
 
     internal IReadOnlyList<string> Patterns => Array.AsReadOnly(patterns);
     internal string CanonicalValue => patterns.Length == 0 ? Cleared : string.Join(',', patterns);
 
+    /// <summary>Validates and canonicalizes bounded template patterns, using defaults for null and the sole none token to clear them.</summary>
     internal static SiteTemplateExclusionPolicy Parse(string value)
     {
         value ??= DefaultPatterns;
@@ -39,10 +41,14 @@ internal sealed class SiteTemplateExclusionPolicy
     internal bool TryEvaluate(string template, out bool excluded)
     {
         excluded = false;
-        if (string.IsNullOrWhiteSpace(template)) return false;
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            return false;
+        }
         excluded = patterns.Any(pattern => FileSystemName.MatchesSimpleExpression(pattern, template.Trim(), ignoreCase: true));
         return true;
     }
 
+    /// <summary>Reports an exclusion only when the observed template can be evaluated and matches a frozen pattern.</summary>
     internal bool IsExcluded(string template) => TryEvaluate(template, out var excluded) && excluded;
 }

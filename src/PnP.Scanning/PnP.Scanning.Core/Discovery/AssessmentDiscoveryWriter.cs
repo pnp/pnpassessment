@@ -95,6 +95,7 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    /// <summary>Streams ordered scan/web page observations in bounded keyset batches, disposing each database reader before yielding rows to acquisition.</summary>
     internal async IAsyncEnumerable<ClassicPageDiscovery> ReadPageStreamAsync(Guid scanId, string siteUrl, string webUrl,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -109,10 +110,16 @@ internal sealed class AssessmentDiscoveryWriter
                     (after == null || string.Compare(row.RecordKey, after) > 0))
                     .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
             }
-            if (batch.Count == 0) yield break;
+            if (batch.Count == 0)
+            {
+                yield break;
+            }
             after = batch[^1].RecordKey;
             // No live SQLite reader is held while a source read or a projection write awaits.
-            foreach (var row in batch) yield return row;
+            foreach (var row in batch)
+            {
+                yield return row;
+            }
         }
     }
 

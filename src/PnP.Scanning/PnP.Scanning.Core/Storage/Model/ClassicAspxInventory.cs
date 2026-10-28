@@ -23,13 +23,13 @@ internal sealed class ClassicAspxInventory
     public string? ContentTypeId { get; set; }
     public string? CustomizedPageStatus { get; set; }
     public string? SetupPath { get; set; }
-    public string FileReadState { get; set; } = "NotAttempted";
+    public string FileReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     public string? FileErrorCodes { get; set; }
     public string? FileErrorDetail { get; set; }
     public string? HandlerDeclaredType { get; set; }
     public string? HandlerNormalizedType { get; set; }
     public string? HandlerEffectiveType { get; set; }
-    public string HandlerReadState { get; set; } = "NotAttempted";
+    public string HandlerReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     public string HandlerParseState { get; set; } = "NotAttempted";
     public string? HandlerSource { get; set; }
     public string? HandlerDefaultProvenance { get; set; }
@@ -41,10 +41,11 @@ internal sealed class ClassicAspxInventory
     public string? CatalogDigest { get; set; }
     public string? CatalogEntryKey { get; set; }
     public string ProvenanceJson { get; set; } = "[]";
-    public string CoverageState { get; set; } = "Unknown";
+    public string CoverageState { get; set; } = ClassicAspxCoverageStates.Unknown;
     public DateTime FirstObservedAtUtc { get; set; }
     public DateTime ObservedAtUtc { get; set; }
 
+    /// <summary>Creates a versioned physical-file key only from observed nonempty site-collection and file GUIDs, never from a web or URL.</summary>
     internal static string CreateTenantFileKey(Guid siteCollectionId, Guid fileUniqueId)
     {
         if (siteCollectionId == Guid.Empty || fileUniqueId == Guid.Empty)
