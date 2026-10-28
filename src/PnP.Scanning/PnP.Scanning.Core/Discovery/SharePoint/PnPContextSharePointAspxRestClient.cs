@@ -12,27 +12,84 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
 {
     private readonly PnPContext context;
     private readonly bool ownsContext;
+    private readonly HttpClient jsonTransport;
+    private readonly HttpClient fileContentClient = new(new HttpClientHandler
+    { AllowAutoRedirect = false, UseCookies = false, UseDefaultCredentials = false });
 
-    internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true)
+    // Optional transport is explicitly borrowed; its owner (for example an offline SDK fixture)
+    // retains its lifetime. Production defaults to our owned no-redirect/no-cookie client.
+    internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true, HttpClient jsonTransport = null)
     {
         this.context = context ?? throw new ArgumentNullException(nameof(context));
         this.ownsContext = ownsContext;
+        this.jsonTransport = jsonTransport ?? fileContentClient;
     }
 
     public Uri WebUrl => context.Uri;
 
-    public async Task<SharePointRestPage> GetPageAsync(Uri requestUri,
-        CancellationToken cancellationToken = default)
+    public Task<SharePointFileContent> ReadFileContentAsync(string serverRelativeUrl, int maxBytes, TimeSpan timeout,
+        CancellationToken cancellationToken = default) => SharePointFileContentReader.ReadAsync(fileContentClient,
+            context.Uri, serverRelativeUrl, maxBytes, timeout,
+            (request, token) => context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request), cancellationToken);
+
+    public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
+        CancellationToken cancellationToken = default) => ReadBoundedPageAsync(jsonTransport, context.Uri,
+            requestUri, (request, token) => context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request),
+            cancellationToken: cancellationToken);
+
+    // Thin fake-HTTP seam; production always supplies the owned no-redirect/no-cookie client above.
+    internal static async Task<SharePointRestPage> ReadBoundedPageAsync(HttpClient client, Uri web, Uri uri,
+        Func<HttpRequestMessage, CancellationToken, Task> authenticate, int maxBytes = 4 * 1024 * 1024,
+        TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
-        using var request = CreateGetRequest(requestUri);
-        await context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request).ConfigureAwait(false);
-        using var response = await context.RestClient.Client.SendAsync(request,
-            HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        return SharePointRestResponseParser.Parse(requestUri, response.StatusCode, bytes,
-            response.Content.Headers.ContentType?.MediaType, Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
-            Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id"),
-            DateTimeOffset.UtcNow, attemptCount: 1, attemptLimit: 1);
+        SharePointFileContentReader.ValidateWeb(web);
+        if (uri == null || !uri.IsAbsoluteUri || uri.Scheme != "https" || !uri.IsDefaultPort ||
+            !string.Equals(uri.Authority, web.Authority, StringComparison.OrdinalIgnoreCase) ||
+            uri.UserInfo.Length != 0 || uri.Fragment.Length != 0 ||
+            !uri.AbsolutePath.StartsWith(web.AbsolutePath.TrimEnd('/') + "/_api/", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("JSON requests must stay in the authenticated web API.");
+        var budget = timeout ?? TimeSpan.FromSeconds(20);
+        if (maxBytes is < 1 or > 16 * 1024 * 1024 || budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(5))
+            throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        SharePointRestPage Failure(DiscoveryTerminalOutcome outcome, string code, HttpStatusCode status = 0) =>
+            new(uri, status, Array.Empty<JsonElement>(), null, DiscoveryHash.Of(code), "bounded-json-error", outcome,
+                code, SharePointSemanticDetectorResults.None, DateTimeOffset.UtcNow, AttemptCount: 1, AttemptLimit: 1);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(budget);
+        try
+        {
+            using var request = CreateGetRequest(uri);
+            await authenticate(request, deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
+            if ((int)response.StatusCode is >= 300 and <= 399 || response.RequestMessage?.RequestUri == null ||
+                !string.Equals(response.RequestMessage.RequestUri.AbsoluteUri, uri.AbsoluteUri, StringComparison.Ordinal))
+                return Failure(DiscoveryTerminalOutcome.Unknown, "json_redirect_or_response_uri_drift", response.StatusCode);
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
+                return Failure(DiscoveryTerminalOutcome.Denied, "json_http_denied", response.StatusCode);
+            long? length = response.Content.Headers.ContentLength;
+            if (length > maxBytes || response.StatusCode == HttpStatusCode.PartialContent)
+                return Failure(DiscoveryTerminalOutcome.Truncated, "json_response_size_or_partial", response.StatusCode);
+            using var buffer = new MemoryStream();
+            using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
+            byte[] chunk = new byte[Math.Min(maxBytes + 1, 8192)];
+            while (true)
+            {
+                int count = await stream.ReadAsync(chunk.AsMemory(0, Math.Min(chunk.Length, maxBytes + 1 - (int)buffer.Length)), deadline.Token).ConfigureAwait(false);
+                if (count == 0) break;
+                buffer.Write(chunk, 0, count);
+                if (buffer.Length > maxBytes) return Failure(DiscoveryTerminalOutcome.Truncated, "json_response_size_limit", response.StatusCode);
+            }
+            if (length.HasValue && length.Value != buffer.Length)
+                return Failure(DiscoveryTerminalOutcome.Truncated, "json_response_incomplete_body", response.StatusCode);
+            return SharePointRestResponseParser.Parse(uri, response.StatusCode, buffer.ToArray(),
+                response.Content.Headers.ContentType?.MediaType, Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
+                Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id"),
+                DateTimeOffset.UtcNow, attemptCount: 1, attemptLimit: 1);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) { return Failure(DiscoveryTerminalOutcome.Truncated, "json_response_timeout"); }
+        catch (IOException) { return Failure(DiscoveryTerminalOutcome.Truncated, "json_response_incomplete_stream"); }
+        catch (HttpRequestException) { return Failure(DiscoveryTerminalOutcome.Failed, "json_transport_failure"); }
     }
 
     internal static HttpRequestMessage CreateGetRequest(Uri requestUri)
@@ -196,6 +253,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
 
     public void Dispose()
     {
+        fileContentClient.Dispose();
         if (ownsContext) context.Dispose();
     }
 

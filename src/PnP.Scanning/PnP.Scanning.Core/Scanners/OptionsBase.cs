@@ -1,4 +1,4 @@
-﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -79,6 +79,14 @@ namespace PnP.Scanning.Core.Scanners
                     else if (property.Property == Constants.StartClassicHomePageOnly)
                     {
                         (options as ClassicOptions).HomePageOnly = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == Constants.StartExcludeSiteTemplates)
+                    {
+                        (options as ClassicOptions).ExcludeSiteTemplates = Discovery.M1.SiteTemplateExclusionPolicy.Parse(property.Value).CanonicalValue;
+                    }
+                    else if (property.Property == Constants.StartPlatformAspxCatalogPayload)
+                    {
+                        (options as ClassicOptions).PlatformAspxCatalogPayload = property.Value;
                     }
                     else if (property.Property == Constants.StartClassicAuditLogWindowDays)
                     {

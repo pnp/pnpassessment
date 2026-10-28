@@ -1,4 +1,4 @@
-﻿using PnP.Core.Admin.Model.SharePoint;
+using PnP.Core.Admin.Model.SharePoint;
 using PnP.Core.Auth;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.Services;
@@ -8,6 +8,8 @@ using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Linq.Expressions;
 using PnP.Scanning.Core.Discovery;
+using PnP.Scanning.Core.Discovery.M1;
+using System.Text.Json;
 
 namespace PnP.Scanning.Core.Services
 {
@@ -103,7 +105,8 @@ namespace PnP.Scanning.Core.Services
                     }
 
                     var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
-                        filter: SiteCollectionFilter.ExcludePersonalSites,
+                        // M1 admission is template-based, not a hard-wired personal-host filter.
+                        filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
                         vanityUrlOptions: vanityUrlOptions);
                     foreach(var siteCollection in siteCollections)
                     {
@@ -177,6 +180,7 @@ namespace PnP.Scanning.Core.Services
         internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
+            var templateEvidence = new List<ClassicPageDiscovery>();
             
             if (isRestart)
             {
@@ -204,7 +208,32 @@ namespace PnP.Scanning.Core.Services
                                                                     }),
                                                                     contextOptions))
             {
-                if (!context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
+                if (options is ClassicOptions { Pages: true } classic)
+                {
+                    // Enumerate first: excluding a parent Web must not exclude a differently templated child.
+                    var allWebs = await LoadAllWebsInSiteCollectionAsync(context, skipAppWebs: false);
+                    var policy = SiteTemplateExclusionPolicy.Parse(classic.ExcludeSiteTemplates);
+                    var decisions = templateEvidence;
+                    foreach (var web in allWebs)
+                    {
+                        var known = policy.TryEvaluate(web.WebTemplate, out var excluded);
+                        var absolute = context.Uri.AbsoluteUri.TrimEnd('/') + (web.WebUrl == "/" ? "" : "/" + web.WebUrl.TrimStart('/'));
+                        decisions.Add(new ClassicPageDiscovery
+                        {
+                            ScanId = scanId, SiteUrl = siteCollectionUrl, WebUrl = web.WebUrl, Url = absolute,
+                            RecordKey = "m1:template-policy:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                                System.Text.Encoding.UTF8.GetBytes(absolute.ToLowerInvariant()))).ToLowerInvariant(),
+                            RowType = "Scope", ScopeType = "WebTemplatePolicy",
+                            ObservationMethod = "M1TemplateExclusions/v1",
+                            DiscoveryStatus = !known ? "Unknown" : excluded ? "PolicyExcluded" : "Complete",
+                            EvidenceJson = JsonSerializer.Serialize(new { policyVersion = "M1TemplateExclusions/v1", policy = policy.CanonicalValue, template = web.WebTemplate, templateObserved = known, excluded }),
+                            ObservedAtUtc = DateTime.UtcNow,
+                        });
+                        if (!excluded) webUrlsToScan.Add(web);
+                    }
+                    // The caller persists these raw decisions with the enumeration result; enumeration itself is read-only.
+                }
+                else if (!context.Web.WebTemplateConfiguration.StartsWith("SPSPERS#"))
                 {
                     webUrlsToScan.AddRange(await LoadAllWebsInSiteCollectionAsync(context));
                 }
@@ -232,7 +261,7 @@ namespace PnP.Scanning.Core.Services
             }
 #endif
 
-            return new(webUrlsToScan);
+            return new(webUrlsToScan, ScopeEvidence: templateEvidence);
         }
 
         /// <summary>
@@ -254,7 +283,7 @@ namespace PnP.Scanning.Core.Services
         }
 
 
-        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context)
+        private async Task<List<EnumeratedWeb>> LoadAllWebsInSiteCollectionAsync(PnPContext context, bool skipAppWebs = true)
         {
             List<EnumeratedWeb> webs = new();
 
@@ -266,7 +295,7 @@ namespace PnP.Scanning.Core.Services
             });
 
             // Get the sub webs from the root web of the site collection
-            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync(skipAppWebs: true);
+            var enumeratedWebs = await context.GetSiteCollectionManager().GetSiteCollectionWebsWithDetailsAsync(skipAppWebs: skipAppWebs);
 
             foreach(var enumeratedWeb in enumeratedWebs)
             {

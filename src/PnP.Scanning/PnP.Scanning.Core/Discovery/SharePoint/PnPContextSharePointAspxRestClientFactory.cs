@@ -7,17 +7,22 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
     private readonly IPnPContextFactory contextFactory;
     private readonly IAuthenticationProvider authenticationProvider;
     private readonly Guid? scanId;
+    private readonly Func<PnPContext, HttpClient> jsonTransportFactory;
     private readonly Dictionary<string, ISharePointAspxRestClient> clients = new(StringComparer.OrdinalIgnoreCase);
 
     internal PnPContextSharePointAspxRestClientFactory(IPnPContextFactory contextFactory,
-        IAuthenticationProvider authenticationProvider, Guid? scanId = null, PnPContext sharedContext = null)
+        IAuthenticationProvider authenticationProvider, Guid? scanId = null, PnPContext sharedContext = null,
+        Func<PnPContext, HttpClient> jsonTransportFactory = null)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         this.authenticationProvider = authenticationProvider ?? throw new ArgumentNullException(nameof(authenticationProvider));
         this.scanId = scanId;
+        // Explicit borrowed transports retain caller ownership; no environment/test autodetection.
+        this.jsonTransportFactory = jsonTransportFactory;
         if (sharedContext != null)
             clients.Add(sharedContext.Uri.AbsoluteUri.TrimEnd('/'),
-                new PnPContextSharePointAspxRestClient(sharedContext, ownsContext: false));
+                new PnPContextSharePointAspxRestClient(sharedContext, ownsContext: false,
+                    jsonTransport: jsonTransportFactory?.Invoke(sharedContext)));
     }
 
     public async Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
@@ -30,7 +35,8 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
             contextOptions.Properties = new Dictionary<string, object> { [Constants.PnPContextPropertyScanId] = scanId.Value };
         var context = await contextFactory.CreateAsync(webUrl, authenticationProvider, cancellationToken,
             contextOptions).ConfigureAwait(false);
-        var client = new PnPContextSharePointAspxRestClient(context);
+        var client = new PnPContextSharePointAspxRestClient(context,
+            jsonTransport: jsonTransportFactory?.Invoke(context));
         clients.Add(key, client);
         return client;
     }

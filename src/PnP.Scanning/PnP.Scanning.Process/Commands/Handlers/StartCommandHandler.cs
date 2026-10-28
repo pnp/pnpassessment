@@ -1,8 +1,9 @@
-﻿using Grpc.Core;
+using Grpc.Core;
 using Microsoft.AspNetCore.DataProtection;
 using PnP.Core.Services;
 using PnP.Scanning.Core;
 using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Discovery.M1;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
@@ -40,6 +41,8 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> classicSkipUserInformationOption;
         private Option<bool> classicHomePageOnlyOption;
         private Option<int> classicAuditLogWindowDaysOption;
+        private Option<string> excludeSiteTemplatesOption;
+        private Option<FileInfo> platformAspxCatalogOption;
 
 #if DEBUG
         // Specific options for the test handler
@@ -304,6 +307,19 @@ namespace PnP.Scanning.Process.Commands
                 min: 1,
                 max: 180);
             cmd.AddOption(classicAuditLogWindowDaysOption);
+
+            excludeSiteTemplatesOption = new Option<string>($"--{Constants.StartExcludeSiteTemplates}",
+                "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.");
+            excludeSiteTemplatesOption.AddValidator(result =>
+            {
+                try { SiteTemplateExclusionPolicy.Parse(result.GetValueOrDefault<string>()); }
+                catch (ArgumentException ex) { result.ErrorMessage = ex.Message; }
+            });
+            cmd.AddOption(excludeSiteTemplatesOption);
+            platformAspxCatalogOption = new Option<FileInfo>($"--{Constants.StartPlatformAspxCatalog}",
+                "Versioned platform ASPX catalog. Its exact bytes are frozen with this scan.");
+            platformAspxCatalogOption.ExistingOnly();
+            cmd.AddOption(platformAspxCatalogOption);
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -433,11 +449,20 @@ namespace PnP.Scanning.Process.Commands
                     classicSkipUserInformationOption,
                     classicHomePageOnlyOption,
                     classicAuditLogWindowDaysOption,
+                    excludeSiteTemplatesOption,
+                    platformAspxCatalogOption,
                 };
                 var modeResult = result.FindResultFor(modeOption);
                 var mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
                 if (mode == Mode.Classic)
+                {
+                    var selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
+                    var m1OptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false } ||
+                        result.FindResultFor(platformAspxCatalogOption) is { IsImplicit: false };
+                    if (m1OptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
+                        result.ErrorMessage = "M1 scope/catalog options require the Pages component.";
                     return;
+                }
                 foreach (var opt in classicOnlyOptions)
                 {
                     // Only complain about options the user actually supplied on the command line.
@@ -461,6 +486,8 @@ namespace PnP.Scanning.Process.Commands
                                               , classicSkipUserInformationOption
                                               , classicHomePageOnlyOption
                                               , classicAuditLogWindowDaysOption
+                                              , excludeSiteTemplatesOption
+                                              , platformAspxCatalogOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -476,6 +503,9 @@ namespace PnP.Scanning.Process.Commands
 
         private async Task HandleStartAsync(StartOptions arguments)
         {
+            // Validate and freeze the explicit local catalog before launching a worker or authenticating.
+            var frozenPlatformCatalogPayload = arguments.PlatformAspxCatalog == null ? null :
+                PlatformAspxCatalog.Load(arguments.PlatformAspxCatalog.FullName).FrozenPayload;
             // Reject retired assessment modes before doing any work. The Workflow 2013 engine code is
             // retained (so pre-existing Workflow scan databases can still be reported on) but the
             // assessment itself can no longer be started. Mirrors the classic-component filtering below.
@@ -642,7 +672,9 @@ namespace PnP.Scanning.Process.Commands
                         arguments.SkipUsageInformation,
                         arguments.SkipUserInformation,
                         arguments.HomePageOnly,
-                        arguments.AuditLogWindowDays);
+                        arguments.AuditLogWindowDays,
+                        arguments.ExcludeSiteTemplates,
+                        frozenPlatformCatalogPayload);
                 }
 
 #if DEBUG

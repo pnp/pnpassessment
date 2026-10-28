@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -30,8 +30,8 @@ namespace PnP.Scanning.Core.Tests.Storage
             var options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options;
             using var context = new ScanContext(options);
             var migrator = context.GetService<IMigrator>();
-            var previous = context.Database.GetMigrations().Last(name => !name.EndsWith("_PageCustomizationStatus"));
-            context.Database.GetMigrations().Last().Should().EndWith("_PageCustomizationStatus");
+            var previous = context.Database.GetMigrations().TakeWhile(name => !name.EndsWith("_PageCustomizationStatus")).Last();
+            context.Database.GetMigrations().Should().Contain(name => name.EndsWith("_PageCustomizationStatus"));
             await migrator.MigrateAsync(previous);
             var scan = Guid.NewGuid();
             var list = Guid.NewGuid();

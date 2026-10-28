@@ -80,7 +80,8 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.ListResponse = "displayForm";
         var snapshot = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
         snapshot.Should().NotBeNull();
-        using var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication, sharedContext: context);
+        using var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication,
+            sharedContext: context, jsonTransportFactory: ctx => ctx.RestClient.Client);
         using var provider = new SharePointLiveAspxDiscoveryProvider(
             new SharePointLiveAspxDiscoveryOptions("test", "sdk-shared-web", "shared-sdk-v1", new string('a', 64)),
             factory, new AspxWebAcquisitionContext(Guid.Parse(OfflineTransport.SiteId), new Uri(Site),

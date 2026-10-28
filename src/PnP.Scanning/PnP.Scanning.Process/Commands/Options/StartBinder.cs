@@ -1,4 +1,4 @@
-﻿using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using System.CommandLine;
 using System.CommandLine.Binding;
@@ -28,6 +28,8 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<bool> classicSkipUserInformation;
         private readonly Option<bool> classicHomePageOnly;
         private readonly Option<int> classicAuditLogWindowDays;
+        private readonly Option<string> excludeSiteTemplates;
+        private readonly Option<FileInfo> platformAspxCatalog;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
@@ -43,6 +45,8 @@ namespace PnP.Scanning.Process.Commands
                            , Option<bool> classicSkipUserInformationInput
                            , Option<bool> classicHomePageOnlyInput
                            , Option<int> classicAuditLogWindowDaysInput
+                           , Option<string> excludeSiteTemplatesInput
+                           , Option<FileInfo> platformAspxCatalogInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
@@ -69,6 +73,8 @@ namespace PnP.Scanning.Process.Commands
             classicSkipUserInformation = classicSkipUserInformationInput;
             classicHomePageOnly = classicHomePageOnlyInput;
             classicAuditLogWindowDays = classicAuditLogWindowDaysInput;
+            excludeSiteTemplates = excludeSiteTemplatesInput;
+            platformAspxCatalog = platformAspxCatalogInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
@@ -97,6 +103,8 @@ namespace PnP.Scanning.Process.Commands
                 SkipUserInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUserInformation),
                 HomePageOnly = bindingContext.ParseResult.GetValueForOption(classicHomePageOnly),
                 AuditLogWindowDays = bindingContext.ParseResult.GetValueForOption(classicAuditLogWindowDays),
+                ExcludeSiteTemplates = bindingContext.ParseResult.GetValueForOption(excludeSiteTemplates),
+                PlatformAspxCatalog = bindingContext.ParseResult.GetValueForOption(platformAspxCatalog),
 
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),

@@ -95,6 +95,27 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadPageStreamAsync(Guid scanId, string siteUrl, string webUrl,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string after = null;
+        while (true)
+        {
+            List<ClassicPageDiscovery> batch;
+            using (var db = createContext())
+            {
+                batch = await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
+                    row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page" &&
+                    (after == null || string.Compare(row.RecordKey, after) > 0))
+                    .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
+            }
+            if (batch.Count == 0) yield break;
+            after = batch[^1].RecordKey;
+            // No live SQLite reader is held while a source read or a projection write awaits.
+            foreach (var row in batch) yield return row;
+        }
+    }
+
     internal async Task<List<ClassicPageDiscovery>> ReadPagesAsync(Guid scanId, string siteUrl, string webUrl,
         CancellationToken cancellationToken = default)
     {

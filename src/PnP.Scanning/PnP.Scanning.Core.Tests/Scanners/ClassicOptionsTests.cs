@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using Xunit;
@@ -84,6 +84,29 @@ namespace PnP.Scanning.Core.Tests.Scanners
             options.SkipUserInformation.Should().BeFalse();
             options.HomePageOnly.Should().BeTrue();
             options.AuditLogWindowDays.Should().Be(14); // default when not explicitly passed
+        }
+
+        [Theory]
+        [InlineData(null, "APP#*,SPSPERS#*")]
+        [InlineData("STS#3", "STS#3")]
+        [InlineData("none", "none")]
+        public void TemplatePolicyRoundTripsThroughNativeProperties(string input, string expected)
+        {
+            var request = new StartRequest { Mode = Mode.Classic.ToString() };
+            ClassicStartRequestBuilder.AddClassicProperties(request, new[] { ClassicComponent.Pages },
+                false, true, true, false, excludeSiteTemplates: input);
+            var options = (ClassicOptions)OptionsBase.FromScannerInput(request);
+            options.ExcludeSiteTemplates.Should().Be(expected);
+            request.Properties.Single(p => p.Property == Constants.StartExcludeSiteTemplates).Type.Should().Be("string");
+        }
+
+        [Fact]
+        public void FrozenCatalogPayloadRoundTripsWithoutReopeningAPath()
+        {
+            var request = new StartRequest { Mode = Mode.Classic.ToString() };
+            ClassicStartRequestBuilder.AddClassicProperties(request, new[] { ClassicComponent.Pages },
+                false, true, true, false, platformAspxCatalogPayload: "fixed-catalog-bytes");
+            ((ClassicOptions)OptionsBase.FromScannerInput(request)).PlatformAspxCatalogPayload.Should().Be("fixed-catalog-bytes");
         }
 
         private static StartRequest ClassicRequest(params (string Key, string Value)[] properties)

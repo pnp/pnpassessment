@@ -23,7 +23,7 @@ public class SiteEnumerationManagerScopeTests
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task Tenant_enumeration_excludes_personal_sites_even_when_pages_are_enabled(bool pages, bool homePageOnly)
+    public async Task Tenant_authority_defers_M1_admission_to_template_policy_and_keeps_legacy_host_filter(bool pages, bool homePageOnly)
     {
         using var fixture = new OfflineEnumeration("STS#0", TeamSite);
         var start = new StartRequest
@@ -38,7 +38,8 @@ public class SiteEnumerationManagerScopeTests
 
         var sites = await fixture.Manager.EnumerateSiteCollectionsToScanAsync(start, null, _ => { });
 
-        sites.Should().Equal(TeamSite);
+        if (pages) sites.Should().Equal(new[] { TeamSite, PersonalSite }, "M1 must observe templates before admission; none can clear the defaults");
+        else sites.Should().Equal(new[] { TeamSite }, "legacy non-page scans retain their host filter");
         fixture.Transport.Requests.Count(url => url.Contains("sites/getallsites", StringComparison.OrdinalIgnoreCase))
             .Should().Be(1, "the real SDK tenant enumeration must run against the offline response");
         fixture.Transport.Unexpected.Should().BeEmpty();
@@ -51,15 +52,25 @@ public class SiteEnumerationManagerScopeTests
     [InlineData("SPSPERS#10", false, false)]
     [InlineData("SPSPERS#10", true, false)]
     [InlineData("SPSPERS#10", true, true)]
-    public async Task Explicit_personal_sites_do_not_enumerate_webs(string template, bool pages, bool homePageOnly)
+    public async Task Explicit_personal_root_is_excluded_but_M1_inspects_independent_child_templates(string template, bool pages, bool homePageOnly)
     {
         using var fixture = new OfflineEnumeration(template, PersonalSite);
 
         var result = await fixture.Manager.EnumerateWebsToScanAsync(Guid.NewGuid(), PersonalSite,
             Options(pages, homePageOnly), null, isRestart: false);
 
-        result.Webs.Should().BeEmpty();
-        fixture.Transport.Requests.Should().NotContain(url => url.Contains("getsubwebsfilteredforcurrentuser"));
+        if (pages)
+        {
+            result.Webs.Select(web => (web.WebUrl, web.WebTemplate)).Should().Equal(("/ordinary", "STS#0"));
+            result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/" && row.DiscoveryStatus == "PolicyExcluded");
+            result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/ordinary" && row.DiscoveryStatus == "Complete");
+            fixture.Transport.Requests.Count(url => url.Contains("getsubwebsfilteredforcurrentuser")).Should().Be(3);
+        }
+        else
+        {
+            result.Webs.Should().BeEmpty();
+            fixture.Transport.Requests.Should().NotContain(url => url.Contains("getsubwebsfilteredforcurrentuser"));
+        }
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
@@ -79,7 +90,43 @@ public class SiteEnumerationManagerScopeTests
             ("/", "STS#0"), ("/ordinary", "STS#0"),
         });
         fixture.Transport.Requests.Count(url => url.Contains("getsubwebsfilteredforcurrentuser"))
-            .Should().Be(2, "only the root and the ordinary subweb are traversed, never APP#0");
+            .Should().Be(pages ? 3 : 2, "M1 observes child templates before filtering, while legacy scans retain APP subtree skipping");
+        if (pages) result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/app" && row.DiscoveryStatus == "PolicyExcluded");
+        fixture.Transport.Unexpected.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Sole_none_clears_defaults_in_the_real_web_enumerator()
+    {
+        using var fixture = new OfflineEnumeration("SPSPERS#0", PersonalSite);
+        var options = Options(true, false); options.ExcludeSiteTemplates = "none";
+        var result = await fixture.Manager.EnumerateWebsToScanAsync(Guid.NewGuid(), PersonalSite, options, null, false);
+        result.Webs.Select(web => web.WebUrl).Should().BeEquivalentTo("/", "/ordinary", "/app");
+        result.ScopeEvidence.Should().HaveCount(3).And.OnlyContain(row => row.DiscoveryStatus == "Complete");
+        fixture.Transport.Unexpected.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Explicit_patterns_replace_defaults_instead_of_extending_them()
+    {
+        using var fixture = new OfflineEnumeration("SPSPERS#0", PersonalSite);
+        var options = Options(true, false); options.ExcludeSiteTemplates = "STS#0";
+        var result = await fixture.Manager.EnumerateWebsToScanAsync(Guid.NewGuid(), PersonalSite, options, null, false);
+        result.Webs.Select(web => web.WebUrl).Should().BeEquivalentTo("/", "/app");
+        result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/ordinary" && row.DiscoveryStatus == "PolicyExcluded");
+        result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/" && row.DiscoveryStatus == "Complete");
+        fixture.Transport.Unexpected.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_excluded_app_parent_does_not_prune_an_allowed_publishing_child()
+    {
+        using var fixture = new OfflineEnumeration("STS#0", TeamSite, allowedChildUnderApp: true);
+        var options = Options(true, false); options.ExcludeSiteTemplates = "STS#0,APP#*";
+        var result = await fixture.Manager.EnumerateWebsToScanAsync(Guid.NewGuid(), TeamSite, options, null, false);
+        result.Webs.Select(web => (web.WebUrl, web.WebTemplate)).Should().Equal(("/app/allowed", "CMSPUBLISHING#0"));
+        result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/app" && row.DiscoveryStatus == "PolicyExcluded");
+        result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/app/allowed" && row.DiscoveryStatus == "Complete");
         fixture.Transport.Unexpected.Should().BeEmpty();
     }
 
@@ -94,9 +141,9 @@ public class SiteEnumerationManagerScopeTests
         internal readonly EnumerationTransport Transport;
         internal readonly SiteEnumerationManager Manager;
 
-        internal OfflineEnumeration(string template, string siteUrl)
+        internal OfflineEnumeration(string template, string siteUrl, bool allowedChildUnderApp = false)
         {
-            Transport = new EnumerationTransport(template, siteUrl);
+            Transport = new EnumerationTransport(template, siteUrl, allowedChildUnderApp);
             var collection = new ServiceCollection();
             collection.AddPnPCore(options => options.DisableTelemetry = true,
                 configureSharePointRest: builder => builder.ConfigurePrimaryHttpMessageHandler(() => Transport),
@@ -127,7 +174,7 @@ public class SiteEnumerationManagerScopeTests
         }
     }
 
-    private sealed class EnumerationTransport(string template, string siteUrl) : HttpMessageHandler
+    private sealed class EnumerationTransport(string template, string siteUrl, bool allowedChildUnderApp) : HttpMessageHandler
     {
         private const string SiteId = "11111111-1111-1111-1111-111111111111";
         private const string WebId = "22222222-2222-2222-2222-222222222222";
@@ -163,7 +210,9 @@ public class SiteEnumerationManagerScopeTests
                 var webUrl = uri.GetLeftPart(UriPartial.Authority) + path[..path.IndexOf("/_api/", StringComparison.OrdinalIgnoreCase)];
                 if (webUrl == siteUrl)
                     return JsonSerializer.Serialize(new { value = new[] { Subweb("ordinary", "STS"), Subweb("app", "APP") } });
-                if (webUrl == siteUrl + "/ordinary") return "{\"value\":[]}";
+                if (webUrl == siteUrl + "/app" && allowedChildUnderApp)
+                    return JsonSerializer.Serialize(new { value = new[] { Subweb("app/allowed", "CMSPUBLISHING") } });
+                if (webUrl == siteUrl + "/ordinary" || webUrl == siteUrl + "/app" || webUrl == siteUrl + "/app/allowed") return "{\"value\":[]}";
             }
             throw UnexpectedRequest(HttpMethod.Get, uri);
         }
@@ -176,7 +225,7 @@ public class SiteEnumerationManagerScopeTests
 
         private object Subweb(string name, string webTemplate) => new
         {
-            Id = name == "app" ? "44444444-4444-4444-4444-444444444444" : "55555555-5555-5555-5555-555555555555",
+            Id = name == "app" ? "44444444-4444-4444-4444-444444444444" : name == "app/allowed" ? "66666666-6666-6666-6666-666666666666" : "55555555-5555-5555-5555-555555555555",
             ServerRelativeUrl = new Uri(siteUrl).AbsolutePath + "/" + name,
             WebTemplate = webTemplate, WebTemplateId = 0, Language = 1033,
             Created = "2020-01-01T00:00:00Z", LastItemModifiedDate = "2020-01-01T00:00:00Z",

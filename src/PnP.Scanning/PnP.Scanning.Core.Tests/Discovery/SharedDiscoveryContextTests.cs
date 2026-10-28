@@ -27,7 +27,7 @@ public sealed class SharedDiscoveryContextTests
         var context = await sdk.CreateAsync();
         var initializationRequests = sdk.Transport.LogicalRequests.Count;
         var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication,
-            sharedContext: context);
+            sharedContext: context, jsonTransportFactory: ctx => ctx.RestClient.Client);
         var first = await factory.GetAsync(new Uri(WebUrl + "/"));
         var again = await factory.GetAsync(new Uri(WebUrl.ToUpperInvariant()));
         first.Should().BeSameAs(again);
@@ -43,7 +43,8 @@ public sealed class SharedDiscoveryContextTests
         IsDisposed(context).Should().BeFalse("the scanner, not discovery, owns this context");
 
         // Prove the retained context still routes real authenticated REST reads after factory disposal.
-        using var retained = new PnPContextSharePointAspxRestClient(context, ownsContext: false);
+        using var retained = new PnPContextSharePointAspxRestClient(context, ownsContext: false,
+            jsonTransport: context.RestClient.Client);
         (await retained.GetPageAsync(new Uri(WebUrl + "/_api/Web?$select=Id"))).Outcome
             .Should().Be(DiscoveryTerminalOutcome.Complete);
         sdk.Transport.LogicalRequests.Should().HaveCount(initializationRequests + 2);
@@ -84,12 +85,33 @@ public sealed class SharedDiscoveryContextTests
         using var sdk = new OfflineSdk();
         var context = await sdk.CreateAsync();
         IsDisposed(context).Should().BeFalse();
-        var client = new PnPContextSharePointAspxRestClient(context);
+        var client = new PnPContextSharePointAspxRestClient(context, jsonTransport: context.RestClient.Client);
         (await client.GetPageAsync(new Uri(WebUrl + "/_api/Web?$select=Id"))).Outcome
             .Should().Be(DiscoveryTerminalOutcome.Complete);
         client.Dispose();
         client.Dispose();
         IsDisposed(context).Should().BeTrue();
+        sdk.Transport.Unexpected.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Disposing_discovery_does_not_dispose_explicitly_borrowed_json_transport()
+    {
+        using var sdk = new OfflineSdk();
+        var context = await sdk.CreateAsync();
+        var http = context.RestClient.Client;
+        int before = sdk.Transport.LogicalRequests.Count;
+        var client = new PnPContextSharePointAspxRestClient(context, ownsContext: false, jsonTransport: http);
+        (await client.GetPageAsync(new Uri(WebUrl + "/_api/Web?$select=Id"))).Outcome
+            .Should().Be(DiscoveryTerminalOutcome.Complete);
+        client.Dispose();
+        // If discovery disposed the injected SDK HttpClient this read would throw ObjectDisposedException.
+        using var request = new HttpRequestMessage(HttpMethod.Get, WebUrl + "/_api/Web?$select=Id");
+        using var response = await http.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        sdk.Transport.LogicalRequests.Should().HaveCount(before + 2);
+        sdk.Created.Should().ContainSingle().Which.Should().BeSameAs(context);
+        IsDisposed(context).Should().BeFalse();
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
@@ -232,7 +254,9 @@ public sealed class SharedDiscoveryContextTests
             if (request.Method == HttpMethod.Get)
             {
                 var result = Route(request.RequestUri, inBatch: false);
-                return JsonResponse(result.Status, result.Json);
+                var directResponse = JsonResponse(result.Status, result.Json);
+                directResponse.RequestMessage = request; // HTTP transport provenance, also required by the bounded reader.
+                return directResponse;
             }
             if (request.Method != HttpMethod.Post || !request.RequestUri.AbsolutePath.EndsWith("/_api/$batch",
                 StringComparison.OrdinalIgnoreCase)) throw Reject(request.Method + " " + request.RequestUri);

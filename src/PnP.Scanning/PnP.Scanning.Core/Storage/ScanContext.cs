@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
 namespace PnP.Scanning.Core.Storage
@@ -47,6 +47,10 @@ namespace PnP.Scanning.Core.Storage
         internal DbSet<ClassicPage> ClassicPages { get; set; }
 
         internal DbSet<ClassicPageDiscovery> ClassicPageDiscoveries { get; set; }
+
+        internal DbSet<ClassicAspxInventory> ClassicAspxInventories { get; set; }
+
+        internal DbSet<ClassicAspxItemBinding> ClassicAspxItemBindings { get; set; }
 
         internal DbSet<ClassicPageWebPart> ClassicPageWebParts { get; set; }
 
@@ -218,6 +222,47 @@ namespace PnP.Scanning.Core.Storage
                 entity.HasIndex(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
                 entity.Property(e => e.RowType).IsRequired();
                 entity.Property(e => e.DiscoveryStatus).IsRequired();
+            });
+
+            modelBuilder.Entity<ClassicAspxInventory>(entity =>
+            {
+                entity.ToTable("ClassicAspxInventories", table => table.HasCheckConstraint(
+                    "CK_ClassicAspxInventories_Identity",
+                    "length(\"AspxKey\") > 0 AND \"IdentityVersion\" > 0 AND (" +
+                    "(\"IdentityKind\" = 'TenantFile' AND \"SiteCollectionId\" IS NOT NULL AND \"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"FileUniqueId\" IS NOT NULL AND \"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000') OR " +
+                    "(\"IdentityKind\" = 'PlatformCatalog' AND \"SiteCollectionId\" IS NULL AND \"FileUniqueId\" IS NULL AND " +
+                    "\"CatalogSource\" IS NOT NULL AND \"CatalogVersion\" IS NOT NULL AND \"CatalogDigest\" IS NOT NULL AND \"CatalogEntryKey\" IS NOT NULL AND " +
+                    "length(trim(\"CatalogSource\")) > 0 AND length(trim(\"CatalogVersion\")) > 0 AND length(\"CatalogDigest\") = 64 AND length(trim(\"CatalogEntryKey\")) > 0))"));
+                entity.HasKey(e => new { e.ScanId, e.AspxKey });
+                entity.Property(e => e.AspxKey).IsRequired();
+                entity.Property(e => e.IdentityKind).IsRequired();
+                entity.Property(e => e.FileReadState).IsRequired();
+                entity.Property(e => e.HandlerReadState).IsRequired();
+                entity.Property(e => e.HandlerParseState).IsRequired();
+                entity.Property(e => e.CoverageState).IsRequired();
+                entity.Property(e => e.ProvenanceJson).IsRequired();
+                entity.HasIndex(e => new { e.ScanId, e.SiteCollectionId, e.FileUniqueId })
+                    .IsUnique().HasFilter("\"IdentityKind\" = 'TenantFile'");
+                entity.HasIndex(e => new { e.ScanId, e.CatalogSource, e.CatalogVersion, e.CatalogDigest, e.CatalogEntryKey })
+                    .IsUnique().HasFilter("\"IdentityKind\" = 'PlatformCatalog'");
+                entity.HasIndex(e => new { e.ScanId, e.IdentityKind });
+            });
+
+            modelBuilder.Entity<ClassicAspxItemBinding>(entity =>
+            {
+                entity.ToTable("ClassicAspxItemBindings", table => table.HasCheckConstraint(
+                    "CK_ClassicAspxItemBindings_RealItem",
+                    "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"WebId\" <> '00000000-0000-0000-0000-000000000000' AND \"ListId\" <> '00000000-0000-0000-0000-000000000000' AND \"ItemId\" > 0 AND \"BindingKinds\" > 0 AND (\"BindingKinds\" & ~31) = 0"));
+                entity.HasKey(e => new { e.ScanId, e.AspxKey, e.SiteCollectionId, e.WebId, e.ListId, e.ItemId });
+                entity.Property(e => e.AspxKey).IsRequired();
+                entity.Property(e => e.ItemGuidReadState).IsRequired();
+                entity.Property(e => e.BindingProvenanceJson).IsRequired();
+                entity.HasOne<ClassicAspxInventory>().WithMany()
+                    .HasForeignKey(e => new { e.ScanId, e.AspxKey })
+                    .HasPrincipalKey(e => new { e.ScanId, e.AspxKey })
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => new { e.ScanId, e.SiteCollectionId, e.WebId, e.ListId, e.ItemId });
+                entity.HasIndex(e => new { e.ScanId, e.ItemGuid });
             });
 
             modelBuilder.Entity<ClassicPage>(entity =>

@@ -1,4 +1,4 @@
-﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -20,11 +20,14 @@ namespace PnP.Scanning.Core.Scanners
             bool skipUsageInformation,
             bool skipUserInformation,
             bool homePageOnly,
-            int auditLogWindowDays = 14)
+            int auditLogWindowDays = 14,
+            string excludeSiteTemplates = null,
+            string platformAspxCatalogPayload = null)
         {
             // Each requested scan component is keyed by its enum name and is always "on" (true);
             // FromScannerInput reads these as the set of enabled ClassicComponents.
-            foreach (var classicComponent in components)
+            var selectedComponents = components.ToArray();
+            foreach (var classicComponent in selectedComponents)
             {
                 request.Properties.Add(new PropertyRequest
                 {
@@ -44,6 +47,24 @@ namespace PnP.Scanning.Core.Scanners
                 Type = "int",
                 Value = auditLogWindowDays.ToString(),
             });
+            if (selectedComponents.Contains(ClassicComponent.Pages))
+            {
+                request.Properties.Add(new PropertyRequest { Property = "M1ProjectionContract", Type = "string", Value = "M1/v1" });
+                request.Properties.Add(new PropertyRequest { Property = "M1ScopeMode", Type = "string", Value = homePageOnly ? "HomePageOnly" : "DeclaredFullInventory" });
+                request.Properties.Add(new PropertyRequest
+                {
+                    Property = Constants.StartExcludeSiteTemplates,
+                    Type = "string",
+                    Value = Discovery.M1.SiteTemplateExclusionPolicy.Parse(excludeSiteTemplates).CanonicalValue,
+                });
+                if (platformAspxCatalogPayload != null)
+                    request.Properties.Add(new PropertyRequest
+                    {
+                        Property = Constants.StartPlatformAspxCatalogPayload,
+                        Type = "string",
+                        Value = platformAspxCatalogPayload,
+                    });
+            }
         }
 
         private static void AddBool(StartRequest request, string property, bool value)
