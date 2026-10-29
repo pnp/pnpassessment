@@ -17,20 +17,9 @@ internal static class ClassicAssessmentInitialization
         Func<TimeSpan, CancellationToken, Task> delay = null,
         Func<Exception, Task> beforeFailureFinalization = null)
     {
-        delay ??= Task.Delay;
         try
         {
-            for (var attempt = 1; ; attempt++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try { return await initialize().ConfigureAwait(false); }
-                catch (Exception error) when (!cancellationToken.IsCancellationRequested &&
-                    attempt < MaxAttempts && IsResponseEnded(error))
-                {
-                    onRetry?.Invoke(attempt, error);
-                    await delay(TimeSpan.FromSeconds(attempt), cancellationToken).ConfigureAwait(false);
-                }
-            }
+            return await RetryAsync(initialize, cancellationToken, onRetry, delay).ConfigureAwait(false);
         }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested)
         {
@@ -42,6 +31,23 @@ internal static class ClassicAssessmentInitialization
             await writer.FailUnassessedPagesAsync(scanId, siteUrl, webUrl, error,
                 "AssessmentInitialization").ConfigureAwait(false);
             throw;
+        }
+    }
+
+    internal static async Task<T> RetryAsync<T>(Func<Task<T>> initialize, CancellationToken cancellationToken,
+        Action<int, Exception> onRetry = null, Func<TimeSpan, CancellationToken, Task> delay = null)
+    {
+        delay ??= Task.Delay;
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try { return await initialize().ConfigureAwait(false); }
+            catch (Exception error) when (!cancellationToken.IsCancellationRequested &&
+                attempt < MaxAttempts && IsResponseEnded(error))
+            {
+                onRetry?.Invoke(attempt, error);
+                await delay(TimeSpan.FromSeconds(attempt), cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 

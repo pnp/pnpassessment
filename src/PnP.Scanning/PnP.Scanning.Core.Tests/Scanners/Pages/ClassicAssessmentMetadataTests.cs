@@ -236,13 +236,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         var context = await sdk.CreateAsync();
         var order = new List<string>();
         var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        SharePointListMetadataSnapshot loaded = null;
-        var result = await ClassicAssessmentMetadata.AcquirePagesAsync(false, async () =>
-        {
-            order.Add("metadata");
-            loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-            return loaded;
-        }, snapshot =>
+        order.Add("metadata");
+        var loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        var result = await ClassicScanner.DiscoverPagesAsync(false, loaded,
+            () => throw new InvalidOperationException("full inventory already loaded metadata"), snapshot =>
         {
             order.Add("discovery");
             snapshot.Should().BeSameAs(loaded).And.NotBeNull();
@@ -267,11 +264,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.ListResponse = response;
         var order = new List<string>();
         var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        var result = await ClassicAssessmentMetadata.AcquirePagesAsync(false, async () =>
-        {
-            order.Add("metadata");
-            return await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-        }, snapshot =>
+        order.Add("metadata");
+        var loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        var result = await ClassicScanner.DiscoverPagesAsync(false, loaded,
+            () => throw new InvalidOperationException("full inventory already loaded metadata"), snapshot =>
         {
             order.Add("fallback-discovery");
             snapshot.Should().BeNull();
@@ -290,7 +286,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         var context = await sdk.CreateAsync();
         var order = new List<string>();
         var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        var result = await ClassicAssessmentMetadata.AcquirePagesAsync(true, async () =>
+        var result = await ClassicScanner.DiscoverPagesAsync(true, null, async () =>
         {
             order.Add("metadata");
             return await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
