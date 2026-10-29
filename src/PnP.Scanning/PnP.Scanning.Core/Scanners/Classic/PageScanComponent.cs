@@ -72,8 +72,9 @@ namespace PnP.Scanning.Core.Scanners
         internal const string SystemPageTemplateCode = "system_page_template";
 
         /// <summary>
-        /// Assesses already discovered physical pages, honoring HOME-only selection while retaining file-only assessment and per-page failures.
-        /// Persists discovery dispositions, page and web-part enrichment, and web summaries without rediscovering library membership; cancellation propagates.
+        /// Assesses already discovered physical pages and independently restores eligible legacy item-only
+        /// display-form pages. Honors HOME-only selection, retains file-only assessment and per-page failures,
+        /// and persists legacy report rows and summaries without adding items to the physical census; cancellation propagates.
         /// </summary>
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext,
             IReadOnlyList<ClassicPageDiscovery> discoveredPages)
@@ -101,6 +102,10 @@ namespace PnP.Scanning.Core.Scanners
 
             var lists = web.Lists;
             var discoveryWriter = new AssessmentDiscoveryWriter(scannerBase.ScanId);
+
+            // Item-only content pages remain part of the legacy assessment/report, not the physical
+            // ASPX census. Never manufacture a discovery row or bind one item to the shared form file.
+            await AddDisplayFormPagesAsync(discovery, context.Uri, lists, web.CancellationToken).ConfigureAwait(false);
 
             // The provider has already found the physical pages in the requested page scope. Do not
             // rediscover selected libraries or gate their existence on publishing features/template.
@@ -214,37 +219,62 @@ namespace PnP.Scanning.Core.Scanners
                 await scannerBase.StorageManager.StorePageWebPartsAsync(scannerBase.ScanId, webPartsList);
             }
 
-            // Loop over the found pages and save the page summary information
-            int wikiPageCounter = 0;
-            int blogPageCounter = 0;
-            int webPartPageCounter = 0;
-            int aspxPageCounter = 0;
-            int publishingPageCounter = 0;
+            var counts = CountAssessedPages(pagesList);
+            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl,
+                scannerBase.WebUrl, scannerBase.WebTemplate, context, remediationCodes, discovery.ModernPageCounter,
+                counts.Wiki, counts.Blog, counts.WebPart, counts.Aspx, counts.Publishing).ConfigureAwait(false);
+        }
 
-            foreach (var page in pagesList)
+        /// <summary>
+        /// Adds independently assessed item-only pages and their remediation codes to the legacy report
+        /// branch. Does not write discovery rows, create file bindings or queue per-item web-part reads.
+        /// </summary>
+        internal static async Task AddDisplayFormPagesAsync(PageDiscovery discovery, Uri contextUri,
+            IReadOnlyList<IList> lists, CancellationToken cancellationToken)
+        {
+            var scanner = discovery.ScannerBase;
+            var pages = await LegacyDisplayFormAssessment.ReadAsync(scanner.ScanId, scanner.SiteUrl,
+                scanner.WebUrl, contextUri, lists, discovery.HomePageOnly, discovery.SkipUserInformation,
+                cancellationToken).ConfigureAwait(false);
+            discovery.Pages.AddRange(pages);
+            discovery.RemediationCodes.UnionWith(pages.Select(page => page.RemediationCode));
+        }
+
+        /// <summary>
+        /// Counts the final legacy assessment rows, including item-only blog/custom-form pages, without
+        /// changing the independently acquired physical inventory or counting modern pages as classic.
+        /// </summary>
+        internal static (int Wiki, int Blog, int WebPart, int Aspx, int Publishing) CountAssessedPages(
+            IReadOnlyList<ClassicPage> pages)
+        {
+            int wiki = 0;
+            int blog = 0;
+            int webPart = 0;
+            int aspx = 0;
+            int publishing = 0;
+            foreach (var page in pages)
             {
                 switch (page.PageType)
                 {
                     case WikiPage:
-                        wikiPageCounter++;
+                        wiki++;
                         break;
                     case BlogPage:
-                        blogPageCounter++;
+                        blog++;
                         break;
                     case WebPartPage:
-                        webPartPageCounter++;
+                        webPart++;
                         break;
                     case ASPXPage:
-                        aspxPageCounter++;
+                        aspx++;
                         break;
                     case PublishingPage:
-                        publishingPageCounter++;
+                        publishing++;
                         break;
                 }
             }
 
-            await scannerBase.StorageManager.StorePageSummaryAsync(scannerBase.ScanId, scannerBase.SiteUrl, scannerBase.WebUrl, scannerBase.WebTemplate, context, remediationCodes,
-                                                                   discovery.ModernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter, publishingPageCounter);
+            return (wiki, blog, webPart, aspx, publishing);
         }
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection

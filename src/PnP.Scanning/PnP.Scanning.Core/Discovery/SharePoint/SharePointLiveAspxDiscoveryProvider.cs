@@ -373,7 +373,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
 
         var result = await ReadFolderCollectionAsync(scope, files: true, cancellationToken).ConfigureAwait(false);
-        foreach (var page in result.Pages)
+        foreach (var page in result.ObservationPages)
         {
             var records = ObservePhysicalRecords(scope, page.Page.Items.Select(item => new RawDiscoveryRecord(
                 PropertyString(item, "UniqueId"), PropertyString(item, "UniqueId"),
@@ -398,6 +398,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
                 WebUrl: scope.WebUrl?.AbsoluteUri)));
             var batch = ToRawBatch(page, records, result.Validation.Outcome);
+            if (result.RetainedObservationPages?.Contains(page) == true)
+            {
+                // The engine stops at a terminal batch; retained attempts must not hide fallback-only files.
+                // Their original HTTP terminal/failure receipts remain unchanged in ReferenceCollector.
+                batch = batch with { IsTerminal = false };
+            }
             if (invalidFileIdentityScopes.Contains(scope.ScopeKey))
             {
                 batch = batch with
@@ -876,11 +882,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 "physical-files:" + scope.ScopeKey, FolderEndpoint(scope, child, physicalSelect), physicalSelect,
                 string.Empty, AspxSurfaceApplicability.Applicable, "PhysicalFolderFilesAuthorityFallback",
                 cancellationToken).ConfigureAwait(false);
-            if (!IsComplete(result.Validation.Outcome) && enriched.Items.Count > 0)
-            {
-                // A failed fallback cannot erase physical observations from an earlier partial page chain.
-                result = enriched;
-            }
+            // Retain every physical observation, but keep the two HTTP chains and coverage proofs separate.
+            result = result with { RetainedObservationPages = enriched.ObservationPages.ToArray() };
         }
         if (!files && result.Items.Any(item => string.IsNullOrWhiteSpace(PropertyString(item, "ServerRelativeUrl"))))
         {
@@ -911,7 +914,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
         if (IsComplete(result.Validation.Outcome))
         {
-            folderCollections[key] = result;
+            folderCollections[key] = result with { RetainedObservationPages = null };
         }
         return result;
     }
@@ -922,8 +925,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     /// <summary>Identifies one physical folder within this provider's authorized Web and permission boundary, independently of its scope entrance.</summary>
     private static string FolderIdentity(LiveScope scope) => scope.WebUrl.GetLeftPart(UriPartial.Authority) +
-        "|" + (AspxReferencePath.Normalize(scope.FolderUrl?.Replace("%20", " ", StringComparison.OrdinalIgnoreCase)) ??
-            scope.FolderUrl ?? string.Empty).TrimEnd('/');
+        "|" + (NormalizeServerRelativePath(scope.FolderUrl) ?? string.Empty).TrimEnd('/');
 
     /// <summary>Selects only observed list-root containment as physical ownership; a form/view declaration never authorizes an owner GUID.</summary>
     private LiveScope PhysicalOwner(LiveScope scope, string path) => listRoots
@@ -1182,6 +1184,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private string Key(params string[] values) => DiscoveryHash.Of(values)[..24];
     private static Uri Endpoint(Uri webUrl, string relative) => new(webUrl.AbsoluteUri.TrimEnd('/') + "/" + relative.TrimStart('/'));
+    /// <summary>Builds a folder collection request from its decoded ResourcePath, preserving literal percent sequences as OData parameter data.</summary>
     private static Uri FolderEndpoint(LiveScope scope, string child, string select, string expand = null)
     {
         var query = $"$select={select}" + (string.IsNullOrWhiteSpace(expand) ? string.Empty : $"&$expand={expand}");
@@ -1189,7 +1192,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             return Endpoint(scope.WebUrl, $"_api/web/RootFolder/{child}?{query}");
         // Keep decoded ResourcePath values unambiguous inside the HTTP URI. In particular, a raw '#'
         // would otherwise start the URI fragment and silently truncate the requested folder and query.
-        var decoded = (scope.FolderUrl ?? string.Empty).Replace("%20", " ", StringComparison.Ordinal)
+        var decoded = (scope.FolderUrl ?? string.Empty)
             .Replace('\\', '/').Replace("'", "''", StringComparison.Ordinal);
         var encoded = WebUtility.UrlEncode(decoded).Replace("+", "%20", StringComparison.Ordinal);
         return Endpoint(scope.WebUrl,
@@ -1348,5 +1351,11 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         IReadOnlyList<LivePage> Pages,
         AspxPaginationValidation Validation,
         AspxSurfaceDispositionRule AppliedDispositionRule,
-        AspxSurfaceDenominatorRow Surface);
+        AspxSurfaceDenominatorRow Surface,
+        IReadOnlyList<LivePage> RetainedObservationPages = null)
+    {
+        /// <summary>Combines file observations without combining their independent pagination chains or coverage proofs.</summary>
+        internal IEnumerable<LivePage> ObservationPages => RetainedObservationPages == null
+            ? Pages : RetainedObservationPages.Concat(Pages);
+    }
 }

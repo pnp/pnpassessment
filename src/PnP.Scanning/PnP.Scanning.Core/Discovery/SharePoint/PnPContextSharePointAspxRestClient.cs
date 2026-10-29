@@ -25,6 +25,8 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         internal const string Timeout = "json_response_timeout";
         internal const string IncompleteStream = "json_response_incomplete_stream";
         internal const string TransportFailure = "json_transport_failure";
+        internal const string ThrottleExhausted = "json_throttle_attempts_exhausted";
+        internal const string ThrottleBudget = "json_throttle_delay_exceeds_budget";
     }
 
     private static class JsonEnvelope
@@ -45,6 +47,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     private readonly PnPContext context;
     private readonly bool ownsContext;
     private readonly HttpClient jsonTransport;
+    private readonly SharePointRestThrottlePolicy throttlePolicy;
     private readonly HttpClient ownedJsonTransport = new(new HttpClientHandler
     {
         AllowAutoRedirect = false,
@@ -54,77 +57,161 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
 
     // Optional transport is explicitly borrowed; its owner (for example an offline SDK fixture)
     // retains its lifetime. Production defaults to our owned no-redirect/no-cookie client.
-    /// <summary>Creates an SDK-backed client with an owned nonredirecting JSON transport and explicit context or JSON-transport ownership.</summary>
-    internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true, HttpClient jsonTransport = null)
+    /// <summary>Creates a bounded SDK-authenticated JSON reader while retaining explicit context and borrowed transport ownership.</summary>
+    internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true, HttpClient jsonTransport = null,
+        SharePointRestThrottlePolicy throttlePolicy = null)
     {
         this.context = context ?? throw new ArgumentNullException(nameof(context));
         this.ownsContext = ownsContext;
         this.jsonTransport = jsonTransport ?? ownedJsonTransport;
+        this.throttlePolicy = throttlePolicy ?? SharePointRestThrottlePolicy.Default;
     }
 
     public Uri WebUrl => context.Uri;
 
-    /// <summary>Requests one bounded JSON page through the configured transport using the context authentication provider.</summary>
+    /// <summary>Requests one bounded JSON page using context authentication and a shared deadline across safe throttle retries.</summary>
     public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
         CancellationToken cancellationToken = default) => ReadBoundedPageAsync(jsonTransport, context.Uri,
             requestUri, (request, token) => context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request),
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken, throttlePolicy: throttlePolicy);
 
-    // Thin fake-HTTP seam; production always supplies the owned no-redirect/no-cookie client above.
-    /// <summary>Enforces exact authenticated web-API scope, one deadline, and a byte budget before parsing durable page evidence.</summary>
+    // Thin fake-HTTP seam; production defaults to the owned no-redirect/no-cookie client above.
+    /// <summary>Enforces authenticated web-API scope, byte limits, and one deadline across fresh 429/503 attempts and server-directed delays.</summary>
     internal static async Task<SharePointRestPage> ReadBoundedPageAsync(HttpClient client, Uri web, Uri uri,
         Func<HttpRequestMessage, CancellationToken, Task> authenticate, int maxBytes = 4 * 1024 * 1024,
-        TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+        TimeSpan? timeout = null, CancellationToken cancellationToken = default,
+        SharePointRestThrottlePolicy throttlePolicy = null)
     {
         SharePointAspxUrlPolicy.ValidateWeb(web);
         if (uri == null || !uri.IsAbsoluteUri || uri.Scheme != "https" || !uri.IsDefaultPort ||
             !string.Equals(uri.Authority, web.Authority, StringComparison.OrdinalIgnoreCase) ||
             uri.UserInfo.Length != 0 || uri.Fragment.Length != 0 ||
             !uri.AbsolutePath.StartsWith(web.AbsolutePath.TrimEnd('/') + "/_api/", StringComparison.OrdinalIgnoreCase))
+        {
             throw new ArgumentException("JSON requests must stay in the authenticated web API.");
+        }
         var budget = timeout ?? TimeSpan.FromSeconds(20);
         if (maxBytes is < 1 or > 16 * 1024 * 1024 || budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(5))
+        {
             throw new ArgumentOutOfRangeException(nameof(maxBytes));
-        SharePointRestPage Failure(DiscoveryTerminalOutcome outcome, string code, HttpStatusCode status = 0) =>
-            new(uri, status, Array.Empty<JsonElement>(), null, DiscoveryHash.Of(code), BoundedJsonErrorSchema, outcome,
-                code, SharePointSemanticDetectorResults.None, DateTimeOffset.UtcNow, AttemptCount: 1, AttemptLimit: 1);
+        }
+        var policy = throttlePolicy ?? SharePointRestThrottlePolicy.Default;
+        var started = policy.Clock.GetTimestamp();
+        var evidence = new SharePointRestPage(uri, 0, Array.Empty<JsonElement>(), null, null,
+            BoundedJsonErrorSchema, DiscoveryTerminalOutcome.Unknown, ReceivedAtUtc: policy.Clock.GetUtcNow(),
+            AttemptCount: 0, AttemptLimit: policy.AttemptLimit);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(budget);
         try
         {
-            using var request = CreateGetRequest(uri);
-            await authenticate(request, deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
-            if ((int)response.StatusCode is >= 300 and <= 399 || response.RequestMessage?.RequestUri == null ||
-                !string.Equals(response.RequestMessage.RequestUri.AbsoluteUri, uri.AbsoluteUri, StringComparison.Ordinal))
-                return Failure(DiscoveryTerminalOutcome.Unknown, JsonReadErrors.RedirectOrUriDrift, response.StatusCode);
-            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
-                return Failure(DiscoveryTerminalOutcome.Denied, JsonReadErrors.Denied, response.StatusCode);
-            long? length = response.Content.Headers.ContentLength;
-            if (length > maxBytes || response.StatusCode == HttpStatusCode.PartialContent)
-                return Failure(DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeOrPartial, response.StatusCode);
-            using var buffer = new MemoryStream();
-            using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
-            byte[] chunk = new byte[Math.Min(maxBytes + 1, 8192)];
             while (true)
             {
-                int count = await stream.ReadAsync(chunk.AsMemory(0, Math.Min(chunk.Length, maxBytes + 1 - (int)buffer.Length)), deadline.Token).ConfigureAwait(false);
-                if (count == 0)
+                deadline.Token.ThrowIfCancellationRequested();
+                if (policy.Clock.GetElapsedTime(started) >= budget)
                 {
-                    break;
+                    return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
                 }
-                buffer.Write(chunk, 0, count);
-                if (buffer.Length > maxBytes)
+                evidence = evidence with
                 {
-                    return Failure(DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeLimit, response.StatusCode);
+                    AttemptCount = evidence.AttemptCount + 1,
+                    StatusCode = 0,
+                    ReceivedAtUtc = policy.Clock.GetUtcNow(),
+                    RequestId = null,
+                    CorrelationId = null
+                };
+                TimeSpan retryDelay;
+                // The failed response, its content/stream, and the request leave scope before any retry delay.
+                using (var request = CreateGetRequest(uri))
+                {
+                    await authenticate(request, deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
+                    deadline.Token.ThrowIfCancellationRequested();
+                    if (policy.Clock.GetElapsedTime(started) >= budget)
+                    {
+                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                    }
+                    using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
+                        deadline.Token).ConfigureAwait(false);
+                    evidence = evidence with
+                    {
+                        StatusCode = response.StatusCode,
+                        ReceivedAtUtc = policy.Clock.GetUtcNow(),
+                        RequestId = Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
+                        CorrelationId = Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id")
+                    };
+                    deadline.Token.ThrowIfCancellationRequested();
+                    if ((int)response.StatusCode is >= 300 and <= 399 || response.RequestMessage?.RequestUri == null ||
+                        !response.RequestMessage.RequestUri.IsAbsoluteUri ||
+                        !string.Equals(response.RequestMessage.RequestUri.AbsoluteUri, uri.AbsoluteUri, StringComparison.Ordinal))
+                    {
+                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Unknown, JsonReadErrors.RedirectOrUriDrift, policy.Clock);
+                    }
+                    if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
+                    {
+                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Denied, JsonReadErrors.Denied, policy.Clock);
+                    }
+                    long? length = response.Content.Headers.ContentLength;
+                    if (length > maxBytes || response.StatusCode == HttpStatusCode.PartialContent)
+                    {
+                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeOrPartial, policy.Clock);
+                    }
+                    if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
+                    {
+                        if (evidence.AttemptCount >= policy.AttemptLimit)
+                        {
+                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.ThrottleExhausted, policy.Clock);
+                        }
+                        // No need to read or persist an error body before disposing the throttled response.
+                        retryDelay = policy.GetRetryDelay(response, evidence.ReceivedAtUtc, evidence.AttemptCount);
+                    }
+                    else
+                    {
+                        using var buffer = new MemoryStream();
+                        using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
+                        byte[] chunk = new byte[Math.Min(maxBytes + 1, 8192)];
+                        while (true)
+                        {
+                            deadline.Token.ThrowIfCancellationRequested();
+                            if (policy.Clock.GetElapsedTime(started) >= budget)
+                            {
+                                return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                            }
+                            int count = await stream.ReadAsync(chunk.AsMemory(0,
+                                Math.Min(chunk.Length, maxBytes + 1 - (int)buffer.Length)), deadline.Token).ConfigureAwait(false);
+                            if (count == 0)
+                            {
+                                break;
+                            }
+                            buffer.Write(chunk, 0, count);
+                            if (buffer.Length > maxBytes)
+                            {
+                                return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeLimit, policy.Clock);
+                            }
+                        }
+                        deadline.Token.ThrowIfCancellationRequested();
+                        if (policy.Clock.GetElapsedTime(started) >= budget)
+                        {
+                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                        }
+                        if (length.HasValue && length.Value != buffer.Length)
+                        {
+                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.IncompleteBody, policy.Clock);
+                        }
+                        var page = SharePointRestResponseParser.Parse(uri, response.StatusCode, buffer.ToArray(),
+                            response.Content.Headers.ContentType?.MediaType, evidence.RequestId, evidence.CorrelationId,
+                            evidence.ReceivedAtUtc, evidence.AttemptCount, evidence.AttemptLimit);
+                        deadline.Token.ThrowIfCancellationRequested();
+                        return policy.Clock.GetElapsedTime(started) >= budget
+                            ? JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock)
+                            : page;
+                    }
                 }
+                deadline.Token.ThrowIfCancellationRequested();
+                if (retryDelay >= budget - policy.Clock.GetElapsedTime(started))
+                {
+                    return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.ThrottleBudget, policy.Clock);
+                }
+                await policy.DelayAsync(retryDelay, deadline.Token).ConfigureAwait(false);
             }
-            if (length.HasValue && length.Value != buffer.Length)
-                return Failure(DiscoveryTerminalOutcome.Truncated, JsonReadErrors.IncompleteBody, response.StatusCode);
-            return SharePointRestResponseParser.Parse(uri, response.StatusCode, buffer.ToArray(),
-                response.Content.Headers.ContentType?.MediaType, Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
-                Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id"),
-                DateTimeOffset.UtcNow, attemptCount: 1, attemptLimit: 1);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -132,17 +219,27 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
         catch (OperationCanceledException)
         {
-            return Failure(DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout);
+            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
         }
         catch (IOException)
         {
-            return Failure(DiscoveryTerminalOutcome.Truncated, JsonReadErrors.IncompleteStream);
+            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.IncompleteStream, policy.Clock);
         }
         catch (HttpRequestException)
         {
-            return Failure(DiscoveryTerminalOutcome.Failed, JsonReadErrors.TransportFailure);
+            return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.TransportFailure, policy.Clock);
         }
     }
+
+    /// <summary>Preserves the final response receipt, or timestamps a response-free failure, without retaining source bytes.</summary>
+    private static SharePointRestPage JsonFailure(SharePointRestPage evidence, DiscoveryTerminalOutcome outcome, string code,
+        TimeProvider clock) => evidence with
+        {
+            ResponseDigest = DiscoveryHash.Of(code),
+            Outcome = outcome,
+            ErrorCode = code,
+            ReceivedAtUtc = evidence.StatusCode == 0 ? clock.GetUtcNow() : evidence.ReceivedAtUtc
+        };
 
     /// <summary>Creates the JSON GET request with the existing no-metadata OData media contract.</summary>
     internal static HttpRequestMessage CreateGetRequest(Uri requestUri)

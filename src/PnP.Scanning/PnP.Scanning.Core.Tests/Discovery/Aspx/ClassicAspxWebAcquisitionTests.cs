@@ -112,12 +112,19 @@ public sealed class ClassicAspxWebAcquisitionTests
         inventory.Single().CoverageState.Should().Be(expected);
     }
 
-    /// <summary>Retains GUID-backed physical files with decoded or encoded hash characters in folder and file ResourcePaths.</summary>
+    /// <summary>Encodes decoded physical file paths without interpreting literal percent sequences or fragment delimiters.</summary>
     [Theory]
-    [InlineData("/sites/inventory/Docs/A#B/page.aspx")]
-    [InlineData("https://example.sharepoint.com/sites/inventory/Docs/A#B/page.aspx")]
-    [InlineData("/sites/inventory/Docs/A%23B/page.aspx")]
-    public async Task PhysicalHashNamesAreNotReferenceFragments(string locator)
+    [InlineData("/sites/inventory/Docs/A#B/page.aspx", "A%23B/page.aspx")]
+    [InlineData("https://example.sharepoint.com/sites/inventory/Docs/A#B/page.aspx", "A%23B/page.aspx")]
+    [InlineData("/sites/inventory/Docs/A%23B/page.aspx", "A%2523B/page.aspx")]
+    [InlineData("/sites/inventory/Docs/A%20B.aspx", "A%2520B.aspx")]
+    [InlineData("https://example.sharepoint.com/sites/inventory/Docs/A%20B.aspx", "A%2520B.aspx")]
+    [InlineData("/sites/inventory/Docs/A B.aspx", "A%20B.aspx")]
+    [InlineData("/sites/inventory/Docs/A%2fB.aspx", "A%252fB.aspx")]
+    [InlineData("/sites/inventory/Docs/A%2FB.aspx", "A%252FB.aspx")]
+    [InlineData("/sites/inventory/Docs/A%2520B.aspx", "A%252520B.aspx")]
+    [InlineData("/sites/inventory/Docs/100%.aspx", "100%25.aspx")]
+    public async Task PhysicalHashNamesAreNotReferenceFragments(string locator, string expectedPath)
     {
         var scanId = Guid.NewGuid();
         var physical = ClassicAspxStreamingFixture.Page(scanId, 1);
@@ -132,7 +139,7 @@ public sealed class ClassicAspxWebAcquisitionTests
                 return Task.CompletedTask;
             });
         gaps.Should().BeEmpty();
-        inventory.Single().Url.Should().Contain("A%23B/page.aspx");
+        inventory.Single().Url.Should().EndWith(expectedPath);
         inventory.Single().FileUniqueId.Should().Be(physical.FileUniqueId.Value);
     }
 

@@ -82,7 +82,7 @@ internal sealed class ClassicAspxWebAcquisition
             SiteUrl = context.SiteUrl.AbsoluteUri,
             WebUrl = context.WebUrl.AbsoluteUri,
             Url = new Uri(context.SiteUrl, path).AbsoluteUri,
-            FileName = observation.FileName ?? path.Split('/')[^1],
+            FileName = observation.FileName ?? Uri.UnescapeDataString(path.Split('/')[^1]),
             ContentTypeId = observation.ContentTypeId,
             CustomizedPageStatus = observation.CustomizedPageStatus,
             SetupPath = observation.SetupPath,
@@ -103,12 +103,12 @@ internal sealed class ClassicAspxWebAcquisition
     }
 
     /// <summary>
-    /// Protects literal hash delimiters reported by a real physical file path before applying the existing authority/path checks.
-    /// Reference-URL normalization must not interpret a server-observed folder/file name as a URL fragment.
+    /// Encodes decoded physical folder/file segments without reinterpreting literal percent escapes or hash characters.
+    /// ResourcePath identity remains distinct from reference-URL navigation and stays within the observed site authority.
     /// </summary>
     private bool TryNormalizePhysicalFilePath(string locator, out string path)
     {
-        return urlPolicy.TryNormalizeResourceReference(locator?.Replace("#", "%23", StringComparison.Ordinal), out path);
+        return urlPolicy.TryNormalizeDecodedPhysicalPath(locator, out path);
     }
 
     /// <summary>Retains an invalid physical observation as a gap without deriving a replacement GUID or silently admitting another scope.</summary>

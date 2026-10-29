@@ -69,6 +69,42 @@ internal sealed class SharePointAspxUrlPolicy
     }
 
     /// <summary>
+    /// Encodes a server-observed decoded physical ResourcePath one segment at a time.
+    /// Literal percent sequences and hash/query delimiters are file-name data, not URI escapes or reference navigation.
+    /// </summary>
+    internal bool TryNormalizeDecodedPhysicalPath(string locator, out string path)
+    {
+        path = null;
+        if (string.IsNullOrWhiteSpace(locator) || locator.Any(char.IsControl) || locator.Contains((char)92))
+        {
+            return false;
+        }
+
+        string decodedPath = locator;
+        if (!decodedPath.StartsWith("/", StringComparison.Ordinal))
+        {
+            const string authoritySeparator = "://";
+            int schemeEnd = locator.IndexOf(authoritySeparator, StringComparison.Ordinal);
+            int pathStart = schemeEnd < 0 ? -1 : locator.IndexOf('/', schemeEnd + authoritySeparator.Length);
+            if (pathStart < 0 || !Uri.TryCreate(locator[..pathStart] + "/", UriKind.Absolute, out var authority) ||
+                !HasSameHttpsAuthority(siteUrl, authority) || !string.IsNullOrEmpty(authority.UserInfo))
+            {
+                return false;
+            }
+            decodedPath = locator[pathStart..];
+        }
+
+        if (decodedPath.StartsWith("//", StringComparison.Ordinal) || ContainsTraversalSegment(decodedPath) ||
+            !IsPathWithinRoot(decodedPath, Uri.UnescapeDataString(siteUrl.AbsolutePath)))
+        {
+            return false;
+        }
+
+        path = string.Join('/', decodedPath.Split('/').Select(Uri.EscapeDataString));
+        return true;
+    }
+
+    /// <summary>
     /// Accepts only a same-authority continuation of the original collection path and all original query values.
     /// A newly introduced nonempty filter, duplicate query key, fragment or user-info component is not followed.
     /// </summary>

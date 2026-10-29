@@ -18,7 +18,7 @@ This covers content-store files, not virtual /_layouts application endpoints or 
 
 List/default-display-form/content-type/form/view declarations are role evidence, not physical file or Item counts. Existing discovery.csv Reference observations retain these declarations; a URL cannot create a missing inventory file. Existing Classic page assessment, rich shared metadata and report denominators remain separate.
 
-Inventory does not enumerate list items, fetch source bytes, infer runtime Handlers or create Item-to-ASPX bindings.
+Inventory does not enumerate list items, fetch source bytes, infer runtime Handlers or create Item-to-ASPX bindings. Legacy Posts/custom-display-form item assessment remains a separate Classic assessment branch: it still produces CP4/CP5 report rows and legacy rollups, without creating physical inventory records.
 
 ## Running
 
