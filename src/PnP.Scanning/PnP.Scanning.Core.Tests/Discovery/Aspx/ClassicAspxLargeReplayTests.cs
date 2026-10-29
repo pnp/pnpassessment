@@ -3,7 +3,7 @@ using PnP.Scanning.Core.Storage;
 using System.Text.Json;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Discovery.M1;
+namespace PnP.Scanning.Core.Tests.Discovery.Aspx;
 
 public sealed class ClassicAspxLargeReplayTests
 {

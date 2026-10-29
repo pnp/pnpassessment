@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 
 /// <summary>
 /// Pure, fail-closed lexical reader of actual ASPX source. It does not render HTML,

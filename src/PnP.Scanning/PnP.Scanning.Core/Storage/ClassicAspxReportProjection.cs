@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 
 namespace PnP.Scanning.Core.Storage;
 
-/// <summary>SQL projections and ordered, typed streaming for the two approved M1 native CSVs.</summary>
+/// <summary>SQL projections and ordered, typed streaming for the two approved ASPX native CSVs.</summary>
 internal static class ClassicAspxReportProjection
 {
     internal const string InventoryCsv = "classicaspxinventories.csv";
@@ -49,15 +49,15 @@ internal static class ClassicAspxReportProjection
             "Zero bindings do not prove complete absence; CoverageState Unknown/Incomplete/Changed is preserved in each inventory row. " +
             "HomePageOnly is targeted, not full inventory or tenant coverage.\n";
         internal const string ObservedWithoutMarker =
-            "M1ProjectionContract=UnknownContract\nAcquisitionState=ObservedWithoutNativeMarker\nM1ScopeMode=Unknown\n" +
-            "Normalized rows were observed without a native M1/v1 marker, for example after resuming an older scan. " +
-            "These observations are real but do not establish the M1/v1 acquisition contract or complete coverage. " +
+            "AspxProjectionContract=UnknownContract\nAcquisitionState=ObservedWithoutNativeMarker\nAspxScopeMode=Unknown\n" +
+            "Normalized rows were observed without a native aspx-inventory/v1 marker, for example after resuming an older scan. " +
+            "These observations are real but do not establish the aspx-inventory/v1 acquisition contract or complete coverage. " +
             "Counts remain declared-scope observations; migration itself never backfills facts.\n";
         internal const string Legacy =
-            "M1ProjectionContract=NotAcquired/Legacy\nAcquisitionState=NotAcquired\nM1ScopeMode=Unknown\n" +
-            "This scan has no native M1/v1 acquisition marker. Empty upgraded M1 tables are not proof that no ASPX exists. " +
+            "AspxProjectionContract=NotAcquired/Legacy\nAcquisitionState=NotAcquired\nAspxScopeMode=Unknown\n" +
+            "This scan has no native aspx-inventory/v1 acquisition marker. Empty upgraded ASPX tables are not proof that no ASPX exists. " +
             "Migration does not backfill historical inventory, bindings or Handler facts.\n";
-        internal const string NullableEncodingPrefix = "M1NullableStringEncoding=" +
+        internal const string NullableEncodingPrefix = "AspxNullableStringEncoding=" +
             ClassicAspxNullableStringConverter.EncodingVersion + "; null=";
         internal const string NullableEncodingLimitations =
             "; non-null leading backslash is escaped with one extra backslash; empty string stays empty.\n";
@@ -167,12 +167,10 @@ internal static class ClassicAspxReportProjection
         var observedDistinctBindingCount = await WriteTypedCsvAsync(Path.Combine(exportPath, BindingsCsv), configuration,
             BindingRowsForExport(context, scanId).AsAsyncEnumerable(), cancellationToken).ConfigureAwait(false);
 
-        var contract = await context.Properties.AsNoTracking()
-            .Where(row => row.ScanId == scanId && row.Name == ClassicAspxProjectionContract.PropertyName)
-            .Select(row => row.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        var scope = await context.Properties.AsNoTracking()
-            .Where(row => row.ScanId == scanId && row.Name == ClassicAspxProjectionContract.ScopeModePropertyName)
-            .Select(row => row.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        var storedContract = await ClassicAspxProjectionContract.ReadAsync(context, scanId, cancellationToken)
+            .ConfigureAwait(false);
+        var contract = storedContract.Version;
+        var scope = storedContract.ScopeMode;
         var observedWithoutMarker = contract != ClassicAspxProjectionContract.Version &&
             (await context.ClassicAspxInventories.AsNoTracking().AnyAsync(row => row.ScanId == scanId, cancellationToken).ConfigureAwait(false) ||
              await context.ClassicAspxItemBindings.AsNoTracking().AnyAsync(row => row.ScanId == scanId, cancellationToken).ConfigureAwait(false));

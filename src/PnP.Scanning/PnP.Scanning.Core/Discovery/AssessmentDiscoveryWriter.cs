@@ -16,6 +16,7 @@ internal sealed class AssessmentDiscoveryWriter
     internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId)) { }
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
+    /// <summary>Persists raw observations without erasing retained failures or rekeying preview evidence during resume.</summary>
     internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
     {
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -26,6 +27,15 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 var previous = await db.ClassicPageDiscoveries.FindAsync(
                     new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
+                if (previous == null && Aspx.ClassicAspxEvidenceCompatibility.LegacyKeyFor(row.RecordKey) is { } legacyKey)
+                {
+                    previous = await db.ClassicPageDiscoveries.FindAsync(
+                        new object[] { row.ScanId, legacyKey }, cancellationToken).ConfigureAwait(false);
+                    if (previous != null)
+                    {
+                        Aspx.ClassicAspxEvidenceCompatibility.PreserveIdentity(row, previous);
+                    }
+                }
                 if (previous == null) db.ClassicPageDiscoveries.Add(row);
                 else
                 {

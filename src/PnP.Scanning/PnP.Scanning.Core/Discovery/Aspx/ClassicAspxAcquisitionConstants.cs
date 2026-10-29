@@ -1,4 +1,4 @@
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 
 /// <summary>Stable acquisition scope names persisted in request receipts and coverage evidence.</summary>
 internal static class ClassicAspxAcquisitionScopes
@@ -27,7 +27,7 @@ internal static class ClassicAspxAcquisitionErrorCodes
     internal const string TransportFailure = "transport_failure";
     internal const string ResponseUriDrift = "pagination_response_uri_drift";
     internal const string UnsafeOrRepeatedCursor = "pagination_unsafe_or_repeated_cursor";
-    internal const string IncompleteCollection = "m1_collection_incomplete";
+    internal const string IncompleteCollection = "aspx_collection_incomplete";
     internal const string UnsupportedRendererPath = "renderer_path_unsupported";
     internal const string UnresolvedCatalogMember = "platform_catalog_member_unresolved";
     internal const string AmbiguousCatalogAlias = "platform_catalog_alias_ambiguous";
@@ -67,14 +67,14 @@ internal static class ClassicAspxAcquisitionEvidenceNames
     internal const string Pagination = "Pagination";
     internal const string RequestPage = "RequestPage";
     internal const string Gap = "Gap";
-    internal const string Acquisition = "M1Acquisition";
+    internal const string Acquisition = "AspxAcquisition";
     internal const string FileResolution = "FileResolution";
     internal const string FileSource = "FileSource";
     internal const string FileClientRoute = "FileClientRoute";
     internal const string ReadFileContentPrefix = "ReadFileContentAsync:";
-    internal const string NativeMethod = "NativeM1Acquisition";
-    internal const string RecordPrefix = "m1:";
-    internal const string WebScopePrefix = "m1:web:";
+    internal const string NativeMethod = "NativeAspxAcquisition";
+    internal const string RecordPrefix = "aspx:";
+    internal const string WebScopePrefix = "aspx:web:";
     internal const string TransportErrorSchema = "transport-error";
     internal const string GetMethod = "GET";
 }

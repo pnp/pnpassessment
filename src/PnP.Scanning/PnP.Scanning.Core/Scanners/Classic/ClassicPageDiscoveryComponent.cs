@@ -1,6 +1,6 @@
 using PnP.Core.Auth;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Services;
 
@@ -8,7 +8,7 @@ namespace PnP.Scanning.Core.Scanners;
 
 internal static class ClassicPageDiscoveryComponent
 {
-    /// <summary>Owns a temporary web context while running Classic discovery and native M1 acquisition for the scheduled web.</summary>
+    /// <summary>Owns a temporary web context while running Classic discovery and native ASPX acquisition for the scheduled web.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner)
     {
         using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
@@ -44,9 +44,9 @@ internal static class ClassicPageDiscoveryComponent
             PlatformAspxCatalog.FromFrozenPayload(scanner.Options.PlatformAspxCatalogPayload);
         var projection = new ClassicAspxProjectionWriter(scanner.ScanId);
         using var nativeClient = new PnPContextSharePointAspxRestClient(context, ownsContext: false);
-        var m1Context = new M1WebAcquisitionContext(scanner.ScanId, site.Id, web.Id,
+        var acquisitionContext = new ClassicAspxWebAcquisitionContext(scanner.ScanId, site.Id, web.Id,
             new Uri(site.Url.ToString(), UriKind.Absolute), new Uri(web.Url.ToString(), UriKind.Absolute), scanner.Options, catalog);
-        await new ClassicAspxWebAcquisition(m1Context, nativeClient, factory).AcquireAsync(
+        await new ClassicAspxWebAcquisition(acquisitionContext, nativeClient, factory).AcquireAsync(
             writer.ReadPageStreamAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token),
             async (batch, cancellation) =>
             {

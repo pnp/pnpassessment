@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 
 /// <summary>Explicit versioned catalog evidence, frozen as exact input bytes with the Scan properties.</summary>
 internal sealed class PlatformAspxCatalog

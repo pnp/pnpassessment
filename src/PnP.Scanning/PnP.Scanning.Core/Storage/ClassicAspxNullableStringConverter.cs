@@ -5,12 +5,12 @@ using CsvHelper.TypeConversion;
 
 namespace PnP.Scanning.Core.Storage;
 
-/// <summary>Reversible nullable-string wire contract for the two M1 CSVs only.</summary>
+/// <summary>Reversible nullable-string wire contract for the two ASPX CSVs only.</summary>
 internal sealed class ClassicAspxNullableStringConverter : DefaultTypeConverter
 {
     internal const string EncodingVersion = "BackslashNullV1";
     internal const string NullToken = @"\N";
-    /// <summary>Preserves null, empty, and literal leading-backslash strings as distinct reversible M1 CSV values.</summary>
+    /// <summary>Preserves null, empty, and literal leading-backslash strings as distinct reversible ASPX CSV values.</summary>
     internal static string Encode(string? value) => value == null ? NullToken :
         value.StartsWith("\\", StringComparison.Ordinal) ? "\\" + value : value;
 
@@ -24,7 +24,7 @@ internal sealed class ClassicAspxNullableStringConverter : DefaultTypeConverter
         return value.StartsWith("\\\\", StringComparison.Ordinal) ? value[1..] : value;
     }
 
-    /// <summary>Applies the M1 nullable-string encoding to the typed CSV field without altering other converter behavior.</summary>
+    /// <summary>Applies the ASPX nullable-string encoding to the typed CSV field without altering other converter behavior.</summary>
     public override string ConvertToString(object? value, IWriterRow row, MemberMapData memberMapData) =>
         Encode((string?)value);
 

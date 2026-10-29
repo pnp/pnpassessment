@@ -83,7 +83,7 @@ namespace PnP.Scanning.Core.Scanners
                     }
                     else if (property.Property == Constants.StartExcludeSiteTemplates)
                     {
-                        (options as ClassicOptions).ExcludeSiteTemplates = Discovery.M1.SiteTemplateExclusionPolicy.Parse(property.Value).CanonicalValue;
+                        (options as ClassicOptions).ExcludeSiteTemplates = Discovery.Aspx.SiteTemplateExclusionPolicy.Parse(property.Value).CanonicalValue;
                     }
                     else if (property.Property == Constants.StartPlatformAspxCatalogPayload)
                     {

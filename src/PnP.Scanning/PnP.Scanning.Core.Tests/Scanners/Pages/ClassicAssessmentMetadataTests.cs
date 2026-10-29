@@ -229,6 +229,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         context.GraphFirst.Should().BeTrue();
     }
 
+    /// <summary>Proves full inventory reuses the exact single metadata snapshot when invoking page discovery.</summary>
     [Fact]
     public async Task Full_acquisition_loads_once_then_passes_identical_snapshot_to_discovery()
     {
@@ -254,6 +255,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Requires incomplete metadata to reach fallback discovery as unknown rather than suppressing physical acquisition.</summary>
     [Theory]
     [InlineData("missing")]
     [InlineData("nextLink")]
@@ -279,6 +281,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Proves homepage discovery precedes the single rich metadata load and does not receive an all-list authority.</summary>
     [Fact]
     public async Task Home_acquisition_discovers_target_first_then_loads_normal_rich_lists_once()
     {

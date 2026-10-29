@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Storage;
 using System.Text.Json;
 
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 
 /// <summary>Bounded, atomic materialization of observed identities and distinct scoped Item pairs.</summary>
 internal sealed class ClassicAspxProjectionWriter

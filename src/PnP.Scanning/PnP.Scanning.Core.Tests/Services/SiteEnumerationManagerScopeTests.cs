@@ -20,7 +20,7 @@ public class SiteEnumerationManagerScopeTests
     private const string PersonalSite = "https://contoso-my.sharepoint.com/personal/alex_contoso_com";
 
     /// <summary>
-    /// Defers M1 tenant-site admission until templates can be evaluated while retaining the legacy non-page personal-host filter.
+    /// Defers ASPX tenant-site admission until templates can be evaluated while retaining the legacy non-page personal-host filter.
     /// </summary>
     [Theory]
     [InlineData(false, false)]
@@ -41,7 +41,7 @@ public class SiteEnumerationManagerScopeTests
 
         var sites = await fixture.Manager.EnumerateSiteCollectionsToScanAsync(start, null, _ => { });
 
-        if (pages) sites.Should().Equal(new[] { TeamSite, PersonalSite }, "M1 must observe templates before admission; none can clear the defaults");
+        if (pages) sites.Should().Equal(new[] { TeamSite, PersonalSite }, "ASPX must observe templates before admission; none can clear the defaults");
         else sites.Should().Equal(new[] { TeamSite }, "legacy non-page scans retain their host filter");
         fixture.Transport.Requests.Count(url => url.Contains("sites/getallsites", StringComparison.OrdinalIgnoreCase))
             .Should().Be(1, "the real SDK tenant enumeration must run against the offline response");
@@ -49,7 +49,7 @@ public class SiteEnumerationManagerScopeTests
     }
 
     /// <summary>
-    /// Excludes personal roots by template yet lets M1 inspect child templates independently; legacy enumeration still skips the root subtree.
+    /// Excludes personal roots by template yet lets ASPX inspect child templates independently; legacy enumeration still skips the root subtree.
     /// </summary>
     [Theory]
     [InlineData("SPSPERS#0", false, false)]
@@ -81,7 +81,7 @@ public class SiteEnumerationManagerScopeTests
     }
 
     /// <summary>
-    /// Excludes app webs without losing regular webs and distinguishes M1 child-template inspection from legacy subtree skipping.
+    /// Excludes app webs without losing regular webs and distinguishes ASPX child-template inspection from legacy subtree skipping.
     /// </summary>
     [Theory]
     [InlineData(false, false)]
@@ -99,7 +99,7 @@ public class SiteEnumerationManagerScopeTests
             ("/", "STS#0"), ("/ordinary", "STS#0"),
         });
         fixture.Transport.Requests.Count(url => url.Contains("getsubwebsfilteredforcurrentuser"))
-            .Should().Be(pages ? 3 : 2, "M1 observes child templates before filtering, while legacy scans retain APP subtree skipping");
+            .Should().Be(pages ? 3 : 2, "ASPX observes child templates before filtering, while legacy scans retain APP subtree skipping");
         if (pages) result.ScopeEvidence.Should().Contain(row => row.WebUrl == "/app" && row.DiscoveryStatus == "PolicyExcluded");
         fixture.Transport.Unexpected.Should().BeEmpty();
     }

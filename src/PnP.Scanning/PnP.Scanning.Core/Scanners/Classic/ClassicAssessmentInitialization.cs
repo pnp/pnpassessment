@@ -11,6 +11,7 @@ internal static class ClassicAssessmentInitialization
 {
     internal const int MaxAttempts = 3;
 
+    /// <summary>Retries eligible initialization failures, retaining discovery before final page failure disposition and rethrowing the original error.</summary>
     internal static async Task<T> ExecuteAsync<T>(Func<Task<T>> initialize,
         AssessmentDiscoveryWriter writer, Guid scanId, string siteUrl, string webUrl,
         CancellationToken cancellationToken, Action<int, Exception> onRetry = null,
@@ -34,6 +35,7 @@ internal static class ClassicAssessmentInitialization
         }
     }
 
+    /// <summary>Retries only eligible interrupted response-body reads within the fixed attempt bound, honoring caller cancellation.</summary>
     internal static async Task<T> RetryAsync<T>(Func<Task<T>> initialize, CancellationToken cancellationToken,
         Action<int, Exception> onRetry = null, Func<TimeSpan, CancellationToken, Task> delay = null)
     {

@@ -34,7 +34,7 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<int> testNumberOfSites;
 #endif
 
-        /// <summary>Retains command option instances so parsed start values, including explicit M1 scope and catalog inputs, bind without reinterpreting defaults.</summary>
+        /// <summary>Retains command option instances so parsed start values, including explicit ASPX scope and catalog inputs, bind without reinterpreting defaults.</summary>
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
                            Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
                            // PER SCAN COMPONENT: implement scan component specific options

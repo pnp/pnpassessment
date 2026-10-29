@@ -4,7 +4,7 @@ using System.Text.Json;
 using static PnP.Scanning.Core.Discovery.SharePointAspxRestJson;
 using static PnP.Scanning.Core.Discovery.SharePointAspxUrlPolicy;
 
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 /// <summary>Incremental native acquisition only. Persistence/union and scan scheduling belong to the caller.</summary>
 internal sealed class ClassicAspxWebAcquisition
 {
@@ -15,7 +15,7 @@ internal sealed class ClassicAspxWebAcquisition
     private const string RedactedText = "[redacted]";
     private const string RedactedKeyValue = "$1=[redacted]";
     private const int MaximumDiagnosticDetailLength = 1024;
-    private readonly M1WebAcquisitionContext context;
+    private readonly ClassicAspxWebAcquisitionContext context;
     private readonly ISharePointAspxRestClient client;
     private readonly ISharePointAspxRestClientFactory clientFactory;
     private ISharePointAspxRestClient siteRootClient;
@@ -24,7 +24,7 @@ internal sealed class ClassicAspxWebAcquisition
     private readonly List<ClassicAspxItemBinding> bindings = new();
     private readonly List<ClassicPageDiscovery> evidence = new();
     private readonly Dictionary<string, ClassicAspxInventory> resources = new(StringComparer.OrdinalIgnoreCase);
-    private Func<M1AcquisitionBatch, CancellationToken, Task> publish;
+    private Func<ClassicAspxAcquisitionBatch, CancellationToken, Task> publish;
     private int BufferedRowCount => inventory.Count + bindings.Count + evidence.Count;
 
     /// <summary>Preserves the legacy site-relative Web path used by raw acquisition evidence.</summary>
@@ -44,7 +44,7 @@ internal sealed class ClassicAspxWebAcquisition
     /// request is sent.
     /// </summary>
     internal ClassicAspxWebAcquisition(
-        M1WebAcquisitionContext context,
+        ClassicAspxWebAcquisitionContext context,
         ISharePointAspxRestClient client,
         ISharePointAspxRestClientFactory clientFactory = null)
     {
@@ -77,7 +77,7 @@ internal sealed class ClassicAspxWebAcquisition
     /// </summary>
     internal async Task AcquireAsync(
         IAsyncEnumerable<ClassicPageDiscovery> physicalPages,
-        Func<M1AcquisitionBatch, CancellationToken, Task> publish,
+        Func<ClassicAspxAcquisitionBatch, CancellationToken, Task> publish,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(physicalPages);
@@ -1114,7 +1114,7 @@ internal sealed class ClassicAspxWebAcquisition
             return;
         }
 
-        var batch = new M1AcquisitionBatch(inventory.ToArray(), bindings.ToArray(), evidence.ToArray());
+        var batch = new ClassicAspxAcquisitionBatch(inventory.ToArray(), bindings.ToArray(), evidence.ToArray());
         await publish(batch, cancellationToken).ConfigureAwait(false); // Persistence failures must propagate, never become network gaps.
         inventory.Clear();
         bindings.Clear();

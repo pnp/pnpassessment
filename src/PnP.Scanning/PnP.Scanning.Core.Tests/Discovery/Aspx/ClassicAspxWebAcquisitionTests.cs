@@ -1,5 +1,5 @@
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using System.Net;
@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.Json;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Discovery.M1;
+namespace PnP.Scanning.Core.Tests.Discovery.Aspx;
 
 public sealed class ClassicAspxWebAcquisitionTests
 {
@@ -25,7 +25,7 @@ public sealed class ClassicAspxWebAcquisitionTests
     /// <summary>
     /// Builds a pages-enabled acquisition context with configurable publication and traversal bounds and optional frozen catalog.
     /// </summary>
-    private static M1WebAcquisitionContext Context(int batchSize = 7, int maxPages = 8, PlatformAspxCatalog catalog = null) =>
+    private static ClassicAspxWebAcquisitionContext Context(int batchSize = 7, int maxPages = 8, PlatformAspxCatalog catalog = null) =>
         new(Scan, Site, Web, SiteUrl, WebUrl, new ClassicOptions { Pages = true }, catalog,
             BatchSize: batchSize, MaxCollectionPages: maxPages);
     /// <summary>
@@ -129,7 +129,7 @@ public sealed class ClassicAspxWebAcquisitionTests
         /// <summary>
         /// Collects all three publication streams and records the largest combined batch without altering emitted facts.
         /// </summary>
-        internal Task Publish(M1AcquisitionBatch batch, CancellationToken ct)
+        internal Task Publish(ClassicAspxAcquisitionBatch batch, CancellationToken ct)
         {
             LargestBatch = Math.Max(LargestBatch, batch.Inventory.Count + batch.Bindings.Count + batch.Evidence.Count);
             Inventory.AddRange(batch.Inventory); Bindings.AddRange(batch.Bindings); Evidence.AddRange(batch.Evidence);

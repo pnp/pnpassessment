@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Storage;
 using System.Text;

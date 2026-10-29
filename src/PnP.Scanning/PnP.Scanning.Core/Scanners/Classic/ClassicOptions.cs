@@ -32,7 +32,7 @@ namespace PnP.Scanning.Core.Scanners
         internal bool HomePageOnly { get; set; }
 
         /// <summary>Frozen Web-template patterns. An explicit list replaces the defaults; sole none clears them.</summary>
-        internal string ExcludeSiteTemplates { get; set; } = Discovery.M1.SiteTemplateExclusionPolicy.DefaultPatterns;
+        internal string ExcludeSiteTemplates { get; set; } = Discovery.Aspx.SiteTemplateExclusionPolicy.DefaultPatterns;
 
         /// <summary>Frozen catalog bytes (base64), never a mutable path reopened on restart.</summary>
         internal string PlatformAspxCatalogPayload { get; set; }

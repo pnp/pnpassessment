@@ -87,7 +87,7 @@ SQL tables are `ClassicAspxInventories` and `ClassicAspxItemBindings`. Native Cl
 |---|---|
 | `aspxinventory.csv` | `ScanId`/`AspxKey`, identity kind/version, site/file GUIDs and locations; file read/errors; declared/normalized/effective Handler and read/parse/source/default/reason evidence; catalog source/version/digest/entry; `ProvenanceJson`, `CoverageState`, `FirstObservedAtUtc`, latest `ObservedAtUtc`, `DistinctItemBindingCount` and `BindingCountBasis`. |
 | `aspxitembindings.csv` | Scoped item/resource key; optional `ItemGuid` and read state; item metadata; `BindingKinds`, `BindingProvenanceJson` and `ObservedAtUtc`. Reasons include `FileSelf`, `ListFormRenderer`, `ContentTypeRenderer`, `DocumentMetadataRenderer` and `PublishingPageLayout`. |
-| `classicaspxinfo.txt` | Acquisition marker/scope and nullable-text encoding. Missing native marker + empty tables means `NotAcquired/Legacy`; missing marker + new observed rows (for example after resume) means `ObservedWithoutNativeMarker` / `UnknownContract`, not an invented `M1/v1` contract. |
+| `classicaspxinfo.txt` | Acquisition marker/scope and nullable-text encoding. Missing native marker + empty tables means `NotAcquired/Legacy`; missing marker + new observed rows (for example after resume) means `ObservedWithoutNativeMarker` / `UnknownContract`, not an invented `aspx-inventory/v1` contract. |
 
 The canonical filenames are `aspxinventory.csv` and `aspxitembindings.csv`. The earlier names `classicaspxinventories.csv` and `classicaspxitembindings.csv` remain compatibility aliases with **exactly the same bytes**, copied from the same completed typed streams rather than another query. Nullable text in canonical and compatibility files uses the same BackslashNullV1 encoding.
 
@@ -97,9 +97,9 @@ Rows stream in deterministic key order; empty tables produce typed header-only C
 
 ### BackslashNullV1 nullable text
 
-Only nullable **text** in the two new M1 CSVs uses `BackslashNullV1`, declared in Info. Parse quoted CSV first, then decode:
+Only nullable **text** in the two new ASPX inventory CSVs uses `BackslashNullV1`, declared in Info. Parse quoted CSV first, then decode:
 
-| Original nullable text | Parsed CSV field before M1 decoding |
+| Original nullable text | Parsed CSV field before nullable-text decoding |
 |---|---|
 | NULL | `\N` |
 | Explicit empty string | Empty field, unchanged |
@@ -112,6 +112,10 @@ The typed `ClassicAspxInventoryExport` and `ClassicAspxItemBindingExport` DTOs a
 
 ## Compatibility and retained observations
 
-Existing Classic CSVs and Power BI templates keep their contracts; the normalized files are additional outputs. `classicpages.csv` is still selected classic-page assessment data, not a replacement for the ASPX inventory. Upgrades create schema without inventing historical inventory, bindings or Handler facts. Header-only legacy M1 files do not mean there was no ASPX.
+Existing Classic CSVs and Power BI templates keep their contracts; the normalized files are additional outputs. `classicpages.csv` is still selected classic-page assessment data, not a replacement for the ASPX inventory. Upgrades create schema without inventing historical inventory, bindings or Handler facts. Header-only legacy inventory files do not mean there was no ASPX.
 
 Pause/restart retain assessment evidence and merge repeated observations by stable resource/item-pair keys. Reasons combine; first/latest timestamps and provenance preserve context. Location or Handler changes can report `ChangedDuringScan` rather than silently proving one immutable state. Metadata-only or denied observations do not erase already acquired source facts. These semantics do not promise service-side exactly-once execution, a transactional tenant snapshot or coverage of unreadable content.
+
+## Saved-scan compatibility
+
+New scans declare `AspxProjectionContract=aspx-inventory/v1` and `AspxScopeMode`. Saved preview declarations are recognized and normalized during export without backfilling properties or changing facts. When both property families exist, the current family is authoritative; unknown or incomplete current declarations never borrow an older version or scope. Retained raw evidence keys and pagination receipts are preserved during resume, and changed evidence remains uncertain rather than gaining complete coverage.

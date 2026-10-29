@@ -94,24 +94,24 @@ namespace PnP.Scanning.Core.Services
             Log.Information("Assessment id is {ScanId}", scanId);
 
             var options = OptionsBase.FromScannerInput(start);
-            var m1Catalog = options is ClassicOptions { Pages: true, PlatformAspxCatalogPayload: not null } pageOptions
-                ? PnP.Scanning.Core.Discovery.M1.PlatformAspxCatalog.FromFrozenPayload(pageOptions.PlatformAspxCatalogPayload) : null;
+            var platformCatalog = options is ClassicOptions { Pages: true, PlatformAspxCatalogPayload: not null } pageOptions
+                ? PnP.Scanning.Core.Discovery.Aspx.PlatformAspxCatalog.FromFrozenPayload(pageOptions.PlatformAspxCatalogPayload) : null;
             await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
             if (options is ClassicOptions { Pages: true })
             {
                 // Seed the declared platform universe once, even for an empty/fully excluded Web selection.
-                await new PnP.Scanning.Core.Discovery.M1.ClassicAspxProjectionWriter(scanId).SeedCatalogAsync(scanId, m1Catalog);
+                await new PnP.Scanning.Core.Discovery.Aspx.ClassicAspxProjectionWriter(scanId).SeedCatalogAsync(scanId, platformCatalog);
                 await new PnP.Scanning.Core.Discovery.AssessmentDiscoveryWriter(scanId).WriteAsync(new[]
                 {
                     new ClassicPageDiscovery
                     {
                         ScanId = scanId, SiteUrl = string.Empty, WebUrl = string.Empty,
-                        RecordKey = "m1:platform-catalog", RowType = "Scope", ScopeType = "PlatformCatalog",
+                        RecordKey = "aspx:platform-catalog", RowType = "Scope", ScopeType = "PlatformCatalog",
                         ObservationMethod = "ExplicitFrozenCatalog/v1",
-                        DiscoveryStatus = m1Catalog == null ? "Unknown" : "Complete",
-                        ExpectedChildCount = m1Catalog?.Entries.Count, ObservedChildCount = m1Catalog?.Entries.Count,
-                        ErrorCodes = m1Catalog == null ? "platform_catalog_not_provided" : null,
-                        EvidenceJson = System.Text.Json.JsonSerializer.Serialize(new { version = m1Catalog?.Version, source = m1Catalog?.Source, digest = m1Catalog?.Digest, contract = ClassicAspxProjectionContract.Version, runtimeHandlerConfirmed = false }),
+                        DiscoveryStatus = platformCatalog == null ? "Unknown" : "Complete",
+                        ExpectedChildCount = platformCatalog?.Entries.Count, ObservedChildCount = platformCatalog?.Entries.Count,
+                        ErrorCodes = platformCatalog == null ? "platform_catalog_not_provided" : null,
+                        EvidenceJson = System.Text.Json.JsonSerializer.Serialize(new { version = platformCatalog?.Version, source = platformCatalog?.Source, digest = platformCatalog?.Digest, contract = ClassicAspxProjectionContract.Version, runtimeHandlerConfirmed = false }),
                         ObservedAtUtc = DateTime.UtcNow
                     }
                 });

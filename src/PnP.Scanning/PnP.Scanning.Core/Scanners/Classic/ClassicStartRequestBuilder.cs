@@ -18,7 +18,7 @@ namespace PnP.Scanning.Core.Scanners
         private const string IntegerPropertyType = "int";
         private const string StringPropertyType = "string";
 
-        /// <summary>Appends Classic component and option properties, declaring the native M1 contract and frozen scope inputs only when Pages is selected.</summary>
+        /// <summary>Appends Classic component and option properties, declaring the native ASPX contract and frozen scope inputs only when Pages is selected.</summary>
         internal static void AddClassicProperties(
             StartRequest request,
             IEnumerable<ClassicComponent> components,
@@ -71,7 +71,7 @@ namespace PnP.Scanning.Core.Scanners
                 {
                     Property = Constants.StartExcludeSiteTemplates,
                     Type = StringPropertyType,
-                    Value = Discovery.M1.SiteTemplateExclusionPolicy.Parse(excludeSiteTemplates).CanonicalValue,
+                    Value = Discovery.Aspx.SiteTemplateExclusionPolicy.Parse(excludeSiteTemplates).CanonicalValue,
                 });
                 if (platformAspxCatalogPayload != null)
                     request.Properties.Add(new PropertyRequest

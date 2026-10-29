@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.DataProtection;
 using PnP.Core.Services;
 using PnP.Scanning.Core;
 using PnP.Scanning.Core.Authentication;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
@@ -19,7 +19,7 @@ namespace PnP.Scanning.Process.Commands
         {
             internal const string TemplateExclusionsHelp = "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.";
             internal const string PlatformCatalogHelp = "Versioned platform ASPX catalog. Its exact bytes are frozen with this scan.";
-            internal const string PagesComponentRequired = "M1 scope/catalog options require the Pages component.";
+            internal const string PagesComponentRequired = "ASPX scope/catalog options require the Pages component.";
         }
 
         private readonly ScannerManager processManager;
@@ -472,9 +472,9 @@ namespace PnP.Scanning.Process.Commands
                 if (mode == Mode.Classic)
                 {
                     var selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
-                    var m1OptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false } ||
+                    var aspxScopeOptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false } ||
                         result.FindResultFor(platformAspxCatalogOption) is { IsImplicit: false };
-                    if (m1OptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
+                    if (aspxScopeOptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
                         result.ErrorMessage = ClassicAcquisitionOptionText.PagesComponentRequired;
                     return;
                 }

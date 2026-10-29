@@ -8,14 +8,14 @@ using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Linq.Expressions;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using System.Text.Json;
 
 namespace PnP.Scanning.Core.Services
 {
     internal sealed class SiteEnumerationManager
     {
-        private const string TemplatePolicyObservationVersion = "M1TemplateExclusions/v1";
+        private const string TemplatePolicyObservationVersion = "web-template-exclusions/v1";
         private readonly IPnPContextFactory contextFactory;
 
         public SiteEnumerationManager(StorageManager storageManager, IPnPContextFactory pnpContextFactory)
@@ -107,7 +107,7 @@ namespace PnP.Scanning.Core.Services
                         }
 
                         var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
-                            // M1 admission is template-based, not a hard-wired personal-host filter.
+                            // ASPX admission is template-based, not a hard-wired personal-host filter.
                             filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
                             vanityUrlOptions: vanityUrlOptions);
                         foreach (var siteCollection in siteCollections)
@@ -224,7 +224,7 @@ namespace PnP.Scanning.Core.Services
                         decisions.Add(new ClassicPageDiscovery
                         {
                             ScanId = scanId, SiteUrl = siteCollectionUrl, WebUrl = web.WebUrl, Url = absolute,
-                            RecordKey = "m1:template-policy:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                            RecordKey = "aspx:template-policy:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                                 System.Text.Encoding.UTF8.GetBytes(absolute.ToLowerInvariant()))).ToLowerInvariant(),
                             RowType = "Scope", ScopeType = "WebTemplatePolicy",
                             ObservationMethod = TemplatePolicyObservationVersion,

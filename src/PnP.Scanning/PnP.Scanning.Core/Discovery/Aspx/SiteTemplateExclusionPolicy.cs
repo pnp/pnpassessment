@@ -1,6 +1,6 @@
 using System.IO.Enumeration;
 
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 
 /// <summary>Frozen, per-scan Web-template exclusion policy. An excluded parent says nothing about its children.</summary>
 internal sealed class SiteTemplateExclusionPolicy

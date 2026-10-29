@@ -193,6 +193,7 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
+        /// <summary>Creates one identity context; the separate shared-metadata step controls when list metadata loads.</summary>
         private Task<PnPContext> CreateWebContextAsync()
         {
             // Create one identity context. Shared assessment metadata is loaded into it once
@@ -206,6 +207,7 @@ namespace PnP.Scanning.Core.Scanners
             });
         }
 
+        /// <summary>Runs page discovery with the shared snapshot or targeted fallback, then finalizes retained initialization failures before assessment.</summary>
         private async Task ExecutePagesAsync(PnPContext context, ClientContext csomContext,
             PnPContextOptions assessmentOptions, SharePointListMetadataSnapshot sharedLists,
             Exception metadataFailure)
@@ -228,6 +230,7 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
+        /// <summary>Loads the Web metadata once through the existing bounded response-body retry policy.</summary>
         private Task<SharePointListMetadataSnapshot> RetryLoadSharedMetadataAsync(PnPContext context,
             PnPContextOptions assessmentOptions, CancellationToken token)
         {
@@ -236,6 +239,7 @@ namespace PnP.Scanning.Core.Scanners
                 token, LogMetadataRetry);
         }
 
+        /// <summary>Loads rich shared assessment metadata only after targeted homepage discovery has completed.</summary>
         private Task<SharePointListMetadataSnapshot> LoadSharedMetadataAfterHomeDiscoveryAsync(PnPContext context,
             PnPContextOptions assessmentOptions)
         {
@@ -245,6 +249,7 @@ namespace PnP.Scanning.Core.Scanners
                 new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl, token, LogMetadataRetry);
         }
 
+        /// <summary>Logs the eligible initialization retry without changing retry classification, attempt limits or exception ownership.</summary>
         private void LogMetadataRetry(int attempt, Exception error) => Logger.Warning(error,
             "Response ended while initializing classic assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
             SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1);

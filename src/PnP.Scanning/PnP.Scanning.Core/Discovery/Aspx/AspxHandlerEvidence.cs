@@ -1,4 +1,4 @@
-namespace PnP.Scanning.Core.Discovery.M1;
+namespace PnP.Scanning.Core.Discovery.Aspx;
 
 internal enum AspxHandlerSourceKind
 {

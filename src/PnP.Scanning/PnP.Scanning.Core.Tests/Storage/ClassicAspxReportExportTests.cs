@@ -10,7 +10,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -32,14 +32,14 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
     /// <summary>
     /// Creates a uniquely named temporary output directory owned by one report scenario.
     /// </summary>
-    private static string DirectoryForTest() => Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "m1-csv-" + Guid.NewGuid().ToString("N"))).FullName;
+    private static string DirectoryForTest() => Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "aspx-csv-" + Guid.NewGuid().ToString("N"))).FullName;
     /// <summary>
     /// Deletes only an output directory guarded by the temporary root and the report-test ownership prefix.
     /// </summary>
     private static void DeleteOwnDirectory(string directory)
     {
         var full = Path.GetFullPath(directory); var temporary = Path.GetFullPath(Path.GetTempPath());
-        if (!full.StartsWith(temporary, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(full).StartsWith("m1-csv-", StringComparison.Ordinal))
+        if (!full.StartsWith(temporary, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(full).StartsWith("aspx-csv-", StringComparison.Ordinal))
             throw new InvalidOperationException("Not an owned report-test directory.");
         Directory.Delete(full, true);
     }
@@ -83,8 +83,48 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
     /// Stores the native projection marker and declared scan scope as independent golden wire values for report verification.
     /// </summary>
     private static void Mark(ScanContext context, Guid scan, string scope = "DeclaredFullInventory") => context.Properties.AddRange(
-        new Property { ScanId = scan, Name = "M1ProjectionContract", Value = "M1/v1" },
-        new Property { ScanId = scan, Name = "M1ScopeMode", Value = scope });
+        new Property { ScanId = scan, Name = "AspxProjectionContract", Value = "aspx-inventory/v1" },
+        new Property { ScanId = scan, Name = "AspxScopeMode", Value = scope });
+
+    /// <summary>Exports earlier saved full and targeted scans with neutral labels while retaining their stored facts and declaration bytes.</summary>
+    [Theory]
+    [InlineData("DeclaredFullInventory")]
+    [InlineData("HomePageOnly")]
+    public async Task EarlierSavedDeclarationsExportNeutralLabelsWithoutBackfill(string scope)
+    {
+        var scan = Guid.NewGuid();
+        var inventory = Inventory(scan);
+        using var context = fixture.CreateContext();
+        context.Add(inventory);
+        context.Properties.AddRange(
+            new Property { ScanId = scan, Name = "M1ProjectionContract", Value = "M1/v1" },
+            new Property { ScanId = scan, Name = "M1ScopeMode", Value = scope });
+        await context.SaveChangesAsync();
+        var before = await context.Properties.AsNoTracking().Where(row => row.ScanId == scan)
+            .OrderBy(row => row.Name).Select(row => new { row.Name, row.Value }).ToListAsync();
+        var directory = DirectoryForTest();
+        try
+        {
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            var info = await File.ReadAllTextAsync(Path.Combine(directory, ClassicAspxReportProjection.InfoFile));
+            info.Should().Contain("AspxProjectionContract=aspx-inventory/v1")
+                .And.Contain("AspxScopeMode=" + scope).And.NotContain("M1");
+            var summaryText = await File.ReadAllTextAsync(Path.Combine(directory, ClassicAspxReportProjection.SummaryJson));
+            summaryText.Should().NotContain("M1");
+            using var summary = JsonDocument.Parse(summaryText);
+            summary.RootElement.GetProperty("projectionContract").GetString()
+                .Should().Be("aspx-inventory/v1");
+            Read<ClassicAspxInventoryExport>(Path.Combine(directory, ClassicAspxReportProjection.InventoryCsv))
+                .Should().ContainSingle();
+            var after = await context.Properties.AsNoTracking().Where(row => row.ScanId == scan)
+                .OrderBy(row => row.Name).Select(row => new { row.Name, row.Value }).ToListAsync();
+            after.Should().BeEquivalentTo(before, options => options.WithStrictOrdering());
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
 
     /// <summary>
     /// Requires SQL-side left-joined counting and CSV export to retain all one hundred bindings with nullable supplementary GUIDs.
@@ -225,8 +265,8 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             using var context = fixture.CreateContext(); await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             Read<ClassicAspxInventoryExport>(Path.Combine(directory, ClassicAspxReportProjection.InventoryCsv)).Should().HaveCount(1);
             var info = await File.ReadAllTextAsync(Path.Combine(directory, ClassicAspxReportProjection.InfoFile));
-            info.Should().Contain("AcquisitionState=ObservedWithoutNativeMarker").And.Contain("M1ProjectionContract=UnknownContract");
-            info.Should().NotContain("AcquisitionState=NotAcquired").And.NotContain("M1ProjectionContract=M1/v1");
+            info.Should().Contain("AcquisitionState=ObservedWithoutNativeMarker").And.Contain("AspxProjectionContract=UnknownContract");
+            info.Should().NotContain("AcquisitionState=NotAcquired").And.NotContain("AspxProjectionContract=aspx-inventory/v1");
         }
         finally { DeleteOwnDirectory(directory); }
     }
@@ -267,13 +307,13 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             }
             (await context.ClassicAspxInventories.SingleAsync(x => x.ScanId == scan)).HandlerDeclaredType.Should().Be(raw);
             var info = await File.ReadAllTextAsync(Path.Combine(directory, ClassicAspxReportProjection.InfoFile));
-            info.Should().Contain("M1NullableStringEncoding=BackslashNullV1").And.Contain(@"null=\N");
+            info.Should().Contain("AspxNullableStringEncoding=BackslashNullV1").And.Contain(@"null=\N");
         }
         finally { DeleteOwnDirectory(directory); }
     }
 
     /// <summary>
-    /// Emits typed headers for empty M1 tables and explains that legacy absence is not evidence that no ASPX exists.
+    /// Emits typed headers for empty ASPX tables and explains that legacy absence is not evidence that no ASPX exists.
     /// </summary>
     [Fact]
     public async Task EmptyNativeM1TablesHaveTypedHeadersAndLegacyNotAcquiredInfo()
@@ -292,7 +332,7 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
     }
 
     /// <summary>
-    /// Exercises native Classic report dispatch, preserving legacy CSV output while adding M1 exports with targeted-scope metadata.
+    /// Exercises native Classic report dispatch, preserving legacy CSV output while adding ASPX exports with targeted-scope metadata.
     /// </summary>
     [Fact]
     public async Task NativeClassicDispatchAddsTwoM1CsvsAndPreservesLegacyCsvs()
@@ -313,7 +353,7 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             Read<ClassicAspxInventoryExport>(Path.Combine(directory, ClassicAspxReportProjection.InventoryCsv)).Should().HaveCount(1);
             Header(Path.Combine(directory, ClassicAspxReportProjection.BindingsCsv)).Should().Contain("ItemId");
             var info = await File.ReadAllTextAsync(Path.Combine(directory, ClassicAspxReportProjection.InfoFile));
-            info.Should().Contain("M1ProjectionContract=M1/v1").And.Contain("M1ScopeMode=HomePageOnly").And.Contain("targeted, not full inventory");
+            info.Should().Contain("AspxProjectionContract=aspx-inventory/v1").And.Contain("AspxScopeMode=HomePageOnly").And.Contain("targeted, not full inventory");
         }
         finally { DeleteOwnDirectory(directory); }
     }
@@ -340,7 +380,7 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             var summary = json.RootElement;
             summary.GetProperty("schemaVersion").GetString().Should().Be("aspx-inventory-summary/v1");
             summary.GetProperty("scanId").GetGuid().Should().Be(scan);
-            summary.GetProperty("projectionContract").GetString().Should().Be("M1/v1");
+            summary.GetProperty("projectionContract").GetString().Should().Be("aspx-inventory/v1");
             summary.GetProperty("scopeMode").GetString().Should().Be("DeclaredFullInventory");
             summary.GetProperty("observedInventoryCount").GetInt64().Should().Be(2);
             summary.GetProperty("observedDistinctBindingCount").GetInt64().Should().Be(3);
@@ -432,15 +472,15 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
     }
 
     /// <summary>
-    /// Migrates legacy pages without inventing historical M1 rows and preserves legacy export alongside empty typed M1 output.
+    /// Migrates legacy pages without inventing historical ASPX rows and preserves legacy export alongside empty typed ASPX output.
     /// </summary>
     [Fact]
     public async Task LegacyMigrationCreatesEmptyM1TablesWithoutHistoricalBackfillAndExportsHeaders()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=True"); await connection.OpenAsync();
         await using var context = new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options);
-        var migrations = context.Database.GetMigrations().ToArray(); var m1 = Array.FindIndex(migrations, x => x.EndsWith("_ClassicAspxInventoryBindings"));
-        m1.Should().BeGreaterThan(0); await context.GetService<IMigrator>().MigrateAsync(migrations[m1 - 1]);
+        var migrations = context.Database.GetMigrations().ToArray(); var inventoryMigrationIndex = Array.FindIndex(migrations, x => x.EndsWith("_ClassicAspxInventoryBindings"));
+        inventoryMigrationIndex.Should().BeGreaterThan(0); await context.GetService<IMigrator>().MigrateAsync(migrations[inventoryMigrationIndex - 1]);
         var scan = Guid.NewGuid(); context.ClassicPages.Add(new ClassicPage { ScanId = scan, SiteUrl = "https://example.invalid/sites/legacy", WebUrl = "/", PageUrl = "/old.aspx" });
         await context.SaveChangesAsync(); context.ChangeTracker.Clear(); await context.Database.MigrateAsync();
         (await context.ClassicAspxInventories.CountAsync()).Should().Be(0); (await context.ClassicAspxItemBindings.CountAsync()).Should().Be(0);

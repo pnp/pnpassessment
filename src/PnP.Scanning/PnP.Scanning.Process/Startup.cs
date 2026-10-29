@@ -13,7 +13,7 @@ namespace PnP.Scanning.Process
             // The explicit catalog is frozen in StartRequest properties (base64 adds 4/3 overhead).
             // Keep a finite native receive budget large enough for the supported catalog size.
             services.AddGrpc(options => options.MaxReceiveMessageSize =
-                PnP.Scanning.Core.Discovery.M1.PlatformAspxCatalog.MaximumTransportMessageBytes);
+                PnP.Scanning.Core.Discovery.Aspx.PlatformAspxCatalog.MaximumTransportMessageBytes);
 
             // Configure the shutdown to 15s - not yet working
             //services.Configure<HostOptions>(

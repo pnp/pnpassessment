@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Storage;
 using Xunit;
 
-namespace PnP.Scanning.Core.Tests.Discovery.M1;
+namespace PnP.Scanning.Core.Tests.Discovery.Aspx;
 
 public sealed class ClassicAspxConsolidationRetentionTests
 {

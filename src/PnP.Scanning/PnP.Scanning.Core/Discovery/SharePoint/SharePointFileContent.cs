@@ -1,4 +1,4 @@
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using System.Net;
 using System.Security.Cryptography;
 

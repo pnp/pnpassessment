@@ -1,14 +1,14 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Discovery.M1;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace PnP.Scanning.Core.Tests.Discovery.M1;
+namespace PnP.Scanning.Core.Tests.Discovery.Aspx;
 
 // Test infrastructure only. Every attempt runs the real acquisition and both real SQLite writers.
 internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
@@ -40,7 +40,7 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
     {
         var raw = new AssessmentDiscoveryWriter(Open);
         var projection = new ClassicAspxProjectionWriter(Open);
-        var context = new M1WebAcquisitionContext(Scan, Site, Web, Url, Url, new ClassicOptions { Pages = true },
+        var context = new ClassicAspxWebAcquisitionContext(Scan, Site, Web, Url, Url, new ClassicOptions { Pages = true },
             BatchSize: 128, MaxCollectionPages: singlePageCap ? 1 : 100);
         await new ClassicAspxWebAcquisition(context, client).AcquireAsync(EmptyPhysical(), async (batch, ct) =>
         {
