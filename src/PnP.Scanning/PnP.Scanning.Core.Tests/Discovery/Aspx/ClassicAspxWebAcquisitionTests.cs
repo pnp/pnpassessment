@@ -23,27 +23,16 @@ public sealed class ClassicAspxWebAcquisitionTests
     private const string Form = "/sites/fixture/child/Lists/hidden/DispForm.aspx";
 
     /// <summary>
-    /// Builds a pages-enabled acquisition context with configurable publication and traversal bounds and optional frozen catalog.
+    /// Builds a pages-enabled acquisition context with a configurable publication bound.
     /// </summary>
-    private static ClassicAspxWebAcquisitionContext Context(int batchSize = 7, int maxPages = 8, PlatformAspxCatalog catalog = null) =>
-        new(Scan, Site, Web, SiteUrl, WebUrl, new ClassicOptions { Pages = true }, catalog,
-            BatchSize: batchSize, MaxCollectionPages: maxPages);
-    /// <summary>
-    /// Creates an OData JSON page through the real response parser, retaining optional continuation evidence.
-    /// </summary>
-    private static SharePointRestPage Page(Uri uri, object[] rows, string next = null) =>
-        SharePointRestResponseParser.Parse(uri, HttpStatusCode.OK, JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
-        { ["value"] = rows, ["@odata.nextLink"] = next }), "application/json");
+    private static ClassicAspxWebAcquisitionContext Context(int batchSize = 7, bool homeOnly = false) =>
+        new(Scan, Site, Web, SiteUrl, WebUrl, new ClassicOptions { Pages = true, HomePageOnly = homeOnly },
+            BatchSize: batchSize, MaxCollectionPages: 8);
     /// <summary>
     /// Yields caller-provided physical discoveries in order without adding synthetic page or item observations.
     /// </summary>
     private static async IAsyncEnumerable<ClassicPageDiscovery> Observations(params ClassicPageDiscovery[] rows)
     { foreach (var row in rows) yield return row; await Task.CompletedTask; }
-    /// <summary>
-    /// Returns successful metadata with the supplied real file identity and path for locator-resolution scenarios.
-    /// </summary>
-    private static SharePointResolvedFile File(Guid id, string path) => new(DiscoveryTerminalOutcome.Complete, id.ToString("D"),
-        path.Split('/')[^1], path, null, "FakeAuthenticatedAPI:FileMetadata");
     /// <summary>
     /// Supplies authenticated actual-source evidence while allowing tests to mark the same bytes explicitly denied.
     /// </summary>
@@ -56,23 +45,21 @@ public sealed class ClassicAspxWebAcquisitionTests
     {
         internal Uri ActualWebUrl = ClassicAspxWebAcquisitionTests.WebUrl;
         public Uri WebUrl => ActualWebUrl;
-        internal Func<Uri, SharePointRestPage> Pages;
-        internal Func<string, SharePointResolvedFile> Resolver;
         internal Func<string, SharePointFileContent> Content = _ => Bytes();
         internal readonly List<Uri> Requests = new();
         internal readonly List<string> Resolutions = new();
         internal int ContentReads;
         internal readonly List<string> ContentPaths = new();
         /// <summary>
-        /// Records collection requests, honors pre-cancellation, and delegates responses to the configured fake authority.
+        /// Rejects collection requests so item enumeration cannot silently return an empty page.
         /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri uri, CancellationToken ct = default)
-        { ct.ThrowIfCancellationRequested(); Requests.Add(uri); return Task.FromResult(Pages?.Invoke(uri) ?? Page(uri, Array.Empty<object>())); }
+        { ct.ThrowIfCancellationRequested(); Requests.Add(uri); throw new InvalidOperationException("Unexpected collection request."); }
         /// <summary>
-        /// Records locator resolutions and returns configured metadata or the stable synthetic renderer identity.
+        /// Rejects file resolution because all inventory rows must come from physical observations.
         /// </summary>
         public Task<SharePointResolvedFile> ResolveFileAsync(string path, CancellationToken ct = default)
-        { Resolutions.Add(path); return Task.FromResult(Resolver?.Invoke(path) ?? File(Renderer, path)); }
+        { Resolutions.Add(path); throw new InvalidOperationException("Unexpected file resolution."); }
         /// <summary>
         /// Counts and records source reads before returning the scenario-specific complete or failed content evidence.
         /// </summary>
@@ -109,17 +96,6 @@ public sealed class ClassicAspxWebAcquisitionTests
         public void Dispose() => Disposed = true;
     }
 
-    /// <summary>
-    /// Creates a hidden non-document list with configurable real items, content types, and list form renderer.
-    /// </summary>
-    private static Client Items(object[] items, object[] types = null, string form = Form) => new()
-    {
-        Pages = uri => uri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase)
-            ? Page(uri, new object[] { new { Id = List, Hidden = true, BaseType = 0, BaseTemplate = 100, DefaultDisplayFormUrl = form } })
-            : uri.AbsolutePath.EndsWith("/ContentTypes", StringComparison.OrdinalIgnoreCase)
-                ? Page(uri, types ?? new object[] { new { Id = new { StringValue = "0x01" }, DisplayFormUrl = "" } })
-                : Page(uri, items)
-    };
     private sealed class Collected
     {
         internal readonly List<ClassicAspxInventory> Inventory = new();
@@ -138,152 +114,113 @@ public sealed class ClassicAspxWebAcquisitionTests
     }
 
     /// <summary>
-    /// Includes real items from hidden non-document lists, bounds publications, and shares one renderer source read across item bindings.
+    /// Collection APIs must never be reached even when a list would return many items.
     /// </summary>
-    [Fact]
-    public async Task All_real_items_including_hidden_non_document_lists_are_bounded_and_not_fixture_counted()
-    {
-        var client = Items(Enumerable.Range(1, 73).Select(i => (object)new { Id = i, Title = "real " + i, ContentTypeId = "0x01" }).ToArray());
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(), found.Publish);
-        Assert.Equal(73, found.Bindings.Count);
-        Assert.Equal(73, found.Bindings.Select(b => b.ItemId).Distinct().Count());
-        Assert.All(found.Bindings, b => { Assert.Equal(Web, b.WebId); Assert.Null(b.ItemGuid); Assert.NotEqual(Guid.Empty, b.ListId); });
-        Assert.Single(found.Inventory);
-        Assert.Equal(1, client.ContentReads);
-        Assert.InRange(found.LargestBatch, 1, 7);
-        Assert.All(client.Requests, r => Assert.DoesNotContain("$filter", r.Query));
-        Assert.Contains(found.Evidence, e => e.RowType == "Scope" && e.DiscoveryStatus == "Complete");
-    }
-
-    /// <summary>
-    /// Falls back to the list form when the most-specific matching content type has no override, ignoring a less-specific override.
-    /// </summary>
-    [Fact]
-    public async Task Most_specific_empty_ct_override_uses_list_default_not_ancestor_override()
-    {
-        var client = Items(new object[] { new { Id = 9, ContentTypeId = "0x0100AA01" } }, new object[]
-        { new { Id = new { StringValue = "0x01" }, DisplayFormUrl = "/sites/fixture/incorrect.aspx" },
-          new { Id = new { StringValue = "0x0100AA" }, DisplayFormUrl = "" } });
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(), found.Publish);
-        Assert.Single(found.Bindings);
-        Assert.Equal(ClassicAspxBindingKinds.ListFormRenderer, found.Bindings[0].BindingKinds);
-        Assert.Equal(Form, client.Resolutions.Single());
-    }
-
-    /// <summary>
-    /// Keeps file-self, metadata-renderer, and parent-layout bindings distinct while preserving physical identities and item-web scope.
-    /// </summary>
-    [Fact]
-    public async Task Actual_aspx_backing_metadata_renderer_and_shared_parent_layout_keep_real_identity_and_item_web()
-    {
-        string page = "/sites/fixture/child/Pages/one.aspx", layout = "/sites/fixture/_catalogs/masterpage/shared.aspx";
-        Guid pageId = Guid.Parse("50000000-0000-0000-0000-000000000002"), layoutId = Guid.Parse("50000000-0000-0000-0000-000000000003");
-        var client = Items(new object[] { new { Id = 21, GUID = Guid.Empty, Title = "page", ContentTypeId = "0x01",
-            File = new { UniqueId = pageId, Name = "one.aspx", ServerRelativeUrl = page },
-            PublishingPageLayout = new { Url = "https://tenant.invalid" + layout } },
-            new { Id = 22, Title = "metadata", ContentTypeId = "0x01", File = new { UniqueId = Guid.NewGuid(), ServerRelativeUrl = "/sites/fixture/child/docs/not-aspx.txt" } } });
-        client.Resolver = path => File(Renderer, path);
-        var root = new Client { ActualWebUrl = SiteUrl, Resolver = path => File(layoutId, path) };
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), client, new Factory(root)).AcquireAsync(Observations(), found.Publish);
-        Assert.Contains(found.Inventory, x => x.AspxKey == ClassicAspxInventory.CreateTenantFileKey(Site, pageId));
-        Assert.DoesNotContain(found.Inventory, x => x.Url.EndsWith(".txt"));
-        var parent = Assert.Single(found.Inventory.Where(x => x.FileUniqueId == layoutId));
-        Assert.Null(parent.WebId); // Never label the parent layout as owned by the child worker web.
-        Assert.Equal(Site, parent.SiteCollectionId);
-        Assert.Contains(found.Bindings, b => b.ItemId == 21 && b.BindingKinds == ClassicAspxBindingKinds.FileSelf);
-        Assert.Contains(found.Bindings, b => b.ItemId == 21 && b.BindingKinds == ClassicAspxBindingKinds.PublishingPageLayout && b.WebId == Web);
-        Assert.Contains(found.Bindings, b => b.ItemId == 22 && b.BindingKinds.HasFlag(ClassicAspxBindingKinds.DocumentMetadataRenderer));
-    }
-
-    /// <summary>
-    /// Retains a legacy list-item page pointer as tenant inventory without inventing file-self bindings or catalog identity from SetupPath.
-    /// </summary>
-    [Fact]
-    public async Task Legacy_listitem_page_pointer_is_not_its_file_self_and_setup_path_is_not_catalog_identity()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Native_acquisition_skips_list_item_enumeration_and_marks_count_unknown(bool homeOnly)
     {
         var client = new Client();
         var found = new Collected();
-        var observation = new ClassicPageDiscovery { ScanId = Scan, RowType = "Page", ScopeType = "ListItem", SiteCollectionId = Site,
-            WebId = Web, ListId = List, ListItemId = 7, FileUniqueId = Renderer, Url = Form, SetupPath = "_layouts/15/template.aspx" };
+        await new ClassicAspxWebAcquisition(Context(homeOnly: homeOnly), client)
+            .AcquireAsync(Observations(), found.Publish);
+
+        Assert.Empty(client.Requests);
+        Assert.Empty(client.Resolutions);
+        Assert.Equal(0, client.ContentReads);
+        Assert.Empty(found.Inventory);
+        Assert.Empty(found.Bindings);
+        var marker = Assert.Single(found.Evidence);
+        Assert.Equal("Scope", marker.RowType);
+        Assert.Equal("ItemEnumerationPolicy", marker.ScopeType);
+        Assert.Equal("PolicyExcluded", marker.DiscoveryStatus);
+        using var details = JsonDocument.Parse(marker.EvidenceJson);
+        Assert.Equal("NotCollected", details.RootElement.GetProperty("itemPages").GetString());
+        Assert.Equal("NotCollected", details.RootElement.GetProperty("itemBindings").GetString());
+        Assert.Equal("MetadataDeclarationsOnly", details.RootElement.GetProperty("displayForms").GetString());
+    }
+
+    /// <summary>
+    /// A physical ASPX stays in inventory without making its list item a binding.
+    /// </summary>
+    [Fact]
+    public async Task Physical_aspx_is_inventoried_without_item_binding()
+    {
+        var client = new Client();
+        var found = new Collected();
+        var observation = new ClassicPageDiscovery
+        {
+            ScanId = Scan, RowType = "Page", ScopeType = "File", SiteCollectionId = Site,
+            WebId = Web, ListId = List, ListItemId = 7, FileUniqueId = Renderer,
+            Url = Form, FileName = "DispForm.aspx", ObservationMethod = "fixture"
+        };
         await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(observation), found.Publish);
+
+        Assert.Empty(client.Requests);
+        Assert.Empty(client.Resolutions);
+        Assert.Equal(1, client.ContentReads);
         Assert.Empty(found.Bindings);
         var physical = Assert.Single(found.Inventory);
         Assert.Equal(ClassicAspxIdentityKinds.TenantFile, physical.IdentityKind);
+        Assert.Equal(Renderer, physical.FileUniqueId);
+        Assert.Equal("Example.ActualHandler", physical.HandlerEffectiveType);
         Assert.Null(physical.WebId);
+        Assert.Contains(found.Evidence, e => e.ScopeType == "ItemEnumerationPolicy");
     }
 
     /// <summary>
-    /// Preserves observed inventory and item bindings after content denial without supplying a handler or framework-default claim.
+    /// A denied source read still retains the observed physical file without guessing its handler.
     /// </summary>
     [Fact]
-    public async Task Denied_content_keeps_observed_inventory_but_never_handler_default()
+    public async Task Denied_physical_source_retains_inventory_without_handler()
     {
-        var client = Items(new object[] { new { Id = 4, ContentTypeId = "0x01" } });
-        client.Content = _ => Bytes(AspxHandlerReadState.Denied);
+        var client = new Client { Content = _ => Bytes(AspxHandlerReadState.Denied) };
         var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(), found.Publish);
-        var row = Assert.Single(found.Inventory);
-        Assert.Equal("Denied", row.HandlerReadState); Assert.Null(row.HandlerEffectiveType); Assert.Null(row.HandlerDefaultProvenance);
-        Assert.Single(found.Bindings);
-    }
+        var observation = new ClassicPageDiscovery
+        {
+            ScanId = Scan, RowType = "Page", ScopeType = "File", SiteCollectionId = Site,
+            WebId = Web, FileUniqueId = Renderer, Url = Form, FileName = "DispForm.aspx"
+        };
+        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(observation), found.Publish);
 
-    /// <summary>
-    /// Retains a denied content-type scope as a coverage gap instead of inventing a list-default renderer binding.
-    /// </summary>
-    [Fact]
-    public async Task Denied_ct_scope_does_not_invent_a_list_default_renderer()
-    {
-        var client = Items(new object[] { new { Id = 4, ContentTypeId = "0x01" } });
-        var original = client.Pages;
-        client.Pages = u => u.AbsolutePath.EndsWith("/ContentTypes", StringComparison.OrdinalIgnoreCase)
-            ? SharePointRestResponseParser.Parse(u, HttpStatusCode.Forbidden, Encoding.UTF8.GetBytes("denied")) : original(u);
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(), found.Publish);
+        var physical = Assert.Single(found.Inventory);
+        Assert.Equal("Denied", physical.HandlerReadState);
+        Assert.Null(physical.HandlerEffectiveType);
         Assert.Empty(found.Bindings);
-        Assert.Contains(found.Evidence, e => e.RowType == "Scope" && e.DiscoveryStatus == "Denied");
-        Assert.Contains(found.Evidence, e => e.ErrorCodes == "content_type_scope_incomplete_no_renderer_fallback");
+        Assert.Empty(client.Requests);
     }
 
     /// <summary>
-    /// Stops unsafe or bounded-out continuations and records incomplete authority rather than reporting an empty collection.
-    /// </summary>
-    [Theory]
-    [InlineData("foreign")]
-    [InlineData("loop")]
-    [InlineData("cap")]
-    public async Task Incomplete_authority_never_claims_empty_and_never_follows_unsafe_cursor(string fault)
-    {
-        var client = new Client { Pages = u => Page(u, Array.Empty<object>(), fault == "foreign" ? "https://foreign.invalid/_api/web/lists" : fault == "loop" ? u.AbsoluteUri : u.AbsoluteUri + "&$skiptoken=second") };
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(maxPages: 1), client).AcquireAsync(Observations(), found.Publish);
-        Assert.Single(client.Requests);
-        Assert.DoesNotContain(found.Evidence, e => e.RowType == "Scope" && e.DiscoveryStatus == "Empty");
-        Assert.Contains(found.Evidence, e => e.RowType == "Scope" && e.DiscoveryStatus is "Unknown" or "Truncated");
-    }
-
-    /// <summary>
-    /// Consumes a valid continuation, rejects nonpositive item IDs, and keeps raw cursor material out of stored pagination evidence.
+    /// Reads an observed parent Web file through the site root while keeping item binding uncollected.
     /// </summary>
     [Fact]
-    public async Task Actual_continuation_is_consumed_and_invalid_item_ids_do_not_create_bindings()
+    public async Task Parent_physical_aspx_uses_site_root_without_item_lookup()
     {
-        var client = Items(Array.Empty<object>()); var original = client.Pages;
-        client.Pages = u => u.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase)
-            ? Page(u, u.Query.Contains("skiptoken") ? new object[] { new { Id = 8, ContentTypeId = "0x01" } } : new object[] { new { Id = 0, ContentTypeId = "0x01" } },
-                u.Query.Contains("skiptoken") ? null : u.AbsoluteUri + "&$skiptoken=next") : original(u);
+        const string layout = "/sites/fixture/_catalogs/masterpage/shared.aspx";
+        var client = new Client();
+        var root = new Client { ActualWebUrl = SiteUrl };
+        var factory = new Factory(root);
         var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(), found.Publish);
-        Assert.Equal(8, Assert.Single(found.Bindings).ItemId);
-        Assert.Equal(2, client.Requests.Count(r => r.AbsolutePath.EndsWith("/items")));
-        Assert.Contains(found.Evidence, e => e.ErrorCodes == "item_positive_id_missing");
-        Assert.All(found.Evidence.Where(e => e.RowType == "Pagination"), e => Assert.False(e.EvidenceJson.Contains("skiptoken=next", StringComparison.OrdinalIgnoreCase)));
+        var observation = new ClassicPageDiscovery
+        {
+            ScanId = Scan, RowType = "Page", ScopeType = "File", SiteCollectionId = Site,
+            WebId = Web, FileUniqueId = Renderer, Url = layout, FileName = "shared.aspx"
+        };
+        await new ClassicAspxWebAcquisition(Context(), client, factory)
+            .AcquireAsync(Observations(observation), found.Publish);
+
+        Assert.Empty(client.Requests);
+        Assert.Empty(root.Requests);
+        Assert.Equal(0, client.ContentReads);
+        Assert.Equal(1, root.ContentReads);
+        Assert.Single(factory.Requests);
+        Assert.Empty(found.Bindings);
+        Assert.Null(Assert.Single(found.Inventory).WebId);
     }
 
     /// <summary>
-    /// Propagates publication failures to the caller instead of misclassifying persistence errors as network coverage gaps.
+    /// Persistence failures propagate while collection access remains disabled.
     /// </summary>
     [Fact]
     public async Task Storage_callback_failure_is_not_swallowed_as_a_network_gap()
@@ -291,141 +228,7 @@ public sealed class ClassicAspxWebAcquisitionTests
         var client = new Client();
         await Assert.ThrowsAsync<IOException>(() => new ClassicAspxWebAcquisition(Context(batchSize: 1), client)
             .AcquireAsync(Observations(), (_, _) => throw new IOException("synthetic storage failure")));
-        Assert.Single(client.Requests);
-    }
-
-    /// <summary>
-    /// Builds one explicit platform path or two ambiguous candidates for testing catalog-only renderer resolution.
-    /// </summary>
-    private static PlatformAspxCatalog Catalog(bool ambiguous = false)
-    {
-        object Entry(string id) => new { id, deploymentIdentity = id, culture = "en-US", path = "/_layouts/15/listform.aspx" };
-        return PlatformAspxCatalog.Parse(JsonSerializer.SerializeToUtf8Bytes(new { schemaVersion = "platform-aspx-catalog/v1", catalogVersion = "1", source = "FakeFrozenCatalog", entries = ambiguous ? new[] { Entry("a"), Entry("b") } : new[] { Entry("a") } }));
-    }
-
-    /// <summary>
-    /// Binds an observed item only to a unique explicit catalog member and never resolves that platform path as a tenant file.
-    /// </summary>
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Only_a_unique_explicit_catalog_member_can_bind_an_actual_item(bool ambiguous)
-    {
-        var client = Items(new object[] { new { Id = 5, ContentTypeId = "0x01" } }, form: "/_layouts/15/listform.aspx?PageType=4&ID=5");
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(catalog: Catalog(ambiguous)), client).AcquireAsync(Observations(), found.Publish);
-        if (ambiguous) { Assert.Empty(found.Bindings); Assert.Contains(found.Evidence, e => e.ErrorCodes == "platform_catalog_alias_ambiguous"); }
-        else { Assert.Single(found.Bindings); Assert.Equal(ClassicAspxIdentityKinds.PlatformCatalog, Assert.Single(found.Inventory).IdentityKind); Assert.Empty(client.Resolutions); }
-    }
-
-    /// <summary>
-    /// Does not publish acquisition bindings or inventory for catalog entries that no observed item references.
-    /// </summary>
-    [Fact]
-    public async Task Unreferenced_catalog_members_never_make_an_item_binding()
-    {
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(catalog: Catalog()), new Client()).AcquireAsync(Observations(), found.Publish);
-        Assert.Empty(found.Bindings); Assert.Empty(found.Inventory);
-    }
-
-    /// <summary>
-    /// Uses a validated site-root client for shared layout metadata and bytes, preserving item scope or recording root unavailability.
-    /// </summary>
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task Same_sc_parent_layout_uses_root_for_metadata_and_source_without_changing_item_web(bool rootAvailable)
-    {
-        const string layout = "/sites/fixture/_catalogs/masterpage/shared-parent.aspx";
-        Guid layoutId = Guid.Parse("60000000-0000-0000-0000-000000000001");
-        var child = Items(new object[] { new { Id = 2, ContentTypeId = "0x01", PublishingPageLayout = new { Url = "https://tenant.invalid" + layout } },
-            new { Id = 3, ContentTypeId = "0x01", PublishingPageLayout = new { Url = "https://tenant.invalid" + layout } } });
-        child.Resolver = path => path == layout ? new(DiscoveryTerminalOutcome.Failed, null, null, path, null,
-            "child API HTTP400", "locator_resolution_failed", ErrorStage: "FileRequest", ErrorDetail: "System.ArgumentException:-2147024809") : File(Renderer, path);
-        var root = new Client { ActualWebUrl = SiteUrl, Resolver = path => File(layoutId, path) };
-        var factory = new Factory(root); var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), child, rootAvailable ? factory : null).AcquireAsync(Observations(), found.Publish);
-        var layoutPairs = found.Bindings.Where(b => b.BindingKinds.HasFlag(ClassicAspxBindingKinds.PublishingPageLayout)).ToArray();
-        Assert.DoesNotContain(layout, child.Resolutions); Assert.DoesNotContain(layout, child.ContentPaths);
-        if (rootAvailable)
-        {
-            Assert.Equal(2, layoutPairs.Length); Assert.Equal(new[] { 2, 3 }, layoutPairs.Select(b => b.ItemId).OrderBy(i => i));
-            Assert.All(layoutPairs, b => { Assert.Equal(Web, b.WebId); Assert.Equal(Site, b.SiteCollectionId); Assert.Equal(ClassicAspxInventory.CreateTenantFileKey(Site, layoutId), b.AspxKey); });
-            var actual = Assert.Single(found.Inventory.Where(i => i.FileUniqueId == layoutId));
-            Assert.Null(actual.WebId); Assert.Equal("Example.ActualHandler", actual.HandlerEffectiveType);
-            Assert.Single(root.Resolutions); Assert.Equal(layout, root.ContentPaths.Single());
-            Assert.Equal(SiteUrl, factory.Requests.Single()); Assert.False(factory.Disposed);
-        }
-        else
-        {
-            Assert.Empty(layoutPairs); Assert.Empty(root.Resolutions); Assert.Empty(root.ContentPaths);
-            Assert.Contains(found.Evidence, e => e.ErrorCodes == "same_site_root_client_unavailable" && e.Url.EndsWith("shared-parent.aspx"));
-        }
-    }
-
-    /// <summary>
-    /// Rejects foreign-authority and other-collection layouts before requesting a root client, metadata, or source bytes.
-    /// </summary>
-    [Theory]
-    [InlineData("https://foreign.invalid/sites/fixture/layout.aspx")]
-    [InlineData("/sites/other-collection/layout.aspx")]
-    public async Task Foreign_or_wrong_collection_layout_never_fetches_metadata_or_bytes(string layout)
-    {
-        var child = Items(new object[] { new { Id = 2, ContentTypeId = "0x01", PublishingPageLayout = new { Url = layout } } });
-        var root = new Client { ActualWebUrl = SiteUrl }; var factory = new Factory(root); var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), child, factory).AcquireAsync(Observations(), found.Publish);
-        Assert.Empty(factory.Requests); Assert.Empty(root.Resolutions); Assert.Empty(root.ContentPaths);
-        Assert.DoesNotContain(found.Bindings, b => b.BindingKinds.HasFlag(ClassicAspxBindingKinds.PublishingPageLayout));
-    }
-
-    /// <summary>
-    /// Rejects a factory client whose actual web is not the expected site root and records the scope mismatch.
-    /// </summary>
-    [Fact]
-    public async Task Factory_returning_wrong_web_is_not_used_as_site_root()
-    {
-        var child = Items(new object[] { new { Id = 2, ContentTypeId = "0x01", PublishingPageLayout = new { Url = "/sites/fixture/_catalogs/masterpage/a.aspx" } } });
-        var wrong = new Client { ActualWebUrl = new Uri("https://tenant.invalid/sites/not-the-collection") };
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), child, new Factory(wrong)).AcquireAsync(Observations(), found.Publish);
-        Assert.Empty(wrong.Resolutions); Assert.Empty(wrong.ContentPaths);
-        Assert.Contains(found.Evidence, e => e.ErrorCodes == "same_site_root_client_scope_mismatch");
-    }
-
-    /// <summary>
-    /// Keeps separate target evidence for equal layout failures while retaining safe diagnostics and removing bearer secrets.
-    /// </summary>
-    [Fact]
-    public async Task Equal_failure_codes_for_different_layout_paths_keep_distinct_safe_target_evidence()
-    {
-        const string a = "/sites/fixture/_catalogs/masterpage/a.aspx", b = "/sites/fixture/_catalogs/masterpage/b.aspx";
-        var child = Items(new object[] { new { Id = 2, ContentTypeId = "0x01", PublishingPageLayout = new { Url = a } },
-            new { Id = 3, ContentTypeId = "0x01", PublishingPageLayout = new { Url = b } } });
-        var root = new Client { ActualWebUrl = SiteUrl, Resolver = path => new(DiscoveryTerminalOutcome.Denied,
-            null, null, path, null, "GET source metadata", "locator_denied", ErrorStage: "MetadataRequest",
-            ErrorDetail: "ServerException:-2147024891 Bearer synthetic-secret") };
-        var found = new Collected();
-        await new ClassicAspxWebAcquisition(Context(), child, new Factory(root)).AcquireAsync(Observations(), found.Publish);
-        var gaps = found.Evidence.Where(e => e.ErrorCodes == "locator_denied").ToArray();
-        Assert.Equal(2, gaps.Length); Assert.Equal(2, gaps.Select(e => e.RecordKey).Distinct().Count());
-        Assert.Contains(gaps, e => e.Url.EndsWith("/a.aspx")); Assert.Contains(gaps, e => e.Url.EndsWith("/b.aspx"));
-        Assert.All(gaps, e => { Assert.Equal("MetadataRequest", e.ErrorStage); Assert.Equal("Denied", e.DiscoveryStatus); Assert.DoesNotContain("synthetic-secret", e.ErrorDetail); Assert.Contains("ServerException:-2147024891", e.ErrorDetail); Assert.Contains("ReferencePath", e.EvidenceJson); });
-    }
-
-    /// <summary>
-    /// Avoids attributing a legacy physical parent layout to the child worker or inventing a file-self item relation.
-    /// </summary>
-    [Fact]
-    public async Task Legacy_physical_parent_layout_never_invents_worker_ownership_or_item_self()
-    {
-        var client = new Client(); var found = new Collected();
-        var row = new ClassicPageDiscovery { ScanId = Scan, RowType = "Page", ScopeType = "File", SiteCollectionId = Site,
-            WebId = Web, ListId = Guid.NewGuid(), ListItemId = 99, FileUniqueId = Renderer,
-            Url = "/sites/fixture/_catalogs/masterpage/parent-layout.aspx" };
-        await new ClassicAspxWebAcquisition(Context(), client).AcquireAsync(Observations(row), found.Publish);
-        Assert.Null(Assert.Single(found.Inventory).WebId);
-        Assert.Empty(found.Bindings);
+        Assert.Empty(client.Requests);
     }
 
     /// <summary>

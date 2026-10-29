@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
+using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Discovery.Aspx;
 
 namespace PnP.Scanning.Core.Storage;
@@ -45,9 +46,13 @@ internal static class ClassicAspxReportProjection
             ClassicAspxProjectionContract.Version + "\nAcquisitionState=" + AcquisitionStates.DeclaredScopeObserved +
             "\n" + ClassicAspxProjectionContract.ScopeModePropertyName + "=";
         internal const string NativeScopeLimitations =
-            "\nCounts are observed distinct normalized item/resource pairs in this declared scan scope. " +
-            "Zero bindings do not prove complete absence; CoverageState Unknown/Incomplete/Changed is preserved in each inventory row. " +
+            "\nBinding counts describe stored distinct item/resource pairs, if any. " +
+            "Zero bindings do not prove absence; consult ItemBindings collection state. " +
+            "CoverageState Unknown/Incomplete/Changed is preserved in each inventory row. " +
             "HomePageOnly is targeted, not full inventory or tenant coverage.\n";
+        internal const string MetadataOnlyItems =
+            "ItemOnlyPages=NotCollected\nItemBindings=NotCollected\n" +
+            "Display-form counts are metadata declarations, not rendered page or list-item counts.\n";
         internal const string ObservedWithoutMarker =
             "AspxProjectionContract=UnknownContract\nAcquisitionState=ObservedWithoutNativeMarker\nAspxScopeMode=Unknown\n" +
             "Normalized rows were observed without a native aspx-inventory/v1 marker, for example after resuming an older scan. " +
@@ -171,6 +176,10 @@ internal static class ClassicAspxReportProjection
             .ConfigureAwait(false);
         var contract = storedContract.Version;
         var scope = storedContract.ScopeMode;
+        var metadataOnlyItems = await context.ClassicPageDiscoveries.AsNoTracking().AnyAsync(row =>
+            row.ScanId == scanId && row.RowType == "Scope" &&
+            row.ScopeType == ClassicAspxAcquisitionScopes.ItemEnumerationPolicy &&
+            row.DiscoveryStatus == "PolicyExcluded", cancellationToken).ConfigureAwait(false);
         var observedWithoutMarker = contract != ClassicAspxProjectionContract.Version &&
             (await context.ClassicAspxInventories.AsNoTracking().AnyAsync(row => row.ScanId == scanId, cancellationToken).ConfigureAwait(false) ||
              await context.ClassicAspxItemBindings.AsNoTracking().AnyAsync(row => row.ScanId == scanId, cancellationToken).ConfigureAwait(false));
@@ -179,6 +188,7 @@ internal static class ClassicAspxReportProjection
             : observedWithoutMarker
                 ? ReportInfoText.ObservedWithoutMarker
                 : ReportInfoText.Legacy;
+        if (metadataOnlyItems) info += ReportInfoText.MetadataOnlyItems;
         info += ReportInfoText.NullableEncodingPrefix + ClassicAspxNullableStringConverter.NullToken +
             ReportInfoText.NullableEncodingLimitations;
         await File.WriteAllTextAsync(Path.Combine(exportPath, InfoFile), info, new UTF8Encoding(false), cancellationToken)
@@ -187,14 +197,14 @@ internal static class ClassicAspxReportProjection
             observedInventoryCount,
             observedDistinctBindingCount,
             zeroObservedBindingsCount,
-            observedCoverageStates, cancellationToken).ConfigureAwait(false);
+            observedCoverageStates, metadataOnlyItems, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Copies completed CSV streams to canonical aliases and writes hashed file evidence with observed-scope counts, not tenant completeness.</summary>
     private static async Task WriteCanonicalSummaryAsync(ScanContext context, Guid scanId, string exportPath,
         string? contract, string? scope, long observedInventoryCount, long observedDistinctBindingCount,
         long zeroObservedBindingsCount, IReadOnlyDictionary<string, long> observedCoverageStates,
-        CancellationToken cancellationToken)
+        bool metadataOnlyItems, CancellationToken cancellationToken)
     {
         // Canonical files are byte aliases of the completed typed streams, never a second database read.
         var inventoryFile = await CopyCanonicalAsync(exportPath, InventoryCsv, CanonicalInventoryCsv, cancellationToken).ConfigureAwait(false);
@@ -226,6 +236,12 @@ internal static class ClassicAspxReportProjection
         }
         var acquisitionState = contract == ClassicAspxProjectionContract.Version ? AcquisitionStates.DeclaredScopeObserved :
             observedInventoryCount != 0 || observedDistinctBindingCount != 0 ? AcquisitionStates.ObservedWithoutNativeMarker : AcquisitionStates.NotAcquiredLegacy;
+        var listDisplayFormReferences = await context.ClassicPageDiscoveries.AsNoTracking().LongCountAsync(row =>
+            row.ScanId == scanId && row.RowType == "Reference" &&
+            row.ScopeType == AspxReferenceSourceKinds.ListDefaultDisplayForm, cancellationToken).ConfigureAwait(false);
+        var contentTypeDisplayFormReferences = await context.ClassicPageDiscoveries.AsNoTracking().LongCountAsync(row =>
+            row.ScanId == scanId && row.RowType == "Reference" &&
+            row.ScopeType == AspxReferenceSourceKinds.ContentTypeDisplayForm, cancellationToken).ConfigureAwait(false);
         var summary = new
         {
             schemaVersion = SummarySchemaVersion,
@@ -248,6 +264,14 @@ internal static class ClassicAspxReportProjection
             observedInventoryCount,
             observedDistinctBindingCount,
             zeroObservedBindingsCount,
+            itemOnlyPageCollectionState = metadataOnlyItems ? "NotCollected" : SummaryStates.Unknown,
+            itemBindingCollectionState = metadataOnlyItems ? "NotCollected" : SummaryStates.Unknown,
+            displayFormDeclarations = new
+            {
+                listDefaultReferenceCount = listDisplayFormReferences,
+                contentTypeReferenceCount = contentTypeDisplayFormReferences,
+                countBasis = "Nonempty URLs declared in list and list content-type metadata; not item or rendered-page counts"
+            },
             countBasis = SummaryCountBasis,
             coverage = new
             {

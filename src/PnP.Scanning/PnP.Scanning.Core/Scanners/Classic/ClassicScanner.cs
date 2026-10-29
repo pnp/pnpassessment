@@ -50,9 +50,8 @@ namespace PnP.Scanning.Core.Scanners
                                                  r => r.ItemCount,
                                                  r => r.LastItemUserModifiedDate,
                                                  r => r.DocumentTemplate,
-                                                 // Display form resolution for list items that have no file of their own:
-                                                 // the item's content type DisplayFormUrl, else the list default. BaseType
-                                                 // tells whether a list's items can lack a file at all.
+                                                 // Capture list and registered content-type display-form declarations
+                                                 // with the shared metadata load, without reading list items.
                                                  r => r.BaseType,
                                                  r => r.DefaultDisplayFormUrl,
                                                  r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl, p => p.UniqueId),
@@ -381,8 +380,13 @@ namespace PnP.Scanning.Core.Scanners
         {
 
             Logger.Information("Post assessment work is starting");
+            var aspxAcquisitionFailures = 0;
             if (Options.Pages)
             {
+                // Site collection workers have all completed here. Acquire and project ASPX only
+                // after the full selected scan has persisted its physical discovery observations.
+                aspxAcquisitionFailures = await ClassicPageDiscoveryComponent.EnrichScanAsync(this)
+                    .ConfigureAwait(false);
                 try
                 {
                     await EnrichPublishingLayoutsAsync().ConfigureAwait(false);
@@ -564,6 +568,8 @@ namespace PnP.Scanning.Core.Scanners
             }
 
             Logger.Information("Post assessment work done");
+            if (aspxAcquisitionFailures != 0)
+                throw new InvalidOperationException($"ASPX acquisition failed for {aspxAcquisitionFailures} Web(s); see discovery evidence.");
         }
 
         private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)

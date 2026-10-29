@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Storage;
 using System.Text.Json;
 
@@ -133,6 +134,28 @@ internal sealed class AssessmentDiscoveryWriter
         }
     }
 
+    /// <summary>Streams persisted Web discovery roots across the whole scan without holding a SQLite reader during acquisition.</summary>
+    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadDiscoveredWebScopesAsync(Guid scanId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string after = null;
+        while (true)
+        {
+            List<ClassicPageDiscovery> batch;
+            using (var db = createContext())
+            {
+                batch = await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
+                    row.RowType == "Scope" && row.ScopeType == "Web" && row.ParentScopeKey == null &&
+                    row.SiteCollectionId != null && row.WebId != null && row.RecordKey.StartsWith("scope:") &&
+                    (after == null || string.Compare(row.RecordKey, after) > 0))
+                    .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
+            }
+            if (batch.Count == 0) yield break;
+            after = batch[^1].RecordKey;
+            foreach (var row in batch) yield return row;
+        }
+    }
+
     internal async Task<List<ClassicPageDiscovery>> ReadPagesAsync(Guid scanId, string siteUrl, string webUrl,
         CancellationToken cancellationToken = default)
     {
@@ -214,7 +237,9 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 verdict = DiscoveryVerdict.Incomplete;
             }
-            else if (pageSelection?.ObservationMethod == "HomePageOnly" || selection?.ScopeType == "SiteSelection")
+            else if (pageSelection?.ObservationMethod == "HomePageOnly" || selection?.ScopeType == "SiteSelection" ||
+                     scopes.Any(row => row.ScopeType == ClassicAspxAcquisitionScopes.ItemEnumerationPolicy &&
+                         row.DiscoveryStatus == "PolicyExcluded"))
             {
                 verdict = DiscoveryVerdict.CompleteDeclaredSubset;
             }

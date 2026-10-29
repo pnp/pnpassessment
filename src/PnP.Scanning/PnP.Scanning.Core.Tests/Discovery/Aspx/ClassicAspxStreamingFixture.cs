@@ -34,7 +34,7 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
         await db.Database.MigrateAsync();
     }
     /// <summary>
-    /// Runs real acquisition and both writers, recording publication bounds and optionally stopping collection traversal after one page.
+    /// Runs real acquisition and both writers, recording publication bounds.
     /// </summary>
     internal async Task RunAsync(OnDemandItems client, bool singlePageCap = false)
     {
@@ -51,7 +51,7 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
         });
     }
     /// <summary>
-    /// Provides an empty asynchronous physical-discovery stream so the scenario isolates REST-derived inventory and item bindings.
+    /// Provides an empty physical-discovery stream so any item access is visible in the fake client's counters.
     /// </summary>
     private static async IAsyncEnumerable<ClassicPageDiscovery> EmptyPhysical()
     { await Task.CompletedTask; yield break; }
@@ -73,7 +73,7 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
         bool denySecondItemPage, bool truncatedSource) : ISharePointAspxRestClient
     {
         internal const int ItemCount = 10000, PageSize = 200;
-        internal int ResolveCalls, SourceCalls, ItemPageRequests, GeneratedItems, LargestGeneratedPage;
+        internal int TotalPageRequests, ResolveCalls, SourceCalls, ItemPageRequests, GeneratedItems, LargestGeneratedPage;
         private string firstItemsUri;
         public Uri WebUrl => Url;
         /// <summary>
@@ -82,6 +82,7 @@ internal sealed class ClassicAspxStreamingFixture : IAsyncDisposable
         public Task<SharePointRestPage> GetPageAsync(Uri uri, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            TotalPageRequests++;
             if (uri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(Json(uri, new object[] { new { Id = list, BaseType = 0, Hidden = true,
                     DefaultDisplayFormUrl = RendererPath } }));

@@ -10,6 +10,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -401,6 +402,60 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         finally { DeleteOwnDirectory(directory); }
     }
 
+    [Fact]
+    public async Task Metadata_only_report_counts_form_declarations_without_claiming_item_counts()
+    {
+        var scan = Guid.NewGuid();
+        using (var seed = fixture.CreateContext())
+        {
+            Mark(seed, scan);
+            seed.ClassicPageDiscoveries.AddRange(
+                new ClassicPageDiscovery
+                {
+                    ScanId = scan, RecordKey = "policy", RowType = "Scope",
+                    ScopeType = "ItemEnumerationPolicy", DiscoveryStatus = "PolicyExcluded",
+                    SiteUrl = "https://example.invalid/sites/test", WebUrl = "/"
+                },
+                new ClassicPageDiscovery
+                {
+                    ScanId = scan, RecordKey = "list-form", RowType = "Reference",
+                    ScopeType = AspxReferenceSourceKinds.ListDefaultDisplayForm,
+                    DiscoveryStatus = "Complete", SiteUrl = "https://example.invalid/sites/test", WebUrl = "/"
+                },
+                new ClassicPageDiscovery
+                {
+                    ScanId = scan, RecordKey = "ct-form-1", RowType = "Reference",
+                    ScopeType = AspxReferenceSourceKinds.ContentTypeDisplayForm,
+                    DiscoveryStatus = "Complete", SiteUrl = "https://example.invalid/sites/test", WebUrl = "/"
+                },
+                new ClassicPageDiscovery
+                {
+                    ScanId = scan, RecordKey = "ct-form-2", RowType = "Reference",
+                    ScopeType = AspxReferenceSourceKinds.ContentTypeDisplayForm,
+                    DiscoveryStatus = "Complete", SiteUrl = "https://example.invalid/sites/test", WebUrl = "/"
+                });
+            await seed.SaveChangesAsync();
+        }
+        var directory = DirectoryForTest();
+        try
+        {
+            using var context = fixture.CreateContext();
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            using var json = JsonDocument.Parse(await File.ReadAllTextAsync(
+                Path.Combine(directory, ClassicAspxReportProjection.SummaryJson)));
+            var summary = json.RootElement;
+            summary.GetProperty("itemOnlyPageCollectionState").GetString().Should().Be("NotCollected");
+            summary.GetProperty("itemBindingCollectionState").GetString().Should().Be("NotCollected");
+            var forms = summary.GetProperty("displayFormDeclarations");
+            forms.GetProperty("listDefaultReferenceCount").GetInt64().Should().Be(1);
+            forms.GetProperty("contentTypeReferenceCount").GetInt64().Should().Be(2);
+            summary.GetProperty("observedDistinctBindingCount").GetInt64().Should().Be(0);
+            var info = await File.ReadAllTextAsync(Path.Combine(directory, ClassicAspxReportProjection.InfoFile));
+            info.Should().Contain("ItemOnlyPages=NotCollected").And.Contain("ItemBindings=NotCollected");
+        }
+        finally { DeleteOwnDirectory(directory); }
+    }
+
     /// <summary>
     /// Reports an unbound targeted catalog member with unknown coverage and catalog metadata only, never embedding the frozen payload.
     /// </summary>
@@ -430,6 +485,8 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             summary.GetProperty("coverage").GetProperty("inventoryStates").GetProperty("Unknown").GetInt64().Should().Be(1);
             summary.GetProperty("observedInventoryCount").GetInt64().Should().Be(1);
             summary.GetProperty("observedDistinctBindingCount").GetInt64().Should().Be(0);
+            summary.GetProperty("itemOnlyPageCollectionState").GetString().Should().Be("Unknown");
+            summary.GetProperty("itemBindingCollectionState").GetString().Should().Be("Unknown");
             summary.GetProperty("zeroObservedBindingsCount").GetInt64().Should().Be(1);
             var reference = summary.GetProperty("catalog");
             reference.GetProperty("state").GetString().Should().Be("VersionedCatalogReference");

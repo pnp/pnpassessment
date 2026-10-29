@@ -73,10 +73,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
     }
 
     /// <summary>
-    /// Reuses the real SDK list projection for content-type item pages, preserving item evidence without another all-lists request.
+    /// Reuses the real SDK list projection for registered display forms without reading list items.
     /// </summary>
     [Fact]
-    public async Task Real_sdk_shared_projection_preserves_content_type_item_pages_without_duplicate_all_lists_get()
+    public async Task Real_sdk_shared_projection_preserves_content_type_form_declarations_without_item_requests()
     {
         using var sdk = new OfflineSdk();
         var context = await sdk.CreateAsync();
@@ -91,20 +91,16 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
                 Guid.Parse(OfflineTransport.WebId), new Uri(Site), "/sites/reuse", "STS#0"), snapshot);
         var list = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren
             .Single(scope => scope.Metadata["role"] == "list");
-        var surface = (await provider.EnumerateChildrenAsync(list)).ObservedChildren
-            .Single(scope => scope.SourceKind == DiscoverySourceKind.ListItemDisplayFormPages);
-        var records = new List<RawDiscoveryRecord>();
-        await foreach (var batch in provider.CreateRawSource(surface).ReadBatchesAsync()) records.AddRange(batch.Records);
-
-        var page = records.Should().ContainSingle().Which;
-        page.PhysicalLocator.Should().Be("/sites/reuse/Lists/Posts/Post.aspx?ID=7");
-        page.ListItemId.Should().Be(7);
-        page.ContentTypeId.Should().Be("0x0110007C4E8A");
-        page.FileUniqueId.Should().BeNull();
-        AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", surface, page).ScopeType.Should().Be("ListItem");
+        (await provider.EnumerateChildrenAsync(list)).ObservedChildren
+            .Should().NotContain(scope => scope.Locator.Contains("Items REST objects", StringComparison.Ordinal));
+        var reference = provider.ReferenceCollector.ReadReferenceEvidence().Should().ContainSingle(value =>
+            value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm).Which;
+        reference.RawLocator.Should().Be("/sites/reuse/Lists/Posts/Post.aspx");
+        reference.ContentTypeId.Should().Be("0x0110");
+        reference.Disposition.Should().Be(AspxReferenceDispositions.Declared);
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
         sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/web/lists", StringComparison.OrdinalIgnoreCase));
-        sdk.Transport.LogicalRequests.Count(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase)).Should().Be(1);
+        sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
         provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.RequiredAdapter == "AllListsAuthority")
             .ActualMethod.Should().Be("MODEL");
         context.Web.Lists.AsRequested().Should().ContainSingle().Which.ContentTypes.AsRequested()

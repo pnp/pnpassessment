@@ -212,6 +212,7 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
     public async Task Existing_scan_scope_produces_the_terminal_coverage_verdict()
     {
         var completeScan = Guid.NewGuid();
+        var metadataOnlyScan = Guid.NewGuid();
         var declaredScan = Guid.NewGuid();
         var homePageScan = Guid.NewGuid();
         var incompleteScan = Guid.NewGuid();
@@ -224,6 +225,9 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         {
             Scope(completeScan, "assessment:site-selection", "Tenant", "Complete"),
             Scope(completeScan, "web:root", "Web", "Complete"),
+            Scope(metadataOnlyScan, "assessment:site-selection", "Tenant", "Complete"),
+            Scope(metadataOnlyScan, "web:root", "Web", "Complete"),
+            Scope(metadataOnlyScan, "native:item-policy", "ItemEnumerationPolicy", "PolicyExcluded"),
             Scope(declaredScan, "assessment:site-selection", "SiteSelection", "Complete"),
             Scope(declaredScan, "web:root", "Web", "Complete"),
             Scope(homePageScan, "assessment:site-selection", "Tenant", "Complete"),
@@ -237,6 +241,7 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         });
 
         (await writer.FinalizeScanAsync(completeScan)).Should().Be(DiscoveryVerdict.CompleteTenantVerified);
+        (await writer.FinalizeScanAsync(metadataOnlyScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(declaredScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(homePageScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(incompleteScan)).Should().Be(DiscoveryVerdict.Incomplete);

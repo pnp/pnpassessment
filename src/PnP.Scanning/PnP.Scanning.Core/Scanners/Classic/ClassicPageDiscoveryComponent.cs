@@ -8,14 +8,14 @@ namespace PnP.Scanning.Core.Scanners;
 
 internal static class ClassicPageDiscoveryComponent
 {
-    /// <summary>Owns a temporary web context while running Classic discovery and native ASPX acquisition for the scheduled web.</summary>
+    /// <summary>Owns a temporary web context while discovering ASPX files for the scheduled web.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner)
     {
         using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
         return await ExecuteAsync(scanner, context).ConfigureAwait(false);
     }
 
-    /// <summary>Uses the shared web context to persist raw acquisition evidence before normalized projection writes, retaining fatal storage failures.</summary>
+    /// <summary>Uses the shared web context to persist physical ASPX discovery before scan-wide acquisition begins.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner,
         PnP.Core.Services.PnPContext context, SharePointListMetadataSnapshot sharedLists = null)
     {
@@ -40,29 +40,57 @@ internal static class ClassicPageDiscoveryComponent
                 web.ServerRelativeUrl, scanner.WebTemplate), sharedLists);
         await new AssessmentWebDiscovery(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, writer)
             .RunAsync(provider, token).ConfigureAwait(false);
+        return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads all persisted Web roots after discovery workers finish, then enriches their ASPX observations.</summary>
+    internal static async Task<int> EnrichScanAsync(ClassicScanner scanner)
+    {
+        var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
+        var writer = new AssessmentDiscoveryWriter(scanner.ScanId);
+        var projection = new ClassicAspxProjectionWriter(scanner.ScanId);
         var catalog = scanner.Options.PlatformAspxCatalogPayload == null ? null :
             PlatformAspxCatalog.FromFrozenPayload(scanner.Options.PlatformAspxCatalogPayload);
-        var projection = new ClassicAspxProjectionWriter(scanner.ScanId);
-        using var nativeClient = new PnPContextSharePointAspxRestClient(context, ownsContext: false);
-        var acquisitionContext = new ClassicAspxWebAcquisitionContext(scanner.ScanId, site.Id, web.Id,
-            new Uri(site.Url.ToString(), UriKind.Absolute), new Uri(web.Url.ToString(), UriKind.Absolute), scanner.Options, catalog);
-        await new ClassicAspxWebAcquisition(acquisitionContext, nativeClient, factory).AcquireAsync(
-            writer.ReadPageStreamAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token),
-            async (batch, cancellation) =>
+        var auth = new ExternalAuthenticationProvider((_, scopes) =>
+            scanner.ScanManager.GetScanAuthenticationManager(scanner.ScanId).GetAccessTokenAsync(scopes));
+        var failures = 0;
+        await foreach (var web in writer.ReadDiscoveredWebScopesAsync(scanner.ScanId, token).ConfigureAwait(false))
+        {
+            token.ThrowIfCancellationRequested();
+            try
             {
-                // Raw acquisition facts survive a subsequent projection failure; storage errors stay fatal.
-                foreach (var evidence in batch.Evidence)
-                {
-                    evidence.SiteUrl = scanner.SiteUrl;
-                    evidence.WebUrl = scanner.WebUrl;
-                }
-                if (batch.Evidence.Count != 0)
-                {
-                    await writer.WriteAsync(batch.Evidence, cancellation).ConfigureAwait(false);
-                }
-                await projection.WriteAsync(batch.Inventory, batch.Bindings, cancellation).ConfigureAwait(false);
-            }, token).ConfigureAwait(false);
-        return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
+                using var factory = new PnPContextSharePointAspxRestClientFactory(scanner.PnPContextFactory, auth,
+                    scanner.ScanId);
+                var webUri = new Uri(web.Url, UriKind.Absolute);
+                var client = await factory.GetAsync(webUri, token).ConfigureAwait(false);
+                var acquisitionContext = new ClassicAspxWebAcquisitionContext(scanner.ScanId,
+                    web.SiteCollectionId.Value, web.WebId.Value, new Uri(web.SiteUrl, UriKind.Absolute),
+                    webUri, scanner.Options, catalog);
+                await new ClassicAspxWebAcquisition(acquisitionContext, client, factory).AcquireAsync(
+                    writer.ReadPageStreamAsync(scanner.ScanId, web.SiteUrl, web.WebUrl, token),
+                    async (batch, cancellation) =>
+                    {
+                        // Keep raw acquisition evidence even if a later projection write fails.
+                        foreach (var evidence in batch.Evidence)
+                        {
+                            evidence.SiteUrl = web.SiteUrl;
+                            evidence.WebUrl = web.WebUrl;
+                        }
+                        if (batch.Evidence.Count != 0)
+                            await writer.WriteAsync(batch.Evidence, cancellation).ConfigureAwait(false);
+                        await projection.WriteAsync(batch.Inventory, batch.Bindings, cancellation).ConfigureAwait(false);
+                    }, token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && !token.IsCancellationRequested)
+            {
+                failures++;
+                await RecordScopeAsync(scanner.ScanId, web.SiteUrl, web.WebUrl, "Web", "Failed", ex,
+                    stage: "AspxAcquisition", writer: writer).ConfigureAwait(false);
+                scanner.Logger.Warning(ex, "ASPX acquisition failed for web {SiteUrl}{WebUrl}",
+                    web.SiteUrl, web.WebUrl);
+            }
+        }
+        return failures;
     }
 
     /// <summary>Persists original web-enumeration authority without replacing retained evidence with the pending checkpoint replay queue.</summary>

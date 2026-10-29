@@ -270,6 +270,8 @@ internal sealed class AssessmentWebDiscovery
             ScopeType = reference.SourceKind,
             Url = reference.RawLocator,
             FileUniqueId = Guid.TryParse(reference.LinkedFileUniqueId, out var fileId) ? fileId : null,
+            ListId = reference.ListId,
+            ContentTypeId = reference.ContentTypeId,
             ObservationMethod = reference.AcquisitionMethod,
             DiscoveryStatus = status,
             ErrorCodes = status is "Failed" or "Unknown" ? reference.ReasonCode : null,

@@ -1,6 +1,10 @@
-# ASPX inventory and item bindings
+# ASPX inventory and display-form declarations
 
-Classic **Pages** records physical ASPX resources separately from the real list items that use them. This acquisition evidence is not the existing classic-page modernization assessment. A resource needs no backing item to enter inventory; a non-ASPX document can use an ASPX renderer without becoming an ASPX resource itself.
+Classic **Pages** inventories physical ASPX resources and records nonempty `List.DefaultDisplayFormUrl` and registered `ContentType.DisplayFormUrl` declarations. It does not enumerate list items to infer item-only pages, per-item renderer bindings or their counts. A form declaration is a possible rendering route, not proof that any item uses it. This acquisition evidence is separate from the classic-page modernization assessment.
+
+For a full Pages scan, each scheduled Web discovers files below its Web root and every observed `List.RootFolder`, recursively. This includes ordinary lists, document libraries, hidden lists and catalogs when the scanning identity can enumerate them. The discovery worker records physical `.aspx` files and metadata references; it does not enumerate list items. After **all selected Webs** have finished discovery, the scan-wide post-scan phase reads the persisted ASPX observations, acquires file content and writes the native inventory. The classic-page modernization assessment still runs in each Web worker and remains a separate result.
+
+Folder traversal lists file metadata for each folder and admits `.aspx` paths locally; it does not have a server-side `*.aspx` filter. Large folder trees therefore cost requests and metadata transfer in proportion to the folders and files observed. Unreadable folders, excluded Webs and virtual or item-only rendering routes remain outside a proven physical-file inventory; their absence cannot be inferred from a finished scan.
 
 Use the existing [Classic assessment](classic/assess.md) and [authentication setup](using-the-assessment-tool/setupauth.md). Examples show page options; supply your environment's authentication arguments. Placeholders are not deployment targets.
 
@@ -14,7 +18,7 @@ microsoft365-assessment.exe report --id <assessment-id> --mode CsvOnly --delimit
 
 `--siteslist` and `--sitesfile` select declared roots. A supplied subweb remains a scheduled root and its descendant subtree; it is not automatically replaced by its parent site collection. Omitting both selectors uses tenant enumeration, a different scope dependent on authority and visible sites. Enumeration failure or a known-root fallback is not a complete tenant inventory.
 
-`--homepageonly` targets each scheduled web's welcome page without enumerating every list, folder, form and item surface. `HomePageOnly` and `DeclaredFullInventory` describe the requested page scope, not a tenant-coverage verdict. A finished assessment or successful report command alone does not establish complete acquisition.
+`--homepageonly` targets each scheduled web's welcome page without enumerating every list, folder and form surface. No Pages scan enumerates all list items. `HomePageOnly` and `DeclaredFullInventory` describe the requested page scope, not a tenant-coverage verdict. A finished assessment or successful report command alone does not establish complete acquisition.
 
 ### Web-template exclusions
 
@@ -64,12 +68,15 @@ A non-null `declaredInherits` requires a nonempty `handlerEvidenceSource` and is
 |---|---|
 | Tenant resource | `AspxKey` uses real `SiteCollectionId` + `FileUniqueId`. Paths/URLs/observing webs are metadata, not extra identities. Unresolved paths do not acquire invented file GUIDs. |
 | Platform resource | A frozen catalog deployment/entry identity. Tenant file GUIDs may be null; observing another web does not multiply the resource. |
-| Item binding | `(ScanId, AspxKey, SiteCollectionId, WebId, ListId, positive ItemId)`. `ItemGuid` is optional supplementary evidence, not the key or an admission requirement. |
-| Repeated sources | `BindingKinds` flags and `BindingProvenanceJson` combine reasons on one item/resource pair, not one row per reason. |
+| List display-form declaration | One nonempty `DefaultDisplayFormUrl` observed in a list metadata row; the reference retains its `ListId`. |
+| Registered content-type display-form declaration | One nonempty `DisplayFormUrl` observed on a content type registered with a list; the reference retains `ListId` and `ContentTypeId`. |
+| Item binding in older scans | Historical rows retain `(ScanId, AspxKey, SiteCollectionId, WebId, ListId, positive ItemId)` identity. New scans do not acquire these rows. |
 
-One renderer used by 100 distinct scoped items gives **one inventory row and 100 bindings**. The same pair found through a list form and content type gives **one binding with both reasons**. An ASPX without a backing item gives **one inventory row and zero bindings**, not an invented item. One item can bind to several ASPX resources. Different site/web/list GUIDs remain distinct even if integer item IDs match.
+The declaration counts measure metadata rows with nonempty form URLs. They do not measure unique forms, actual renderings, item-only pages or list item counts. Physical ASPX files can still enter inventory through file discovery, including a display-form file when it is observed as a file.
 
-`DistinctItemBindingCount` is the SQL count of unique normalized binding pairs for that assessment/resource—not source flags, nullable `ItemGuid` values, mixed discovery rows, visits or platform-wide usage. Inventory is left-joined to the count, retaining zero-binding resources. Counts are **observations in the declared scope**; zero does not establish complete absence when coverage is unknown, incomplete or changed.
+`DistinctItemBindingCount` remains the SQL count of stored binding pairs for compatibility with saved scans. A zero in a new scan means item bindings were **not collected**. Check `itemBindingCollectionState` in `aspxsummary.json` before interpreting it. Full Pages scans with this policy receive the `CompleteDeclaredSubset` coverage verdict, since item-only pages are outside the collected subset.
+
+Service-side classic rendering telemetry could measure render events or distinct item IDs seen during a time window. It would measure observed usage, not the number of items that could render but were never requested.
 
 ### Handler source facts, not classification
 
@@ -77,21 +84,21 @@ One renderer used by 100 distinct scoped items gives **one inventory row and 100
 
 Only complete, available **actual file bytes** support source parsing. Denied, unavailable, truncated or invalidly encoded bytes, rendered HTML and path-only observations do not prove an actual Handler. A readable source without `Inherits` may carry the explicitly labelled `FrameworkDefaultAssumptionNotConfigResolved`; this is not resolved `web.config` or a runtime type check. Catalog declarations stay versioned references; types/assemblies are not loaded to verify execution.
 
-Acquisition does not use a later classic/modern, user/non-user or modernization classification as an admission gate. Existing page assessment results remain separate from resource existence and normalized bindings.
+Acquisition does not use a later classic/modern, user/non-user or modernization classification as an admission gate. Existing page assessment results remain separate from physical resource existence and form declarations.
 
 ## SQL and native CSVs
 
-SQL tables are `ClassicAspxInventories` and `ClassicAspxItemBindings`. Native Classic reports add:
+SQL tables remain `ClassicAspxInventories` and `ClassicAspxItemBindings` for saved-scan compatibility. Native Classic reports add:
 
 | Output | Key fields |
 |---|---|
-| `aspxinventory.csv` | `ScanId`/`AspxKey`, identity kind/version, site/file GUIDs and locations; file read/errors; declared/normalized/effective Handler and read/parse/source/default/reason evidence; catalog source/version/digest/entry; `ProvenanceJson`, `CoverageState`, `FirstObservedAtUtc`, latest `ObservedAtUtc`, `DistinctItemBindingCount` and `BindingCountBasis`. |
-| `aspxitembindings.csv` | Scoped item/resource key; optional `ItemGuid` and read state; item metadata; `BindingKinds`, `BindingProvenanceJson` and `ObservedAtUtc`. Reasons include `FileSelf`, `ListFormRenderer`, `ContentTypeRenderer`, `DocumentMetadataRenderer` and `PublishingPageLayout`. |
-| `classicaspxinfo.txt` | Acquisition marker/scope and nullable-text encoding. Missing native marker + empty tables means `NotAcquired/Legacy`; missing marker + new observed rows (for example after resume) means `ObservedWithoutNativeMarker` / `UnknownContract`, not an invented `aspx-inventory/v1` contract. |
+| `aspxinventory.csv` | Physical ASPX and catalog identities, file and Handler evidence, coverage, provenance and `DistinctItemBindingCount`. A zero binding count in a new scan means bindings were not collected. |
+| `aspxitembindings.csv` | Compatibility output for saved binding observations. New scans leave it header-only and mark `ItemBindings=NotCollected` in the Info file. |
+| `classicaspxinfo.txt` | Acquisition marker/scope, explicit item-page and binding collection state, and nullable-text encoding. Missing native marker + empty tables means `NotAcquired/Legacy`; missing marker + observed rows means `ObservedWithoutNativeMarker` / `UnknownContract`. |
 
-The canonical filenames are `aspxinventory.csv` and `aspxitembindings.csv`. The earlier names `classicaspxinventories.csv` and `classicaspxitembindings.csv` remain compatibility aliases with **exactly the same bytes**, copied from the same completed typed streams rather than another query. Nullable text in canonical and compatibility files uses the same BackslashNullV1 encoding.
+The canonical filenames are `aspxinventory.csv` and `aspxitembindings.csv`. The earlier names `classicaspxinventories.csv` and `classicaspxitembindings.csv` remain byte-identical compatibility aliases. Nullable text in these four files uses the same BackslashNullV1 encoding.
 
-`aspxsummary.json` uses `schemaVersion: "aspx-inventory-summary/v1"`. It records the assessment ID, native projection contract/acquisition state, requested scope, frozen template exclusions, catalog source/version/digest (never its payload), `observedInventoryCount`, `observedDistinctBindingCount`, `zeroObservedBindingsCount`, observed inventory coverage states and canonical-file lengths/SHA256 hashes/compatibility names. Counts describe the exported streams, not a second query or tenant-wide denominator. `HomePageOnly`, unknown/absent contract, unknown catalog and incomplete/changed coverage remain separate; the summary makes no tenant-completeness assertion. Zero observations in an upgraded legacy scan remain NotAcquired/Legacy, not proof of no ASPX.
+`aspxsummary.json` uses `schemaVersion: "aspx-inventory-summary/v1"`. It reports the assessment ID, projection contract, requested scope, frozen template exclusions, catalog source/version/digest, observed inventory and binding-stream counts, inventory coverage states, and canonical-file lengths and SHA256 hashes. For new scans, `itemOnlyPageCollectionState` and `itemBindingCollectionState` are `NotCollected`. `displayFormDeclarations.listDefaultReferenceCount` and `contentTypeReferenceCount` count observed metadata references, not item counts. Legacy scans without the new policy marker report the collection state as `Unknown`. The summary makes no tenant-completeness assertion.
 
 Rows stream in deterministic key order; empty tables produce typed header-only CSVs. `Unknown`, `Incomplete` and `ChangedDuringScan` must not become complete tenant coverage. Retain the assessment ID, source/catalog version and declared scope when comparing results. Homepage and full-inventory totals are not equivalent universes.
 
@@ -114,7 +121,7 @@ The typed `ClassicAspxInventoryExport` and `ClassicAspxItemBindingExport` DTOs a
 
 Existing Classic CSVs and Power BI templates keep their contracts; the normalized files are additional outputs. `classicpages.csv` is still selected classic-page assessment data, not a replacement for the ASPX inventory. Upgrades create schema without inventing historical inventory, bindings or Handler facts. Header-only legacy inventory files do not mean there was no ASPX.
 
-Pause/restart retain assessment evidence and merge repeated observations by stable resource/item-pair keys. Reasons combine; first/latest timestamps and provenance preserve context. Location or Handler changes can report `ChangedDuringScan` rather than silently proving one immutable state. Metadata-only or denied observations do not erase already acquired source facts. These semantics do not promise service-side exactly-once execution, a transactional tenant snapshot or coverage of unreadable content.
+Pause/restart retain assessment evidence and merge repeated observations by stable resource keys. Saved item-binding rows remain available for compatibility; the new acquisition path does not add item bindings. First/latest timestamps and provenance preserve context. Location or Handler changes can report `ChangedDuringScan` rather than proving one immutable state. Metadata-only or denied observations do not erase already acquired source facts. These semantics do not promise service-side exactly-once execution, a transactional tenant snapshot or coverage of unreadable content.
 
 ## Saved-scan compatibility
 
