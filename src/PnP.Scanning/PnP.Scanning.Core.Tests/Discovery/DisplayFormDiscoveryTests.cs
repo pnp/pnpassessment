@@ -15,6 +15,9 @@ public sealed class DisplayFormDiscoveryTests
 {
     private static readonly Uri SiteUrl = new("https://contoso.sharepoint.com/sites/a");
 
+    /// <summary>
+    /// Requires the all-lists request to include list-default and content-type form declarations without querying item collections.
+    /// </summary>
     [Fact]
     public async Task All_lists_request_carries_both_display_form_tiers_without_item_reads()
     {
@@ -32,6 +35,9 @@ public sealed class DisplayFormDiscoveryTests
         factory.Client.Requests.Should().NotContain(uri => uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Retains declared form locations and content-type scope as unlinked reference evidence, without deriving per-item pages or requests.
+    /// </summary>
     [Fact]
     public async Task Registered_forms_are_evidence_without_creating_item_page_surfaces()
     {
@@ -58,6 +64,9 @@ public sealed class DisplayFormDiscoveryTests
         factory.Client.Requests.Should().NotContain(uri => uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Preserves content-type form declarations across verbose and no-metadata collection wrappers and both supported ID shapes.
+    /// </summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -79,6 +88,9 @@ public sealed class DisplayFormDiscoveryTests
             flavor == (wrappedContentTypes ? "odata-verbose" : "odata-nometadata"));
     }
 
+    /// <summary>
+    /// Keeps each registered content type and its declared form path distinct instead of collapsing them into one list-level reference.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

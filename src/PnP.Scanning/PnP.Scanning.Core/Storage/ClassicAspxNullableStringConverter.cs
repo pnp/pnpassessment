@@ -5,7 +5,7 @@ using CsvHelper.TypeConversion;
 
 namespace PnP.Scanning.Core.Storage;
 
-/// <summary>Reversible nullable-string wire contract for the two ASPX CSVs only.</summary>
+/// <summary>Reversible nullable-string wire contract for the canonical ASPX inventory CSV.</summary>
 internal sealed class ClassicAspxNullableStringConverter : DefaultTypeConverter
 {
     internal const string EncodingVersion = "BackslashNullV1";

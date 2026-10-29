@@ -1,53 +1,51 @@
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
+using PnP.Scanning.Core.Discovery.Aspx;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Discovery.Aspx;
 
 public sealed class ClassicAspxLargeReplayTests
 {
+    /// <summary>Streams ten thousand distinct physical files in bounded batches and keeps one inventory row per identity after replay.</summary>
     [Fact]
-    public async Task Ten_thousand_item_list_is_never_enumerated_by_native_acquisition()
+    public async Task TenThousandPhysicalFilesRemainBoundedAndReplayIdempotent()
     {
         await using var scenario = new ClassicAspxStreamingFixture();
         await scenario.InitializeAsync();
-        var source = scenario.Client("large-first");
-        await scenario.RunAsync(source);
-
-        using var db = scenario.Open();
-        Assert.Equal(0, await db.ClassicAspxItemBindings.CountAsync());
-        Assert.Equal(0, await db.ClassicAspxInventories.CountAsync());
-        var marker = await db.ClassicPageDiscoveries.SingleAsync(x =>
-            x.RowType == "Scope" && x.ScopeType == "ItemEnumerationPolicy");
-        Assert.Equal("PolicyExcluded", marker.DiscoveryStatus);
-        using var details = JsonDocument.Parse(marker.EvidenceJson);
-        Assert.Equal("NotCollected", details.RootElement.GetProperty("itemPages").GetString());
-        Assert.Equal("NotCollected", details.RootElement.GetProperty("itemBindings").GetString());
-        Assert.Equal(0, source.TotalPageRequests);
-        Assert.Equal(0, source.ItemPageRequests);
-        Assert.Equal(0, source.GeneratedItems);
-        Assert.Equal(0, source.ResolveCalls);
-        Assert.Equal(0, source.SourceCalls);
-        Assert.InRange(scenario.LargestPublishedBatch, 1, 128);
+        var scanId = Guid.NewGuid();
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            await new ClassicAspxWebAcquisition(ClassicAspxStreamingFixture.Context(scanId)).AcquireAsync(
+                ClassicAspxStreamingFixture.Pages(scanId, 10000), scenario.PublishAsync);
+        }
+        using var context = scenario.CreateContext();
+        (await context.ClassicAspxInventories.CountAsync()).Should().Be(10000);
+        scenario.LargestPublishedBatch.Should().BeInRange(1, 128);
     }
 
+    /// <summary>Propagates a publication failure and converges on the same unique file set after an explicit replay.</summary>
     [Fact]
-    public async Task Replay_keeps_one_policy_marker_without_reading_items()
+    public async Task ReplayAfterFailedPublicationDoesNotDuplicatePhysicalFiles()
     {
         await using var scenario = new ClassicAspxStreamingFixture();
         await scenario.InitializeAsync();
-        var first = scenario.Client("first");
-        var replay = scenario.Client("replay", overrideForm: true, denySecondItemPage: true);
-        await scenario.RunAsync(first);
-        await scenario.RunAsync(replay);
-
-        using var db = scenario.Open();
-        Assert.Equal(1, await db.ClassicPageDiscoveries.CountAsync(x =>
-            x.RowType == "Scope" && x.ScopeType == "ItemEnumerationPolicy"));
-        Assert.Equal(0, await db.ClassicAspxItemBindings.CountAsync());
-        Assert.Equal(0, first.TotalPageRequests);
-        Assert.Equal(0, replay.TotalPageRequests);
-        Assert.Equal(0, first.GeneratedItems);
-        Assert.Equal(0, replay.GeneratedItems);
+        var scanId = Guid.NewGuid();
+        int publication = 0;
+        var acquire = () => new ClassicAspxWebAcquisition(ClassicAspxStreamingFixture.Context(scanId)).AcquireAsync(
+            ClassicAspxStreamingFixture.Pages(scanId, 1000), async (batch, token) =>
+            {
+                if (++publication == 2)
+                {
+                    throw new IOException("publication sentinel");
+                }
+                await scenario.PublishAsync(batch, token);
+            });
+        await acquire.Should().ThrowAsync<IOException>().WithMessage("publication sentinel");
+        await new ClassicAspxWebAcquisition(ClassicAspxStreamingFixture.Context(scanId)).AcquireAsync(
+            ClassicAspxStreamingFixture.Pages(scanId, 1000), scenario.PublishAsync);
+        using var context = scenario.CreateContext();
+        (await context.ClassicAspxInventories.CountAsync()).Should().Be(1000);
+        scenario.LargestPublishedBatch.Should().BeInRange(1, 128);
     }
 }

@@ -25,8 +25,6 @@ namespace PnP.Scanning.Core
         internal const string StartClassicHomePageOnly = "homepageonly";
         internal const string StartClassicAuditLogWindowDays = "auditlogwindowdays";
         internal const string StartExcludeSiteTemplates = "excludesitetemplates";
-        internal const string StartPlatformAspxCatalog = "platformaspxcatalog";
-        internal const string StartPlatformAspxCatalogPayload = "platformaspxcatalogpayload";
         internal const string StartTestNumberOfSites = "testnumberofsites";
 
         internal const string ListRunning = "running";

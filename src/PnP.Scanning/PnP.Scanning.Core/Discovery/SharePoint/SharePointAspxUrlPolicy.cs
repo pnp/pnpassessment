@@ -102,6 +102,16 @@ internal sealed class SharePointAspxUrlPolicy
         return true;
     }
 
+    /// <summary>Requires an exact default-port HTTPS Web authority before any authentication or folder request.</summary>
+    internal static void ValidateWeb(Uri web)
+    {
+        if (web == null || !web.IsAbsoluteUri || web.Scheme != HttpsScheme || !web.IsDefaultPort ||
+            !string.IsNullOrEmpty(web.UserInfo) || !string.IsNullOrEmpty(web.Query) || !string.IsNullOrEmpty(web.Fragment))
+        {
+            throw new ArgumentException("An exact HTTPS web authority is required.");
+        }
+    }
+
     /// <summary>Requires HTTPS on the default port and the same authority, without normalizing one resource into another.</summary>
     internal static bool HasSameHttpsAuthority(Uri expected, Uri actual)
     {

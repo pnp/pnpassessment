@@ -13,6 +13,9 @@ namespace PnP.Scanning.Core.Tests.Discovery
         private const string WebUrl = "/sites/team/blog";
         private const string SiteUrl = "/sites/team";
 
+        /// <summary>
+        /// Resolves a stock blog content-type form relative to its owning web rather than the site-collection root.
+        /// </summary>
         [Fact]
         public void ToServerRelative_StockBlogPostContentType_NormalizesWebRelativePath()
         {
@@ -54,6 +57,9 @@ namespace PnP.Scanning.Core.Tests.Discovery
                 .Should().Be("/_layouts/15/userdisp.aspx");
         }
 
+        /// <summary>
+        /// Rejects missing, blank, and unknown-token form declarations instead of inventing a normalized location.
+        /// </summary>
         [Theory]
         [InlineData(null)]
         [InlineData("")]

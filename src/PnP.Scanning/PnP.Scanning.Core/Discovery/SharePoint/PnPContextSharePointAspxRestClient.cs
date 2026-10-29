@@ -45,7 +45,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     private readonly PnPContext context;
     private readonly bool ownsContext;
     private readonly HttpClient jsonTransport;
-    private readonly HttpClient fileContentClient = new(new HttpClientHandler
+    private readonly HttpClient ownedJsonTransport = new(new HttpClientHandler
     {
         AllowAutoRedirect = false,
         UseCookies = false,
@@ -54,21 +54,15 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
 
     // Optional transport is explicitly borrowed; its owner (for example an offline SDK fixture)
     // retains its lifetime. Production defaults to our owned no-redirect/no-cookie client.
-    /// <summary>Creates an SDK-backed client with an owned nonredirecting source transport and explicit context or JSON-transport ownership.</summary>
+    /// <summary>Creates an SDK-backed client with an owned nonredirecting JSON transport and explicit context or JSON-transport ownership.</summary>
     internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true, HttpClient jsonTransport = null)
     {
         this.context = context ?? throw new ArgumentNullException(nameof(context));
         this.ownsContext = ownsContext;
-        this.jsonTransport = jsonTransport ?? fileContentClient;
+        this.jsonTransport = jsonTransport ?? ownedJsonTransport;
     }
 
     public Uri WebUrl => context.Uri;
-
-    /// <summary>Authenticates a bounded nonredirecting source read using the context web authority.</summary>
-    public Task<SharePointFileContent> ReadFileContentAsync(string serverRelativeUrl, int maxBytes, TimeSpan timeout,
-        CancellationToken cancellationToken = default) => SharePointFileContentReader.ReadAsync(fileContentClient,
-            context.Uri, serverRelativeUrl, maxBytes, timeout,
-            (request, token) => context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request), cancellationToken);
 
     /// <summary>Requests one bounded JSON page through the configured transport using the context authentication provider.</summary>
     public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
@@ -82,7 +76,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         Func<HttpRequestMessage, CancellationToken, Task> authenticate, int maxBytes = 4 * 1024 * 1024,
         TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
-        SharePointFileContentReader.ValidateWeb(web);
+        SharePointAspxUrlPolicy.ValidateWeb(web);
         if (uri == null || !uri.IsAbsoluteUri || uri.Scheme != "https" || !uri.IsDefaultPort ||
             !string.Equals(uri.Authority, web.Authority, StringComparison.OrdinalIgnoreCase) ||
             uri.UserInfo.Length != 0 || uri.Fragment.Length != 0 ||
@@ -319,7 +313,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     /// <summary>Disposes the owned HTTP client and, only when ownership was granted, its SDK context.</summary>
     public void Dispose()
     {
-        fileContentClient.Dispose();
+        ownedJsonTransport.Dispose();
         if (ownsContext)
         {
             context.Dispose();

@@ -11,8 +11,8 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20261027101206_ClassicAspxInventoryBindings")]
-    partial class ClassicAspxInventoryBindings
+    [Migration("20261029074843_ClassicAspxInventoryOnly")]
+    partial class ClassicAspxInventoryOnly
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -356,18 +356,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("AspxKey")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("CatalogDigest")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CatalogEntryKey")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CatalogSource")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CatalogVersion")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("ContentTypeId")
                         .HasColumnType("TEXT");
 
@@ -391,55 +379,19 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("FileUniqueId")
+                    b.Property<Guid>("FileUniqueId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("FirstObservedAtUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("HandlerDeclaredType")
+                    b.Property<Guid?>("FolderUniqueId")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("HandlerDefaultProvenance")
+                    b.Property<Guid?>("ListId")
                         .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerEffectiveType")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerErrorCodes")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerErrorDetail")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerNormalizedType")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerParseState")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerReadState")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerReasonCode")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandlerSource")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("IdentityKind")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("IdentityVersion")
-                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ObservedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PageType")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ProvenanceJson")
@@ -449,7 +401,7 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.Property<string>("SetupPath")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("SiteCollectionId")
+                    b.Property<Guid>("SiteCollectionId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SiteUrl")
@@ -466,83 +418,12 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
 
                     b.HasKey("ScanId", "AspxKey");
 
-                    b.HasIndex("ScanId", "IdentityKind");
-
                     b.HasIndex("ScanId", "SiteCollectionId", "FileUniqueId")
-                        .IsUnique()
-                        .HasFilter("\"IdentityKind\" = 'TenantFile'");
-
-                    b.HasIndex("ScanId", "CatalogSource", "CatalogVersion", "CatalogDigest", "CatalogEntryKey")
-                        .IsUnique()
-                        .HasFilter("\"IdentityKind\" = 'PlatformCatalog'");
+                        .IsUnique();
 
                     b.ToTable("ClassicAspxInventories", null, t =>
                         {
-                            t.HasCheckConstraint("CK_ClassicAspxInventories_Identity", "length(\"AspxKey\") > 0 AND \"IdentityVersion\" > 0 AND ((\"IdentityKind\" = 'TenantFile' AND \"SiteCollectionId\" IS NOT NULL AND \"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"FileUniqueId\" IS NOT NULL AND \"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000') OR (\"IdentityKind\" = 'PlatformCatalog' AND \"SiteCollectionId\" IS NULL AND \"FileUniqueId\" IS NULL AND \"CatalogSource\" IS NOT NULL AND \"CatalogVersion\" IS NOT NULL AND \"CatalogDigest\" IS NOT NULL AND \"CatalogEntryKey\" IS NOT NULL AND length(trim(\"CatalogSource\")) > 0 AND length(trim(\"CatalogVersion\")) > 0 AND length(\"CatalogDigest\") = 64 AND length(trim(\"CatalogEntryKey\")) > 0))");
-                        });
-                });
-
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicAspxItemBinding", b =>
-                {
-                    b.Property<Guid>("ScanId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AspxKey")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("SiteCollectionId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("WebId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("ListId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("BindingKinds")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("BindingProvenanceJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ContentTypeId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("ItemGuid")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ItemGuidReadState")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ItemTitle")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ItemUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ObservedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SiteUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("WebUrl")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ScanId", "AspxKey", "SiteCollectionId", "WebId", "ListId", "ItemId");
-
-                    b.HasIndex("ScanId", "ItemGuid");
-
-                    b.HasIndex("ScanId", "SiteCollectionId", "WebId", "ListId", "ItemId");
-
-                    b.ToTable("ClassicAspxItemBindings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ClassicAspxItemBindings_RealItem", "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"WebId\" <> '00000000-0000-0000-0000-000000000000' AND \"ListId\" <> '00000000-0000-0000-0000-000000000000' AND \"ItemId\" > 0 AND \"BindingKinds\" > 0 AND (\"BindingKinds\" & ~31) = 0");
+                            t.HasCheckConstraint("CK_ClassicAspxInventories_RealFile", "length(\"AspxKey\") > 0 AND \"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'");
                         });
                 });
 
@@ -2094,15 +1975,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("Workflows");
-                });
-
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicAspxItemBinding", b =>
-                {
-                    b.HasOne("PnP.Scanning.Core.Storage.ClassicAspxInventory", null)
-                        .WithMany()
-                        .HasForeignKey("ScanId", "AspxKey")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

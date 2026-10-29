@@ -71,6 +71,10 @@ namespace PnP.Scanning.Core.Scanners
         // The file's vti_setuppath proves it ghosts from a stock list view/form template.
         internal const string SystemPageTemplateCode = "system_page_template";
 
+        /// <summary>
+        /// Assesses already discovered physical pages, honoring HOME-only selection while retaining file-only assessment and per-page failures.
+        /// Persists discovery dispositions, page and web-part enrichment, and web summaries without rediscovering library membership; cancellation propagates.
+        /// </summary>
         internal static async Task ExecuteAsync(ScannerBase scannerBase, PnPContext context, ClientContext csomContext,
             IReadOnlyList<ClassicPageDiscovery> discoveredPages)
         {

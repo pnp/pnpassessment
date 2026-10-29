@@ -44,7 +44,6 @@ namespace PnP.Scanning.Process.Commands
 
         public string ExcludeSiteTemplates { get; set; }
 
-        public FileInfo PlatformAspxCatalog { get; set; }
 
         public int AuditLogWindowDays { get; set; } = 14;
 

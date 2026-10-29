@@ -27,8 +27,7 @@ namespace PnP.Scanning.Core.Scanners
             bool skipUserInformation,
             bool homePageOnly,
             int auditLogWindowDays = 14,
-            string excludeSiteTemplates = null,
-            string platformAspxCatalogPayload = null)
+            string excludeSiteTemplates = null)
         {
             // Each requested scan component is keyed by its enum name and is always "on" (true);
             // FromScannerInput reads these as the set of enabled ClassicComponents.
@@ -73,13 +72,6 @@ namespace PnP.Scanning.Core.Scanners
                     Type = StringPropertyType,
                     Value = Discovery.Aspx.SiteTemplateExclusionPolicy.Parse(excludeSiteTemplates).CanonicalValue,
                 });
-                if (platformAspxCatalogPayload != null)
-                    request.Properties.Add(new PropertyRequest
-                    {
-                        Property = Constants.StartPlatformAspxCatalogPayload,
-                        Type = StringPropertyType,
-                        Value = platformAspxCatalogPayload,
-                    });
             }
         }
 

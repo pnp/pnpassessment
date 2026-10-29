@@ -28,15 +28,6 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 var previous = await db.ClassicPageDiscoveries.FindAsync(
                     new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
-                if (previous == null && Aspx.ClassicAspxEvidenceCompatibility.LegacyKeyFor(row.RecordKey) is { } legacyKey)
-                {
-                    previous = await db.ClassicPageDiscoveries.FindAsync(
-                        new object[] { row.ScanId, legacyKey }, cancellationToken).ConfigureAwait(false);
-                    if (previous != null)
-                    {
-                        Aspx.ClassicAspxEvidenceCompatibility.PreserveIdentity(row, previous);
-                    }
-                }
                 if (previous == null) db.ClassicPageDiscoveries.Add(row);
                 else
                 {
@@ -237,9 +228,7 @@ internal sealed class AssessmentDiscoveryWriter
             {
                 verdict = DiscoveryVerdict.Incomplete;
             }
-            else if (pageSelection?.ObservationMethod == "HomePageOnly" || selection?.ScopeType == "SiteSelection" ||
-                     scopes.Any(row => row.ScopeType == ClassicAspxAcquisitionScopes.ItemEnumerationPolicy &&
-                         row.DiscoveryStatus == "PolicyExcluded"))
+            else if (pageSelection?.ObservationMethod == "HomePageOnly" || selection?.ScopeType == "SiteSelection")
             {
                 verdict = DiscoveryVerdict.CompleteDeclaredSubset;
             }

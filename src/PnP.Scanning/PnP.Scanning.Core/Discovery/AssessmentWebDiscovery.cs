@@ -249,6 +249,10 @@ internal sealed class AssessmentWebDiscovery
         ObservedAtUtc = surface.AsOfUtc.UtcDateTime,
     };
 
+    /// <summary>
+    /// Projects a reference into scan- and web-scoped evidence with its declaration scope, optional physical link, and failure diagnostics,
+    /// without promoting the reference to a physical page observation.
+    /// </summary>
     private ClassicPageDiscovery ReferenceEvidence(AspxReferenceCandidate reference)
     {
         var status = reference.Disposition switch

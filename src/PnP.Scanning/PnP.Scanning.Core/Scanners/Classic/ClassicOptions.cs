@@ -34,9 +34,6 @@ namespace PnP.Scanning.Core.Scanners
         /// <summary>Frozen Web-template patterns. An explicit list replaces the defaults; sole none clears them.</summary>
         internal string ExcludeSiteTemplates { get; set; } = Discovery.Aspx.SiteTemplateExclusionPolicy.DefaultPatterns;
 
-        /// <summary>Frozen catalog bytes (base64), never a mutable path reopened on restart.</summary>
-        internal string PlatformAspxCatalogPayload { get; set; }
-
         /// <summary>Number of days back to query the audit log via Graph (1-180, default 14). Max 180 days (Audit Standard) / 1 year (Audit Premium).</summary>
         internal int AuditLogWindowDays { get; set; } = 14;
     }

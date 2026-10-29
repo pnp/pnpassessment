@@ -43,30 +43,23 @@ internal static class ClassicPageDiscoveryComponent
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }
 
-    /// <summary>Reads all persisted Web roots after discovery workers finish, then enriches their ASPX observations.</summary>
+    /// <summary>Projects physical file observations after discovery workers finish, with no second SharePoint acquisition pass.</summary>
     internal static async Task<int> EnrichScanAsync(ClassicScanner scanner)
     {
         var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
         var writer = new AssessmentDiscoveryWriter(scanner.ScanId);
         var projection = new ClassicAspxProjectionWriter(scanner.ScanId);
-        var catalog = scanner.Options.PlatformAspxCatalogPayload == null ? null :
-            PlatformAspxCatalog.FromFrozenPayload(scanner.Options.PlatformAspxCatalogPayload);
-        var auth = new ExternalAuthenticationProvider((_, scopes) =>
-            scanner.ScanManager.GetScanAuthenticationManager(scanner.ScanId).GetAccessTokenAsync(scopes));
         var failures = 0;
         await foreach (var web in writer.ReadDiscoveredWebScopesAsync(scanner.ScanId, token).ConfigureAwait(false))
         {
             token.ThrowIfCancellationRequested();
             try
             {
-                using var factory = new PnPContextSharePointAspxRestClientFactory(scanner.PnPContextFactory, auth,
-                    scanner.ScanId);
                 var webUri = new Uri(web.Url, UriKind.Absolute);
-                var client = await factory.GetAsync(webUri, token).ConfigureAwait(false);
                 var acquisitionContext = new ClassicAspxWebAcquisitionContext(scanner.ScanId,
                     web.SiteCollectionId.Value, web.WebId.Value, new Uri(web.SiteUrl, UriKind.Absolute),
-                    webUri, scanner.Options, catalog);
-                await new ClassicAspxWebAcquisition(acquisitionContext, client, factory).AcquireAsync(
+                    webUri);
+                await new ClassicAspxWebAcquisition(acquisitionContext).AcquireAsync(
                     writer.ReadPageStreamAsync(scanner.ScanId, web.SiteUrl, web.WebUrl, token),
                     async (batch, cancellation) =>
                     {
@@ -78,7 +71,7 @@ internal static class ClassicPageDiscoveryComponent
                         }
                         if (batch.Evidence.Count != 0)
                             await writer.WriteAsync(batch.Evidence, cancellation).ConfigureAwait(false);
-                        await projection.WriteAsync(batch.Inventory, batch.Bindings, cancellation).ConfigureAwait(false);
+                        await projection.WriteAsync(batch.Inventory, cancellation).ConfigureAwait(false);
                     }, token).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException && !token.IsCancellationRequested)

@@ -85,10 +85,6 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         (options as ClassicOptions).ExcludeSiteTemplates = Discovery.Aspx.SiteTemplateExclusionPolicy.Parse(property.Value).CanonicalValue;
                     }
-                    else if (property.Property == Constants.StartPlatformAspxCatalogPayload)
-                    {
-                        (options as ClassicOptions).PlatformAspxCatalogPayload = property.Value;
-                    }
                     else if (property.Property == Constants.StartClassicAuditLogWindowDays)
                     {
                         if (int.TryParse(property.Value, out var days))

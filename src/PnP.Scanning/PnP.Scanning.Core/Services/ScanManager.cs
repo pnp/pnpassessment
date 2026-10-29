@@ -94,28 +94,7 @@ namespace PnP.Scanning.Core.Services
             Log.Information("Assessment id is {ScanId}", scanId);
 
             var options = OptionsBase.FromScannerInput(start);
-            var platformCatalog = options is ClassicOptions { Pages: true, PlatformAspxCatalogPayload: not null } pageOptions
-                ? PnP.Scanning.Core.Discovery.Aspx.PlatformAspxCatalog.FromFrozenPayload(pageOptions.PlatformAspxCatalogPayload) : null;
             await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
-            if (options is ClassicOptions { Pages: true })
-            {
-                // Seed the declared platform universe once, even for an empty/fully excluded Web selection.
-                await new PnP.Scanning.Core.Discovery.Aspx.ClassicAspxProjectionWriter(scanId).SeedCatalogAsync(scanId, platformCatalog);
-                await new PnP.Scanning.Core.Discovery.AssessmentDiscoveryWriter(scanId).WriteAsync(new[]
-                {
-                    new ClassicPageDiscovery
-                    {
-                        ScanId = scanId, SiteUrl = string.Empty, WebUrl = string.Empty,
-                        RecordKey = "aspx:platform-catalog", RowType = "Scope", ScopeType = "PlatformCatalog",
-                        ObservationMethod = "ExplicitFrozenCatalog/v1",
-                        DiscoveryStatus = platformCatalog == null ? "Unknown" : "Complete",
-                        ExpectedChildCount = platformCatalog?.Entries.Count, ObservedChildCount = platformCatalog?.Entries.Count,
-                        ErrorCodes = platformCatalog == null ? "platform_catalog_not_provided" : null,
-                        EvidenceJson = System.Text.Json.JsonSerializer.Serialize(new { version = platformCatalog?.Version, source = platformCatalog?.Source, digest = platformCatalog?.Digest, contract = ClassicAspxProjectionContract.Version, runtimeHandlerConfirmed = false }),
-                        ObservedAtUtc = DateTime.UtcNow
-                    }
-                });
-            }
             if (discoveryEvidence != null)
             {
                 foreach (var row in discoveryEvidence) row.ScanId = scanId;

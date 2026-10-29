@@ -124,6 +124,9 @@ public sealed class SharedListMetadataTests
         if (empty) authority.AbsenceProofKind.Should().Be("AuthorityTerminalZero");
     }
 
+    /// <summary>
+    /// Reuses complete modeled form declarations across collection and ID shapes, retaining separate references without REST or item reads.
+    /// </summary>
     [Theory]
     [InlineData("array", false)]
     [InlineData("array", true)]
@@ -242,6 +245,10 @@ public sealed class SharedListMetadataTests
         ListAuthority(provider).ActualMethod.Should().Be("MODEL");
     }
 
+    /// <summary>
+    /// Requires shared and raw list authority to expose the same hidden, catalog, and ordinary-list folder and reference surfaces,
+    /// while reusing one modeled web-root read and retaining its physical file.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -279,6 +286,9 @@ public sealed class SharedListMetadataTests
         records.Should().ContainSingle(record => record.PhysicalLocator == "/sites/a/default.aspx");
     }
 
+    /// <summary>
+    /// Discovers real ASPX files under an ordinary list root and its nested folder with the observed list scope, without item enumeration.
+    /// </summary>
     [Fact]
     public async Task Ordinary_list_root_and_nested_folder_discover_physical_aspx_without_item_enumeration()
     {
@@ -322,6 +332,7 @@ public sealed class SharedListMetadataTests
         provider.ReferenceCollector.ReadSurfaceEvidence().Should().NotContain(row => row.RequiredAdapter == "AllListsAuthority");
     }
 
+    /// <summary>A rejected shared snapshot and failed enriched/minimal list authorities remain denied, never a successful empty census.</summary>
     [Fact]
     public async Task Rejected_snapshot_does_not_turn_raw_authority_failure_into_a_known_empty_collection()
     {
@@ -331,14 +342,14 @@ public sealed class SharedListMetadataTests
 
         await provider.EnumerateChildrenAsync(provider.RootScope);
 
-        factory.Client.AllListReads.Should().Be(1);
+        factory.Client.AllListReads.Should().Be(2, "failed enriched list metadata is followed by an independent physical-root projection");
         var authority = ListAuthority(provider);
         authority.ActualMethod.Should().Be("GET");
         authority.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Denied);
         authority.ExpectedCountState.Should().Be(AspxExpectedCountState.Unknown);
         authority.ExpectedCount.Should().BeNull();
         authority.AbsenceProofKind.Should().BeNull();
-        provider.ReferenceCollector.ReadPaginationEvidence().Should().ContainSingle();
+        provider.ReferenceCollector.ReadPaginationEvidence().Should().HaveCount(2);
     }
 
     public static IEnumerable<object[]> UnusableSnapshots()
@@ -480,6 +491,9 @@ public sealed class SharedListMetadataTests
         internal int FileResolutions { get; private set; }
         internal int FolderReads { get; private set; }
 
+        /// <summary>
+        /// Records offline REST requests and supplies configurable list authority, denial, continuations, item rows, and task-folder facts.
+        /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);

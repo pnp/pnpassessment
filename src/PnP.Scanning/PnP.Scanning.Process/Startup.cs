@@ -7,13 +7,10 @@ namespace PnP.Scanning.Process
 {
     internal class Startup<T> where T : class
     {
-        /// <summary>Registers the existing gRPC services with a finite receive budget large enough for the supported frozen Base64 catalog payload.</summary>
+        /// <summary>Registers the existing gRPC services without adding inventory-only transport requirements.</summary>
         public void ConfigureServices(IServiceCollection services)
         {
-            // The explicit catalog is frozen in StartRequest properties (base64 adds 4/3 overhead).
-            // Keep a finite native receive budget large enough for the supported catalog size.
-            services.AddGrpc(options => options.MaxReceiveMessageSize =
-                PnP.Scanning.Core.Discovery.Aspx.PlatformAspxCatalog.MaximumTransportMessageBytes);
+            services.AddGrpc();
 
             // Configure the shutdown to 15s - not yet working
             //services.Configure<HostOptions>(

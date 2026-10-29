@@ -17,6 +17,9 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     public AssessmentRestartEvidenceTests(ScanContextFixture database) => this.database = database;
     private AssessmentDiscoveryWriter Writer() => new(database.CreateContext);
 
+    /// <summary>
+    /// Reads all discovered web roots for one scan across keyset batches, excluding scheduled assessment roots and other scans.
+    /// </summary>
     [Fact]
     public async Task Scan_wide_acquisition_reads_only_discovered_web_roots_across_keyset_batches()
     {

@@ -133,11 +133,12 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         page.ErrorCode.Should().NotBeNullOrWhiteSpace();
     }
 
+    /// <summary>BaseType retains the legacy library-surface classification while independent physical-root admission is proved by provider tests.</summary>
     [Theory]
     [InlineData(1, "Applicable", true)]
     [InlineData(0, "SystemOrVirtualOnly", false)]
     [InlineData(2, "NotApplicable", false)]
-    public void Actual_list_base_type_controls_raw_file_admission(
+    public void Actual_list_base_type_classifies_the_legacy_library_surface(
         int baseType, string applicability, bool rawRequired)
     {
         var decision = AspxListApplicabilityPolicy.Evaluate(baseType);
@@ -208,11 +209,11 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
             row.RowType == "Reference" && row.EvidenceJson != null).Should().BeTrue();
     }
 
+    /// <summary>Retains the terminal physical-scope verdict for complete, targeted, denied and unproved selection authorities.</summary>
     [Fact]
     public async Task Existing_scan_scope_produces_the_terminal_coverage_verdict()
     {
         var completeScan = Guid.NewGuid();
-        var metadataOnlyScan = Guid.NewGuid();
         var declaredScan = Guid.NewGuid();
         var homePageScan = Guid.NewGuid();
         var incompleteScan = Guid.NewGuid();
@@ -225,9 +226,6 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         {
             Scope(completeScan, "assessment:site-selection", "Tenant", "Complete"),
             Scope(completeScan, "web:root", "Web", "Complete"),
-            Scope(metadataOnlyScan, "assessment:site-selection", "Tenant", "Complete"),
-            Scope(metadataOnlyScan, "web:root", "Web", "Complete"),
-            Scope(metadataOnlyScan, "native:item-policy", "ItemEnumerationPolicy", "PolicyExcluded"),
             Scope(declaredScan, "assessment:site-selection", "SiteSelection", "Complete"),
             Scope(declaredScan, "web:root", "Web", "Complete"),
             Scope(homePageScan, "assessment:site-selection", "Tenant", "Complete"),
@@ -241,7 +239,6 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         });
 
         (await writer.FinalizeScanAsync(completeScan)).Should().Be(DiscoveryVerdict.CompleteTenantVerified);
-        (await writer.FinalizeScanAsync(metadataOnlyScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(declaredScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(homePageScan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset);
         (await writer.FinalizeScanAsync(incompleteScan)).Should().Be(DiscoveryVerdict.Incomplete);

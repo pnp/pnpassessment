@@ -11,10 +11,6 @@ internal interface ISharePointAspxRestClient : IDisposable
     Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Optionally reads bounded actual source bytes; clients without this capability explicitly return unsupported evidence.</summary>
-    Task<SharePointFileContent> ReadFileContentAsync(string serverRelativeUrl, int maxBytes, TimeSpan timeout,
-        CancellationToken cancellationToken = default) => Task.FromResult(SharePointFileContent.Unsupported());
-
     /// <summary>Reads the modeled welcome-page property with its provider outcome and provenance.</summary>
     Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken cancellationToken = default);
 

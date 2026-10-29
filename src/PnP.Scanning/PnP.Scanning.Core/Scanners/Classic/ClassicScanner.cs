@@ -376,6 +376,10 @@ namespace PnP.Scanning.Core.Scanners
             return failedSites;
         }
 
+        /// <summary>
+        /// After web workers finish, projects observed ASPX, finalizes coverage, and persists page, web-part, and site rollups plus optional usage.
+        /// Retains optional enrichment and usage diagnostics, then surfaces accumulated acquisition failures after consolidation.
+        /// </summary>
         internal async override Task PostScanningAsync()
         {
 

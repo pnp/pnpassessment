@@ -103,18 +103,6 @@ namespace PnP.Scanning.Core.Tests.Scanners
             request.Properties.Single(p => p.Property == Constants.StartExcludeSiteTemplates).Type.Should().Be("string");
         }
 
-        /// <summary>
-        /// Passes the already frozen catalog payload through native options without requiring the original filesystem path.
-        /// </summary>
-        [Fact]
-        public void FrozenCatalogPayloadRoundTripsWithoutReopeningAPath()
-        {
-            var request = new StartRequest { Mode = Mode.Classic.ToString() };
-            ClassicStartRequestBuilder.AddClassicProperties(request, new[] { ClassicComponent.Pages },
-                false, true, true, false, platformAspxCatalogPayload: "fixed-catalog-bytes");
-            ((ClassicOptions)OptionsBase.FromScannerInput(request)).PlatformAspxCatalogPayload.Should().Be("fixed-catalog-bytes");
-        }
-
         private static StartRequest ClassicRequest(params (string Key, string Value)[] properties)
         {
             var request = new StartRequest { Mode = Mode.Classic.ToString() };

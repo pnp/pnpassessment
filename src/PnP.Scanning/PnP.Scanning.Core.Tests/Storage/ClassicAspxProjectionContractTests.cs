@@ -9,30 +9,26 @@ namespace PnP.Scanning.Core.Tests.Storage;
 
 public sealed class ClassicAspxProjectionContractTests : IClassFixture<ScanContextFixture>
 {
-    private const string LegacyMarkerName = "M1ProjectionContract";
-    private const string LegacyScopeName = "M1ScopeMode";
-    private const string LegacyVersion = "M1/v1";
     private readonly ScanContextFixture fixture;
 
-    /// <summary>Isolates each stored declaration case by scan ID in the shared migrated fixture.</summary>
+    /// <summary>Isolates each stored declaration case by assessment ID in the shared migrated fixture.</summary>
     public ClassicAspxProjectionContractTests(ScanContextFixture fixture)
     {
         this.fixture = fixture;
     }
 
-    /// <summary>Normalizes both known property families without altering or backfilling the saved declaration.</summary>
+    /// <summary>Reads supported current-family declarations without altering stored scope, marker bytes, or unrelated assessment properties.</summary>
     [Theory]
-    [InlineData(false, "DeclaredFullInventory")]
-    [InlineData(false, "HomePageOnly")]
-    [InlineData(true, "DeclaredFullInventory")]
-    [InlineData(true, "HomePageOnly")]
-    public async Task SupportedDeclarationsNormalizeWithoutWrites(bool legacy, string scope)
+    [InlineData("DeclaredFullInventory")]
+    [InlineData("HomePageOnly")]
+    public async Task CurrentDeclarationIsReadWithoutWritesOrBackfill(string scope)
     {
         var scanId = Guid.NewGuid();
         using var context = fixture.CreateContext();
         context.Properties.AddRange(
-            new Property { ScanId = scanId, Name = legacy ? LegacyMarkerName : "AspxProjectionContract", Value = legacy ? LegacyVersion : "aspx-inventory/v1" },
-            new Property { ScanId = scanId, Name = legacy ? LegacyScopeName : "AspxScopeMode", Value = scope });
+            new Property { ScanId = scanId, Name = "AspxProjectionContract", Value = "aspx-inventory/v1" },
+            new Property { ScanId = scanId, Name = "AspxScopeMode", Value = scope },
+            new Property { ScanId = scanId, Name = "unrelated", Value = "unchanged" });
         await context.SaveChangesAsync();
         var before = await context.Properties.AsNoTracking().Where(row => row.ScanId == scanId)
             .OrderBy(row => row.Name).Select(row => new { row.Name, row.Value }).ToListAsync();
@@ -47,20 +43,21 @@ public sealed class ClassicAspxProjectionContractTests : IClassFixture<ScanConte
         after.Should().BeEquivalentTo(before, options => options.WithStrictOrdering());
     }
 
-    /// <summary>Never borrows an old version or scope when any current-family declaration is present.</summary>
+    /// <summary>Never treats unsupported preview markers as current authority or borrows their scope when current properties are missing.</summary>
     [Theory]
+    [InlineData(null, null, false)]
     [InlineData("unknown-v2", null, false)]
     [InlineData("M1/v1", null, false)]
     [InlineData(null, "HomePageOnly", false)]
     [InlineData("aspx-inventory/v1", null, true)]
     [InlineData("aspx-inventory/v1", "HomePageOnly", true)]
-    public async Task CurrentFamilyCannotBorrowLegacyAuthority(string? version, string? scope, bool recognized)
+    public async Task OnlyCurrentMarkerCanDeclareAcquisition(string? version, string? scope, bool recognized)
     {
         var scanId = Guid.NewGuid();
         using var context = fixture.CreateContext();
         context.Properties.AddRange(
-            new Property { ScanId = scanId, Name = LegacyMarkerName, Value = LegacyVersion },
-            new Property { ScanId = scanId, Name = LegacyScopeName, Value = "DeclaredFullInventory" });
+            new Property { ScanId = scanId, Name = "M1ProjectionContract", Value = "M1/v1" },
+            new Property { ScanId = scanId, Name = "M1ScopeMode", Value = "DeclaredFullInventory" });
         if (version != null)
         {
             context.Properties.Add(new Property { ScanId = scanId, Name = "AspxProjectionContract", Value = version });
@@ -78,7 +75,7 @@ public sealed class ClassicAspxProjectionContractTests : IClassFixture<ScanConte
         result.ScopeMode.Should().Be(scope);
     }
 
-    /// <summary>Does not turn an upgraded schema with no saved marker into proof of completed acquisition.</summary>
+    /// <summary>Does not turn an upgraded schema with no saved declaration into proof of acquired or complete inventory.</summary>
     [Fact]
     public async Task MissingDeclarationRemainsUnknown()
     {
@@ -88,12 +85,13 @@ public sealed class ClassicAspxProjectionContractTests : IClassFixture<ScanConte
         result.Version.Should().BeNull();
         result.ScopeMode.Should().BeNull();
     }
-    /// <summary>Writes only neutral contract properties for Pages, preserving full/home intent and excluding unrelated components.</summary>
+
+    /// <summary>Writes only neutral contract properties for Pages and preserves full/home intent without declaring unrelated components acquired.</summary>
     [Theory]
     [InlineData(true, false)]
     [InlineData(true, true)]
     [InlineData(false, false)]
-    public void NewStartRequestsUseDomainDeclarationOnly(bool pages, bool homePageOnly)
+    public void StartRequestsUseOnlyTheCurrentDomainDeclaration(bool pages, bool homePageOnly)
     {
         var request = new PnP.Scanning.Core.Services.StartRequest();
         var components = pages
@@ -115,5 +113,4 @@ public sealed class ClassicAspxProjectionContractTests : IClassFixture<ScanConte
             request.Properties.Should().NotContain(property => property.Property == "AspxProjectionContract" || property.Property == "AspxScopeMode");
         }
     }
-
 }
