@@ -30,10 +30,7 @@ ClassificationReason | Identifies the existing heuristic or fallback used; unava
 ContentTypeId | Content type id observed in the raw metadata, when available.
 CustomizedPageStatus | Observed SharePoint customization status: Uncustomized, Customized or None. Unavailable values do not prove ghosting.
 SetupPath | Observed vti_setuppath, when available. Absence of an observation is not proof of user-authored content.
-NoExecuteRaw | Original string returned for the requested SPO NoExecute field, preserved without trimming or converting it to a boolean. This is a server-projected one-bit field, not the complete DocFlags bitmask.
-IsPoisoned | True only for an available, trusted original NoExecute value exactly `1`; False for exactly `0`; empty when unavailable, invalid or conflicting. Calculated during export, not persisted as a file fact.
-PoisonState | Poisoned, NotPoisoned or Unknown, based only on the captured server NoExecute field and its source/read/conflict evidence.
-RenderDisposition | NoExecuteDownload when the field blocks execution; NotBlockedByNoExecute when it does not; Unknown otherwise. NotBlockedByNoExecute does not guarantee that an actual HTTP request will render: other policies and permissions still apply.
+NoExecute | True when an available, trusted server NoExecute value is exactly `1`; False for exactly `0`; empty when unavailable, invalid or conflicting. This is the only execution/poison column. False means this flag does not block execution, not a guarantee of actual HTTP rendering.
 MetadataReadState | Read outcome for the selected item metadata used by classification. Successful physical discovery does not imply these fields were available.
 ErrorCodes | Retained file/item observation error codes, when present.
 ErrorDetail | Retained details of the observation errors, when present.
@@ -41,7 +38,7 @@ ObservedAtUtc | Latest retained file observation time, in UTC.
 
 ## NoExecute evidence
 
-The current implementation requests NoExecute with the existing selected-page list-stream metadata query. It does not execute or download the ASPX to test rendering. Missing fields, explicit null, invalid values and failed reads are distinct in SQL; none is replaced with `0`. Where no backing item or readable field is available, poison remains Unknown. The summary declares `poisonEvidenceKind=ServerNoExecuteField` and `fullDocFlagsCollected=false`.
+The current implementation requests NoExecute with the existing selected-page list-stream metadata query. It does not execute or download the ASPX to test rendering. Missing fields, explicit null, invalid values and failed reads are distinct in SQL; none is replaced with `0`. SQL retains the original NoExecuteRaw value, source and read state; the CSV exposes only the nullable Boolean NoExecute. Where no backing item or readable field is available, NoExecute is empty, not False. The summary declares `poisonEvidenceKind=ServerNoExecuteField` and `fullDocFlagsCollected=false`.
 
 ## Nullable text values
 
@@ -53,4 +50,4 @@ CSV field value | Meaning
 Empty field | A known empty string, not SQL NULL.
 `\\N` | Literal text `\N`. For a non-null field beginning with two backslashes, remove exactly one escape backslash.
 
-This applies to SiteUrl, WebUrl, Url, FileName, ClassicPageType, ContentTypeId, CustomizedPageStatus, SetupPath, NoExecuteRaw, ErrorCodes and ErrorDetail. Nullable GUIDs and IsPoisoned use empty fields when unknown. Other assessment CSV encodings are unchanged.
+This applies to SiteUrl, WebUrl, Url, FileName, ClassicPageType, ContentTypeId, CustomizedPageStatus, SetupPath, ErrorCodes and ErrorDetail. Nullable GUIDs and NoExecute use empty fields when unknown. Other assessment CSV encodings are unchanged.

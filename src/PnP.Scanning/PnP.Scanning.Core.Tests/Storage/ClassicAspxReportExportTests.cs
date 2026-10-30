@@ -27,7 +27,7 @@ public sealed class ClassicAspxReportExportTests
     {
         "ScanId", "SiteCollectionId", "WebId", "ListId", "FileUniqueId", "SiteUrl", "WebUrl", "Url", "FileName",
         "ClassicPageType", "PageRole", "ClassificationState", "ClassificationReason", "ContentTypeId",
-        "CustomizedPageStatus", "SetupPath", "NoExecuteRaw", "IsPoisoned", "PoisonState", "RenderDisposition",
+        "CustomizedPageStatus", "SetupPath", "NoExecute",
         "MetadataReadState", "ErrorCodes", "ErrorDetail", "ObservedAtUtc"
     };
 
@@ -144,7 +144,7 @@ public sealed class ClassicAspxReportExportTests
         (await ClassicAspxReportProjection.Files(secondContext, second.ScanId).SingleAsync()).ScanId.Should().Be(second.ScanId);
     }
 
-    /// <summary>Publishes exactly the fixed 24-column business CSV and its summary, without inventory, raw-file or alias outputs.</summary>
+    /// <summary>Publishes exactly the fixed 21-column business CSV and its summary, without inventory, raw-file or alias outputs.</summary>
     [Fact]
     public async Task DirectExportPublishesOnlyCanonicalBusinessFiles()
     {
@@ -159,7 +159,7 @@ public sealed class ClassicAspxReportExportTests
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             Directory.GetFiles(directory).Select(Path.GetFileName).Should().BeEquivalentTo(CsvName, SummaryName);
-            Header(directory).Should().Equal(ExpectedHeader).And.HaveCount(24);
+            Header(directory).Should().Equal(ExpectedHeader).And.HaveCount(21);
             ReadRows(directory).Should().ContainSingle();
         }
         finally
@@ -275,8 +275,7 @@ public sealed class ClassicAspxReportExportTests
             var row = ReadRows(directory).Single();
             row.Should().BeEquivalentTo(ClassicAspxReportProjection.Project(fact));
             row.Url.Should().Be("/sites/test/%E6%B8%AC%E8%A9%A6%252f%23%3F%2C%22renderer%22.aspx");
-            row.NoExecuteRaw.Should().Be("1");
-            row.IsPoisoned.Should().BeTrue();
+            row.NoExecute.Should().BeTrue();
             context.ChangeTracker.Clear();
             (await context.SPFiles.SingleAsync()).ServerRelativeUrl.Should().Be(fact.ServerRelativeUrl);
         }
@@ -325,7 +324,7 @@ public sealed class ClassicAspxReportExportTests
                 csv.Read();
                 csv.ReadHeader();
                 csv.Read();
-                foreach (var column in new[] { "SiteUrl", "WebUrl", "FileName", "ContentTypeId", "CustomizedPageStatus", "SetupPath", "NoExecuteRaw", "ErrorCodes", "ErrorDetail" })
+                foreach (var column in new[] { "SiteUrl", "WebUrl", "FileName", "ContentTypeId", "CustomizedPageStatus", "SetupPath", "ErrorCodes", "ErrorDetail" })
                 {
                     csv.GetField<string>(column).Should().Be(wire);
                 }
@@ -342,7 +341,7 @@ public sealed class ClassicAspxReportExportTests
 
     /// <summary>Retains ordinary nullable GUID and Boolean converters, distinguishing unknown poison from known false and true.</summary>
     [Fact]
-    public async Task NullableGuidAndPoisonBooleanRoundTripNormally()
+    public async Task NullableGuidAndNoExecuteBooleanRoundTripNormally()
     {
         using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
@@ -367,9 +366,9 @@ public sealed class ClassicAspxReportExportTests
             var rows = ReadRows(directory).ToDictionary(row => row.FileUniqueId);
             rows[unknown.FileUniqueId].WebId.Should().BeNull();
             rows[unknown.FileUniqueId].ListId.Should().BeNull();
-            rows[unknown.FileUniqueId].IsPoisoned.Should().BeNull();
-            rows[poisoned.FileUniqueId].IsPoisoned.Should().BeTrue();
-            rows[clear.FileUniqueId].IsPoisoned.Should().BeFalse();
+            rows[unknown.FileUniqueId].NoExecute.Should().BeNull();
+            rows[poisoned.FileUniqueId].NoExecute.Should().BeTrue();
+            rows[clear.FileUniqueId].NoExecute.Should().BeFalse();
         }
         finally
         {
@@ -377,7 +376,7 @@ public sealed class ClassicAspxReportExportTests
         }
     }
 
-    /// <summary>Preserves the original NoExecute field string through SQLite and CSV, interpreting only available exact server zero/one values.</summary>
+    /// <summary>Preserves the original NoExecute field string in SQLite and exports only its nullable Boolean interpretation.</summary>
     [Theory]
     [InlineData("0", false)]
     [InlineData("1", true)]
@@ -401,9 +400,7 @@ public sealed class ClassicAspxReportExportTests
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             var row = ReadRows(directory).Should().ContainSingle().Which;
-            row.NoExecuteRaw.Should().Be(raw);
-            row.IsPoisoned.Should().Be(expected);
-            row.PoisonState.Should().Be(expected.HasValue ? expected.Value ? "Poisoned" : "NotPoisoned" : "Unknown");
+            row.NoExecute.Should().Be(expected);
             (await context.SPFiles.AsNoTracking().SingleAsync()).NoExecuteRaw.Should().Be(raw);
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             summary.RootElement.GetProperty("poisonEvidenceKind").GetString().Should().Be("ServerNoExecuteField");
@@ -441,10 +438,7 @@ public sealed class ClassicAspxReportExportTests
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             var row = ReadRows(directory).Should().ContainSingle().Which;
-            row.NoExecuteRaw.Should().Be("1");
-            row.IsPoisoned.Should().BeNull();
-            row.PoisonState.Should().Be("Unknown");
-            row.RenderDisposition.Should().Be("Unknown");
+            row.NoExecute.Should().BeNull();
             (await context.SPFiles.AsNoTracking().SingleAsync()).ProvenanceJson.Should().Contain("NoExecuteRaw").And.Contain("metadata_changed");
         }
         finally
@@ -464,6 +458,7 @@ public sealed class ClassicAspxReportExportTests
             using var context = fixture.CreateContext();
             await ClassicAspxReportProjection.ExportCsvAsync(context, Guid.NewGuid(), directory, Configuration());
             Header(directory).Should().Equal(ExpectedHeader);
+            Header(directory).Should().NotContain(new[] { "NoExecuteRaw", "IsPoisoned", "PoisonState", "RenderDisposition" });
             ReadRows(directory).Should().BeEmpty();
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             var root = summary.RootElement;

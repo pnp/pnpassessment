@@ -3,7 +3,7 @@ using CsvHelper.Configuration.Attributes;
 
 namespace PnP.Scanning.Core.Storage;
 
-/// <summary>Fixed 24-column business export of one selected physical classic or unclassified ASPX file.</summary>
+/// <summary>Fixed 21-column business export of one selected physical classic or unclassified ASPX file.</summary>
 internal sealed class ClassicAspxExport
 {
     [Index(0)]
@@ -54,27 +54,18 @@ internal sealed class ClassicAspxExport
     [Index(15), TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? SetupPath { get; set; }
 
-    [Index(16), TypeConverter(typeof(ClassicAspxNullableStringConverter))]
-    public string? NoExecuteRaw { get; set; }
+    [Index(16)]
+    public bool? NoExecute { get; set; }
 
     [Index(17)]
-    public bool? IsPoisoned { get; set; }
-
-    [Index(18)]
-    public string PoisonState { get; set; } = string.Empty;
-
-    [Index(19)]
-    public string RenderDisposition { get; set; } = string.Empty;
-
-    [Index(20)]
     public string MetadataReadState { get; set; } = string.Empty;
 
-    [Index(21), TypeConverter(typeof(ClassicAspxNullableStringConverter))]
+    [Index(18), TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? ErrorCodes { get; set; }
 
-    [Index(22), TypeConverter(typeof(ClassicAspxNullableStringConverter))]
+    [Index(19), TypeConverter(typeof(ClassicAspxNullableStringConverter))]
     public string? ErrorDetail { get; set; }
 
-    [Index(23)]
+    [Index(20)]
     public DateTime ObservedAtUtc { get; set; }
 }

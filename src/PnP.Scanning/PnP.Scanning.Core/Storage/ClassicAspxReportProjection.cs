@@ -71,10 +71,7 @@ internal static class ClassicAspxReportProjection
             ContentTypeId = file.ContentTypeId,
             CustomizedPageStatus = file.CustomizedPageStatus,
             SetupPath = file.SetupPath,
-            NoExecuteRaw = file.NoExecuteRaw,
-            IsPoisoned = poison.IsPoisoned,
-            PoisonState = poison.PoisonState,
-            RenderDisposition = poison.RenderDisposition,
+            NoExecute = poison.IsPoisoned,
             MetadataReadState = file.ItemMetadataReadState,
             ErrorCodes = file.FileErrorCodes,
             ErrorDetail = file.FileErrorDetail,
@@ -143,7 +140,6 @@ internal static class ClassicAspxReportProjection
             nullableStringEncoding = ClassicAspxNullableStringConverter.EncodingVersion,
             poisonEvidenceKind = ClassicAspxPoisonAnalysis.EvidenceKind,
             fullDocFlagsCollected = false,
-            renderDispositionBasis = "Server NoExecute field only; not an HTTP rendering guarantee",
             files = new[] { evidence }
         };
         await File.WriteAllTextAsync(Path.Combine(exportPath, SummaryJson), JsonSerializer.Serialize(summary,
@@ -173,9 +169,9 @@ internal static class ClassicAspxReportProjection
             await csv.NextRecordAsync().ConfigureAwait(false);
             counts.Selected++;
             counts.UnknownClassification += row.ClassicPageType == null ? 1 : 0;
-            counts.Poisoned += row.IsPoisoned == true ? 1 : 0;
-            counts.PoisonUnknown += row.IsPoisoned == null ? 1 : 0;
-            counts.NoExecuteMissing += string.IsNullOrEmpty(row.NoExecuteRaw) ? 1 : 0;
+            counts.Poisoned += row.NoExecute == true ? 1 : 0;
+            counts.PoisonUnknown += row.NoExecute == null ? 1 : 0;
+            counts.NoExecuteMissing += string.IsNullOrEmpty(file.NoExecuteRaw) ? 1 : 0;
             var state = file.CoverageState ?? ClassicAspxCoverageStates.Unknown;
             counts.CoverageStates[state] = counts.CoverageStates.GetValueOrDefault(state) + 1;
         }
