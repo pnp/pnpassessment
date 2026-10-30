@@ -8,8 +8,10 @@ This csv file contains the physical ASPX inventory and acquisition evidence coll
 
 `Page` rows represent physical ASPX files. `Scope` rows represent tenant, site, web, list, folder and API surfaces. `Reference` rows record Forms, Views and welcome-page references. `Pagination` rows record sanitized request-chain evidence. `Gap` rows retain acquisition gaps that are not owned by one scope. After post-scan processing, the `Summary` row records the scan-wide coverage verdict.
 
+`Assessment` rows with `ObservationMethod=LegacyDisplayFormAssessment` record failed legacy custom-display-form list reads. Their `AssessmentStatus` is `Failed`; `DiscoveryStatus=NotApplicable` indicates that the row is not a discovery observation. `ListId`, `ErrorStage`, `ErrorCodes` and `ErrorDetail` identify the failure; `EvidenceJson` records its outcome and the number of already assessed pages retained from that list. Other eligible lists and physical ASPX assessment continue. These diagnostic rows are not pages or discovery scopes and do not change the physical inventory, discovery coverage verdict or legacy report denominators. Successfully read items remain in `classicpages.csv`; a failed or partial list read is never reported as a successful empty read. HOME-only assessments do not read these legacy items.
+
 > [!NOTE]
-> A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` coverage rows. These rows identify parts of the requested scope with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records discovery and assessment gaps through Scope and Gap rows together with the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Summary evidence records `pageScope=HomePageOnly` for a scoped home-page scan and `pageScope=FullInventory` otherwise.
+> A finished assessment can contain `Denied`, `Failed`, `Partial` or `Unknown` coverage rows. These rows identify parts of the requested scope with incomplete inspection. Discovered pages remain as Page rows when their assessment fails. `discovery.csv` records discovery gaps through Scope and Gap rows and legacy-list assessment failures through Assessment rows, together with the `ErrorStage`, `ErrorCodes` and `ErrorDetail` columns. The Summary evidence records `pageScope=HomePageOnly` for a scoped home-page scan and `pageScope=FullInventory` otherwise.
 
 ## Summary coverage verdicts
 
@@ -29,10 +31,10 @@ The following columns are included:
 Column|Description
 ------|-----------
 RecordKey | Stable key for the page or discovery scope within the assessment.
-RowType | `Page`, `Scope`, `Reference`, `Pagination`, `Gap` or `Summary`.
+RowType | `Page`, `Scope`, `Reference`, `Pagination`, `Gap`, `Assessment` or `Summary`.
 ScopeType | Type of scope or object represented by the row, such as `Tenant`, `SiteCollection`, `PageSelection`, `Web`, `List`, `Folder`, `Surface` or `File`.
 ParentScopeKey | Record key of the parent discovery scope.
-Url | Server-relative page URL for a Page row. For a Scope row this is the inspected scope or endpoint.
+Url | Server-relative page URL for a Page row. For a Scope row this is the inspected scope or endpoint. For a legacy Assessment diagnostic this is the web URL; `ListId` identifies the failed list.
 SiteCollectionId | Id of the owning site collection when it could be resolved.
 WebId | Id of the owning web when it could be resolved.
 ListId | Id of the owning list or library when the row is list-backed.
@@ -45,9 +47,9 @@ SetupPath | The file's `vti_setuppath`: the on-disk template a ghosted file was 
 HomePage | True or False when the web's welcome page could be resolved and compared with this page. Empty means the home-page state is unknown.
 LibraryHidden | True when the owning library is hidden, False when it is visible, or empty when this could not be determined.
 ObservationMethod | API surface or adapter that observed the page or scope.
-DiscoveryStatus | Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on `RowType`. The Summary values and their conditions are defined in Summary coverage verdicts.
+DiscoveryStatus | Page existence, scope completion, reference disposition, pagination completion, gap state or the final scan-wide coverage verdict, depending on `RowType`. `NotApplicable` for legacy Assessment diagnostics. The Summary values and their conditions are defined in Summary coverage verdicts.
 AssessmentStatus | Page enrichment result: `Complete`, `NotSelected`, `NotApplicable` or `Failed`. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as `NotSelected`. A file whose list item could not be read is still assessed from the file alone, with the inapplicable item-dependent operations recorded in `ErrorCodes`: `list_association_absent` when the file belongs to no list, which is the normal state of a web-root file; `list_item_absent` for a confirmed absence of any backing item; `owning_list_unresolved` when the file names an owning list that was not matched in the web; `list_association_unknown` when the file lies inside a loaded list, so it is list-backed, but no observation of it reported a list association — the identity is unknown rather than absent; and `system_page_template` when `SetupPath` proves the file ghosts from the stock list view or list form template and therefore carries no page content of its own. The first two are confirmed structural absences and do not make the page a failure. The next two are read gaps and leave the assessment `Failed`, because the item metadata may exist and was simply unreachable.
-ExpectedChildCount | Number of child scopes or objects expected when the source can provide a reliable count.
+ExpectedChildCount | Number of child scopes or objects expected when the source can provide a reliable count. Legacy Assessment diagnostics do not assert expected or observed child counts.
 ObservedChildCount | Number of child scopes or objects that were observed.
 ErrorStage | Discovery or assessment stage that produced an error or coverage gap.
 ErrorCodes | One or more error or coverage-gap codes.

@@ -302,13 +302,10 @@ namespace PnP.Scanning.Process.Services
         #endregion
 
 #if DEBUG
-        /// <summary>Preserves the DEBUG checkpoint no-op: returns before automatic Visual Studio attachment, leaving debugger attachment under external control.</summary>
         private static void AttachDebugger(System.Diagnostics.Process processToAttachTo)
         {
             try
             {
-                return;
-
                 var vsProcess = VisualStudioManager.GetVisualStudioForSolutions(new List<string> { "PnP.Scanning.sln" });
 
                 if (vsProcess != null)

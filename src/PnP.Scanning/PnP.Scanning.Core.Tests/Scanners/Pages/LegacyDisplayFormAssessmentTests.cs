@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Text.Json;
 using System.Xml.Linq;
 using CsvHelper;
 using CsvHelper.Configuration;
@@ -14,6 +15,7 @@ using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
 using OfflineSdk = PnP.Scanning.Core.Tests.Discovery.SharedDiscoveryContextTests.OfflineSdk;
+using MetadataFixture = PnP.Scanning.Core.Tests.Discovery.AssessmentPageMetadataReplayTests.MetadataFixture;
 
 namespace PnP.Scanning.Core.Tests.Scanners.Pages;
 
@@ -257,6 +259,192 @@ public sealed class LegacyDisplayFormAssessmentTests : IClassFixture<ScanContext
         posts.Requests.Should().HaveCount(duringStream ? 1 : 0);
     }
 
+    [Theory]
+    [InlineData("denied", 0, "Denied")]
+    [InlineData("later-page", 1, "Failed")]
+    [InlineData("list-metadata", 0, "Denied")]
+    [InlineData("item-metadata", 1, "Denied")]
+    public async Task Legacy_list_failures_retain_partial_pages_and_continue_physical_assessment_and_reports(
+        string failureKind, int retainedPages, string outcome)
+    {
+        var scan = Guid.NewGuid();
+        var earlier = Posts();
+        var brokenItem = StrictProxy.Create<IListItem>((_, _) =>
+            throw new UnauthorizedAccessException("offline item metadata denied"));
+        var failed = new ListFixture(ListBaseType.GenericList, ListTemplateType.GenericList, "Restricted",
+            "Lists/Restricted/Article.aspx", Array.Empty<(string, string)>(),
+            failureKind == "item-metadata"
+                ? new[] { Item(7, "0x01", "Retained partial item"), brokenItem }
+                : new[] { Item(7, "0x01", "Retained partial item") },
+            new[] { Item(3, "0x01", "Unread page") });
+        if (failureKind == "list-metadata")
+        {
+            failed.MetadataError = new UnauthorizedAccessException("offline list metadata denied");
+        }
+        else if (failureKind != "item-metadata")
+        {
+            failed.ReadError = failureKind == "denied"
+                ? new UnauthorizedAccessException("offline list read denied")
+                : new IOException("offline second page interrupted");
+            failed.FailReadAt = failureKind == "denied" ? 0 : 1;
+        }
+        var later = new ListFixture(ListBaseType.GenericList, ListTemplateType.GenericList, "Later",
+            "Lists/Later/Article.aspx", Array.Empty<(string, string)>(),
+            new[] { Item(9, "0x01", "Subsequent list") });
+        var physical = new MetadataFixture(scan, "WikiPages/wiki.aspx", new()
+        {
+            ["WikiField"] = "<p>Readable physical wiki</p>",
+            ["NoExecute"] = "1",
+        }, Site, Web);
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        await writer.WriteAsync(new[]
+        {
+            physical.Row,
+            new ClassicPageDiscovery
+            {
+                ScanId = scan, RecordKey = "assessment:site-selection", RowType = "Scope",
+                ScopeType = "SiteSelection", DiscoveryStatus = "Complete", Url = Site,
+                ObservedAtUtc = DateTime.UtcNow,
+            },
+        });
+
+        var assessment = NewAssessment(scan, skipUserInformation: true);
+        await PageScanComponent.AddDisplayFormPagesAsync(assessment, new Uri(WebAddress),
+            new[] { earlier.List, failed.List, later.List }, CancellationToken.None, writer);
+
+        assessment.Pages.Should().HaveCount(3 + retainedPages);
+        assessment.Pages.Count(page => page.ListId == earlier.Id).Should().Be(2);
+        assessment.Pages.Count(page => page.ListId == failed.Id).Should().Be(retainedPages);
+        assessment.Pages.Should().ContainSingle(page => page.ListId == later.Id);
+        later.Requests.Should().ContainSingle();
+        failed.Requests.Should().HaveCount(failureKind switch
+        {
+            "list-metadata" => 0,
+            "later-page" => 2,
+            _ => 1,
+        });
+
+        var input = await PageScanComponent.LoadPhysicalPageAsync(physical.List, physical.Row, null, true);
+        physical.StreamRequests.Should().Be(1);
+        physical.LastViewFields.Should().Contain("NoExecute");
+        input.FileFacts.NoExecuteRaw.Should().Be("1");
+        input.FileFacts.NoExecuteReadState.Should().Be("Available");
+        physical.Row.PageType = input.Page.PageType;
+        physical.Row.AssessmentStatus = "Complete";
+        PageScanComponent.AddSitePage(assessment, input);
+        assessment.EnrichmentInputs.Should().ContainSingle().Which.Should().BeSameAs(input);
+        var parts = await PageScanComponent.ExtractWebPartsAsync(null, input, exportWebPartProperties: false);
+        parts.Should().NotBeEmpty("the readable physical wiki must still reach web-part assessment");
+        PageMappingCalculator.ApplyMapping(input.Page, parts, PageScanComponent.MappingManager);
+        PageScanComponent.ApplyDiscoveryState(input.Page, physical.Row);
+        await new SPFileWriter(database.CreateContext).WriteAsync(new[] { input.FileFacts }, CancellationToken.None);
+        await writer.UpdateExistingAsync(new[] { physical.Row });
+
+        using var sdk = new OfflineSdk();
+        var context = await sdk.CreateAsync();
+        var counts = PageScanComponent.CountAssessedPages(assessment.Pages);
+        using (var store = database.CreateContext())
+        {
+            await StorageManager.StorePageInformationAsync(store, assessment.Pages);
+            await StorageManager.StorePageWebPartsAsync(store, parts);
+            await StorageManager.StorePageSummaryAsync(store, scan, Site, Web, "BLOG#0", context,
+                assessment.RemediationCodes, assessment.ModernPageCounter, counts.Wiki, counts.Blog,
+                counts.WebPart, counts.Aspx, counts.Publishing);
+            await StorageManager.ComputeAndStoreWebPageRollupsAsync(store, scan);
+        }
+
+        (await writer.FinalizeScanAsync(scan)).Should().Be(DiscoveryVerdict.CompleteDeclaredSubset,
+            "a legacy assessment gap must not change the independent physical discovery verdict");
+        (await writer.ReadWebCoverageAsync(scan, Site, Web)).Should().Be("Complete");
+        using var read = database.CreateContext();
+        var evidence = await read.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Assessment");
+        evidence.ScopeType.Should().Be("List");
+        evidence.ListId.Should().Be(failed.Id);
+        evidence.AssessmentStatus.Should().Be("Failed");
+        evidence.DiscoveryStatus.Should().Be("NotApplicable");
+        evidence.FileUniqueId.Should().BeNull();
+        evidence.ListItemId.Should().BeNull();
+        evidence.ErrorStage.Should().Be(failureKind == "list-metadata" ? "LegacyDisplayFormMetadata" : "LegacyDisplayFormItems");
+        evidence.ErrorCodes.Should().Be(failureKind == "later-page" ? nameof(IOException) : nameof(UnauthorizedAccessException));
+        evidence.ErrorDetail.Should().Contain("offline");
+        using var detail = JsonDocument.Parse(evidence.EvidenceJson);
+        detail.RootElement.GetProperty("outcome").GetString().Should().Be(outcome);
+        detail.RootElement.GetProperty("retainedPageCount").GetInt32().Should().Be(retainedPages);
+        (await read.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan && row.RowType == "Page")).Should().Be(1);
+        var coverage = await read.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Summary");
+        coverage.ObservedChildCount.Should().Be(1);
+        coverage.ErrorCodes.Should().BeEmpty();
+        var storedPages = await read.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
+        storedPages.Should().HaveCount(4 + retainedPages);
+        var storedPhysical = storedPages.Single(page => page.FileUniqueId == physical.Row.FileUniqueId);
+        storedPhysical.AssessmentStatus.Should().Be("Complete");
+        storedPhysical.WebPartCount.Should().Be(parts.Count);
+        var summary = await read.ClassicWebSummaries.SingleAsync(value => value.ScanId == scan);
+        summary.ClassicPages.Should().Be(4 + retainedPages);
+        summary.ClassicBlogPages.Should().Be(2);
+        summary.ClassicASPXPages.Should().Be(1 + retainedPages);
+        summary.ClassicWikiPages.Should().Be(1);
+        summary.PagesWithWebParts.Should().Be(1);
+        (await read.SPFiles.SingleAsync(file => file.ScanId == scan)).NoExecuteRaw.Should().Be("1");
+
+        string directory = Path.Combine(Path.GetTempPath(), "legacy-list-failure-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await ReportManager.ExportClassicReportDataAsync(read, scan, directory,
+                new CsvConfiguration(CultureInfo.InvariantCulture));
+            ReadCsv<ClassicPage>(directory, "classicpages.csv").Should().HaveCount(4 + retainedPages);
+            ReadCsv<ClassicPageDiscovery>(directory, "discovery.csv")
+                .Should().ContainSingle(row => row.RowType == "Assessment" && row.ListId == failed.Id &&
+                    row.AssessmentStatus == "Failed" && row.ErrorDetail == evidence.ErrorDetail);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Native_or_requested_cancellation_propagates_without_failure_evidence_or_later_list_reads(
+        bool cancelToken)
+    {
+        var scan = Guid.NewGuid();
+        using var cancel = new CancellationTokenSource();
+        var posts = Posts();
+        posts.ReadError = cancelToken ? new IOException("canceled request") : new OperationCanceledException("native cancellation");
+        if (cancelToken)
+        {
+            posts.AfterRead = cancel.Cancel;
+        }
+        var later = Posts();
+        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        var run = () => PageScanComponent.AddDisplayFormPagesAsync(NewAssessment(scan, true), new Uri(WebAddress),
+            new[] { posts.List, later.List }, cancel.Token, writer);
+
+        (await run.Should().ThrowAsync<Exception>()).Which.Should().BeSameAs(posts.ReadError);
+        posts.Requests.Should().ContainSingle();
+        later.Requests.Should().BeEmpty();
+        using var read = database.CreateContext();
+        (await read.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Failure_evidence_persistence_error_propagates_instead_of_becoming_another_list_gap()
+    {
+        var posts = Posts();
+        posts.ReadError = new UnauthorizedAccessException("offline list denied");
+        var later = Posts();
+        var storageError = new IOException("offline evidence persistence failed");
+        var writer = new AssessmentDiscoveryWriter(() => throw storageError);
+        var run = () => PageScanComponent.AddDisplayFormPagesAsync(NewAssessment(Guid.NewGuid(), true),
+            new Uri(WebAddress), new[] { posts.List, later.List }, CancellationToken.None, writer);
+
+        (await run.Should().ThrowAsync<IOException>()).Which.Should().BeSameAs(storageError);
+        later.Requests.Should().BeEmpty("an unpersisted failure must fail the worker");
+    }
+
     /// <summary>Creates only the legacy orchestration inputs; all page rows/codes come from the production branch.</summary>
     private static PageScanComponent.PageDiscovery NewAssessment(Guid scan, bool skipUserInformation)
     {
@@ -275,7 +463,8 @@ public sealed class LegacyDisplayFormAssessmentTests : IClassFixture<ScanContext
         bool skipUserInformation = true, bool homePageOnly = false, CancellationToken cancellationToken = default)
     {
         return LegacyDisplayFormAssessment.ReadAsync(scan, Site, Web, new Uri(WebAddress),
-            lists.Select(value => value.List).ToArray(), homePageOnly, skipUserInformation, cancellationToken);
+            lists.Select(value => value.List).ToArray(), homePageOnly, skipUserInformation, cancellationToken,
+            (_, error) => Task.FromException(error));
     }
 
     /// <summary>Seeds a Posts list with parent/specialized forms and a stock-form sibling across two native pages.</summary>
@@ -345,6 +534,9 @@ public sealed class LegacyDisplayFormAssessmentTests : IClassFixture<ScanContext
         internal List<RenderListDataOptions> Requests { get; } = new();
         internal int MetadataReads { get; private set; }
         internal Action AfterRead { get; set; }
+        internal Exception ReadError { get; set; }
+        internal int FailReadAt { get; set; }
+        internal Exception MetadataError { get; set; }
 
         /// <summary>Creates strict SDK proxies that enforce recursive paged CAML, cache clearing and no File metadata reads.</summary>
         internal ListFixture(ListBaseType baseType, ListTemplateType template, string title, string defaultForm,
@@ -391,15 +583,23 @@ public sealed class LegacyDisplayFormAssessmentTests : IClassFixture<ScanContext
                     view.Element("RowLimit").Attribute("Paged").Value.Should().Be("TRUE");
                     view.Element("OrderBy").Element("FieldRef").Attribute("Name").Value.Should().Be("ID");
                     requested.Should().BeEmpty("cached stream rows must be cleared before every page");
-                    requested.AddRange(pages[index]);
                     Requests.Add(options);
                     AfterRead?.Invoke();
+                    if (ReadError != null && index == FailReadAt)
+                    {
+                        return Task.FromException<Dictionary<string, object>>(ReadError);
+                    }
+                    requested.AddRange(pages[index]);
                     return Task.FromResult(index + 1 < pages.Length
                         ? new Dictionary<string, object> { ["NextHref"] = "?Paged=TRUE&p_ID=7" }
                         : new Dictionary<string, object>());
                 }
 
                 MetadataReads++;
+                if (MetadataError != null && method.Name == "get_ContentTypes")
+                {
+                    throw MetadataError;
+                }
                 return method.Name switch
                 {
                     "get_Id" => Id,

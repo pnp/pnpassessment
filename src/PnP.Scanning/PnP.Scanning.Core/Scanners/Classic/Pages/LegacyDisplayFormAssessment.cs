@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Scanning.Core.Discovery;
@@ -25,10 +26,11 @@ internal static class LegacyDisplayFormAssessment
     /// Reads only eligible non-document lists using the scanner's already loaded metadata. HOME
     /// assessment never enumerates item-only pages, preserving its physical welcome-page-only scope.
     /// Content-type overrides take precedence over the list form, with the longest matching ID first.
+    /// Failed lists retain already assessed items and report failure outside the acquisition handler.
     /// </summary>
     internal static async Task<List<ClassicPage>> ReadAsync(Guid scanId, string siteUrl, string webUrl,
         Uri contextUri, IReadOnlyList<IList> lists, bool homePageOnly, bool skipUserInformation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Func<ClassicPageDiscovery, Exception, Task> onListFailure)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var pages = new List<ClassicPage>();
@@ -42,43 +44,88 @@ internal static class LegacyDisplayFormAssessment
             ? siteUri.AbsolutePath
             : webRoot;
 
-        foreach (var list in lists)
+        for (int index = 0; index < lists.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (list.BaseType == ListBaseType.DocumentLibrary)
+            var list = lists[index];
+            Guid? listId = null;
+            int previousPageCount = pages.Count;
+            string stage = "LegacyDisplayFormMetadata";
+            Exception failure = null;
+            try
             {
-                continue;
-            }
-
-            var contentTypeForms = list.ContentTypes.AsRequested()
-                .Where(contentType => !string.IsNullOrEmpty(contentType.StringId))
-                .Select(contentType => (ContentTypeId: contentType.StringId, FormUrl: DisplayFormUrlPolicy.ToServerRelative(
-                    contentType.DisplayFormUrl, webRoot, siteRoot)))
-                .Where(candidate => candidate.FormUrl != null)
-                .OrderByDescending(candidate => candidate.ContentTypeId.Length)
-                .ToList();
-            string listForm = DisplayFormUrlPolicy.ToServerRelative(list.DefaultDisplayFormUrl, webRoot, siteRoot);
-            if (!contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm).Any(IsContentPageForm))
-            {
-                continue;
-            }
-
-            await ReadItemsAsync(list, skipUserInformation, cancellationToken, items =>
-            {
-                foreach (var item in items)
+                listId = list.Id;
+                if (list.BaseType == ListBaseType.DocumentLibrary)
                 {
-                    string form = ResolveDisplayForm(contentTypeForms, listForm,
-                        GetFieldValue(item, ContentTypeIdField, string.Empty));
-                    if (!IsContentPageForm(form))
-                    {
-                        continue;
-                    }
-
-                    pages.Add(AssessItem(scanId, siteUrl, webUrl, list, item, form, skipUserInformation));
+                    continue;
                 }
-            }).ConfigureAwait(false);
+
+                var contentTypeForms = list.ContentTypes.AsRequested()
+                    .Where(contentType => !string.IsNullOrEmpty(contentType.StringId))
+                    .Select(contentType => (ContentTypeId: contentType.StringId, FormUrl: DisplayFormUrlPolicy.ToServerRelative(
+                        contentType.DisplayFormUrl, webRoot, siteRoot)))
+                    .Where(candidate => candidate.FormUrl != null)
+                    .OrderByDescending(candidate => candidate.ContentTypeId.Length)
+                    .ToList();
+                string listForm = DisplayFormUrlPolicy.ToServerRelative(list.DefaultDisplayFormUrl, webRoot, siteRoot);
+                if (!contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm).Any(IsContentPageForm))
+                {
+                    continue;
+                }
+
+                stage = "LegacyDisplayFormItems";
+                await ReadItemsAsync(list, skipUserInformation, cancellationToken, items =>
+                {
+                    foreach (var item in items)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string form = ResolveDisplayForm(contentTypeForms, listForm,
+                            GetFieldValue(item, ContentTypeIdField, string.Empty));
+                        if (!IsContentPageForm(form))
+                        {
+                            continue;
+                        }
+
+                        pages.Add(AssessItem(scanId, siteUrl, webUrl, list, item, form, skipUserInformation));
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                failure = ex;
+            }
+
+            if (failure != null)
+            {
+                var evidence = new ClassicPageDiscovery
+                {
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = webUrl,
+                    RecordKey = "assessment:legacy-display-form:" + DiscoveryHash.Of(siteUrl, webUrl,
+                        listId?.ToString("D") ?? "index:" + index.ToString(CultureInfo.InvariantCulture)),
+                    RowType = "Assessment",
+                    ScopeType = "List",
+                    ListId = listId,
+                    Url = contextUri.AbsoluteUri,
+                    ObservationMethod = nameof(LegacyDisplayFormAssessment),
+                    DiscoveryStatus = "NotApplicable",
+                    AssessmentStatus = "Failed",
+                    ObservedAtUtc = DateTime.UtcNow,
+                    EvidenceJson = JsonSerializer.Serialize(new
+                    {
+                        outcome = AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(failure)),
+                        retainedPageCount = pages.Count - previousPageCount,
+                    }),
+                };
+                AssessmentWebDiscovery.AddError(evidence, stage, AssessmentWebDiscovery.ErrorCode(failure),
+                    AssessmentWebDiscovery.ErrorDetail(failure));
+                // Persistence failures must propagate, not be classified as another unreadable list.
+                await onListFailure(evidence, failure).ConfigureAwait(false);
+            }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return pages;
     }
 

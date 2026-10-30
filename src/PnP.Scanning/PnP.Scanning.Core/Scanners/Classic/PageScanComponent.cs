@@ -236,15 +236,23 @@ namespace PnP.Scanning.Core.Scanners
 
         /// <summary>
         /// Adds independently assessed item-only pages and their remediation codes to the legacy report
-        /// branch. Does not write discovery rows, create file bindings or queue per-item web-part reads.
+        /// branch. Persists failed-list assessment diagnostics without creating physical discovery rows,
+        /// file bindings or per-item web-part reads.
         /// </summary>
         internal static async Task AddDisplayFormPagesAsync(PageDiscovery discovery, Uri contextUri,
-            IReadOnlyList<IList> lists, CancellationToken cancellationToken)
+            IReadOnlyList<IList> lists, CancellationToken cancellationToken, AssessmentDiscoveryWriter writer = null)
         {
             var scanner = discovery.ScannerBase;
+            writer ??= new AssessmentDiscoveryWriter(scanner.ScanId);
             var pages = await LegacyDisplayFormAssessment.ReadAsync(scanner.ScanId, scanner.SiteUrl,
                 scanner.WebUrl, contextUri, lists, discovery.HomePageOnly, discovery.SkipUserInformation,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken, async (evidence, error) =>
+                {
+                    scanner.Logger.Warning(error,
+                        "Legacy display-form assessment failed for list {ListId} in {WebUrl}; retaining assessed items and continuing",
+                        evidence.ListId, scanner.WebUrl);
+                    await writer.WriteAsync(new[] { evidence }, cancellationToken).ConfigureAwait(false);
+                }).ConfigureAwait(false);
             discovery.Pages.AddRange(pages);
             discovery.RemediationCodes.UnionWith(pages.Select(page => page.RemediationCode));
         }
@@ -360,7 +368,7 @@ namespace PnP.Scanning.Core.Scanners
             ? HomePageDetector.IsHomePage(pageUrl, welcomePage)
             : discoveredHomePage;
 
-        private static void AddSitePage(PageDiscovery disc, PageEnrichmentInput input)
+        internal static void AddSitePage(PageDiscovery disc, PageEnrichmentInput input)
         {
             var pageToAdd = input.Page;
             switch (pageToAdd.PageType)

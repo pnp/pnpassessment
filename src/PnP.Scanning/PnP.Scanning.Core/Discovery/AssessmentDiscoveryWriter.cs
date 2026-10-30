@@ -223,7 +223,7 @@ internal sealed class AssessmentDiscoveryWriter
                 .Concat(allRows.Where(row => row.RowType == "Reference" ||
                     (row.RowType == "Pagination" && row.DiscoveryStatus is ("Denied" or "Failed" or "Unknown")))
                     .Select(row => row.DiscoveryStatus)).ToArray();
-            var gapCodes = allRows.SelectMany(row => (row.ErrorCodes ?? string.Empty)
+            var gapCodes = allRows.Where(row => row.RowType != "Assessment").SelectMany(row => (row.ErrorCodes ?? string.Empty)
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 .Select(code => code.Contains(':') ? code[(code.LastIndexOf(':') + 1)..] : code)
                 .ToArray();

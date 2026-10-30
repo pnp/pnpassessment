@@ -271,7 +271,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         return csv.GetRecords<T>().ToArray();
     }
 
-    private sealed class MetadataFixture
+    internal sealed class MetadataFixture
     {
         public ClassicPageDiscovery Row { get; }
         public IList List { get; }
@@ -281,14 +281,15 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         public int StreamRequests { get; private set; }
         public string[] LastViewFields { get; private set; } = Array.Empty<string>();
 
-        public MetadataFixture(Guid scan, string path, Dictionary<string, object> fields)
+        public MetadataFixture(Guid scan, string path, Dictionary<string, object> fields,
+            string siteUrl = Site, string webUrl = Web)
         {
             var listId = Guid.NewGuid();
             var fileId = Guid.NewGuid();
             Row = new ClassicPageDiscovery
             {
-                ScanId = scan, SiteUrl = Site, WebUrl = Web, RecordKey = "page:" + fileId,
-                RowType = "Page", ScopeType = "File", Url = Web + "/" + path,
+                ScanId = scan, SiteUrl = siteUrl, WebUrl = webUrl, RecordKey = "page:" + fileId,
+                RowType = "Page", ScopeType = "File", Url = webUrl + "/" + path,
                 SiteCollectionId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 WebId = Guid.Parse("22222222-2222-2222-2222-222222222222"), ListId = listId,
                 FileUniqueId = fileId, ListItemId = 1, FileName = Path.GetFileName(path),
@@ -331,7 +332,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 return Task.FromResult(ReturnedId == null ? null : hasAll ? wildcardItem : minimalItem);
             });
             var folder = StrictProxy.Create<IFolder>((method, _) => method.Name == "get_ServerRelativeUrl"
-                ? Web + "/" + path.Split('/')[0]
+                ? webUrl + "/" + path.Split('/')[0]
                 : throw new InvalidOperationException("Unexpected folder call: " + method.Name));
             List = StrictProxy.Create<IList>((method, args) =>
             {
