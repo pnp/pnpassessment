@@ -43,49 +43,6 @@ internal static class ClassicPageDiscoveryComponent
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }
 
-    /// <summary>Projects physical file observations after discovery workers finish, with no second SharePoint acquisition pass.</summary>
-    internal static async Task<int> EnrichScanAsync(ClassicScanner scanner)
-    {
-        var token = scanner.ScanManager.GetCancellationTokenSource(scanner.ScanId).Token;
-        var writer = new AssessmentDiscoveryWriter(scanner.ScanId);
-        var projection = new ClassicAspxProjectionWriter(scanner.ScanId);
-        var failures = 0;
-        await foreach (var web in writer.ReadDiscoveredWebScopesAsync(scanner.ScanId, token).ConfigureAwait(false))
-        {
-            token.ThrowIfCancellationRequested();
-            try
-            {
-                var webUri = new Uri(web.Url, UriKind.Absolute);
-                var acquisitionContext = new ClassicAspxWebAcquisitionContext(scanner.ScanId,
-                    web.SiteCollectionId.Value, web.WebId.Value, new Uri(web.SiteUrl, UriKind.Absolute),
-                    webUri);
-                await new ClassicAspxWebAcquisition(acquisitionContext).AcquireAsync(
-                    writer.ReadPageStreamAsync(scanner.ScanId, web.SiteUrl, web.WebUrl, token),
-                    async (batch, cancellation) =>
-                    {
-                        // Keep raw acquisition evidence even if a later projection write fails.
-                        foreach (var evidence in batch.Evidence)
-                        {
-                            evidence.SiteUrl = web.SiteUrl;
-                            evidence.WebUrl = web.WebUrl;
-                        }
-                        if (batch.Evidence.Count != 0)
-                            await writer.WriteAsync(batch.Evidence, cancellation).ConfigureAwait(false);
-                        await projection.WriteAsync(batch.Inventory, cancellation).ConfigureAwait(false);
-                    }, token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException && !token.IsCancellationRequested)
-            {
-                failures++;
-                await RecordScopeAsync(scanner.ScanId, web.SiteUrl, web.WebUrl, "Web", "Failed", ex,
-                    stage: "AspxAcquisition", writer: writer).ConfigureAwait(false);
-                scanner.Logger.Warning(ex, "ASPX acquisition failed for web {SiteUrl}{WebUrl}",
-                    web.SiteUrl, web.WebUrl);
-            }
-        }
-        return failures;
-    }
-
     /// <summary>Persists original web-enumeration authority without replacing retained evidence with the pending checkpoint replay queue.</summary>
     internal static async Task RecordWebEnumerationScopeAsync(Guid scanId, string siteUrl,
         WebEnumerationResult enumeration, Exception error = null, AssessmentDiscoveryWriter writer = null)

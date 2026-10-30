@@ -17,6 +17,18 @@ internal sealed class AssessmentDiscoveryWriter
     internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId)) { }
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
+    /// <summary>Commits bounded physical facts before ASPX admission, so file-type and later assessment decisions cannot discard raw files.</summary>
+    internal async Task WritePhysicalFilesAsync(Guid scanId, IEnumerable<RawDiscoveryRecord> records,
+        CancellationToken cancellationToken)
+    {
+        var files = new SPFileWriter(createContext);
+        foreach (var batch in records.Select(record => SPFileFactProjection.FromPhysicalRecord(scanId, record))
+            .Where(file => file != null).Chunk(128))
+        {
+            await files.WriteAsync(batch, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Persists raw observations without erasing retained failures or rekeying preview evidence during resume.</summary>
     internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
     {

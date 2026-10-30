@@ -384,13 +384,8 @@ namespace PnP.Scanning.Core.Scanners
         {
 
             Logger.Information("Post assessment work is starting");
-            var aspxAcquisitionFailures = 0;
             if (Options.Pages)
             {
-                // Site collection workers have all completed here. Acquire and project ASPX only
-                // after the full selected scan has persisted its physical discovery observations.
-                aspxAcquisitionFailures = await ClassicPageDiscoveryComponent.EnrichScanAsync(this)
-                    .ConfigureAwait(false);
                 try
                 {
                     await EnrichPublishingLayoutsAsync().ConfigureAwait(false);
@@ -572,8 +567,6 @@ namespace PnP.Scanning.Core.Scanners
             }
 
             Logger.Information("Post assessment work done");
-            if (aspxAcquisitionFailures != 0)
-                throw new InvalidOperationException($"ASPX acquisition failed for {aspxAcquisitionFailures} Web(s); see discovery evidence.");
         }
 
         private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)

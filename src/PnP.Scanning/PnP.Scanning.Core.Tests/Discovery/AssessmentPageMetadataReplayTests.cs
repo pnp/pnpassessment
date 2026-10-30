@@ -155,6 +155,31 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.LastViewFields.Should().NotContain("Editor", "SkipUserInformation should avoid requesting user details");
     }
 
+    /// <summary>Requests NoExecute through the existing native list-stream query and captures its original string before legacy classification.</summary>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("1")]
+    [InlineData(" 1 ")]
+    public async Task Native_metadata_query_retains_original_NoExecute_without_changing_page_heuristics(string raw)
+    {
+        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/webpart.aspx", new()
+        {
+            ["ContentTypeId"] = "0x010109006DC758714F143A4FB8A7253506F98C5F",
+            ["HTML_x0020_File_x0020_Type"] = "SharePoint.WebPartPage.Document",
+            ["NoExecute"] = raw
+        });
+
+        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+
+        fixture.LastViewFields.Should().Contain("NoExecute");
+        fixture.StreamRequests.Should().Be(1, "raw capture must not reread or execute the ASPX");
+        loaded.Page.PageType.Should().Be("WebPartPage");
+        loaded.FileFacts.Should().NotBeNull();
+        loaded.FileFacts.NoExecuteRaw.Should().Be(raw);
+        loaded.FileFacts.NoExecuteSource.Should().Be("SPO.ListItem.NoExecute");
+        loaded.FileFacts.NoExecuteReadState.Should().Be("Available");
+    }
+
     [Fact]
     public async Task Native_list_stream_modern_marker_is_classified_without_inflating_classic_rows()
     {

@@ -1269,7 +1269,8 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         metadata != null && metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
     private static bool? MetadataBool(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
-    private static string InferPageType(string contentTypeId)
+    /// <summary>Reuses the existing content-type prefix heuristics for discovery and business export without changing their precedence.</summary>
+    internal static string InferPageType(string contentTypeId)
     {
         if (string.IsNullOrWhiteSpace(contentTypeId)) return null;
         if (contentTypeId.StartsWith("0x0101009D1CB255DA76424F860D91F20E6C4118", StringComparison.OrdinalIgnoreCase))

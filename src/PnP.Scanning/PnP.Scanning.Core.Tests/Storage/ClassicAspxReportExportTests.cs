@@ -9,7 +9,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -17,77 +16,74 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Storage;
 
-public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixture>
+/// <summary>Exercises the canonical business CSV through real SQLite facts and the native Classic report dispatcher.</summary>
+public sealed class ClassicAspxReportExportTests
 {
+    private const string CsvName = "classicaspx.csv";
+    private const string SummaryName = "classicaspxsummary.json";
+    private const string ModernApplication = "B6917CB1-93A0-4B97-A84D-7CF49975D4EC";
+    private const string ModernContentType = "0x0101009D1CB255DA76424F860D91F20E6C411800";
     private static readonly string[] ExpectedHeader =
     {
-        "ScanId", "AspxKey", "SiteCollectionId", "WebId", "ListId", "FolderUniqueId", "FileUniqueId",
-        "SiteUrl", "WebUrl", "Url", "FileName", "ContentTypeId", "CustomizedPageStatus", "SetupPath",
-        "FileReadState", "FileErrorCodes", "FileErrorDetail", "ProvenanceJson", "CoverageState",
-        "FirstObservedAtUtc", "ObservedAtUtc"
+        "ScanId", "SiteCollectionId", "WebId", "ListId", "FileUniqueId", "SiteUrl", "WebUrl", "Url", "FileName",
+        "ClassicPageType", "PageRole", "ClassificationState", "ClassificationReason", "ContentTypeId",
+        "CustomizedPageStatus", "SetupPath", "NoExecuteRaw", "IsPoisoned", "PoisonState", "RenderDisposition",
+        "MetadataReadState", "ErrorCodes", "ErrorDetail", "ObservedAtUtc"
     };
-    private readonly ScanContextFixture fixture;
 
-    /// <summary>Uses the shared migrated SQLite fixture while each export scenario isolates its rows by a new assessment ID.</summary>
-    public ClassicAspxReportExportTests(ScanContextFixture fixture)
-    {
-        this.fixture = fixture;
-    }
-
-    /// <summary>Uses invariant comma-delimited CSV so wire expectations do not depend on the machine locale.</summary>
+    /// <summary>Uses invariant comma-delimited CSV for independent golden wire assertions.</summary>
     private static CsvConfiguration Configuration() => new(CultureInfo.InvariantCulture) { Delimiter = "," };
 
-    /// <summary>Creates a unique output directory whose ownership prefix is checked before cleanup.</summary>
+    /// <summary>Creates a unique output directory whose absolute ownership boundary is checked before cleanup.</summary>
     private static string DirectoryForTest() =>
-        Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "aspx-csv-" + Guid.NewGuid().ToString("N"))).FullName;
+        Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "classic-aspx-csv-" + Guid.NewGuid().ToString("N"))).FullName;
 
-    /// <summary>Deletes only an output directory contained by the temporary root and marked with this report-test ownership prefix.</summary>
+    /// <summary>Deletes only this test's resolved absolute directory beneath the temporary root and with the expected ownership prefix.</summary>
     private static void DeleteOwnDirectory(string directory)
     {
         var full = Path.GetFullPath(directory);
         var temporary = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) + Path.DirectorySeparatorChar;
         if (!full.StartsWith(temporary, StringComparison.OrdinalIgnoreCase) ||
-            !Path.GetFileName(full).StartsWith("aspx-csv-", StringComparison.Ordinal))
+            !Path.GetFileName(full).StartsWith("classic-aspx-csv-", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Not an owned report-test directory.");
         }
         Directory.Delete(full, true);
     }
 
-    /// <summary>Materializes typed inventory records before disposing both readers, using the same invariant configuration as export.</summary>
-    private static List<ClassicAspxInventoryExport> ReadInventory(string directory)
+    /// <summary>Materializes typed business records while both CSV readers remain owned by this helper.</summary>
+    private static List<ClassicAspxExport> ReadRows(string directory)
     {
-        using var reader = new StreamReader(Path.Combine(directory, "aspxinventory.csv"));
+        using var reader = new StreamReader(Path.Combine(directory, CsvName));
         using var csv = new CsvReader(reader, Configuration());
-        return csv.GetRecords<ClassicAspxInventoryExport>().ToList();
+        return csv.GetRecords<ClassicAspxExport>().ToList();
     }
 
-    /// <summary>Reads the canonical CSV header independently of the export type so column names and order remain a golden wire contract.</summary>
+    /// <summary>Reads the header independently of the DTO so order and column names are a fixed golden contract.</summary>
     private static string[] Header(string directory)
     {
-        using var reader = new StreamReader(Path.Combine(directory, "aspxinventory.csv"));
+        using var reader = new StreamReader(Path.Combine(directory, CsvName));
         using var csv = new CsvReader(reader, Configuration());
         csv.Read();
         csv.ReadHeader();
         return csv.HeaderRecord!;
     }
 
-    /// <summary>Creates one real physical-file observation with optional owner metadata and explicit observed coverage.</summary>
-    private static ClassicAspxInventory Inventory(Guid scan, Guid? site = null, Guid? file = null)
+    /// <summary>Creates one physical file fact with real GUID identity and no fabricated item or NoExecute observation.</summary>
+    private static SPFile FileFact(Guid scan, Guid? site = null, Guid? file = null)
     {
-        var sc = site ?? Guid.NewGuid();
-        var id = file ?? Guid.NewGuid();
         var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        return new ClassicAspxInventory
+        return new SPFile
         {
             ScanId = scan,
-            AspxKey = ClassicAspxInventory.CreateTenantFileKey(sc, id),
-            SiteCollectionId = sc,
-            FileUniqueId = id,
+            SiteCollectionId = site ?? Guid.NewGuid(),
+            FileUniqueId = file ?? Guid.NewGuid(),
             WebId = Guid.NewGuid(),
             ListId = Guid.NewGuid(),
             FolderUniqueId = Guid.NewGuid(),
-            Url = "/sites/test/renderer.aspx",
+            SiteUrl = "https://example.invalid/sites/test",
+            WebUrl = "https://example.invalid/sites/test",
+            ServerRelativeUrl = "/sites/test/renderer.aspx",
             FileName = "renderer.aspx",
             FileReadState = "Available",
             CoverageState = "Observed",
@@ -97,50 +93,74 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         };
     }
 
-    /// <summary>Stores current projection and scope markers as independent golden wire values rather than production constants.</summary>
+    /// <summary>Stores current acquisition/scope markers as independent wire values, not export-production constants.</summary>
     private static void Mark(ScanContext context, Guid scan, string scope = "DeclaredFullInventory") =>
         context.Properties.AddRange(
             new Property { ScanId = scan, Name = "AspxProjectionContract", Value = "aspx-inventory/v1" },
             new Property { ScanId = scan, Name = "AspxScopeMode", Value = scope });
 
-    /// <summary>Requires a scan-scoped ordered single-table SQL projection without obsolete joins, item counts, or in-memory schema shaping.</summary>
+    /// <summary>Uses only SPFile and native GUID ordering in SQL; extension filtering and existing classification remain outside the raw-fact query.</summary>
     [Fact]
-    public async Task SqlProjectionUsesOnlyInventoryInDeterministicKeyOrder()
+    public async Task SqlProjectionUsesOnlyFactsInDeterministicNativeKeyOrder()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
-        var first = Inventory(scan);
-        var second = Inventory(scan, first.SiteCollectionId);
+        var first = FileFact(scan);
+        var second = FileFact(scan, first.SiteCollectionId);
+        var otherScan = FileFact(Guid.NewGuid());
         using var context = fixture.CreateContext();
-        context.AddRange(first, second, Inventory(Guid.NewGuid(), first.SiteCollectionId, first.FileUniqueId));
+        context.AddRange(first, second, otherScan);
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
-        var query = ClassicAspxReportProjection.Inventories(context, scan);
+        var query = ClassicAspxReportProjection.Files(context, scan);
         var sql = query.ToQueryString();
-        sql.Should().Contain("ORDER BY").And.Contain("ClassicAspxInventories")
-            .And.NotContain("JOIN").And.NotContain("GROUP BY").And.NotContain("COUNT(")
-            .And.NotContain("ClassicAspxItemBindings");
+        sql.Should().Contain("ORDER BY").And.Contain("SPFile").And.Contain("SiteCollectionId").And.Contain("FileUniqueId")
+            .And.NotContain("JOIN").And.NotContain("GROUP BY").And.NotContain("COUNT(").And.NotContain("IsClassic");
         var rows = await query.ToListAsync();
-        rows.Select(row => row.AspxKey).Should().Equal(new[] { first.AspxKey, second.AspxKey }.OrderBy(key => key, StringComparer.Ordinal));
+        rows.Select(row => (row.SiteCollectionId, row.FileUniqueId)).Should().Equal(
+            new[] { first, second }.OrderBy(row => row.SiteCollectionId).ThenBy(row => row.FileUniqueId)
+                .Select(row => (row.SiteCollectionId, row.FileUniqueId)));
         rows.Should().HaveCount(2).And.OnlyContain(row => row.ScanId == scan);
         context.ChangeTracker.Entries().Should().BeEmpty();
     }
 
-    /// <summary>Publishes exactly one canonical 21-column CSV and one summary, without binding files, aliases, or information-text sidecars.</summary>
+    /// <summary>Isolates scans with the same native pair in separate real databases instead of violating the new two-column key in one fixture.</summary>
     [Fact]
-    public async Task DirectExportPublishesOnlyCanonicalInventoryAndSummary()
+    public async Task SameNativePairAcrossAssessmentsUsesIsolatedFixtures()
     {
+        using var firstFixture = new ScanContextFixture();
+        using var secondFixture = new ScanContextFixture();
+        var site = Guid.NewGuid();
+        var file = Guid.NewGuid();
+        var first = FileFact(Guid.NewGuid(), site, file);
+        var second = FileFact(Guid.NewGuid(), site, file);
+        using var firstContext = firstFixture.CreateContext();
+        using var secondContext = secondFixture.CreateContext();
+        firstContext.Add(first);
+        secondContext.Add(second);
+        await firstContext.SaveChangesAsync();
+        await secondContext.SaveChangesAsync();
+        (await ClassicAspxReportProjection.Files(firstContext, first.ScanId).SingleAsync()).ScanId.Should().Be(first.ScanId);
+        (await ClassicAspxReportProjection.Files(secondContext, second.ScanId).SingleAsync()).ScanId.Should().Be(second.ScanId);
+    }
+
+    /// <summary>Publishes exactly the fixed 24-column business CSV and its summary, without inventory, raw-file or alias outputs.</summary>
+    [Fact]
+    public async Task DirectExportPublishesOnlyCanonicalBusinessFiles()
+    {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
         using var context = fixture.CreateContext();
-        context.Add(Inventory(scan));
+        context.Add(FileFact(scan));
         Mark(context, scan);
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            Directory.GetFiles(directory).Select(Path.GetFileName).Should().BeEquivalentTo("aspxinventory.csv", "aspxsummary.json");
-            Header(directory).Should().Equal(ExpectedHeader);
-            ReadInventory(directory).Should().ContainSingle();
+            Directory.GetFiles(directory).Select(Path.GetFileName).Should().BeEquivalentTo(CsvName, SummaryName);
+            Header(directory).Should().Equal(ExpectedHeader).And.HaveCount(24);
+            ReadRows(directory).Should().ContainSingle();
         }
         finally
         {
@@ -148,19 +168,68 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Exports multiple observation sources for a real file as one inventory row whose provenance retains all enrichment roles.</summary>
+    /// <summary>Excludes only existing modern results and non-ASPX physical files, preserving failed, unknown and file-only classic rows without an assessment join.</summary>
     [Fact]
-    public async Task ActualWriterUnionExportsOneFileAndAllObservationProvenance()
+    public async Task BusinessFilterPreservesUnknownAndFailedPhysicalRows()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
-        var first = Inventory(scan);
+        var classic = FileFact(scan);
+        classic.ItemMetadataReadState = "Available";
+        classic.WikiFieldHasValue = true;
+        classic.ItemMetadataFieldStatesJson = "{\"WikiField\":\"value\"}";
+        var unknown = FileFact(scan);
+        unknown.FileReadState = "Unavailable";
+        unknown.FileErrorCodes = "HTTP403";
+        var fallback = FileFact(scan);
+        fallback.ContentTypeId = "0x010109";
+        var modern = FileFact(scan);
+        modern.ItemMetadataReadState = "Available";
+        modern.ClientSideApplicationId = ModernApplication;
+        modern.ItemMetadataFieldStatesJson = "{\"ClientSideApplicationId\":\"value\"}";
+        var modernCt = FileFact(scan);
+        modernCt.ContentTypeId = ModernContentType;
+        var nonAspx = FileFact(scan);
+        nonAspx.FileName = "file.txt";
+        nonAspx.ServerRelativeUrl = "/sites/test/file.txt";
+        using var context = fixture.CreateContext();
+        context.AddRange(classic, unknown, fallback, modern, modernCt, nonAspx);
+        await context.SaveChangesAsync();
+        var directory = DirectoryForTest();
+        try
+        {
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            var rows = ReadRows(directory);
+            rows.Select(row => row.FileUniqueId).Should().BeEquivalentTo(new[] { classic.FileUniqueId, unknown.FileUniqueId, fallback.FileUniqueId });
+            rows.Single(row => row.FileUniqueId == classic.FileUniqueId).ClassicPageType.Should().Be("WikiPage");
+            rows.Single(row => row.FileUniqueId == fallback.FileUniqueId).ClassicPageType.Should().Be("BasicPage");
+            var failure = rows.Single(row => row.FileUniqueId == unknown.FileUniqueId);
+            failure.ClassicPageType.Should().BeNull();
+            failure.ClassificationState.Should().Be("Unknown");
+            failure.ErrorCodes.Should().Be("HTTP403");
+            (await context.SPFiles.CountAsync()).Should().Be(6);
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
+
+    /// <summary>Streams one row for merged observations of one real pair and derives its role only through the existing setup-path classifier.</summary>
+    [Fact]
+    public async Task ActualWriterUnionExportsOnePhysicalFile()
+    {
+        using var fixture = new ScanContextFixture();
+        var scan = Guid.NewGuid();
+        var first = FileFact(scan);
         first.ProvenanceJson = "[{\"source\":\"FolderFileObservation\"}]";
-        var next = Inventory(scan, first.SiteCollectionId, first.FileUniqueId);
+        first.SetupPath = @"1033\templates\pages\form.aspx";
+        var next = FileFact(scan, first.SiteCollectionId, first.FileUniqueId);
         next.WebId = first.WebId;
         next.ListId = first.ListId;
         next.FolderUniqueId = first.FolderUniqueId;
         next.ProvenanceJson = "[{\"role\":\"ListDefaultDisplayForm\"}]";
-        var writer = new ClassicAspxProjectionWriter(fixture.CreateContext);
+        var writer = new SPFileWriter(fixture.CreateContext);
         await writer.WriteAsync(new[] { first });
         await writer.WriteAsync(new[] { next });
         var directory = DirectoryForTest();
@@ -168,9 +237,11 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         {
             using var context = fixture.CreateContext();
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            var row = ReadInventory(directory).Should().ContainSingle().Which;
-            row.AspxKey.Should().Be(first.AspxKey);
-            row.ProvenanceJson.Should().Contain("FolderFileObservation").And.Contain("ListDefaultDisplayForm");
+            var row = ReadRows(directory).Should().ContainSingle().Which;
+            row.SiteCollectionId.Should().Be(first.SiteCollectionId);
+            row.FileUniqueId.Should().Be(first.FileUniqueId);
+            row.PageRole.Should().Be("ListForm");
+            (await context.SPFiles.SingleAsync()).ProvenanceJson.Should().Contain("FolderFileObservation").And.Contain("ListDefaultDisplayForm");
         }
         finally
         {
@@ -178,60 +249,36 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Retains per-file coverage labels in both CSV and summary without promoting any observed scope to tenant-wide completeness.</summary>
-    [Theory]
-    [InlineData("Unknown")]
-    [InlineData("Observed")]
-    [InlineData("Incomplete")]
-    [InlineData("ChangedDuringScan")]
-    public async Task CoverageRemainsObservedEvidenceNotTenantCompleteness(string coverage)
-    {
-        var scan = Guid.NewGuid();
-        using var context = fixture.CreateContext();
-        var inventory = Inventory(scan);
-        inventory.CoverageState = coverage;
-        context.Add(inventory);
-        Mark(context, scan);
-        await context.SaveChangesAsync();
-        var directory = DirectoryForTest();
-        try
-        {
-            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            ReadInventory(directory).Single().CoverageState.Should().Be(coverage);
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json")));
-            summary.RootElement.GetProperty("coverage").GetProperty("inventoryStates").GetProperty(coverage).GetInt64().Should().Be(1);
-            summary.RootElement.GetProperty("coverage").GetProperty("tenantCompleteness").GetString().Should().Be("NotAsserted");
-        }
-        finally
-        {
-            DeleteOwnDirectory(directory);
-        }
-    }
-
-    /// <summary>Round-trips Unicode, quoting, multiline error evidence, nullable metadata, real IDs, and timestamps through the typed 21-column CSV.</summary>
+    /// <summary>Preserves Unicode, quoted multiline errors, nullable metadata and the decoded physical locator while encoding percent/hash only in the exported URL.</summary>
     [Fact]
-    public async Task TypedCsvPreservesAllPhysicalObservationFacts()
+    public async Task TypedCsvPreservesFactsAndNormalizesOnlyExportUrl()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
-        var inventory = Inventory(scan);
-        inventory.Url = "/sites/test/測試,\"renderer\".aspx";
-        inventory.SiteUrl = "https://example.invalid/sites/test";
-        inventory.WebUrl = "/";
-        inventory.ContentTypeId = null;
-        inventory.CustomizedPageStatus = string.Empty;
-        inventory.SetupPath = "features/template.aspx";
-        inventory.FileErrorCodes = "HTTP403";
-        inventory.FileErrorDetail = "metadata,unavailable\nsecond-line";
-        inventory.ProvenanceJson = "[{\"source\":\"Unicode測試,quoted\"}]";
+        var fact = FileFact(scan);
+        fact.ServerRelativeUrl = "/sites/test/測試%2f#?,\"renderer\".aspx";
+        fact.FileName = "測試%2f#?,\"renderer\".aspx";
+        fact.CustomizedPageStatus = string.Empty;
+        fact.SetupPath = "features/template.aspx";
+        fact.NoExecuteRaw = "1";
+        fact.NoExecuteSource = "SPO.ListItem.NoExecute";
+        fact.NoExecuteReadState = "Available";
+        fact.FileErrorCodes = "HTTP403";
+        fact.FileErrorDetail = "metadata,unavailable\nsecond-line";
         using var context = fixture.CreateContext();
-        context.Add(inventory);
+        context.Add(fact);
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            var row = ReadInventory(directory).Single();
-            row.Should().BeEquivalentTo(inventory);
+            var row = ReadRows(directory).Single();
+            row.Should().BeEquivalentTo(ClassicAspxReportProjection.Project(fact));
+            row.Url.Should().Be("/sites/test/%E6%B8%AC%E8%A9%A6%252f%23%3F%2C%22renderer%22.aspx");
+            row.NoExecuteRaw.Should().Be("1");
+            row.IsPoisoned.Should().BeTrue();
+            context.ChangeTracker.Clear();
+            (await context.SPFiles.SingleAsync()).ServerRelativeUrl.Should().Be(fact.ServerRelativeUrl);
         }
         finally
         {
@@ -239,7 +286,7 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Separates null, empty, sentinel, and leading-backslash strings on the wire and preserves every nullable inventory text field.</summary>
+    /// <summary>Separates null, empty, literal sentinel, leading backslashes and multiline text in each reversible nullable string field.</summary>
     [Theory]
     [InlineData(null, @"\N")]
     [InlineData("", "")]
@@ -248,39 +295,43 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
     [InlineData(@"\leading", @"\\leading")]
     [InlineData(@"inside\path", @"inside\path")]
     [InlineData("測試,\"quote\"\nline", "測試,\"quote\"\nline")]
-    public async Task NullableTextEncodingIsReversibleAndDeclaredInSummary(string? raw, string wire)
+    public async Task NullableTextEncodingIsReversibleAndDeclared(string? raw, string wire)
     {
+        using var fixture = new ScanContextFixture();
         ClassicAspxNullableStringConverter.Encode(raw).Should().Be(wire);
         ClassicAspxNullableStringConverter.Decode(wire).Should().Be(raw);
         var scan = Guid.NewGuid();
-        var inventory = Inventory(scan);
-        inventory.SiteUrl = raw;
-        inventory.WebUrl = raw;
-        inventory.Url = raw;
-        inventory.FileName = raw;
-        inventory.ContentTypeId = raw;
-        inventory.CustomizedPageStatus = raw;
-        inventory.SetupPath = raw;
-        inventory.FileErrorCodes = raw;
-        inventory.FileErrorDetail = raw;
+        var fact = FileFact(scan);
+        fact.SiteUrl = raw;
+        fact.WebUrl = raw;
+        fact.FileName = raw;
+        fact.ContentTypeId = raw;
+        fact.CustomizedPageStatus = raw;
+        fact.SetupPath = raw;
+        fact.NoExecuteRaw = raw;
+        fact.FileErrorCodes = raw;
+        fact.FileErrorDetail = raw;
         using var context = fixture.CreateContext();
-        context.Add(inventory);
+        context.Add(fact);
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            ReadInventory(directory).Single().Should().BeEquivalentTo(inventory);
-            using (var reader = new StreamReader(Path.Combine(directory, "aspxinventory.csv")))
+            ReadRows(directory).Single().Should().BeEquivalentTo(ClassicAspxReportProjection.Project(fact));
+            using (var reader = new StreamReader(Path.Combine(directory, CsvName)))
             using (var csv = new CsvReader(reader, Configuration()))
             {
                 csv.Read();
                 csv.ReadHeader();
                 csv.Read();
-                csv.GetField<string>("SiteUrl").Should().Be(wire);
+                foreach (var column in new[] { "SiteUrl", "WebUrl", "FileName", "ContentTypeId", "CustomizedPageStatus", "SetupPath", "NoExecuteRaw", "ErrorCodes", "ErrorDetail" })
+                {
+                    csv.GetField<string>(column).Should().Be(wire);
+                }
             }
-            (await context.ClassicAspxInventories.AsNoTracking().SingleAsync(row => row.ScanId == scan)).SiteUrl.Should().Be(raw);
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json")));
+            (await context.SPFiles.AsNoTracking().SingleAsync()).SiteUrl.Should().Be(raw);
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             summary.RootElement.GetProperty("nullableStringEncoding").GetString().Should().Be("BackslashNullV1");
         }
         finally
@@ -289,23 +340,137 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Emits the full typed header for an empty upgraded assessment while reporting absence of acquisition authority, not absence of ASPX.</summary>
+    /// <summary>Retains ordinary nullable GUID and Boolean converters, distinguishing unknown poison from known false and true.</summary>
+    [Fact]
+    public async Task NullableGuidAndPoisonBooleanRoundTripNormally()
+    {
+        using var fixture = new ScanContextFixture();
+        var scan = Guid.NewGuid();
+        var unknown = FileFact(scan);
+        unknown.WebId = null;
+        unknown.ListId = null;
+        var poisoned = FileFact(scan);
+        poisoned.NoExecuteSource = "SPO.ListItem.NoExecute";
+        poisoned.NoExecuteReadState = "Available";
+        poisoned.NoExecuteRaw = "1";
+        var clear = FileFact(scan);
+        clear.NoExecuteSource = "SPO.ListItem.NoExecute";
+        clear.NoExecuteReadState = "Available";
+        clear.NoExecuteRaw = "0";
+        using var context = fixture.CreateContext();
+        context.AddRange(unknown, poisoned, clear);
+        await context.SaveChangesAsync();
+        var directory = DirectoryForTest();
+        try
+        {
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            var rows = ReadRows(directory).ToDictionary(row => row.FileUniqueId);
+            rows[unknown.FileUniqueId].WebId.Should().BeNull();
+            rows[unknown.FileUniqueId].ListId.Should().BeNull();
+            rows[unknown.FileUniqueId].IsPoisoned.Should().BeNull();
+            rows[poisoned.FileUniqueId].IsPoisoned.Should().BeTrue();
+            rows[clear.FileUniqueId].IsPoisoned.Should().BeFalse();
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
+
+    /// <summary>Preserves the original NoExecute field string through SQLite and CSV, interpreting only available exact server zero/one values.</summary>
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", true)]
+    [InlineData(" 1 ", null)]
+    [InlineData("01", null)]
+    [InlineData("", null)]
+    [InlineData("0x01000000", null)]
+    public async Task OriginalNoExecuteTextIsNotNormalizedOrExpanded(string raw, bool? expected)
+    {
+        using var fixture = new ScanContextFixture();
+        var scan = Guid.NewGuid();
+        var fact = FileFact(scan);
+        fact.NoExecuteRaw = raw;
+        fact.NoExecuteSource = "SPO.ListItem.NoExecute";
+        fact.NoExecuteReadState = "Available";
+        using var context = fixture.CreateContext();
+        context.Add(fact);
+        await context.SaveChangesAsync();
+        var directory = DirectoryForTest();
+        try
+        {
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            var row = ReadRows(directory).Should().ContainSingle().Which;
+            row.NoExecuteRaw.Should().Be(raw);
+            row.IsPoisoned.Should().Be(expected);
+            row.PoisonState.Should().Be(expected.HasValue ? expected.Value ? "Poisoned" : "NotPoisoned" : "Unknown");
+            (await context.SPFiles.AsNoTracking().SingleAsync()).NoExecuteRaw.Should().Be(raw);
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
+            summary.RootElement.GetProperty("poisonEvidenceKind").GetString().Should().Be("ServerNoExecuteField");
+            summary.RootElement.GetProperty("fullDocFlagsCollected").GetBoolean().Should().BeFalse();
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
+
+    /// <summary>Exports conflicting same-file NoExecute observations as unknown while retaining the writer's original raw value and both pieces of provenance.</summary>
+    [Fact]
+    public async Task ActualWriterNoExecuteConflictDoesNotBecomeFalse()
+    {
+        using var fixture = new ScanContextFixture();
+        var scan = Guid.NewGuid();
+        var first = FileFact(scan);
+        first.NoExecuteRaw = "0";
+        first.NoExecuteSource = "SPO.ListItem.NoExecute";
+        first.NoExecuteReadState = "Available";
+        var later = FileFact(scan, first.SiteCollectionId, first.FileUniqueId);
+        later.WebId = first.WebId;
+        later.ListId = first.ListId;
+        later.FolderUniqueId = first.FolderUniqueId;
+        later.NoExecuteRaw = "1";
+        later.NoExecuteSource = "SPO.ListItem.NoExecute";
+        later.NoExecuteReadState = "Available";
+        var writer = new SPFileWriter(fixture.CreateContext);
+        await writer.WriteAsync(new[] { first });
+        await writer.WriteAsync(new[] { later });
+        using var context = fixture.CreateContext();
+        var directory = DirectoryForTest();
+        try
+        {
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            var row = ReadRows(directory).Should().ContainSingle().Which;
+            row.NoExecuteRaw.Should().Be("1");
+            row.IsPoisoned.Should().BeNull();
+            row.PoisonState.Should().Be("Unknown");
+            row.RenderDisposition.Should().Be("Unknown");
+            (await context.SPFiles.AsNoTracking().SingleAsync()).ProvenanceJson.Should().Contain("NoExecuteRaw").And.Contain("metadata_changed");
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
+
+    /// <summary>Emits the complete typed header for a legacy scan without inventing acquisition authority or historical physical rows.</summary>
     [Fact]
     public async Task EmptyExportHasTypedHeaderAndDoesNotClaimAcquisition()
     {
+        using var fixture = new ScanContextFixture();
         var directory = DirectoryForTest();
         try
         {
             using var context = fixture.CreateContext();
             await ClassicAspxReportProjection.ExportCsvAsync(context, Guid.NewGuid(), directory, Configuration());
             Header(directory).Should().Equal(ExpectedHeader);
-            ReadInventory(directory).Should().BeEmpty();
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json")));
+            ReadRows(directory).Should().BeEmpty();
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             var root = summary.RootElement;
             root.GetProperty("projectionContract").ValueKind.Should().Be(JsonValueKind.Null);
             root.GetProperty("acquisitionState").GetString().Should().Be("NotAcquired/Legacy");
             root.GetProperty("scopeMode").GetString().Should().Be("Unknown");
-            root.GetProperty("observedInventoryCount").GetInt64().Should().Be(0);
+            root.GetProperty("selectedClassicAspxCount").GetInt64().Should().Be(0);
             root.GetProperty("coverage").GetProperty("tenantCompleteness").GetString().Should().Be("NotAsserted");
         }
         finally
@@ -314,22 +479,26 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Reports real observations in an unmarked assessment without relabeling them unacquired or asserting a known native contract.</summary>
+    /// <summary>Does not mislabel observed raw facts as unacquired merely because every file is excluded by the business filter.</summary>
     [Fact]
-    public async Task UnmarkedObservedRowsRetainUnknownContract()
+    public async Task ModernOnlyObservationsDoNotBecomeLegacyAcquisition()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
+        var modern = FileFact(scan);
+        modern.ContentTypeId = ModernContentType;
         using var context = fixture.CreateContext();
-        context.Add(Inventory(scan));
+        context.Add(modern);
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json")));
+            ReadRows(directory).Should().BeEmpty();
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             summary.RootElement.GetProperty("projectionContract").ValueKind.Should().Be(JsonValueKind.Null);
             summary.RootElement.GetProperty("acquisitionState").GetString().Should().Be("ObservedWithoutNativeMarker");
-            summary.RootElement.GetProperty("observedInventoryCount").GetInt64().Should().Be(1);
+            summary.RootElement.GetProperty("selectedClassicAspxCount").GetInt64().Should().Be(0);
         }
         finally
         {
@@ -337,15 +506,16 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Preserves the current full/home declaration as read-only scope evidence and explicitly marks home acquisition as targeted.</summary>
+    /// <summary>Preserves scope declarations as read-only evidence and marks HOME as targeted without promoting any scope to tenant completeness.</summary>
     [Theory]
     [InlineData("DeclaredFullInventory", false)]
     [InlineData("HomePageOnly", true)]
     public async Task CurrentScopeExportsWithoutMutationOrCoveragePromotion(string scope, bool targeted)
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
         using var context = fixture.CreateContext();
-        context.Add(Inventory(scan));
+        context.Add(FileFact(scan));
         Mark(context, scan, scope);
         await context.SaveChangesAsync();
         var before = await context.Properties.AsNoTracking().Where(row => row.ScanId == scan)
@@ -354,7 +524,7 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json")));
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             var root = summary.RootElement;
             root.GetProperty("projectionContract").GetString().Should().Be("aspx-inventory/v1");
             root.GetProperty("scopeMode").GetString().Should().Be(scope);
@@ -371,16 +541,27 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Validates summary counts, frozen exclusions, coverage totals, and SHA256 evidence for the single completed CSV stream.</summary>
+    /// <summary>Counts only selected business rows and explicitly identifies server NoExecute evidence without claiming complete DocFlags collection.</summary>
     [Fact]
-    public async Task SummaryDescribesOnlyTheCompletedInventoryStream()
+    public async Task SummaryDescribesOnlyCompletedBusinessStream()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
+        var unknown = FileFact(scan);
+        var poisoned = FileFact(scan);
+        poisoned.ContentTypeId = "0x010109";
+        poisoned.CoverageState = "Incomplete";
+        poisoned.NoExecuteRaw = "1";
+        poisoned.NoExecuteReadState = "Available";
+        poisoned.NoExecuteSource = "SPO.ListItem.NoExecute";
+        var modern = FileFact(scan);
+        modern.ContentTypeId = ModernContentType;
+        modern.CoverageState = "ChangedDuringScan";
+        var textFile = FileFact(scan);
+        textFile.FileName = "other.txt";
+        textFile.ServerRelativeUrl = "/sites/test/other.txt";
         using var context = fixture.CreateContext();
-        var first = Inventory(scan);
-        var second = Inventory(scan);
-        second.CoverageState = "Incomplete";
-        context.AddRange(first, second);
+        context.AddRange(unknown, poisoned, modern, textFile);
         Mark(context, scan);
         context.Properties.Add(new Property { ScanId = scan, Name = "excludesitetemplates", Value = "none" });
         await context.SaveChangesAsync();
@@ -388,21 +569,27 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            var text = await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json"));
-            text.Should().NotContain("Binding").And.NotContain("binding").And.NotContain("catalog")
-                .And.NotContain("Handler").And.NotContain("NotCollected").And.NotContain("compatibilityAlias");
-            using var summary = JsonDocument.Parse(text);
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             var root = summary.RootElement;
-            root.GetProperty("schemaVersion").GetString().Should().Be("aspx-inventory-summary/v1");
+            root.GetProperty("schemaVersion").GetString().Should().Be("classic-aspx-summary/v1");
             root.GetProperty("scanId").GetGuid().Should().Be(scan);
-            root.GetProperty("observedInventoryCount").GetInt64().Should().Be(2);
+            root.GetProperty("selectedClassicAspxCount").GetInt64().Should().Be(2);
+            root.GetProperty("unknownClassificationCount").GetInt64().Should().Be(1);
+            root.GetProperty("poisonedCount").GetInt64().Should().Be(1);
+            root.GetProperty("poisonUnknownCount").GetInt64().Should().Be(1);
+            root.GetProperty("noExecuteMissingCount").GetInt64().Should().Be(1);
+            root.GetProperty("poisonEvidenceKind").GetString().Should().Be("ServerNoExecuteField");
+            root.GetProperty("fullDocFlagsCollected").GetBoolean().Should().BeFalse();
+            root.TryGetProperty("rawMaskCapability", out _).Should().BeFalse();
             root.GetProperty("templateExclusions").GetProperty("state").GetString().Should().Be("FrozenPolicy");
             root.GetProperty("templateExclusions").GetProperty("value").GetString().Should().Be("none");
-            root.GetProperty("coverage").GetProperty("inventoryStates").GetProperty("Observed").GetInt64().Should().Be(1);
-            root.GetProperty("coverage").GetProperty("inventoryStates").GetProperty("Incomplete").GetInt64().Should().Be(1);
+            var coverage = root.GetProperty("coverage").GetProperty("selectedFileStates");
+            coverage.GetProperty("Observed").GetInt64().Should().Be(1);
+            coverage.GetProperty("Incomplete").GetInt64().Should().Be(1);
+            coverage.TryGetProperty("ChangedDuringScan", out _).Should().BeFalse();
             var evidence = root.GetProperty("files").EnumerateArray().Should().ContainSingle().Which;
-            evidence.GetProperty("name").GetString().Should().Be("aspxinventory.csv");
-            var bytes = await File.ReadAllBytesAsync(Path.Combine(directory, "aspxinventory.csv"));
+            evidence.GetProperty("name").GetString().Should().Be(CsvName);
+            var bytes = await File.ReadAllBytesAsync(Path.Combine(directory, CsvName));
             evidence.GetProperty("length").GetInt64().Should().Be(bytes.Length);
             evidence.GetProperty("sha256").GetString().Should().Be(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
         }
@@ -412,34 +599,28 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Never turns declaration-only raw references into inventory rows or reintroduces binding collection state in the report.</summary>
+    /// <summary>Does not turn metadata references or legacy assessed pages into fake physical-file observations.</summary>
     [Fact]
-    public async Task MetadataReferencesDoNotInventInventoryOrBindingPlaceholders()
+    public async Task MetadataReferencesDoNotInventBusinessRows()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
         using var context = fixture.CreateContext();
         Mark(context, scan);
         context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
         {
-            ScanId = scan,
-            RecordKey = "metadata-only-reference",
-            RowType = "Reference",
-            ScopeType = "ListDefaultDisplayForm",
-            DiscoveryStatus = "Complete",
-            SiteUrl = "https://example.invalid/sites/test",
-            WebUrl = "/",
+            ScanId = scan, RecordKey = "metadata-only-reference", RowType = "Reference", ScopeType = "ListDefaultDisplayForm",
+            DiscoveryStatus = "Complete", SiteUrl = "https://example.invalid/sites/test", WebUrl = "/",
             Url = "/sites/test/Forms/DispForm.aspx"
         });
+        context.ClassicPages.Add(new ClassicPage { ScanId = scan, SiteUrl = "https://example.invalid/sites/test", WebUrl = "/", PageUrl = "/legacy.aspx" });
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            ReadInventory(directory).Should().BeEmpty();
-            var text = await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json"));
-            using var summary = JsonDocument.Parse(text);
-            summary.RootElement.GetProperty("observedInventoryCount").GetInt64().Should().Be(0);
-            text.Should().NotContain("NotCollected").And.NotContain("Binding").And.NotContain("binding");
+            ReadRows(directory).Should().BeEmpty();
+            (await context.SPFiles.CountAsync()).Should().Be(0);
         }
         finally
         {
@@ -447,13 +628,14 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Exercises the actual Classic report dispatcher while retaining existing discovery and page CSVs alongside only the canonical ASPX outputs.</summary>
+    /// <summary>Exercises the real Classic report seam while retaining discovery and legacy CSVs alongside only the canonical ASPX business outputs.</summary>
     [Fact]
     public async Task NativeClassicDispatchPreservesDiscoveryAndLegacyCsvs()
     {
+        using var fixture = new ScanContextFixture();
         var scan = Guid.NewGuid();
         using var context = fixture.CreateContext();
-        context.Add(Inventory(scan));
+        context.Add(FileFact(scan));
         Mark(context, scan, "HomePageOnly");
         context.ClassicPages.Add(new ClassicPage
         {
@@ -469,11 +651,10 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             using var reader = new StreamReader(Path.Combine(directory, "classicpages.csv"));
             using var csv = new CsvReader(reader, Configuration());
             csv.GetRecords<ClassicPage>().Single().PageUrl.Should().Be("/Home.aspx");
-            ReadInventory(directory).Should().ContainSingle();
-            var files = Directory.GetFiles(directory).Select(Path.GetFileName).ToArray();
-            files.Should().Contain("aspxinventory.csv").And.Contain("aspxsummary.json")
-                .And.NotContain("classicaspxinventories.csv").And.NotContain("classicaspxitembindings.csv")
-                .And.NotContain("aspxitembindings.csv").And.NotContain("classicaspxinfo.txt");
+            ReadRows(directory).Should().ContainSingle();
+            Directory.GetFiles(directory).Select(Path.GetFileName).Should().Contain(CsvName).And.Contain(SummaryName)
+                .And.NotContain("aspxinventory.csv").And.NotContain("aspxsummary.json").And.NotContain("spfiles.csv")
+                .And.NotContain("classicaspxinventories.csv").And.NotContain("aspxitembindings.csv");
         }
         finally
         {
@@ -481,15 +662,14 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         }
     }
 
-    /// <summary>Runs the real main-to-inventory-only migration path and exports legacy pages without inventing historical physical observations.</summary>
+    /// <summary>Runs the previous-to-current migration path without creating historical SPFile facts from legacy assessment rows.</summary>
     [Fact]
-    public async Task MainMigrationPreservesLegacyExportWithoutBackfill()
+    public async Task MigrationPreservesLegacyExportWithoutBackfill()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         await using var context = new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options);
         var migrations = context.Database.GetMigrations().ToArray();
-        migrations.Last().Should().EndWith("_ClassicAspxInventoryOnly");
         await context.GetService<IMigrator>().MigrateAsync(migrations[^2]);
         var scan = Guid.NewGuid();
         context.ClassicPages.Add(new ClassicPage
@@ -499,7 +679,7 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         await context.Database.MigrateAsync();
-        (await context.ClassicAspxInventories.CountAsync()).Should().Be(0);
+        (await context.SPFiles.CountAsync()).Should().Be(0);
         var directory = DirectoryForTest();
         try
         {
@@ -508,9 +688,70 @@ public sealed class ClassicAspxReportExportTests : IClassFixture<ScanContextFixt
             using var csv = new CsvReader(reader, Configuration());
             csv.GetRecords<ClassicPage>().Single().PageUrl.Should().Be("/old.aspx");
             Header(directory).Should().Equal(ExpectedHeader);
-            ReadInventory(directory).Should().BeEmpty();
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "aspxsummary.json")));
-            summary.RootElement.GetProperty("acquisitionState").GetString().Should().Be("NotAcquired/Legacy");
+            ReadRows(directory).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
+
+    /// <summary>Exercises a stream larger than one writer batch while leaving the exporting ScanContext untracked and retaining one row per native pair.</summary>
+    [Fact]
+    public async Task MultiBatchFactsExportWithoutTrackingOrAssessmentJoin()
+    {
+        using var fixture = new ScanContextFixture();
+        var scan = Guid.NewGuid();
+        var facts = Enumerable.Range(0, SPFileWriter.MaximumBatchSize * 2 + 1).Select(_ => FileFact(scan)).ToArray();
+        var writer = new SPFileWriter(fixture.CreateContext);
+        foreach (var batch in facts.Chunk(SPFileWriter.MaximumBatchSize))
+        {
+            await writer.WriteAsync(batch);
+        }
+        using var context = fixture.CreateContext();
+        var directory = DirectoryForTest();
+        try
+        {
+            await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
+            ReadRows(directory).Select(row => (row.SiteCollectionId, row.FileUniqueId)).Should().HaveCount(facts.Length).And.OnlyHaveUniqueItems();
+            context.ChangeTracker.Entries().Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteOwnDirectory(directory);
+        }
+    }
+
+    /// <summary>Retains the physical file and a nullable export URL when the stored locator cannot pass the existing site-boundary policy.</summary>
+    [Theory]
+    [InlineData("/sites/other/page.aspx")]
+    [InlineData("/sites/test/../page.aspx")]
+    [InlineData("https://foreign.invalid/sites/test/page.aspx")]
+    public void UnsafeLocatorNeverRemovesObservedGuidIdentity(string locator)
+    {
+        var fact = FileFact(Guid.NewGuid());
+        fact.ServerRelativeUrl = locator;
+        var row = ClassicAspxReportProjection.Project(fact);
+        row.Should().NotBeNull();
+        row!.Url.Should().BeNull();
+        row.FileUniqueId.Should().Be(fact.FileUniqueId);
+        fact.ServerRelativeUrl.Should().Be(locator);
+    }
+
+    /// <summary>Propagates caller cancellation instead of producing an apparently complete summary for an interrupted stream.</summary>
+    [Fact]
+    public async Task CancelledStreamDoesNotPublishSummary()
+    {
+        using var fixture = new ScanContextFixture();
+        using var context = fixture.CreateContext();
+        var directory = DirectoryForTest();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        try
+        {
+            Func<Task> export = () => ClassicAspxReportProjection.ExportCsvAsync(context, Guid.NewGuid(), directory, Configuration(), cancellation.Token);
+            await export.Should().ThrowAsync<OperationCanceledException>();
+            File.Exists(Path.Combine(directory, SummaryName)).Should().BeFalse();
         }
         finally
         {

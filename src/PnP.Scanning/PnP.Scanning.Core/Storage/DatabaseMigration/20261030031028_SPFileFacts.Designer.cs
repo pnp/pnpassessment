@@ -11,8 +11,8 @@ using PnP.Scanning.Core.Storage;
 namespace PnP.Scanning.Core.Storage.DatabaseMigration
 {
     [DbContext(typeof(ScanContext))]
-    [Migration("20261029074843_ClassicAspxInventoryOnly")]
-    partial class ClassicAspxInventoryOnly
+    [Migration("20261030031028_SPFileFacts")]
+    partial class SPFileFacts
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -346,85 +346,6 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("ClassicAddIns");
-                });
-
-            modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicAspxInventory", b =>
-                {
-                    b.Property<Guid>("ScanId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AspxKey")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ContentTypeId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CoverageState")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CustomizedPageStatus")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FileErrorCodes")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FileErrorDetail")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FileName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FileReadState")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("FileUniqueId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("FirstObservedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("FolderUniqueId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("ListId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ObservedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ProvenanceJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SetupPath")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("SiteCollectionId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SiteUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Url")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("WebId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("WebUrl")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ScanId", "AspxKey");
-
-                    b.HasIndex("ScanId", "SiteCollectionId", "FileUniqueId")
-                        .IsUnique();
-
-                    b.ToTable("ClassicAspxInventories", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ClassicAspxInventories_RealFile", "length(\"AspxKey\") > 0 AND \"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'");
-                        });
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.ClassicExtensibility", b =>
@@ -1242,6 +1163,118 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("Properties");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.SPFile", b =>
+                {
+                    b.Property<Guid>("SiteCollectionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FileUniqueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BSN")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClientSideApplicationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentTypeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CoverageState")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomizedPageStatus")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileErrorCodes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileErrorDetail")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileReadState")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FirstObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FolderUniqueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HtmlFileType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemMetadataFieldStatesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemMetadataReadState")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("Length")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("ListId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ListItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("NoExecuteRaw")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NoExecuteReadState")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NoExecuteSource")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProvenanceJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ScanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ServerRelativeUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SetupPath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("WebId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("WikiFieldHasValue")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SiteCollectionId", "FileUniqueId");
+
+                    b.ToTable("SPFile", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SPFile_RealFile", "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND \"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'");
+                        });
                 });
 
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Scan", b =>

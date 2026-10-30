@@ -48,7 +48,7 @@ Export the gathered data as CSV files in a custom location | microsoft365-assess
 
 The CSV export includes [discovery.csv](csv-discovery.md), which lists physical ASPX files discovered within the requested page scope, inspected scopes, sanitized acquisition evidence and the final coverage verdict. Use its Scope and Gap rows to identify denied, failed, partial or otherwise incomplete discovery. The existing [classicpages.csv](csv-classicpages.md) continues to contain the classic pages selected for page assessment and modernization analysis.
 
-The export also includes [aspxinventory.csv](csv-aspxinventory.md), a normalized inventory with one row per observed physical ASPX file. This is an additional output; it does not replace discovery.csv or classicpages.csv.
+The export also includes [classicaspx.csv](csv-classicaspx.md), a business projection with one row per selected physical ASPX file, using the existing classification heuristics. This is an additional output; it does not replace discovery.csv or classicpages.csv.
 
 [!INCLUDE [Clarify the --id parameter](./../fragments/clarify-id-parameter.md)]
 

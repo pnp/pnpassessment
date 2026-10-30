@@ -40,6 +40,7 @@ namespace PnP.Scanning.Core.Scanners
         private const string ClientSideApplicationIdField = "ClientSideApplicationId";
         private const string TitleField = "Title";
         private const string BSNField = "BSN";
+        private const string NoExecuteField = "NoExecute";
 
         // Page Types
         internal const string ModernPage = "ModernPage";
@@ -130,10 +131,12 @@ namespace PnP.Scanning.Core.Scanners
                         web.ListRootFolderUrls));
                     continue;
                 }
+                SPFile fileFacts = null;
                 try
                 {
                     var input = await LoadPhysicalPageAsync(list, row, web.WelcomePage,
                         options.SkipUserInformation, web.WelcomePageKnown).ConfigureAwait(false);
+                    fileFacts = input.FileFacts;
                     row.PageType = input.Page.PageType;
                     row.HomePage = input.Page.HomePage;
                     if (row.PageType == PublishingPage) AddPublishingPage(discovery, input);
@@ -147,9 +150,15 @@ namespace PnP.Scanning.Core.Scanners
                         throw;
                     }
                     row.AssessmentStatus = "Failed";
+                    fileFacts = SPFileFactProjection.FromItemFailure(row, ex);
                     AssessmentWebDiscovery.AddError(row, "PageMetadata", AssessmentWebDiscovery.ErrorCode(ex),
                         AssessmentWebDiscovery.ErrorDetail(ex));
                     scannerBase.Logger.Warning(ex, "Page metadata assessment failed for {PageUrl}; retaining discovery", row.Url);
+                }
+                if (fileFacts != null)
+                {
+                    // Persistence errors must fail the worker, not become a SharePoint metadata gap.
+                    await new SPFileWriter(scannerBase.ScanId).WriteAsync(new[] { fileFacts }, web.CancellationToken).ConfigureAwait(false);
                 }
             }
             // Commit one Web's assessment dispositions in a single EF transaction.
@@ -279,6 +288,7 @@ namespace PnP.Scanning.Core.Scanners
 
         // Kept independent of ScannerBase so the same SDK field selection and metadata projection
         // can be replayed offline against the assessment database/report pipeline.
+        /// <summary>Reads the selected item with the existing field projection, captures raw facts, and applies the unchanged legacy page heuristics.</summary>
         internal static async Task<PageEnrichmentInput> LoadPhysicalPageAsync(IList list, ClassicPageDiscovery row,
             string welcomePage, bool skipUserInformation, bool? welcomePageKnown = null)
         {
@@ -291,7 +301,7 @@ namespace PnP.Scanning.Core.Scanners
             // Unlike selecting optional REST properties, missing ViewFields are omitted by
             // SharePoint rather than failing classic libraries that lack a modern-only field.
             IListItem item = null;
-            await QueryListAsync(list, PageQuery(new List<string> { WikiField, HtmlFileTypeField, ClientSideApplicationIdField },
+            await QueryListAsync(list, PageQuery(new List<string> { WikiField, HtmlFileTypeField, ClientSideApplicationIdField, NoExecuteField },
                 filterOnASPXPages: false, itemId: row.ListItemId.Value, skipUserInformation: skipUserInformation), items =>
             {
                 foreach (var candidate in items)
@@ -327,6 +337,7 @@ namespace PnP.Scanning.Core.Scanners
             return new PageEnrichmentInput
             {
                 Page = page,
+                FileFacts = SPFileFactProjection.FromItemMetadata(row, item.Values),
                 WikiFieldHtml = isPublishing ? null : GetFieldValue<string>(item, WikiField),
                 FileLeafRef = GetFieldValue(item, FileLeafRefField, ""),
             };
@@ -878,6 +889,9 @@ namespace PnP.Scanning.Core.Scanners
         internal sealed class PageEnrichmentInput
         {
             public ClassicPage Page { get; init; }
+
+            /// <summary>Raw selected-item inputs observed without persisting Wiki HTML or a business classification.</summary>
+            public SPFile FileFacts { get; init; }
 
             public string WikiFieldHtml { get; init; }
 

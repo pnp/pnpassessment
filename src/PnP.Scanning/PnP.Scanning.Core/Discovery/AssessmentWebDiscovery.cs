@@ -113,6 +113,7 @@ internal sealed class AssessmentWebDiscovery
         }
     }
 
+    /// <summary>Commits raw physical facts before ASPX admission and records surface outcomes without converting persistence failures into API gaps.</summary>
     private async Task<DiscoveryTerminalOutcome> ReadSurfaceAsync(IAspxDiscoveryProvider provider,
         DiscoveryScopeRegistration scope, ClassicPageDiscovery scopeRow, CancellationToken cancellationToken)
     {
@@ -148,6 +149,7 @@ internal sealed class AssessmentWebDiscovery
                 }
                 if (!available) break;
                 var batch = enumerator.Current;
+                await writer.WritePhysicalFilesAsync(scanId, batch.Records ?? Array.Empty<RawDiscoveryRecord>(), cancellationToken).ConfigureAwait(false);
                 var pages = new List<ClassicPageDiscovery>();
                 foreach (var record in batch.Records ?? Array.Empty<RawDiscoveryRecord>())
                 {

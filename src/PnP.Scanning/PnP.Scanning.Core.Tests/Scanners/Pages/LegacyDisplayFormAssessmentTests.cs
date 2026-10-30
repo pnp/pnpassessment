@@ -69,17 +69,16 @@ public sealed class LegacyDisplayFormAssessmentTests : IClassFixture<ScanContext
         await writer.WriteAsync(new[] { physical });
         using (var seed = database.CreateContext())
         {
-            seed.ClassicAspxInventories.Add(new ClassicAspxInventory
+            seed.SPFiles.Add(new SPFile
             {
                 ScanId = scan,
-                AspxKey = ClassicAspxInventory.CreateTenantFileKey(physical.SiteCollectionId.Value, physical.FileUniqueId.Value),
                 SiteCollectionId = physical.SiteCollectionId.Value,
                 WebId = physical.WebId,
                 ListId = posts.Id,
                 FileUniqueId = physical.FileUniqueId.Value,
                 SiteUrl = Site,
                 WebUrl = Web,
-                Url = physical.Url,
+                ServerRelativeUrl = physical.Url,
                 FileName = "Post.aspx",
                 FirstObservedAtUtc = ModifiedAt,
                 ObservedAtUtc = ModifiedAt,
@@ -144,7 +143,7 @@ public sealed class LegacyDisplayFormAssessmentTests : IClassFixture<ScanContext
         summary.ClassicPages.Should().Be(3);
         summary.AggregatedRemediationCodes.Split(',').Should().BeEquivalentTo("CP4", "CP5");
         summary.PagesWithWebParts.Should().Be(0, "shared form web parts are not item-level inventories");
-        (await read.ClassicAspxInventories.CountAsync(value => value.ScanId == scan)).Should().Be(1);
+        (await read.SPFiles.CountAsync(value => value.ScanId == scan)).Should().Be(1);
         var discovery = await read.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
         discovery.Should().ContainSingle().Which.RecordKey.Should().Be(physical.RecordKey);
         discovery.Should().NotContain(row => row.ScopeType == "ListItem" || row.RowType == "ReferenceBinding" ||

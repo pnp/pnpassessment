@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Storage;
 using Xunit;
 
@@ -10,7 +9,7 @@ namespace PnP.Scanning.Core.Tests.Discovery.Aspx;
 
 public sealed class ClassicAspxConsolidationRetentionTests
 {
-    /// <summary>Exercises the supported restart lifecycle: pending legacy results are cleared while real inventory from pending and finished webs and raw denial evidence survive.</summary>
+    /// <summary>Exercises the real restart lifecycle: pending legacy results clear while ASPX and non-ASPX file facts, raw item/NoExecute metadata, and denial evidence survive.</summary>
     [Fact]
     public async Task ActualRestartRetainsPhysicalInventoryAndRawEvidence()
     {
@@ -66,9 +65,9 @@ public sealed class ClassicAspxConsolidationRetentionTests
                 db.ClassicLists.Add(new ClassicList { ScanId = scan, SiteUrl = url, WebUrl = "/", ListId = list });
                 await db.SaveChangesAsync();
             }
-            var pending = Inventory(scan, site, pendingWeb, list, url + "/pending.aspx");
-            var finished = Inventory(scan, site, finishedWeb, list, url + "/finished/kept.aspx");
-            await new ClassicAspxProjectionWriter(scan).WriteAsync(new[] { pending, finished });
+            var pending = Inventory(scan, site, pendingWeb, list, "/sites/retention/pending.aspx", "1");
+            var finished = Inventory(scan, site, finishedWeb, list, "/sites/retention/finished/retained.json", "0");
+            await new SPFileWriter(scan).WriteAsync(new[] { pending, finished });
             var raw = new AssessmentDiscoveryWriter(scan);
             await raw.WriteAsync(new[]
             {
@@ -93,11 +92,22 @@ public sealed class ClassicAspxConsolidationRetentionTests
             Assert.Empty(await retained.ClassicPageWebParts.ToArrayAsync());
             Assert.Empty(await retained.ClassicLists.ToArrayAsync());
             Assert.Single(await retained.ClassicPages.Where(row => row.WebUrl == "/finished").ToArrayAsync());
-            var inventories = await retained.ClassicAspxInventories.OrderBy(row => row.AspxKey).ToArrayAsync();
+            var inventories = await retained.SPFiles.OrderBy(row => row.FileUniqueId).ToArrayAsync();
             Assert.Equal(2, inventories.Length);
-            Assert.Contains(inventories, row => row.AspxKey == pending.AspxKey && row.WebId == pendingWeb && row.ProvenanceJson == pending.ProvenanceJson);
-            Assert.Contains(inventories, row => row.AspxKey == finished.AspxKey && row.WebId == finishedWeb && row.ProvenanceJson == finished.ProvenanceJson);
-            Assert.All(inventories, row => Assert.Equal("Observed", row.CoverageState));
+            Assert.Contains(inventories, row => row.SiteCollectionId == pending.SiteCollectionId && row.FileUniqueId == pending.FileUniqueId && row.WebId == pendingWeb && row.ProvenanceJson == pending.ProvenanceJson);
+            Assert.Contains(inventories, row => row.SiteCollectionId == finished.SiteCollectionId && row.FileUniqueId == finished.FileUniqueId && row.WebId == finishedWeb && row.ProvenanceJson == finished.ProvenanceJson);
+            Assert.All(inventories, row =>
+            {
+                Assert.Equal("Observed", row.CoverageState);
+                Assert.Equal(42, row.ListItemId);
+                Assert.Equal(4096L, row.Length);
+                Assert.Equal(row.FileUniqueId == pending.FileUniqueId ? "1" : "0", row.NoExecuteRaw);
+                Assert.Equal("synthetic-noexecute-source", row.NoExecuteSource);
+                Assert.Equal("Available", row.NoExecuteReadState);
+                Assert.Equal("Available", row.ItemMetadataReadState);
+                Assert.Equal("{\"WikiField\":\"value\"}", row.ItemMetadataFieldStatesJson);
+                Assert.False(row.WikiFieldHasValue);
+            });
             var denial = await retained.ClassicPageDiscoveries.SingleAsync(row => row.RecordKey == "raw-pending-denied");
             Assert.Equal("Denied", denial.DiscoveryStatus);
             Assert.Equal("synthetic_retained_denial", denial.ErrorCodes);
@@ -121,19 +131,26 @@ public sealed class ClassicAspxConsolidationRetentionTests
         }
     }
 
-    /// <summary>Creates one independently observed physical file with real identity and web/list metadata for restart-retention assertions.</summary>
-    private static ClassicAspxInventory Inventory(Guid scan, Guid site, Guid web, Guid list, string url)
+    /// <summary>Creates one independently observed physical file with real identity, web/list metadata, and the original NoExecute 0/1 field rather than a full mask.</summary>
+    private static SPFile Inventory(Guid scan, Guid site, Guid web, Guid list, string url, string noExecuteRaw)
     {
         var file = Guid.NewGuid();
-        return new ClassicAspxInventory
+        return new SPFile
         {
             ScanId = scan,
-            AspxKey = ClassicAspxInventory.CreateTenantFileKey(site, file),
             SiteCollectionId = site,
             FileUniqueId = file,
             WebId = web,
             ListId = list,
-            Url = url,
+            ServerRelativeUrl = url,
+            ListItemId = 42,
+            Length = 4096,
+            WikiFieldHasValue = false,
+            ItemMetadataReadState = "Available",
+            ItemMetadataFieldStatesJson = "{\"WikiField\":\"value\"}",
+            NoExecuteRaw = noExecuteRaw,
+            NoExecuteSource = "synthetic-noexecute-source",
+            NoExecuteReadState = "Available",
             ProvenanceJson = "[\"observed-before-interruption\"]",
             CoverageState = "Observed",
             ObservedAtUtc = DateTime.UtcNow

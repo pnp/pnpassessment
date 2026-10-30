@@ -48,7 +48,7 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<ClassicPageDiscovery> ClassicPageDiscoveries { get; set; }
 
-        internal DbSet<ClassicAspxInventory> ClassicAspxInventories { get; set; }
+        internal DbSet<SPFile> SPFiles { get; set; }
 
         internal DbSet<ClassicPageWebPart> ClassicPageWebParts { get; set; }
 
@@ -132,7 +132,7 @@ namespace PnP.Scanning.Core.Storage
             base.OnConfiguring(optionsBuilder);
         }
 
-        /// <summary>Configures existing compound keys and real physical ASPX identity constraints without deriving observations from migration.</summary>
+        /// <summary>Configures existing compound keys and real SharePoint-file identity constraints without deriving observations or classification from migration.</summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Extend the model defined via annotations, typically used for defining compound keys
@@ -223,18 +223,19 @@ namespace PnP.Scanning.Core.Storage
                 entity.Property(e => e.DiscoveryStatus).IsRequired();
             });
 
-            modelBuilder.Entity<ClassicAspxInventory>(entity =>
+            modelBuilder.Entity<SPFile>(entity =>
             {
-                entity.ToTable("ClassicAspxInventories", table => table.HasCheckConstraint(
-                    "CK_ClassicAspxInventories_RealFile",
-                    "length(\"AspxKey\") > 0 AND \"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND " +
+                entity.ToTable("SPFile", table => table.HasCheckConstraint(
+                    "CK_SPFile_RealFile",
+                    "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND " +
                     "\"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'"));
-                entity.HasKey(e => new { e.ScanId, e.AspxKey });
-                entity.Property(e => e.AspxKey).IsRequired();
+                entity.HasKey(e => new { e.SiteCollectionId, e.FileUniqueId });
                 entity.Property(e => e.FileReadState).IsRequired();
                 entity.Property(e => e.CoverageState).IsRequired();
                 entity.Property(e => e.ProvenanceJson).IsRequired();
-                entity.HasIndex(e => new { e.ScanId, e.SiteCollectionId, e.FileUniqueId }).IsUnique();
+                entity.Property(e => e.ItemMetadataReadState).IsRequired();
+                entity.Property(e => e.ItemMetadataFieldStatesJson).IsRequired();
+                entity.Property(e => e.NoExecuteReadState).IsRequired();
             });
 
             modelBuilder.Entity<ClassicPage>(entity =>
