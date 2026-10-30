@@ -271,13 +271,31 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         internal List<Uri> Requests { get; } = new();
         public Uri WebUrl { get; }
 
+        /// <summary>Supplies the same root file and hash-named child through REST rather than modeled child expansion.</summary>
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
             CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
-            return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK,
-                Array.Empty<JsonElement>(), null, new string('b', 64), "odata-nometadata",
-                DiscoveryTerminalOutcome.Complete));
+            var items = (IReadOnlyList<JsonElement>)Array.Empty<JsonElement>();
+            if (requestUri.AbsolutePath.EndsWith("/RootFolder/Files", StringComparison.OrdinalIgnoreCase) &&
+                !Uri.UnescapeDataString(requestUri.Query).Contains("$skip=1", StringComparison.Ordinal))
+            {
+                items = new[] { JsonSerializer.SerializeToElement(new
+                {
+                    UniqueId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
+                    Name = "default.aspx", ServerRelativeUrl = "/sites/a/default.aspx", CustomizedPageStatus = "Uncustomized"
+                }) };
+            }
+            if (requestUri.AbsolutePath.EndsWith("/RootFolder/Folders", StringComparison.OrdinalIgnoreCase))
+            {
+                items = new[] { JsonSerializer.SerializeToElement(new
+                {
+                    UniqueId = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                    Name = "A#B", ServerRelativeUrl = "/sites/a/Docs/A#B"
+                }) };
+            }
+            return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK, items, null,
+                new string('b', 64), "odata-nometadata", DiscoveryTerminalOutcome.Complete));
         }
 
         public Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,

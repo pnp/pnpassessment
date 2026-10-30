@@ -10,6 +10,7 @@ namespace PnP.Scanning.Core.Discovery;
 
 internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestClient
 {
+    private const int MaximumJsonResponseBytes = 16 * 1024 * 1024;
     private const string JsonAcceptMediaType = "application/json;odata=nometadata";
     private const string BoundedJsonErrorSchema = "bounded-json-error";
     private const string FileResolutionProvider = "PnP.Core:IWeb.GetFileByServerRelativeUrlOrDefaultAsync";
@@ -19,7 +20,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     {
         internal const string RedirectOrUriDrift = "json_redirect_or_response_uri_drift";
         internal const string Denied = "json_http_denied";
-        internal const string SizeOrPartial = "json_response_size_or_partial";
+        internal const string PartialContent = "json_response_size_or_partial";
         internal const string SizeLimit = "json_response_size_limit";
         internal const string IncompleteBody = "json_response_incomplete_body";
         internal const string Timeout = "json_response_timeout";
@@ -76,9 +77,9 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             cancellationToken: cancellationToken, throttlePolicy: throttlePolicy);
 
     // Thin fake-HTTP seam; production defaults to the owned no-redirect/no-cookie client above.
-    /// <summary>Enforces authenticated web-API scope, byte limits, and one deadline across fresh 429/503 attempts and server-directed delays.</summary>
+    /// <summary>Enforces authenticated web-API scope, a default sixteen-MiB byte cap, and one deadline across fresh 429/503 attempts and server-directed delays.</summary>
     internal static async Task<SharePointRestPage> ReadBoundedPageAsync(HttpClient client, Uri web, Uri uri,
-        Func<HttpRequestMessage, CancellationToken, Task> authenticate, int maxBytes = 4 * 1024 * 1024,
+        Func<HttpRequestMessage, CancellationToken, Task> authenticate, int maxBytes = MaximumJsonResponseBytes,
         TimeSpan? timeout = null, CancellationToken cancellationToken = default,
         SharePointRestThrottlePolicy throttlePolicy = null)
     {
@@ -91,7 +92,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             throw new ArgumentException("JSON requests must stay in the authenticated web API.");
         }
         var budget = timeout ?? TimeSpan.FromSeconds(20);
-        if (maxBytes is < 1 or > 16 * 1024 * 1024 || budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(5))
+        if (maxBytes is < 1 or > MaximumJsonResponseBytes || budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(5))
         {
             throw new ArgumentOutOfRangeException(nameof(maxBytes));
         }
@@ -149,10 +150,9 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                     {
                         return JsonFailure(evidence, DiscoveryTerminalOutcome.Denied, JsonReadErrors.Denied, policy.Clock);
                     }
-                    long? length = response.Content.Headers.ContentLength;
-                    if (length > maxBytes || response.StatusCode == HttpStatusCode.PartialContent)
+                    if (response.StatusCode == HttpStatusCode.PartialContent)
                     {
-                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeOrPartial, policy.Clock);
+                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.PartialContent, policy.Clock);
                     }
                     if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
                     {
@@ -165,6 +165,11 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                     }
                     else
                     {
+                        long? length = response.Content.Headers.ContentLength;
+                        if (length > maxBytes)
+                        {
+                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeLimit, policy.Clock);
+                        }
                         using var buffer = new MemoryStream();
                         using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
                         byte[] chunk = new byte[Math.Min(maxBytes + 1, 8192)];
@@ -230,6 +235,10 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.TransportFailure, policy.Clock);
         }
     }
+
+    /// <summary>Identifies only explicit byte-cap truncation so partial responses and unrelated failures never trigger a smaller file page.</summary>
+    internal static bool IsResponseSizeLimit(SharePointRestPage page) =>
+        page is { Outcome: DiscoveryTerminalOutcome.Truncated, ErrorCode: JsonReadErrors.SizeLimit };
 
     /// <summary>Preserves the final response receipt, or timestamps a response-free failure, without retaining source bytes.</summary>
     private static SharePointRestPage JsonFailure(SharePointRestPage evidence, DiscoveryTerminalOutcome outcome, string code,
@@ -341,41 +350,32 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
     }
 
-    /// <summary>Reads one SDK folder with requested child collections; missing expansions remain failures rather than empty-folder coverage.</summary>
+    /// <summary>Reads only physical folder identity through the SDK; child inventory must use byte-bounded REST pagination rather than unbounded expansions.</summary>
     public async Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
         CancellationToken cancellationToken = default)
     {
         const string provider = "PnP.Core.Model.SharePoint:IFolder";
-        const string operation = "GetFolderByServerRelativeUrlOrDefaultAsync(Folders,Files)";
+        const string operation = "GetFolderByServerRelativeUrlAsync(UniqueId,ServerRelativeUrl)";
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             var folder = await context.Web.GetFolderByServerRelativeUrlAsync(serverRelativeUrl,
-                item => item.UniqueId, item => item.ServerRelativeUrl,
-                item => item.Folders.QueryProperties(child => child.UniqueId, child => child.Name,
-                    child => child.ServerRelativeUrl),
-                item => item.Files.QueryProperties(file => file.UniqueId, file => file.Name,
-                    file => file.ServerRelativeUrl, file => file.CustomizedPageStatus,
-                    file => file.Properties)).ConfigureAwait(false);
+                item => item.UniqueId, item => item.ServerRelativeUrl).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             if (folder == null)
+            {
                 return new(DiscoveryTerminalOutcome.Failed, null, serverRelativeUrl,
                     Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
                     provider, operation, "folder_not_found", provider + ":" + operation,
                     DateTimeOffset.UtcNow);
-            // An unexpanded collection materialises as zero items, which would be indistinguishable
-            // from a genuinely empty folder and would claim coverage this call never observed.
-            if (!folder.Folders.Requested || !folder.Files.Requested)
-                return new(DiscoveryTerminalOutcome.Failed, folder.UniqueId.ToString("D"),
-                    folder.ServerRelativeUrl, Array.Empty<SharePointModeledFolder>(),
-                    Array.Empty<SharePointModeledFile>(), provider, operation,
-                    "web_root_folder_not_expanded", provider + ":" + operation + ":NotExpanded",
-                    DateTimeOffset.UtcNow);
-            var folders = MapFolders(folder.Folders);
-            var files = MapFiles(folder.Files);
-            var outcome = folders.Count == 0 && files.Count == 0
-                ? DiscoveryTerminalOutcome.Empty : DiscoveryTerminalOutcome.Complete;
-            return new(outcome, folder.UniqueId.ToString("D"), folder.ServerRelativeUrl, folders, files,
-                provider, operation, null, provider + ":" + operation, DateTimeOffset.UtcNow);
+            }
+            // Metadata alone cannot prove an empty or complete child census. The provider reads
+            // Files and Folders separately through the bounded REST transport and page policy.
+            return new(DiscoveryTerminalOutcome.Unknown, folder.UniqueId.ToString("D"),
+                folder.ServerRelativeUrl, Array.Empty<SharePointModeledFolder>(),
+                Array.Empty<SharePointModeledFile>(), provider, operation,
+                "folder_children_require_bounded_rest", provider + ":" + operation,
+                DateTimeOffset.UtcNow);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

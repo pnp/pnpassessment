@@ -56,6 +56,28 @@ public sealed class SharedDiscoveryContextTests
         IsDisposed(context).Should().BeTrue();
     }
 
+    /// <summary>Uses the real SDK for folder identity only; expanded child collections cannot bypass bounded REST file reads.</summary>
+    [Fact]
+    public async Task Folder_identity_lookup_does_not_expand_any_child_collection()
+    {
+        using var sdk = new OfflineSdk();
+        var context = await sdk.CreateAsync();
+        int before = sdk.Transport.LogicalRequests.Count;
+        using var client = new PnPContextSharePointAspxRestClient(context, ownsContext: false);
+        var result = await client.ReadFolderAsync(new Uri(WebUrl).AbsolutePath + "/Documents");
+        result.FolderUniqueId.Should().Be(FolderId.ToString("D"));
+        result.Outcome.Should().Be(DiscoveryTerminalOutcome.Unknown);
+        result.ErrorCode.Should().Be("folder_children_require_bounded_rest");
+        result.Files.Should().BeEmpty();
+        result.Folders.Should().BeEmpty();
+        var requests = sdk.Transport.LogicalRequests.Skip(before).ToArray();
+        requests.Should().ContainSingle();
+        var endpoint = Uri.UnescapeDataString(requests[0].Uri.AbsoluteUri);
+        endpoint.Should().ContainEquivalentOf("GetFolderByServerRelativePath");
+        endpoint.Should().NotContain("Files").And.NotContain("Folders").And.NotContain("Properties");
+        sdk.Transport.Unexpected.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("https://contoso.sharepoint.com/sites/reuse/sub")]
     [InlineData("https://contoso.sharepoint.com/sites/reuse-other")]
@@ -301,6 +323,7 @@ public sealed class SharedDiscoveryContextTests
             return response;
         }
 
+        /// <summary>Routes SDK identity, list and folder-metadata reads without returning unrequested child collections.</summary>
         private (HttpStatusCode Status, string Json) Route(Uri uri, bool inBatch)
         {
             LogicalRequests.Add((uri, inBatch));
@@ -324,6 +347,14 @@ public sealed class SharedDiscoveryContextTests
                     new { Id = 7, ContentTypeId = "0x0110007C4E8A" },
                     new { Id = 9, ContentTypeId = "0x01" },
                 } }));
+            if (endpoint.StartsWith("Web/GetFolderByServerRelativePath(", StringComparison.OrdinalIgnoreCase))
+            {
+                return (HttpStatusCode.OK, JsonSerializer.Serialize(new
+                {
+                    UniqueId = FolderId,
+                    ServerRelativeUrl = new Uri(currentWeb).AbsolutePath + "/Documents",
+                }));
+            }
             if (!endpoint.Equals("Web", StringComparison.OrdinalIgnoreCase)) throw Reject("GET " + uri);
             var web = new Dictionary<string, object>
             {

@@ -19,6 +19,7 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
 
     public SetupPathAcquisitionTests(ScanContextFixture database) => this.database = database;
 
+    /// <summary>Keeps the setup-path property bag in every bounded data and terminal-empty request.</summary>
     [Fact]
     public async Task Rest_folder_files_request_asks_for_the_file_property_bag()
     {
@@ -27,11 +28,15 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
 
         await ReadRecordsAsync(provider.CreateRawSource(await LibraryFolderAsync(provider)));
 
-        var request = factory.Client.Requests.Single(uri =>
-            uri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase));
-        var query = Uri.UnescapeDataString(request.Query);
-        query.Should().Contain("$expand=ListItemAllFields,Properties");
-        query.Should().Contain("Properties");
+        var requests = factory.Client.Requests.Where(uri =>
+            uri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase)).ToArray();
+        requests.Should().HaveCount(2, "one data page and one terminal-empty page retain the same projection");
+        foreach (var request in requests)
+        {
+            var query = Uri.UnescapeDataString(request.Query);
+            query.Should().Contain("$expand=ListItemAllFields,Properties");
+            query.Should().Contain("Properties");
+        }
     }
 
     [Fact]
@@ -50,8 +55,9 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
         records.Single(record => record.FileName == "uploaded.aspx").SetupPath.Should().BeNull();
     }
 
+    /// <summary>Retains the root file setup path through REST even when an SDK model contains children.</summary>
     [Fact]
-    public async Task Modeled_web_root_files_carry_the_setup_path_through_the_raw_record()
+    public async Task Bounded_web_root_files_carry_the_setup_path_through_the_raw_record()
     {
         using var factory = new SetupPathFactory();
         using var provider = Provider(factory);
@@ -172,14 +178,31 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
         internal List<Uri> Requests { get; } = new();
         public Uri WebUrl => SiteUrl;
 
+        /// <summary>Returns folder-specific setup-path metadata and slices Files using the actual paging controls.</summary>
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
             CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
-            var json = requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase) ? FilesJson
-                : requestUri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase) ? ListsJson
-                : "[]";
-            return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK, Items(json), null,
+            var files = requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase);
+            var root = requestUri.AbsolutePath.EndsWith("/RootFolder/Files", StringComparison.OrdinalIgnoreCase);
+            var rootJson = JsonSerializer.Serialize(new[] { new
+            {
+                UniqueId = Guid.Parse("99999999-9999-9999-9999-999999999999"),
+                Name = "Home.aspx", ServerRelativeUrl = "/sites/a/Home.aspx", CustomizedPageStatus = "Customized",
+                Properties = new Dictionary<string, string> { ["vti_x005f_setuppath"] = @"Features\SitePagePublishing\Home.aspx" }
+            }});
+            var json = files ? root ? rootJson : FilesJson
+                : requestUri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase) ? ListsJson : "[]";
+            var items = Items(json);
+            if (files)
+            {
+                var query = requestUri.Query.TrimStart('?').Split('&').Select(segment => segment.Split('=', 2))
+                    .ToDictionary(parts => Uri.UnescapeDataString(parts[0]), parts => parts.Length == 2 ? Uri.UnescapeDataString(parts[1]) : "");
+                int offset = query.TryGetValue("$skip", out var skip) ? int.Parse(skip) : 0;
+                int size = query.TryGetValue("$top", out var top) ? int.Parse(top) : int.MaxValue;
+                items = items.Skip(offset).Take(size).ToArray();
+            }
+            return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK, items, null,
                 new string('b', 64), "odata-nometadata", DiscoveryTerminalOutcome.Complete));
         }
 

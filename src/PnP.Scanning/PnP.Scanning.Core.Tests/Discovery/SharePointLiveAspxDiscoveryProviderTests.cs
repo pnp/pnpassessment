@@ -89,16 +89,20 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
         var result = await TraverseAsync(provider);
 
         result.Records.Should().HaveCount(2);
-        factory.Client.Requests.Count(uri => FolderPath(uri) == RootPath && uri.AbsolutePath.EndsWith("/Files")).Should().Be(2);
+        factory.Client.Requests.Count(uri => FolderPath(uri) == RootPath && uri.AbsolutePath.EndsWith("/Files")).Should().Be(3);
         factory.Client.Requests.Count(uri => FolderPath(uri) == RootPath && uri.AbsolutePath.EndsWith("/Folders")).Should().Be(2);
         var paged = provider.ReferenceCollector.ReadPaginationEvidence().GroupBy(receipt => receipt.CollectionScopeKey)
-            .Where(group => group.Count() == 2).ToArray();
+            .Where(group => group.Count() > 1).ToArray();
         paged.Should().HaveCount(2);
+        paged.Select(group => group.Count()).Should().BeEquivalentTo(new[] { 3, 2 });
         foreach (var receipts in paged)
         {
             var ordered = receipts.OrderBy(receipt => receipt.PageOrdinal).ToArray();
-            ordered[0].NextTokenHash.Should().Be(ordered[1].RequestTokenHash);
-            ordered[1].TerminalFlag.Should().BeTrue();
+            for (int index = 1; index < ordered.Length; index++)
+            {
+                ordered[index - 1].NextTokenHash.Should().Be(ordered[index].RequestTokenHash);
+            }
+            ordered[^1].TerminalFlag.Should().BeTrue();
             AspxPaginationContract.Validate(ordered, DiscoveryTerminalOutcome.Complete).GapCodes.Should().BeEmpty();
         }
     }
@@ -313,7 +317,7 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
         foreach (var path in paths)
         {
             factory.Client.Requests.Count(uri => FolderPath(uri) == path && uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal))
-                .Should().Be(1);
+                .Should().Be(2);
         }
     }
 
@@ -356,6 +360,190 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
             .Should().Contain(row => row.DiscoveryStatus == "Failed");
         provider.ReferenceCollector.ReadPaginationEvidence().Select(receipt => receipt.CollectionScopeKey)
             .Distinct().Should().Contain(key => key.StartsWith("physical-files:", StringComparison.Ordinal));
+    }
+
+    /// <summary>Recovered size failures remain durable attempts without contaminating the successful authority chain or blocking cache reuse.</summary>
+    [Fact]
+    public async Task Recovered_size_attempts_preserve_complete_authority_and_cache()
+    {
+        using var factory = new FolderFactory();
+        factory.Client.FolderResponse = uri =>
+        {
+            var top = QueryNumber(uri, "$top", 0);
+            var skip = QueryNumber(uri, "$skip", 0);
+            var rootFiles = uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) && FolderPath(uri) == RootPath;
+            var sizeFailure = rootFiles && skip == 0 && top > 200;
+            return FixturePage(uri, sizeFailure ? Array.Empty<JsonElement>()
+                : rootFiles && skip == 0 ? new[] { FileRow(1, RootPath + "/A.aspx"), FileRow(2, RootPath + "/B.aspx") }
+                : Array.Empty<JsonElement>(), sizeFailure ? DiscoveryTerminalOutcome.Truncated : DiscoveryTerminalOutcome.Complete,
+                sizeFailure ? "json_response_size_limit" : null);
+        };
+        using var provider = Provider(factory);
+        var root = await ListRootAsync(provider);
+
+        var batches = await ReadBatchesAsync(provider, root);
+
+        batches.SelectMany(batch => batch.Records).Should().HaveCount(2);
+        batches.Last().TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        var surface = provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.SurfaceId == "files:" + root.ScopeKey);
+        surface.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        surface.ExpectedCount.Should().Be(2);
+        surface.ExpectedCountState.Should().Be(AspxExpectedCountState.Known);
+        surface.ContinuationRemaining.Should().BeFalse();
+        var attempts = surface.EvidenceRefs.Where(value => value.StartsWith("file-page-attempt;", StringComparison.Ordinal)).ToArray();
+        attempts.Should().HaveCount(4);
+        attempts.Count(value => value.Contains("errorCode=json_response_size_limit;", StringComparison.Ordinal)).Should().Be(2);
+        attempts.Should().OnlyContain(value => value.Contains("status=200;", StringComparison.Ordinal) &&
+            value.Contains("$top=", StringComparison.Ordinal) && value.Contains("$skip=", StringComparison.Ordinal));
+        var receipts = provider.ReferenceCollector.ReadPaginationEvidence().Where(row => row.CollectionScopeKey == surface.SurfaceId)
+            .OrderBy(row => row.PageOrdinal).ToArray();
+        receipts.Should().HaveCount(2).And.OnlyContain(receipt => receipt.ErrorCode == null);
+        AspxPaginationContract.Validate(receipts, DiscoveryTerminalOutcome.Complete).GapCodes.Should().BeEmpty();
+        factory.Client.Requests.Where(uri => uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal))
+            .Select(uri => QueryNumber(uri, "$top", 0)).Should().Equal(1000, 500, 200, 200);
+        var beforeReuse = factory.Client.Requests.Count;
+        await ReadBatchesAsync(provider, root);
+        factory.Client.Requests.Should().HaveCount(beforeReuse);
+    }
+
+    /// <summary>A final minimum-size failure retains earlier file facts and every attempt but never authorizes a successful cache entry.</summary>
+    [Fact]
+    public async Task Minimum_size_failure_retains_facts_and_is_reread()
+    {
+        using var factory = new FolderFactory();
+        factory.Client.FolderResponse = uri =>
+        {
+            var rootFiles = uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) && FolderPath(uri) == RootPath;
+            var sizeFailure = rootFiles && QueryNumber(uri, "$skip", 0) > 0;
+            return FixturePage(uri, rootFiles && !sizeFailure ? new[] { FileRow(1, RootPath + "/retained.aspx") }
+                : Array.Empty<JsonElement>(), sizeFailure ? DiscoveryTerminalOutcome.Truncated : DiscoveryTerminalOutcome.Complete,
+                sizeFailure ? "json_response_size_limit" : null);
+        };
+        using var provider = Provider(factory);
+        var root = await ListRootAsync(provider);
+
+        var batches = await ReadBatchesAsync(provider, root);
+
+        batches.SelectMany(batch => batch.Records).Should().ContainSingle();
+        batches.Last().TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
+        var surface = provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.SurfaceId == "files:" + root.ScopeKey);
+        surface.ExpectedCount.Should().BeNull();
+        surface.ExpectedCountState.Should().Be(AspxExpectedCountState.Unknown);
+        surface.EvidenceRefs.Count(value => value.StartsWith("file-page-attempt;", StringComparison.Ordinal)).Should().Be(4);
+        var firstRequests = factory.Client.Requests.Count;
+        await ReadBatchesAsync(provider, root);
+        factory.Client.Requests.Count.Should().Be(firstRequests + 4);
+    }
+
+    /// <summary>Completed size attempts survive cancellation even before any resolved page can enter the authority chain.</summary>
+    [Fact]
+    public async Task Cancellation_retains_unresolved_size_attempts_and_restarts_at_zero()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var factory = new FolderFactory();
+        factory.Client.FolderResponse = uri =>
+        {
+            if (QueryNumber(uri, "$top", 0) == 500)
+            {
+                cancellation.Cancel();
+            }
+            return FixturePage(uri, Array.Empty<JsonElement>(), DiscoveryTerminalOutcome.Truncated, "json_response_size_limit");
+        };
+        using var provider = Provider(factory);
+        var root = await ListRootAsync(provider);
+
+        var action = () => ReadBatchesAsync(provider, root, cancellation.Token);
+        await action.Should().ThrowAsync<OperationCanceledException>();
+
+        var surface = provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.SurfaceId == "files:" + root.ScopeKey);
+        surface.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Cancelled);
+        surface.ExpectedCount.Should().BeNull();
+        surface.EvidenceRefs.Count(value => value.StartsWith("file-page-attempt;", StringComparison.Ordinal) &&
+            value.Contains("errorCode=json_response_size_limit;", StringComparison.Ordinal)).Should().Be(2);
+        factory.Client.FolderResponse = uri => FixturePage(uri, QueryNumber(uri, "$skip", 0) == 0
+            ? new[] { FileRow(1, RootPath + "/replayed.aspx") } : Array.Empty<JsonElement>());
+        var retried = await ReadBatchesAsync(provider, root);
+        retried.SelectMany(batch => batch.Records).Should().ContainSingle();
+        factory.Client.Requests.Where(uri => uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal))
+            .Select(uri => QueryNumber(uri, "$skip", -1)).Should().Equal(0, 0, 0, 1);
+    }
+
+    /// <summary>Even a legacy complete SDK expansion cannot replace the bounded REST census of 1111 real web-root files.</summary>
+    [Fact]
+    public async Task Complete_modeled_files_cannot_bypass_bounded_REST()
+    {
+        using var factory = new FolderFactory();
+        factory.Client.CompleteModeledFolder = true;
+        factory.Client.ModeledFiles = new[] { new SharePointModeledFile("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+            "sdk-only.aspx", "/sites/a/sdk-only.aspx", "Uncustomized") };
+        factory.Client.Files["/sites/a"] = Enumerable.Range(1, 1111).Select(id => FileRow(id, "/sites/a/page-" + id + ".aspx")).ToArray();
+        using var provider = Provider(factory);
+        var root = await WebRootAsync(provider);
+
+        var batches = await ReadBatchesAsync(provider, root);
+
+        var records = batches.SelectMany(batch => batch.Records).ToArray();
+        records.Should().HaveCount(1111).And.NotContain(record => record.PhysicalLocator == "/sites/a/sdk-only.aspx");
+        records.Select(record => record.FileUniqueId).Should().BeEquivalentTo(factory.Client.Files["/sites/a"]
+            .Select(row => row.GetProperty("UniqueId").GetString()));
+        records.Should().OnlyContain(record => record.FolderUniqueId == Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff"));
+        batches.Last().TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        var requests = factory.Client.Requests.Where(uri => FolderPath(uri) == "/sites/a" && uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal)).ToArray();
+        requests.Select(uri => QueryNumber(uri, "$skip", -1)).Should().Equal(0, 1000, 1111);
+        requests.Select(uri => QueryNumber(uri, "$top", -1)).Should().Equal(1000, 1000, 1000);
+        factory.Client.ModeledFolderReads.Should().Be(1);
+        provider.ReferenceCollector.ReadSurfaceEvidence().Should().Contain(row => row.SurfaceId == "folder-identity:" + root.ScopeKey &&
+            row.ActualMethod == "MODEL" && row.ClassificationEffect == "metadata-only" && row.ActualSelect == "UniqueId,ServerRelativeUrl");
+        provider.ReferenceCollector.ReadSurfaceEvidence().Should().Contain(row => row.SurfaceId == "files:" + root.ScopeKey && row.ActualMethod == "GET");
+    }
+
+    /// <summary>A metadata-only SDK folder result contributes its observed identity while REST independently proves its files and child folders.</summary>
+    [Fact]
+    public async Task Metadata_only_folder_identity_requires_both_REST_collections()
+    {
+        using var factory = new FolderFactory();
+        factory.Client.Files["/sites/a"] = new[] { FileRow(1, "/sites/a/physical.aspx") };
+        using var provider = Provider(factory);
+        var root = await WebRootAsync(provider);
+
+        var batches = await ReadBatchesAsync(provider, root);
+        var children = await provider.EnumerateChildrenAsync(root);
+
+        batches.SelectMany(batch => batch.Records).Should().ContainSingle(record =>
+            record.FolderUniqueId == Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff"));
+        children.ObservedChildren.Should().ContainSingle(scope => scope.Locator == RootPath);
+        factory.Client.ModeledFolderReads.Should().Be(1);
+        factory.Client.Requests.Count(uri => FolderPath(uri) == "/sites/a" && uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal)).Should().Be(2);
+        factory.Client.Requests.Count(uri => FolderPath(uri) == "/sites/a" && uri.AbsolutePath.EndsWith("/Folders", StringComparison.Ordinal)).Should().Be(1);
+    }
+
+    /// <summary>Finds the physical web-root scope without traversing unrelated list or declaration surfaces.</summary>
+    private static async Task<DiscoveryScopeRegistration> WebRootAsync(SharePointLiveAspxDiscoveryProvider provider)
+    {
+        var container = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.Single(scope => scope.Metadata["role"] == "web-root");
+        return (await provider.EnumerateChildrenAsync(container)).ObservedChildren.Single();
+    }
+
+    /// <summary>Builds a raw physical collection observation with deterministic digest and independent terminal/error evidence.</summary>
+    private static SharePointRestPage FixturePage(Uri uri, IReadOnlyList<JsonElement> items,
+        DiscoveryTerminalOutcome outcome = DiscoveryTerminalOutcome.Complete, string errorCode = null)
+    {
+        return new SharePointRestPage(uri, HttpStatusCode.OK, items, null, DiscoveryHash.Of(uri.AbsoluteUri, outcome.ToString()),
+            "fixture", outcome, errorCode, ReceivedAtUtc: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Reads paging controls from the request wire independently of the production cursor implementation.</summary>
+    private static int QueryNumber(Uri uri, string key, int fallback)
+    {
+        foreach (var segment in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = segment.Split('=', 2);
+            if (Uri.UnescapeDataString(parts[0]) == key)
+            {
+                return parts.Length == 2 ? int.Parse(WebUtility.UrlDecode(parts[1]), System.Globalization.CultureInfo.InvariantCulture) : fallback;
+            }
+        }
+        return fallback;
     }
 
     /// <summary>Creates one provider-bound Web with real scope identities and no optional shared snapshot.</summary>
@@ -434,9 +622,16 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
     /// <summary>Recognizes only raw Files/Folders collection endpoints in request de-duplication assertions.</summary>
     private static bool IsFolderCollection(Uri uri) => uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) || uri.AbsolutePath.EndsWith("/Folders", StringComparison.Ordinal);
 
-    /// <summary>Extracts the decoded REST resource-path argument without changing the product's URI builder.</summary>
+    /// <summary>Recognizes the authorized Web's RootFolder route or a decoded ResourcePath alias without changing the product URI builder.</summary>
     private static string FolderPath(Uri uri)
     {
+        var rootEndpoint = WebUrl.AbsolutePath.TrimEnd('/') + "/_api/web/RootFolder/";
+        if (string.Equals(uri.GetLeftPart(UriPartial.Authority), WebUrl.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(uri.AbsolutePath, rootEndpoint + "Files", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(uri.AbsolutePath, rootEndpoint + "Folders", StringComparison.OrdinalIgnoreCase)))
+        {
+            return WebUrl.AbsolutePath;
+        }
         var query = WebUtility.UrlDecode(uri.Query);
         var start = query.IndexOf("@u='", StringComparison.Ordinal);
         if (start < 0) return null;
@@ -460,7 +655,10 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
         internal List<Uri> Requests { get; } = new();
         internal IReadOnlyList<JsonElement> Lists { get; set; } = new[] { ListRow(RootPath) };
         internal Dictionary<string, JsonElement[]> Files { get; } = new(StringComparer.Ordinal);
-        internal Dictionary<string, JsonElement[]> Folders { get; } = new(StringComparer.Ordinal);
+        internal Dictionary<string, JsonElement[]> Folders { get; } = new(StringComparer.Ordinal)
+        {
+            ["/sites/a"] = new[] { FolderRow(RootPath) },
+        };
         internal string ReferencePath { get; set; }
         internal string WelcomePage { get; set; }
         internal bool DenyExpandedLists { get; set; }
@@ -473,8 +671,11 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
         internal CancellationTokenSource CancelOnSecondFilePage { get; set; }
         internal int Resolutions { get; private set; }
         internal Func<Uri, SharePointRestPage> FolderResponse { get; set; }
+        internal IReadOnlyList<SharePointModeledFile> ModeledFiles { get; set; } = Array.Empty<SharePointModeledFile>();
+        internal bool CompleteModeledFolder { get; set; }
+        internal int ModeledFolderReads { get; private set; }
 
-        /// <summary>Serves deterministic physical and metadata pages, including independent denial, truncation and cancellation cases.</summary>
+        /// <summary>Applies Files top/offset controls independently of Folders continuations while retaining denial, truncation and cancellation fixtures.</summary>
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
@@ -507,9 +708,23 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
                 {
                     var collection = files ? Files : Folders;
                     items = folder != null && collection.TryGetValue(folder, out var rows) ? rows : Array.Empty<JsonElement>();
-                    if (PageRootCollections && folder == RootPath && items.Count > 1)
+                    if (files)
                     {
-                        if (secondPage) items = items.Skip(1).ToArray();
+                        var skip = secondPage ? 1 : QueryNumber(requestUri, "$skip", 0);
+                        var top = QueryNumber(requestUri, "$top", 1000);
+                        items = items.Skip(skip).Take(top).ToArray();
+                        if (PageRootCollections && folder == RootPath && skip == 0 && items.Count > 1)
+                        {
+                            items = items.Take(1).ToArray();
+                            next = requestUri.AbsoluteUri + "&$skiptoken=second";
+                        }
+                    }
+                    else if (PageRootCollections && folder == RootPath && items.Count > 1)
+                    {
+                        if (secondPage)
+                        {
+                            items = items.Skip(1).ToArray();
+                        }
                         else
                         {
                             items = items.Take(1).ToArray();
@@ -547,12 +762,16 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
                 "fixture", "welcome", null, "fixture:welcome", DateTimeOffset.UtcNow));
         }
 
-        /// <summary>Exposes the list root as a web-root child to exercise overlap with the independent all-lists entry.</summary>
-        public Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new SharePointModeledFolderResult(DiscoveryTerminalOutcome.Complete,
+        /// <summary>Returns observed folder identity separately from child authority, with an opt-in legacy expansion to prove it cannot bypass REST.</summary>
+        public Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl, CancellationToken cancellationToken = default)
+        {
+            ModeledFolderReads++;
+            return Task.FromResult(new SharePointModeledFolderResult(
+                CompleteModeledFolder ? DiscoveryTerminalOutcome.Complete : DiscoveryTerminalOutcome.Unknown,
                 "ffffffff-ffff-ffff-ffff-ffffffffffff", serverRelativeUrl,
-                new[] { new SharePointModeledFolder(FolderId.ToString("D"), "Docs", RootPath) },
-                Array.Empty<SharePointModeledFile>(), "fixture", "folder", null, "fixture:folder", DateTimeOffset.UtcNow));
+                Array.Empty<SharePointModeledFolder>(), ModeledFiles, "fixture", "folder-metadata",
+                CompleteModeledFolder ? null : "folder_children_require_bounded_rest", "fixture:folder", DateTimeOffset.UtcNow));
+        }
 
         /// <summary>Releases no external resources because all responses are in-memory observations.</summary>
         public void Dispose() { }

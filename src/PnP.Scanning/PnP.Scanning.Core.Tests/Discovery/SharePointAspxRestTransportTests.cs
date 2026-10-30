@@ -12,7 +12,7 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 public sealed class SharePointAspxRestTransportTests
 {
     private const string WebUrl = "https://contoso.sharepoint.com/sites/reuse";
-    private const int DefaultMaxBytes = 4 * 1024 * 1024;
+    private const int DefaultMaxBytes = 16 * 1024 * 1024;
     private static readonly Uri Web = new(WebUrl);
     private static readonly Uri RequestUri = new(WebUrl + "/_api/Web/Lists?$select=Id");
     private static readonly DateTimeOffset Epoch = new(2026, 10, 29, 0, 0, 0, TimeSpan.Zero);
@@ -102,6 +102,7 @@ public sealed class SharePointAspxRestTransportTests
         page.Outcome.Should().Be(DiscoveryTerminalOutcome.Failed);
         page.StatusCode.Should().Be((HttpStatusCode)status);
         page.ErrorCode.Should().Be("json_throttle_attempts_exhausted");
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
         page.AttemptCount.Should().Be(3);
         page.AttemptLimit.Should().Be(3);
         page.ReceivedAtUtc.Should().Be(Epoch.AddSeconds(3));
@@ -320,6 +321,7 @@ public sealed class SharePointAspxRestTransportTests
         page.AttemptLimit.Should().Be(3);
         page.Outcome.Should().Be(status is 401 or 403 ? DiscoveryTerminalOutcome.Denied :
             status is >= 300 and <= 399 ? DiscoveryTerminalOutcome.Unknown : DiscoveryTerminalOutcome.Failed);
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
         fixture.Handler.Requests.Should().ContainSingle();
         fixture.Delays.Should().BeEmpty();
         response.Disposed.Should().BeTrue();
@@ -368,22 +370,99 @@ public sealed class SharePointAspxRestTransportTests
         fixture.Streams.Single().Disposed.Should().BeTrue();
     }
 
-    /// <summary>Maintains the default four-MiB declared-length boundary without reading any oversized body.</summary>
+    /// <summary>Rejects declared bodies beyond the default sixteen-MiB cap before acquisition while retaining the response receipt.</summary>
     [Fact]
     public async Task Declared_oversized_response_is_rejected_before_stream_read()
     {
         using var fixture = new TransportFixture();
         var response = fixture.Enqueue(HttpStatusCode.OK);
         response.Content.Headers.ContentLength = DefaultMaxBytes + 1;
+        response.Headers.Add("SPRequestGuid", "size-request");
+        response.Headers.Add("x-ms-correlation-id", "size-correlation");
 
         var page = await fixture.ReadAsync();
 
         page.Outcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
-        page.ErrorCode.Should().Be("json_response_size_or_partial");
+        page.ErrorCode.Should().Be("json_response_size_limit");
         page.StatusCode.Should().Be(HttpStatusCode.OK);
+        page.RequestId.Should().Be("size-request");
+        page.CorrelationId.Should().Be("size-correlation");
+        page.ReceivedAtUtc.Should().Be(Epoch);
+        page.AttemptCount.Should().Be(1);
+        page.Items.Should().BeEmpty();
+        page.NextLink.Should().BeNull();
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeTrue();
         fixture.Streams.Single().ReadBytes.Should().Be(0);
         fixture.Streams.Single().Disposed.Should().BeTrue();
+        response.Disposed.Should().BeTrue();
         fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+    }
+
+    /// <summary>Accepts a valid JSON response exactly at the real default sixteen-MiB limit with or without a declared length.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Default_limit_accepts_exactly_sixteen_MiB(bool missingContentLength)
+    {
+        using var fixture = new TransportFixture();
+        var response = fixture.Enqueue(HttpStatusCode.OK, SizedJsonBody(DefaultMaxBytes));
+        fixture.Streams.Single().ExposeLength = !missingContentLength;
+        response.Content.Headers.ContentLength.Should().Be(missingContentLength ? (long?)null : DefaultMaxBytes);
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        page.ErrorCode.Should().BeNull();
+        page.Items.Should().ContainSingle();
+        page.Items.Single().GetProperty("Id").GetString().Should().Be("offline");
+        page.NextLink.Should().BeNull();
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
+        fixture.Streams.Single().ReadBytes.Should().Be(DefaultMaxBytes);
+        fixture.Streams.Single().Disposed.Should().BeTrue();
+        response.Disposed.Should().BeTrue();
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+    }
+
+    /// <summary>Detects a missing-length body one byte beyond the real default cap and stops after the single sentinel byte.</summary>
+    [Fact]
+    public async Task Default_limit_rejects_sixteen_MiB_plus_one_unknown_length_byte()
+    {
+        using var fixture = new TransportFixture();
+        var response = fixture.Enqueue(HttpStatusCode.OK, SizedJsonBody(DefaultMaxBytes + 1));
+        fixture.Streams.Single().ExposeLength = false;
+        response.Content.Headers.ContentLength.Should().BeNull();
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
+        page.ErrorCode.Should().Be("json_response_size_limit");
+        page.AttemptCount.Should().Be(1);
+        page.Items.Should().BeEmpty();
+        page.NextLink.Should().BeNull();
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeTrue();
+        fixture.Streams.Single().ReadBytes.Should().Be(DefaultMaxBytes + 1);
+        fixture.Streams.Single().Disposed.Should().BeTrue();
+        response.Disposed.Should().BeTrue();
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+    }
+
+    /// <summary>Rejects byte limits outside the hard sixteen-MiB ceiling before authentication or HTTP acquisition.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(16777217)]
+    public async Task Invalid_byte_limit_is_rejected_before_authentication(int maxBytes)
+    {
+        using var fixture = new TransportFixture();
+
+        Func<Task> read = () => fixture.ReadAsync(maxBytes: maxBytes);
+        await read.Should().ThrowAsync<ArgumentOutOfRangeException>();
+
+        fixture.Authenticated.Should().BeEmpty();
+        fixture.Handler.Requests.Should().BeEmpty();
+        fixture.Delays.Should().BeEmpty();
     }
 
     /// <summary>Reads at most budget plus one sentinel byte for an unknown-length response and never retries a truncated body.</summary>
@@ -404,6 +483,147 @@ public sealed class SharePointAspxRestTransportTests
         fixture.Delays.Should().BeEmpty();
     }
 
+    /// <summary>Requires both truncation and the exact size code, never a partial, timeout, malformed JSON, or similar-looking code.</summary>
+    [Theory]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, "json_response_size_limit", true)]
+    [InlineData(DiscoveryTerminalOutcome.Complete, "json_response_size_limit", false)]
+    [InlineData(DiscoveryTerminalOutcome.Failed, "json_response_size_limit", false)]
+    [InlineData(DiscoveryTerminalOutcome.Denied, "json_response_size_limit", false)]
+    [InlineData(DiscoveryTerminalOutcome.Unknown, "json_response_size_limit", false)]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, "json_response_size_or_partial", false)]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, "json_response_timeout", false)]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, "invalid_json", false)]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, "JSON_RESPONSE_SIZE_LIMIT", false)]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, "json_response_size_limit_extra", false)]
+    [InlineData(DiscoveryTerminalOutcome.Truncated, null, false)]
+    public void Size_limit_classifier_requires_exact_outcome_and_code(DiscoveryTerminalOutcome outcome, string code, bool expected)
+    {
+        var page = new SharePointRestPage(RequestUri, HttpStatusCode.OK, Array.Empty<System.Text.Json.JsonElement>(),
+            null, null, "offline-classification", outcome, ErrorCode: code);
+
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().Be(expected);
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(null).Should().BeFalse();
+    }
+
+    /// <summary>Keeps HTTP 206 classified as partial even when its declared body also exceeds the byte cap.</summary>
+    [Fact]
+    public async Task Partial_content_with_oversized_header_is_not_a_page_size_failure()
+    {
+        using var fixture = new TransportFixture();
+        var response = fixture.Enqueue(HttpStatusCode.PartialContent);
+        response.Content.Headers.ContentLength = DefaultMaxBytes + 1;
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
+        page.ErrorCode.Should().Be("json_response_size_or_partial");
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
+        fixture.Streams.Single().ReadBytes.Should().Be(0);
+        fixture.Streams.Single().Disposed.Should().BeTrue();
+        response.Disposed.Should().BeTrue();
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+    }
+
+    /// <summary>Honors 429/503 retry semantics despite oversized error headers and keeps every attempt on the same 1000-file request.</summary>
+    [Theory]
+    [InlineData(429, false)]
+    [InlineData(503, false)]
+    [InlineData(429, true)]
+    [InlineData(503, true)]
+    public async Task Oversized_throttle_headers_do_not_request_smaller_file_pages(int status, bool exhaust)
+    {
+        using var fixture = new TransportFixture(attemptLimit: 2);
+        var filesUri = new Uri(WebUrl + "/_api/Web/RootFolder/Files?$top=1000&$skip=0");
+        var first = fixture.Enqueue((HttpStatusCode)status, retryAfter: "1");
+        first.Content.Headers.ContentLength = DefaultMaxBytes + 1;
+        var last = fixture.Enqueue(exhaust ? (HttpStatusCode)status : HttpStatusCode.OK, retryAfter: "1");
+        if (exhaust)
+        {
+            last.Content.Headers.ContentLength = DefaultMaxBytes + 1;
+        }
+
+        var page = await fixture.ReadAsync(uri: filesUri);
+
+        page.Outcome.Should().Be(exhaust ? DiscoveryTerminalOutcome.Failed : DiscoveryTerminalOutcome.Complete);
+        page.ErrorCode.Should().Be(exhaust ? "json_throttle_attempts_exhausted" : null);
+        page.AttemptCount.Should().Be(2);
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
+        fixture.Handler.Requests.Should().HaveCount(2).And.OnlyContain(request => request.RequestUri == filesUri);
+        fixture.Delays.Should().Equal(TimeSpan.FromSeconds(1));
+        fixture.Streams.First().ReadBytes.Should().Be(0);
+        fixture.Responses.Should().OnlyContain(response => response.Disposed);
+        fixture.Streams.Should().OnlyContain(stream => stream.Disposed);
+    }
+
+    /// <summary>Rejects malformed JSON without treating size-related words or credentials in its bytes as a typed size failure.</summary>
+    [Fact]
+    public async Task Invalid_json_does_not_trigger_size_fallback_or_leak_tokens()
+    {
+        const string credential = "offline-private-access-token";
+        using var fixture = new TransportFixture();
+        var response = fixture.Enqueue(HttpStatusCode.OK, "{invalid-json: json_response_size_limit Bearer " + credential);
+        response.Headers.TryAddWithoutValidation("Authorization", "Bearer " + credential);
+        fixture.Authenticate = (request, _) => request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential);
+
+        var page = await fixture.ReadAsync();
+
+        page.ErrorCode.Should().NotBeNull();
+        page.Items.Should().BeEmpty();
+        page.NextLink.Should().BeNull();
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
+        System.Text.Json.JsonSerializer.Serialize(page).Should().NotContain(credential).And.NotContain("Bearer");
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+        response.Disposed.Should().BeTrue();
+        fixture.Streams.Single().Disposed.Should().BeTrue();
+    }
+
+    /// <summary>Persists only bounded failure evidence when either declared or streamed bytes exceed the cap, excluding authentication and body secrets.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Size_limit_evidence_excludes_credentials_and_response_bytes(bool declaredLength)
+    {
+        const string credential = "offline-private-size-token";
+        using var fixture = new TransportFixture();
+        var response = fixture.Enqueue(HttpStatusCode.OK, "Bearer " + credential + new string('x', 64));
+        fixture.Streams.Single().ExposeLength = declaredLength;
+        response.Headers.TryAddWithoutValidation("Authorization", "Bearer " + credential);
+        fixture.Authenticate = (request, _) => request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential);
+
+        var page = await fixture.ReadAsync(maxBytes: 32);
+
+        page.ErrorCode.Should().Be("json_response_size_limit");
+        page.Items.Should().BeEmpty();
+        page.NextLink.Should().BeNull();
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeTrue();
+        System.Text.Json.JsonSerializer.Serialize(page).Should().NotContain(credential).And.NotContain("Bearer");
+        fixture.Streams.Single().ReadBytes.Should().Be(declaredLength ? 0 : 33);
+        fixture.Streams.Single().Disposed.Should().BeTrue();
+        response.Disposed.Should().BeTrue();
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+    }
+
+    /// <summary>Propagates caller cancellation during body acquisition while disposing the response and stream without retry or size fallback.</summary>
+    [Fact]
+    public async Task Caller_cancellation_during_body_read_disposes_response_and_stream()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var fixture = new TransportFixture();
+        var response = fixture.Enqueue(HttpStatusCode.OK);
+        fixture.Streams.Single().BeforeRead = cancellation.Cancel;
+
+        Func<Task> read = () => fixture.ReadAsync(cancellationToken: cancellation.Token);
+        await read.Should().ThrowAsync<OperationCanceledException>();
+
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().BeEmpty();
+        response.Disposed.Should().BeTrue();
+        fixture.Streams.Single().Disposed.Should().BeTrue();
+    }
+
     /// <summary>Preserves incomplete-body and HTTP partial-content rejection independently of retry support.</summary>
     [Theory]
     [InlineData(false)]
@@ -421,6 +641,7 @@ public sealed class SharePointAspxRestTransportTests
 
         page.Outcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
         page.ErrorCode.Should().Be(partial ? "json_response_size_or_partial" : "json_response_incomplete_body");
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
         page.Items.Should().BeEmpty();
         fixture.Streams.Single().Disposed.Should().BeTrue();
         fixture.Handler.Requests.Should().ContainSingle();
@@ -438,6 +659,7 @@ public sealed class SharePointAspxRestTransportTests
         var page = await fixture.ReadAsync();
 
         page.ErrorCode.Should().Be("json_response_incomplete_stream");
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
         page.Outcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
         page.StatusCode.Should().Be(HttpStatusCode.OK);
         page.AttemptCount.Should().Be(1);
@@ -473,6 +695,7 @@ public sealed class SharePointAspxRestTransportTests
         var page = await fixture.ReadAsync();
 
         page.ErrorCode.Should().Be("json_response_timeout");
+        PnPContextSharePointAspxRestClient.IsResponseSizeLimit(page).Should().BeFalse();
         page.StatusCode.Should().Be(HttpStatusCode.OK);
         page.Outcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
         fixture.Streams.Single().Disposed.Should().BeTrue();
@@ -549,6 +772,13 @@ public sealed class SharePointAspxRestTransportTests
         handler.UseDefaultCredentials.Should().BeFalse();
     }
 
+    /// <summary>Builds an ASCII JSON page padded with legal trailing whitespace to an exact transport byte length.</summary>
+    private static string SizedJsonBody(int byteLength)
+    {
+        const string body = "{\"value\":[{\"Id\":\"offline\"}]}";
+        return body + new string(' ', byteLength - Encoding.UTF8.GetByteCount(body));
+    }
+
     /// <summary>Reads explicit lifecycle and transport fields without invoking any network operation.</summary>
     private static T Field<T>(object instance, string name)
     {
@@ -601,11 +831,18 @@ public sealed class SharePointAspxRestTransportTests
             return response;
         }
 
-        /// <summary>Authenticates only through an in-memory marker and passes all bounds directly to the production reader.</summary>
-        internal Task<SharePointRestPage> ReadAsync(int maxBytes = DefaultMaxBytes, TimeSpan? timeout = null,
-            CancellationToken cancellationToken = default, Uri uri = null) =>
-            PnPContextSharePointAspxRestClient.ReadBoundedPageAsync(Http, Web, uri ?? RequestUri,
-                AuthenticateAsync, maxBytes, timeout, cancellationToken, Policy);
+        /// <summary>Exercises the production default unless a test explicitly overrides the byte cap, using only in-memory authentication.</summary>
+        internal Task<SharePointRestPage> ReadAsync(int? maxBytes = null, TimeSpan? timeout = null,
+            CancellationToken cancellationToken = default, Uri uri = null)
+        {
+            if (maxBytes.HasValue)
+            {
+                return PnPContextSharePointAspxRestClient.ReadBoundedPageAsync(Http, Web, uri ?? RequestUri,
+                    AuthenticateAsync, maxBytes.Value, timeout, cancellationToken, Policy);
+            }
+            return PnPContextSharePointAspxRestClient.ReadBoundedPageAsync(Http, Web, uri ?? RequestUri,
+                AuthenticateAsync, timeout: timeout, cancellationToken: cancellationToken, throttlePolicy: Policy);
+        }
 
         /// <summary>Records per-attempt authentication and allows deterministic cancellation or authentication-time simulation.</summary>
         private Task AuthenticateAsync(HttpRequestMessage request, CancellationToken token)
