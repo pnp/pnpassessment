@@ -124,13 +124,16 @@ public sealed class SharedListMetadataTests
         if (empty) authority.AbsenceProofKind.Should().Be("AuthorityTerminalZero");
     }
 
+    /// <summary>
+    /// Reuses complete modeled form declarations across collection and ID shapes, retaining separate references without REST or item reads.
+    /// </summary>
     [Theory]
     [InlineData("array", false)]
     [InlineData("array", true)]
     [InlineData("results", false)]
     [InlineData("results", true)]
     [InlineData("value", false)]
-    public async Task Shared_content_type_forms_discover_item_pages_without_a_duplicate_all_lists_request(
+    public async Task Shared_content_type_forms_are_declarations_without_item_requests(
         string shape, bool flattenedId)
     {
         var row = ListRow(title: "Posts", path: "/sites/a/Lists/Posts", baseType: 0, template: 100);
@@ -149,28 +152,24 @@ public sealed class SharedListMetadataTests
         var snapshot = SharePointListMetadataSnapshot.TryCreate(WebUrl, WebJson(row));
         snapshot.Should().NotBeNull();
         using var factory = new CountingFactory();
-        factory.Client.Items = new[]
-        {
-            JsonSerializer.SerializeToElement(new { Id = 7, ContentTypeId = "0x0110007C4E8A" }),
-            JsonSerializer.SerializeToElement(new { Id = 9, ContentTypeId = "0x01" }),
-        };
         using var provider = Provider(factory, snapshot);
         var list = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren
             .Single(scope => scope.Metadata["role"] == "list");
-        var surface = (await provider.EnumerateChildrenAsync(list)).ObservedChildren
-            .Single(scope => scope.SourceKind == DiscoverySourceKind.ListItemDisplayFormPages);
-        var records = new List<RawDiscoveryRecord>();
-        await foreach (var batch in provider.CreateRawSource(surface).ReadBatchesAsync()) records.AddRange(batch.Records);
-
-        var page = records.Should().ContainSingle().Which;
-        page.PhysicalLocator.Should().Be("/sites/a/Lists/Posts/Special.aspx?ID=7");
-        page.ListItemId.Should().Be(7);
-        page.ContentTypeId.Should().Be("0x0110007C4E8A");
-        page.FileUniqueId.Should().BeNull();
-        page.LocatorIsGuaranteedPhysicalFilePath.Should().BeFalse();
-        AssessmentWebDiscovery.Page(Guid.NewGuid(), WebUrl.AbsoluteUri, "/", surface, page).ScopeType.Should().Be("ListItem");
+        (await provider.EnumerateChildrenAsync(list)).ObservedChildren
+            .Should().NotContain(scope => scope.Locator.Contains("Items REST objects", StringComparison.Ordinal));
+        var references = provider.ReferenceCollector.ReadReferenceEvidence();
+        references.Should().ContainSingle(value =>
+            value.SourceKind == AspxReferenceSourceKinds.ListDefaultDisplayForm &&
+            value.RawLocator == "/sites/a/Lists/Posts/DispForm.aspx");
+        references.Where(value => value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm)
+            .Select(value => (value.ContentTypeId, value.RawLocator))
+            .Should().BeEquivalentTo(new[]
+            {
+                ("0x0110", "/sites/a/Lists/Posts/Post.aspx"),
+                ("0x0110007C4E", "/sites/a/Lists/Posts/Special.aspx")
+            });
         factory.Client.AllListReads.Should().Be(0);
-        factory.Client.Requests.Should().ContainSingle().Which.AbsolutePath.Should().EndWith("/items");
+        factory.Client.Requests.Should().BeEmpty();
         ListAuthority(provider).ActualMethod.Should().Be("MODEL");
     }
 
@@ -246,6 +245,10 @@ public sealed class SharedListMetadataTests
         ListAuthority(provider).ActualMethod.Should().Be("MODEL");
     }
 
+    /// <summary>
+    /// Requires shared and raw list authority to expose the same hidden, catalog, and ordinary-list folder and reference surfaces,
+    /// while reusing one SDK root identity lookup and retaining its file through bounded REST.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -268,19 +271,42 @@ public sealed class SharedListMetadataTests
         factory.Client.AllListReads.Should().Be(share ? 0 : 1);
         factory.Client.Requests.Count(uri => uri.AbsolutePath.EndsWith("/Forms")).Should().Be(3);
         factory.Client.Requests.Count(uri => uri.AbsolutePath.EndsWith("/Views")).Should().Be(3);
-        factory.Client.Requests.Count(uri => uri.AbsolutePath.EndsWith("/Files")).Should().Be(5);
-        factory.Client.Requests.Count(uri => uri.AbsolutePath.EndsWith("/Folders")).Should().Be(5);
-        factory.Client.FolderReads.Should().Be(1, "root files and folders share the same modeled root result");
+        factory.Client.Requests.Count(uri => uri.AbsolutePath.EndsWith("/Files")).Should().Be(8);
+        factory.Client.Requests.Count(uri => uri.AbsolutePath.EndsWith("/Folders")).Should().Be(7);
+        factory.Client.FolderReads.Should().Be(1, "one SDK root identity lookup is reused while both child collections use REST");
         var lists = scopes.Where(scope => scope.Metadata["role"] == "list").ToArray();
         lists.Should().HaveCount(3);
         lists.Single(scope => scope.Metadata["title"] == "Hidden library").Metadata["hidden"].Should().Be("True");
         lists.Single(scope => scope.Metadata["title"] == "Catalog").Metadata["isCatalog"].Should().Be("True");
         lists.Single(scope => scope.Metadata["title"] == "Tasks").Metadata["baseType"].Should().Be("0");
-        scopes.Count(scope => scope.Metadata["role"] == "folder").Should().Be(2);
+        scopes.Count(scope => scope.Metadata["role"] == "folder").Should().Be(3);
         scopes.Count(scope => scope.Metadata["role"] == "physical-forms").Should().Be(3);
         scopes.Count(scope => scope.Metadata["role"] == "forms").Should().Be(3);
         scopes.Count(scope => scope.Metadata["role"] == "views").Should().Be(3);
         records.Should().ContainSingle(record => record.PhysicalLocator == "/sites/a/default.aspx");
+    }
+
+    /// <summary>
+    /// Discovers real ASPX files under an ordinary list root and its nested folder with the observed list scope, without item enumeration.
+    /// </summary>
+    [Fact]
+    public async Task Ordinary_list_root_and_nested_folder_discover_physical_aspx_without_item_enumeration()
+    {
+        var tasks = ListRow(title: "Tasks", path: "/sites/a/Lists/Tasks", baseType: 0, template: 100);
+        using var factory = new CountingFactory();
+        factory.Client.RawLists = new[] { JsonSerializer.SerializeToElement(tasks) };
+        factory.Client.IncludeTaskFiles = true;
+        using var provider = Provider(factory, null);
+
+        var (scopes, records) = await TraverseAsync(provider);
+
+        scopes.Should().Contain(scope => scope.Metadata["role"] == "folder" &&
+            scope.SourceKind == DiscoverySourceKind.RawListFolderFiles);
+        records.Should().Contain(record => record.PhysicalLocator == "/sites/a/Lists/Tasks/DispForm.aspx" &&
+            record.ListId == ListId);
+        records.Should().Contain(record => record.PhysicalLocator == "/sites/a/Lists/Tasks/Nested/Custom.aspx" &&
+            record.ListId == ListId);
+        factory.Client.Requests.Should().NotContain(uri => uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -306,6 +332,7 @@ public sealed class SharedListMetadataTests
         provider.ReferenceCollector.ReadSurfaceEvidence().Should().NotContain(row => row.RequiredAdapter == "AllListsAuthority");
     }
 
+    /// <summary>A rejected shared snapshot and failed enriched/minimal list authorities remain denied, never a successful empty census.</summary>
     [Fact]
     public async Task Rejected_snapshot_does_not_turn_raw_authority_failure_into_a_known_empty_collection()
     {
@@ -315,14 +342,14 @@ public sealed class SharedListMetadataTests
 
         await provider.EnumerateChildrenAsync(provider.RootScope);
 
-        factory.Client.AllListReads.Should().Be(1);
+        factory.Client.AllListReads.Should().Be(2, "failed enriched list metadata is followed by an independent physical-root projection");
         var authority = ListAuthority(provider);
         authority.ActualMethod.Should().Be("GET");
         authority.TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Denied);
         authority.ExpectedCountState.Should().Be(AspxExpectedCountState.Unknown);
         authority.ExpectedCount.Should().BeNull();
         authority.AbsenceProofKind.Should().BeNull();
-        provider.ReferenceCollector.ReadPaginationEvidence().Should().ContainSingle();
+        provider.ReferenceCollector.ReadPaginationEvidence().Should().HaveCount(2);
     }
 
     public static IEnumerable<object[]> UnusableSnapshots()
@@ -457,12 +484,16 @@ public sealed class SharedListMetadataTests
         internal IReadOnlyList<JsonElement> Items { get; set; } = Array.Empty<JsonElement>();
         internal bool PageLists { get; set; }
         internal bool DenyLists { get; set; }
+        internal bool IncludeTaskFiles { get; set; }
         internal string WelcomePage { get; set; }
         internal int AllListReads { get; private set; }
         internal int WelcomePageReads { get; private set; }
         internal int FileResolutions { get; private set; }
         internal int FolderReads { get; private set; }
 
+        /// <summary>
+        /// Records offline REST requests and supplies configurable list authority, denial, continuations, item rows, and task-folder facts.
+        /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
@@ -480,6 +511,50 @@ public sealed class SharedListMetadataTests
                 }
             }
             else if (requestUri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase)) items = Items;
+            else if (requestUri.AbsolutePath.EndsWith("/RootFolder/Files", StringComparison.OrdinalIgnoreCase))
+            {
+                items = new[] { JsonSerializer.SerializeToElement(new
+                {
+                    UniqueId = FileId, Name = "default.aspx", ServerRelativeUrl = "/sites/a/default.aspx",
+                    CustomizedPageStatus = "Uncustomized"
+                }) };
+            }
+            else if (IncludeTaskFiles)
+            {
+                var folder = WebUtility.UrlDecode(requestUri.Query);
+                if (folder.Contains("/Lists/Tasks/Nested", StringComparison.OrdinalIgnoreCase) &&
+                    requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase))
+                    items = new[] { JsonSerializer.SerializeToElement(new
+                    {
+                        UniqueId = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                        Name = "Custom.aspx", ServerRelativeUrl = "/sites/a/Lists/Tasks/Nested/Custom.aspx",
+                        CustomizedPageStatus = "Uncustomized",
+                    }) };
+                else if (folder.Contains("/Lists/Tasks", StringComparison.OrdinalIgnoreCase) &&
+                         requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase))
+                    items = new[] { JsonSerializer.SerializeToElement(new
+                    {
+                        UniqueId = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+                        Name = "DispForm.aspx", ServerRelativeUrl = "/sites/a/Lists/Tasks/DispForm.aspx",
+                        CustomizedPageStatus = "Uncustomized",
+                    }) };
+                else if (folder.Contains("/Lists/Tasks", StringComparison.OrdinalIgnoreCase) &&
+                         !folder.Contains("/Nested", StringComparison.OrdinalIgnoreCase) &&
+                         requestUri.AbsolutePath.EndsWith("/Folders", StringComparison.OrdinalIgnoreCase))
+                    items = new[] { JsonSerializer.SerializeToElement(new
+                    {
+                        UniqueId = Guid.Parse("88888888-8888-8888-8888-888888888888"),
+                        Name = "Nested", ServerRelativeUrl = "/sites/a/Lists/Tasks/Nested",
+                    }) };
+            }
+            if (requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase))
+            {
+                var query = requestUri.Query.TrimStart('?').Split('&').Select(segment => segment.Split('=', 2))
+                    .ToDictionary(parts => Uri.UnescapeDataString(parts[0]), parts => parts.Length == 2 ? Uri.UnescapeDataString(parts[1]) : "");
+                int offset = query.TryGetValue("$skip", out var skip) ? int.Parse(skip) : 0;
+                int size = query.TryGetValue("$top", out var top) ? int.Parse(top) : int.MaxValue;
+                items = items.Skip(offset).Take(size).ToArray();
+            }
             return Task.FromResult(new SharePointRestPage(requestUri,
                 DenyLists ? HttpStatusCode.Forbidden : HttpStatusCode.OK, items, next,
                 DiscoveryHash.Of(requestUri.AbsoluteUri), "odata-nometadata", outcome,

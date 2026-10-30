@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -22,6 +22,9 @@ namespace PnP.Scanning.Core.Tests.Storage
             this.fixture = fixture;
         }
 
+        /// <summary>
+        /// Upgrades legacy page and discovery rows with unknown customization metadata, preserving existing facts through downgrade and re-upgrade.
+        /// </summary>
         [Fact]
         public async Task Customization_migration_preserves_existing_pages_with_unknown_statuses()
         {
@@ -30,8 +33,8 @@ namespace PnP.Scanning.Core.Tests.Storage
             var options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options;
             using var context = new ScanContext(options);
             var migrator = context.GetService<IMigrator>();
-            var previous = context.Database.GetMigrations().Last(name => !name.EndsWith("_PageCustomizationStatus"));
-            context.Database.GetMigrations().Last().Should().EndWith("_PageCustomizationStatus");
+            var previous = context.Database.GetMigrations().TakeWhile(name => !name.EndsWith("_PageCustomizationStatus")).Last();
+            context.Database.GetMigrations().Should().Contain(name => name.EndsWith("_PageCustomizationStatus"));
             await migrator.MigrateAsync(previous);
             var scan = Guid.NewGuid();
             var list = Guid.NewGuid();

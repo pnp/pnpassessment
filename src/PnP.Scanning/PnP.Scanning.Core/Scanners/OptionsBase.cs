@@ -1,4 +1,4 @@
-﻿using PnP.Scanning.Core.Services;
+using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -6,6 +6,7 @@ namespace PnP.Scanning.Core.Scanners
     {
         internal string Mode { get; set; }
 
+        /// <summary>Restores the selected scanner options from request properties, including the frozen Classic template policy and catalog payload without changing defaults.</summary>
         internal static OptionsBase FromScannerInput(StartRequest request)
         {
             var options = NewOptions(request.Mode);
@@ -79,6 +80,10 @@ namespace PnP.Scanning.Core.Scanners
                     else if (property.Property == Constants.StartClassicHomePageOnly)
                     {
                         (options as ClassicOptions).HomePageOnly = bool.Parse(property.Value);
+                    }
+                    else if (property.Property == Constants.StartExcludeSiteTemplates)
+                    {
+                        (options as ClassicOptions).ExcludeSiteTemplates = Discovery.Aspx.SiteTemplateExclusionPolicy.Parse(property.Value).CanonicalValue;
                     }
                     else if (property.Property == Constants.StartClassicAuditLogWindowDays)
                     {

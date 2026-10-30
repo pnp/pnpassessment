@@ -72,35 +72,35 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Reuses the real SDK list projection for registered display forms without reading list items.
+    /// </summary>
     [Fact]
-    public async Task Real_sdk_shared_projection_preserves_content_type_item_pages_without_duplicate_all_lists_get()
+    public async Task Real_sdk_shared_projection_preserves_content_type_form_declarations_without_item_requests()
     {
         using var sdk = new OfflineSdk();
         var context = await sdk.CreateAsync();
         sdk.Transport.ListResponse = "displayForm";
         var snapshot = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
         snapshot.Should().NotBeNull();
-        using var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication, sharedContext: context);
+        using var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication,
+            sharedContext: context, jsonTransportFactory: ctx => ctx.RestClient.Client);
         using var provider = new SharePointLiveAspxDiscoveryProvider(
             new SharePointLiveAspxDiscoveryOptions("test", "sdk-shared-web", "shared-sdk-v1", new string('a', 64)),
             factory, new AspxWebAcquisitionContext(Guid.Parse(OfflineTransport.SiteId), new Uri(Site),
                 Guid.Parse(OfflineTransport.WebId), new Uri(Site), "/sites/reuse", "STS#0"), snapshot);
         var list = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren
             .Single(scope => scope.Metadata["role"] == "list");
-        var surface = (await provider.EnumerateChildrenAsync(list)).ObservedChildren
-            .Single(scope => scope.SourceKind == DiscoverySourceKind.ListItemDisplayFormPages);
-        var records = new List<RawDiscoveryRecord>();
-        await foreach (var batch in provider.CreateRawSource(surface).ReadBatchesAsync()) records.AddRange(batch.Records);
-
-        var page = records.Should().ContainSingle().Which;
-        page.PhysicalLocator.Should().Be("/sites/reuse/Lists/Posts/Post.aspx?ID=7");
-        page.ListItemId.Should().Be(7);
-        page.ContentTypeId.Should().Be("0x0110007C4E8A");
-        page.FileUniqueId.Should().BeNull();
-        AssessmentWebDiscovery.Page(Guid.NewGuid(), Site, "/", surface, page).ScopeType.Should().Be("ListItem");
+        (await provider.EnumerateChildrenAsync(list)).ObservedChildren
+            .Should().NotContain(scope => scope.Locator.Contains("Items REST objects", StringComparison.Ordinal));
+        var reference = provider.ReferenceCollector.ReadReferenceEvidence().Should().ContainSingle(value =>
+            value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm).Which;
+        reference.RawLocator.Should().Be("/sites/reuse/Lists/Posts/Post.aspx");
+        reference.ContentTypeId.Should().Be("0x0110");
+        reference.Disposition.Should().Be(AspxReferenceDispositions.Declared);
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
         sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/web/lists", StringComparison.OrdinalIgnoreCase));
-        sdk.Transport.LogicalRequests.Count(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase)).Should().Be(1);
+        sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
         provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.RequiredAdapter == "AllListsAuthority")
             .ActualMethod.Should().Be("MODEL");
         context.Web.Lists.AsRequested().Should().ContainSingle().Which.ContentTypes.AsRequested()
@@ -225,6 +225,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         context.GraphFirst.Should().BeTrue();
     }
 
+    /// <summary>Proves full inventory reuses the exact single metadata snapshot when invoking page discovery.</summary>
     [Fact]
     public async Task Full_acquisition_loads_once_then_passes_identical_snapshot_to_discovery()
     {
@@ -232,13 +233,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         var context = await sdk.CreateAsync();
         var order = new List<string>();
         var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        SharePointListMetadataSnapshot loaded = null;
-        var result = await ClassicAssessmentMetadata.AcquirePagesAsync(false, async () =>
-        {
-            order.Add("metadata");
-            loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-            return loaded;
-        }, snapshot =>
+        order.Add("metadata");
+        var loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        var result = await ClassicScanner.DiscoverPagesAsync(false, loaded,
+            () => throw new InvalidOperationException("full inventory already loaded metadata"), snapshot =>
         {
             order.Add("discovery");
             snapshot.Should().BeSameAs(loaded).And.NotBeNull();
@@ -253,6 +251,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Requires incomplete metadata to reach fallback discovery as unknown rather than suppressing physical acquisition.</summary>
     [Theory]
     [InlineData("missing")]
     [InlineData("nextLink")]
@@ -263,11 +262,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.ListResponse = response;
         var order = new List<string>();
         var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        var result = await ClassicAssessmentMetadata.AcquirePagesAsync(false, async () =>
-        {
-            order.Add("metadata");
-            return await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-        }, snapshot =>
+        order.Add("metadata");
+        var loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        var result = await ClassicScanner.DiscoverPagesAsync(false, loaded,
+            () => throw new InvalidOperationException("full inventory already loaded metadata"), snapshot =>
         {
             order.Add("fallback-discovery");
             snapshot.Should().BeNull();
@@ -279,6 +277,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Proves homepage discovery precedes the single rich metadata load and does not receive an all-list authority.</summary>
     [Fact]
     public async Task Home_acquisition_discovers_target_first_then_loads_normal_rich_lists_once()
     {
@@ -286,7 +285,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         var context = await sdk.CreateAsync();
         var order = new List<string>();
         var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        var result = await ClassicAssessmentMetadata.AcquirePagesAsync(true, async () =>
+        var result = await ClassicScanner.DiscoverPagesAsync(true, null, async () =>
         {
             order.Add("metadata");
             return await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);

@@ -1,8 +1,9 @@
-﻿using Grpc.Core;
+using Grpc.Core;
 using Microsoft.AspNetCore.DataProtection;
 using PnP.Core.Services;
 using PnP.Scanning.Core;
 using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Process.Services;
@@ -14,6 +15,12 @@ namespace PnP.Scanning.Process.Commands
 {
     internal class StartCommandHandler
     {
+        private static class ClassicAcquisitionOptionText
+        {
+            internal const string TemplateExclusionsHelp = "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.";
+            internal const string PagesComponentRequired = "ASPX scope options require the Pages component.";
+        }
+
         private readonly ScannerManager processManager;
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly ConfigurationOptions configurationOptions;
@@ -40,12 +47,14 @@ namespace PnP.Scanning.Process.Commands
         private Option<bool> classicSkipUserInformationOption;
         private Option<bool> classicHomePageOnlyOption;
         private Option<int> classicAuditLogWindowDaysOption;
+        private Option<string> excludeSiteTemplatesOption;
 
 #if DEBUG
         // Specific options for the test handler
         private Option<int> testNumberOfSitesOption;
 #endif
 
+        /// <summary>Builds start options and their validators, including explicit Classic template-exclusion inputs without starting workers or authentication.</summary>
         public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance)
         {
             processManager = processManagerInstance;
@@ -304,6 +313,21 @@ namespace PnP.Scanning.Process.Commands
                 min: 1,
                 max: 180);
             cmd.AddOption(classicAuditLogWindowDaysOption);
+
+            excludeSiteTemplatesOption = new Option<string>($"--{Constants.StartExcludeSiteTemplates}",
+                ClassicAcquisitionOptionText.TemplateExclusionsHelp);
+            excludeSiteTemplatesOption.AddValidator(result =>
+            {
+                try
+                {
+                    SiteTemplateExclusionPolicy.Parse(result.GetValueOrDefault<string>());
+                }
+                catch (ArgumentException ex)
+                {
+                    result.ErrorMessage = ex.Message;
+                }
+            });
+            cmd.AddOption(excludeSiteTemplatesOption);
 #if DEBUG
             testNumberOfSitesOption = new(
                 name: $"--{Constants.StartTestNumberOfSites}",
@@ -378,6 +402,7 @@ namespace PnP.Scanning.Process.Commands
             return option;
         }
 
+        /// <summary>Creates a bounded integer Classic option with the established default fallback; cross-option mode validation remains at command level.</summary>
         private Option<int> CreateClassicIntOption(string name, string description, int defaultValue, int min, int max)
         {
             var option = new Option<int>(
@@ -414,7 +439,7 @@ namespace PnP.Scanning.Process.Commands
         }
 
         /// <summary>
-        /// https://github.com/dotnet/command-line-api/blob/main/docs/model-binding.md#more-complex-types
+        /// Attaches cross-option Classic mode/component validation and the unlimited-option binder before returning the start command.
         /// </summary>
         /// <returns></returns>
         public Command Create()
@@ -433,11 +458,18 @@ namespace PnP.Scanning.Process.Commands
                     classicSkipUserInformationOption,
                     classicHomePageOnlyOption,
                     classicAuditLogWindowDaysOption,
+                    excludeSiteTemplatesOption,
                 };
                 var modeResult = result.FindResultFor(modeOption);
                 var mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
                 if (mode == Mode.Classic)
+                {
+                    var selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
+                    var aspxScopeOptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false };
+                    if (aspxScopeOptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
+                        result.ErrorMessage = ClassicAcquisitionOptionText.PagesComponentRequired;
                     return;
+                }
                 foreach (var opt in classicOnlyOptions)
                 {
                     // Only complain about options the user actually supplied on the command line.
@@ -461,6 +493,7 @@ namespace PnP.Scanning.Process.Commands
                                               , classicSkipUserInformationOption
                                               , classicHomePageOnlyOption
                                               , classicAuditLogWindowDaysOption
+                                              , excludeSiteTemplatesOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
@@ -474,6 +507,7 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>Validates the supported Classic options, then sends the existing supported-component start request.</summary>
         private async Task HandleStartAsync(StartOptions arguments)
         {
             // Reject retired assessment modes before doing any work. The Workflow 2013 engine code is
@@ -642,7 +676,8 @@ namespace PnP.Scanning.Process.Commands
                         arguments.SkipUsageInformation,
                         arguments.SkipUserInformation,
                         arguments.HomePageOnly,
-                        arguments.AuditLogWindowDays);
+                        arguments.AuditLogWindowDays,
+                        arguments.ExcludeSiteTemplates);
                 }
 
 #if DEBUG

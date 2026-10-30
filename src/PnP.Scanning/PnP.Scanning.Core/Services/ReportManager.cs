@@ -1,4 +1,4 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Storage;
@@ -396,6 +396,7 @@ namespace PnP.Scanning.Core.Services
         /// </summary>
         internal static async Task ExportClassicReportDataAsync(ScanContext dbContext, Guid scanId, string exportPath, CsvConfiguration config)
         {
+            await ClassicAspxReportProjection.ExportCsvAsync(dbContext, scanId, exportPath, config);
             // Physical inventory, scope coverage, references, pagination, gaps and the final verdict
             // share the assessment-owned discovery.csv report.
             using (var writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))

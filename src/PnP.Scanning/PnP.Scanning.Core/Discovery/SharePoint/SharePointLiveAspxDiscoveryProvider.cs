@@ -11,10 +11,8 @@ namespace PnP.Scanning.Core.Discovery;
 /// </summary>
 internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvider, IAspxReferenceAcquisitionProvider
 {
-    // DefaultDisplayFormUrl and the per-content-type DisplayFormUrl resolve the pages a list item is
-    // addressed through when it owns no file of its own. They ride along on the existing all-lists
-    // request rather than costing a round trip per list, at the cost of a larger response for webs
-    // whose lists carry many content types.
+    // Display-form declarations ride along on the all-lists request. They are evidence about
+    // possible rendering routes, not evidence that any particular list item is a page.
     private const string AllListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId,DefaultViewUrl,DefaultDisplayFormUrl,ContentTypes/Id,ContentTypes/DisplayFormUrl";
     private const string AllListsExpand = "RootFolder,ContentTypes";
     private const string FormsSelect = "Id,ServerRelativeUrl,FormType";
@@ -24,19 +22,24 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     // REST encodes the '_' of a property bag name as '_x005f_', so vti_setuppath arrives under this name.
     private const string RestSetupPathProperty = "vti_x005f_setuppath";
     private const string FoldersSelect = "UniqueId,Name,ServerRelativeUrl";
-    // Only what decides whether an item is a page and where that page lives. The values a report shows
-    // belong to the item, which is read again by the assessment that needs them.
-    private const string ItemsSelect = "Id,ContentTypeId";
     private readonly SharePointLiveAspxDiscoveryOptions options;
     private readonly ISharePointAspxRestClientFactory clientFactory;
     private readonly SharePointListMetadataSnapshot sharedLists;
     private readonly Dictionary<string, LiveScope> scopes = new(StringComparer.Ordinal);
+    private const string MissingFileIdentity = "file_unique_id_missing_or_invalid";
+    private const string PhysicalListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId";
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, LiveCollectionResult> folderCollections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> emittedFileScopes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> invalidFileIdentityScopes = new(StringComparer.Ordinal);
+    private readonly HashSet<string> invalidFolderScopes = new(StringComparer.Ordinal);
+    private readonly List<LiveScope> listRoots = new();
+    private readonly Dictionary<string, string> observedFolderIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, RawDiscoveryRecord> targetedFiles = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ListDisplayForms> displayForms = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> welcomePageByWeb = new(StringComparer.OrdinalIgnoreCase);
     private bool disposed;
 
+    /// <summary>Binds one authorized Web, shared list snapshot and provider-local physical-folder caches.</summary>
     internal SharePointLiveAspxDiscoveryProvider(SharePointLiveAspxDiscoveryOptions options,
         ISharePointAspxRestClientFactory clientFactory, AspxWebAcquisitionContext web,
         SharePointListMetadataSnapshot sharedLists = null)
@@ -84,6 +87,10 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         };
     }
 
+    /// <summary>
+    /// Creates deferred readers for physical folder files, form/view references, or the targeted welcome file; structural scopes have no source.
+    /// Rejects disposed providers and unsupported source roles rather than silently returning empty observations.
+    /// </summary>
     public IRawDiscoverySource CreateRawSource(DiscoveryScopeRegistration surface)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -94,7 +101,6 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             "folder" or "physical-forms" or "web-root-folder" => ReadFolderFilesAsync(scope, token),
             "forms" => ReadReferencesAsync(scope, isForm: true, token),
             "views" => ReadReferencesAsync(scope, isForm: false, token),
-            "display-form-items" => ReadDisplayFormItemsAsync(scope, token),
             "welcome-page" => ReadTargetedFileAsync(scope, token),
             _ => throw new InvalidOperationException($"Unsupported live raw surface role '{scope.Role}'."),
         });
@@ -107,10 +113,31 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         clientFactory.Dispose();
     }
 
+    /// <summary>Acquires all authorized list roots independently of optional role metadata, while HOME remains targeted.</summary>
     private async Task<DiscoveryChildEnumerationResult> EnumerateWebAsync(LiveScope parent,
         CancellationToken cancellationToken)
     {
-        var welcomePage = await AcquireWelcomePageAsync(parent, cancellationToken).ConfigureAwait(false);
+        WelcomePageAcquisition welcomePage;
+        try
+        {
+            welcomePage = await AcquireWelcomePageAsync(parent, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (options.Intent != AspxDiscoveryIntent.HomePageOnly)
+        {
+            ReferenceCollector.AddReference(Candidate(AspxReferenceSourceKinds.WebWelcomePage, parent.ScopeKey,
+                "PnP.Core welcome-page metadata", null, AspxReferenceDispositions.ReferenceUnavailable,
+                "welcome_page_failed", null, "unavailable") with
+            {
+                ErrorStage = "ReadWelcomePage",
+                ErrorDetail = ex.Message,
+            });
+            ReferenceCollector.AddGap("welcome-page:" + parent.ScopeKey + ":welcome_page_failed");
+            welcomePage = new(DiscoveryTerminalOutcome.Failed, null, null, "welcome_page_failed");
+        }
         if (options.Intent == AspxDiscoveryIntent.HomePageOnly)
         {
             if (welcomePage.Physical == null)
@@ -143,6 +170,21 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 AspxSurfaceApplicability.Applicable, "AllListsAuthority", cancellationToken).ConfigureAwait(false);
             listItems = listResult.Items;
             listOutcome = listResult.Validation.Outcome;
+            if (!IsComplete(listOutcome))
+            {
+                // Content-type expansion is enrichment, never the only admission route to List.RootFolder.
+                var physicalEndpoint = Endpoint(parent.WebUrl,
+                    $"_api/web/lists?$select={PhysicalListsSelect}&$expand=RootFolder");
+                var physicalLists = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
+                    "physical-lists:" + parent.ScopeKey, physicalEndpoint, PhysicalListsSelect, string.Empty,
+                    AspxSurfaceApplicability.Applicable, "PhysicalListsAuthorityFallback", cancellationToken)
+                    .ConfigureAwait(false);
+                listItems = listItems.Concat(physicalLists.Items)
+                    .GroupBy(item => PropertyGuid(item, "Id")?.ToString("D") ??
+                        NestedString(item, "RootFolder", "ServerRelativeUrl") ?? item.GetRawText(), StringComparer.Ordinal)
+                    .Select(group => group.First()).ToArray();
+                listOutcome = physicalLists.Validation.Outcome;
+            }
         }
         var containers = new List<LiveScope>
         {
@@ -174,13 +216,15 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             var scope = Add(new LiveScope(Key("list", parent.WebUrl.AbsoluteUri, listId?.ToString("D") ?? title),
                 parent.ScopeKey, DiscoveryScopeKind.Container, null, rootFolder ?? title, "list", parent.WebUrl,
                 listId, baseType, rootFolder, metadata));
-            displayForms[scope.ScopeKey] = ReadDisplayForms(item);
+            listRoots.Add(scope);
+            RecordDisplayFormDeclarations(scope, item);
             containers.Add(scope);
             RecordListApplicability(parent, scope, template);
         }
         return Result(parent, containers, listOutcome);
     }
 
+    /// <summary>Registers physical list roots and role-reference surfaces without a BaseType admission filter.</summary>
     private Task<DiscoveryChildEnumerationResult> EnumerateContainerAsync(LiveScope parent,
         CancellationToken cancellationToken)
     {
@@ -195,17 +239,20 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
         var children = new List<LiveScope>();
         var decision = AspxListApplicabilityPolicy.Evaluate(parent.BaseType);
-        if (decision.RawLibraryRequired && !string.IsNullOrWhiteSpace(parent.FolderUrl))
-            children.Add(Add(new LiveScope(Key("folder", parent.WebUrl.AbsoluteUri, parent.FolderUrl), parent.ScopeKey,
-                DiscoveryScopeKind.Folder, DiscoverySourceKind.RawListLibraryFiles, parent.FolderUrl,
+        // Every list has a folder root. Ordinary lists can own physical form ASPX files
+        // there as well, so BaseType must not gate recursive file discovery.
+        if (!string.IsNullOrWhiteSpace(parent.FolderUrl))
+            children.Add(Add(new LiveScope(Key("folder", parent.ScopeKey, parent.FolderUrl), parent.ScopeKey,
+                DiscoveryScopeKind.Folder, decision.RawLibraryRequired
+                    ? DiscoverySourceKind.RawListLibraryFiles : DiscoverySourceKind.RawListFolderFiles, parent.FolderUrl,
                 "folder", parent.WebUrl, parent.ListId, parent.BaseType, parent.FolderUrl, parent.Metadata)));
         if (!string.IsNullOrWhiteSpace(parent.FolderUrl))
         {
             var formsFolder = parent.FolderUrl.TrimEnd('/') + "/Forms";
-            children.Add(Add(new LiveScope(Key("physical-forms", parent.WebUrl.AbsoluteUri, formsFolder),
+            children.Add(Add(new LiveScope(Key("physical-forms", parent.ScopeKey, formsFolder),
                 parent.ScopeKey, DiscoveryScopeKind.Folder, DiscoverySourceKind.RawListLibraryFiles,
                 formsFolder, "physical-forms", parent.WebUrl, parent.ListId, parent.BaseType,
-                formsFolder, parent.Metadata)));
+                formsFolder, WithMetadata(parent.Metadata, ("folderUniqueId", string.Empty)))));
         }
         children.Add(Add(new LiveScope(Key("forms", parent.WebUrl.AbsoluteUri, parent.ListId?.ToString("D") ?? parent.ScopeKey),
             parent.ScopeKey, DiscoveryScopeKind.Folder, DiscoverySourceKind.ListFormBackingFiles,
@@ -215,103 +262,79 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             parent.ScopeKey, DiscoveryScopeKind.Folder, DiscoverySourceKind.ListViewBackingFiles,
             parent.Locator + "/Views REST objects", "views", parent.WebUrl, parent.ListId,
             parent.BaseType, parent.FolderUrl, parent.Metadata)));
-        if (HasDisplayFormPages(parent))
-            children.Add(Add(new LiveScope(Key("display-form-items", parent.WebUrl.AbsoluteUri,
-                    parent.ListId?.ToString("D") ?? parent.ScopeKey),
-                parent.ScopeKey, DiscoveryScopeKind.Folder, DiscoverySourceKind.ListItemDisplayFormPages,
-                parent.Locator + "/Items REST objects", "display-form-items", parent.WebUrl, parent.ListId,
-                parent.BaseType, parent.FolderUrl, parent.Metadata)));
-
-        var outcome = decision.Outcome;
+        // BaseType describes a list; it cannot veto an authorized physical root.
+        var outcome = string.IsNullOrWhiteSpace(parent.FolderUrl)
+            ? DiscoveryTerminalOutcome.Unknown : DiscoveryTerminalOutcome.Complete;
         return Task.FromResult(Result(parent, children, outcome,
-            outcome == DiscoveryTerminalOutcome.Unknown ? "invalid_or_unspecified_base_type" : null));
+            outcome == DiscoveryTerminalOutcome.Unknown ? "list_root_folder_missing" : null));
     }
 
+    /// <summary>Enumerates each parent-bound folder scope while reusing only terminal, complete physical folder contents.</summary>
     private async Task<DiscoveryChildEnumerationResult> EnumerateFolderAsync(LiveScope parent,
         CancellationToken cancellationToken)
     {
-        if (parent.Role is "forms" or "views" or "welcome-page" or "display-form-items")
+        cancellationToken.ThrowIfCancellationRequested();
+        if (parent.Role is "forms" or "views" or "welcome-page")
+        {
             return Result(parent, Array.Empty<LiveScope>(), DiscoveryTerminalOutcome.Empty);
-        if (parent.SourceKind == DiscoverySourceKind.WebRootFiles)
-        {
-            var modeledResult = await ReadModeledFolderAsync(parent, cancellationToken).ConfigureAwait(false);
-            RecordModeledFolderSurface(parent, modeledResult, files: false);
-            if (modeledResult.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty)
-            {
-                var modeledChildren = modeledResult.Folders.Select(item => Add(new LiveScope(
-                    Key("web-root-folder", parent.WebUrl.AbsoluteUri, item.ServerRelativeUrl), parent.ScopeKey,
-                    DiscoveryScopeKind.Folder, DiscoverySourceKind.WebRootFiles, item.ServerRelativeUrl,
-                    "folder", parent.WebUrl, null, null, item.ServerRelativeUrl,
-                    WithMetadata(parent.Metadata, ("folderUniqueId", item.UniqueId))))).ToArray();
-                return Result(parent, modeledChildren, modeledResult.Outcome, modeledResult.ErrorCode);
-            }
         }
-        var endpoint = FolderEndpoint(parent, "Folders", FoldersSelect);
-        var result = await ReadCollectionAsync(parent.ScopeKey, parent.ScopeKey,
-            "folders:" + parent.ScopeKey, endpoint, FoldersSelect, string.Empty,
-            AspxSurfaceApplicability.Applicable, "RecursiveFolderAuthority", cancellationToken).ConfigureAwait(false);
-        var children = result.Items.Select(item =>
-        {
-            var folderUrl = PropertyString(item, "ServerRelativeUrl");
-            return Add(new LiveScope(Key("folder", parent.WebUrl.AbsoluteUri, folderUrl ?? Guid.NewGuid().ToString("N")),
-                parent.ScopeKey, DiscoveryScopeKind.Folder, parent.SourceKind, folderUrl ?? "missing-folder-url",
-                "folder", parent.WebUrl, parent.ListId, parent.BaseType, folderUrl,
-                WithMetadata(parent.Metadata, ("folderUniqueId", PropertyString(item, "UniqueId") ?? string.Empty))));
-        }).ToArray();
-        return Result(parent, children, result.Validation.Outcome);
+
+        parent = await ReadFolderIdentityAsync(parent, cancellationToken).ConfigureAwait(false);
+        var result = await ReadFolderCollectionAsync(parent, files: false, cancellationToken).ConfigureAwait(false);
+        var rawChildren = result.Items.Select(item => FolderChild(parent,
+                PropertyString(item, "ServerRelativeUrl"), PropertyString(item, "UniqueId")))
+            .Where(child => child != null).ToArray();
+        return Result(parent, rawChildren, invalidFolderScopes.Contains(parent.ScopeKey)
+            ? DiscoveryTerminalOutcome.Unknown : result.Validation.Outcome);
     }
 
+    /// <summary>Keeps folder scopes specific to their parent and rejects missing or cyclic locators without inventing identities.</summary>
+    private LiveScope FolderChild(LiveScope parent, string folderUrl, string folderUniqueId)
+    {
+        if (string.IsNullOrWhiteSpace(folderUrl))
+        {
+            invalidFolderScopes.Add(parent.ScopeKey);
+            ReferenceCollector.AddGap("folders:" + parent.ScopeKey + ":folder_url_missing");
+            return null;
+        }
+        for (var ancestor = parent; ancestor != null; ancestor = ancestor.ParentScopeKey != null
+            ? scopes.GetValueOrDefault(ancestor.ParentScopeKey) : null)
+        {
+            if (ancestor.Kind == DiscoveryScopeKind.Folder &&
+                string.Equals(FolderIdentity(ancestor), FolderIdentity(parent with { FolderUrl = folderUrl }),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                invalidFolderScopes.Add(parent.ScopeKey);
+                ReferenceCollector.AddGap("folders:" + parent.ScopeKey + ":folder_cycle");
+                return null;
+            }
+        }
+        if (Guid.TryParse(folderUniqueId, out var observedId) && observedId != Guid.Empty)
+        {
+            observedFolderIds[FolderIdentity(parent with { FolderUrl = folderUrl })] = observedId.ToString("D");
+        }
+        var owner = PhysicalOwner(parent, folderUrl);
+        return Add(new LiveScope(Key("folder", parent.ScopeKey, folderUrl), parent.ScopeKey,
+            DiscoveryScopeKind.Folder, parent.SourceKind, folderUrl, "folder", parent.WebUrl,
+            owner?.ListId, owner?.BaseType, folderUrl,
+            WithMetadata(owner?.Metadata ?? parent.Metadata, ("folderUniqueId", folderUniqueId ?? string.Empty))));
+    }
+
+    /// <summary>Emits GUID-backed file facts only from physical folder authority, once per file across overlapping folder entrances.</summary>
     private async IAsyncEnumerable<RawDiscoveryBatch> ReadFolderFilesAsync(LiveScope scope,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        if (scope.SourceKind == DiscoverySourceKind.WebRootFiles)
+        cancellationToken.ThrowIfCancellationRequested();
+        scope = PhysicalScope(scope);
+        scope = await ReadFolderIdentityAsync(scope, cancellationToken).ConfigureAwait(false);
+        var result = await ReadFolderCollectionAsync(scope, files: true, cancellationToken).ConfigureAwait(false);
+        foreach (var page in result.ObservationPages)
         {
-            var modeled = await ReadModeledFolderAsync(scope, cancellationToken).ConfigureAwait(false);
-            RecordModeledFolderSurface(scope, modeled, files: true);
-            if (modeled.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty)
-            {
-                var records = modeled.Files.Select(item => new RawDiscoveryRecord(
-                    item.UniqueId, item.UniqueId, scope.ScopeKey, item.Name, item.ServerRelativeUrl, true,
-                    options.PermissionContext, new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["actualProvider"] = modeled.Provider,
-                        ["actualOperation"] = modeled.Operation,
-                        ["customizedPageStatus"] = item.CustomizedPageStatus ?? "unknown",
-                    },
-                    SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
-                    WebId: MetadataGuid(scope.Metadata, "webId"),
-                    ListId: scope.ListId,
-                    FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId") ??
-                        (Guid.TryParse(modeled.FolderUniqueId, out var modeledFolderId) ? modeledFolderId : null),
-                    HomePage: IsHomePage(scope, item.ServerRelativeUrl),
-                    LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
-                    CustomizedPageStatusRaw: item.CustomizedPageStatus,
-                    SetupPath: item.SetupPath,
-                    ObservationMethod: modeled.Provider + ":" + modeled.Operation,
-                    WelcomePageStatus: HomePageStatus(scope, item.ServerRelativeUrl),
-                    SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
-                    WebUrl: scope.WebUrl?.AbsoluteUri)).ToArray();
-                var terminalOutcome = modeled.Outcome == DiscoveryTerminalOutcome.Complete && records.Length == 0
-                    ? DiscoveryTerminalOutcome.Empty : modeled.Outcome;
-                yield return new RawDiscoveryBatch(0,
-                    DiscoveryHash.Of(modeled.Provider, modeled.Operation, scope.FolderUrl),
-                    DiscoveryHash.Of(string.Join('|', records.Select(item => item.FileUniqueId))), records,
-                    IsTerminal: true, terminalOutcome);
-                yield break;
-            }
-        }
-        var endpoint = FolderEndpoint(scope, "Files", FilesSelect, FilesExpand);
-        var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
-            "files:" + scope.ScopeKey, endpoint, FilesSelect, string.Empty,
-            AspxSurfaceApplicability.Applicable, scope.Role == "physical-forms"
-                ? "PhysicalFormsTreeAuthority" : "DocumentLibraryFilesAuthority", cancellationToken).ConfigureAwait(false);
-        foreach (var page in result.Pages)
-        {
-            var records = page.Page.Items.Select(item => new RawDiscoveryRecord(
+            var records = ObservePhysicalRecords(scope, page.Page.Items.Select(item => new RawDiscoveryRecord(
                 PropertyString(item, "UniqueId"), PropertyString(item, "UniqueId"),
                 scope.ListId?.ToString("D") ?? scope.ScopeKey, PropertyString(item, "Name"),
                 PropertyString(item, "ServerRelativeUrl"), true, options.PermissionContext,
-                EvidenceMetadata(endpoint, FilesSelect, string.Empty, page.Page.SchemaFlavor,
+                EvidenceMetadata(page.Page.RequestUri, page.Receipt.ActualSelect, string.Empty, page.Page.SchemaFlavor,
                     ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown"),
                     ("length", PropertyString(item, "Length") ?? "unknown")),
                 SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
@@ -328,10 +351,51 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 ObservationMethod: "SharePoint REST folder files",
                 WelcomePageStatus: HomePageStatus(scope, PropertyString(item, "ServerRelativeUrl")),
                 SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
-                WebUrl: scope.WebUrl?.AbsoluteUri))
-                .ToArray();
-            yield return ToRawBatch(page, records, result.Validation.Outcome);
+                WebUrl: scope.WebUrl?.AbsoluteUri)));
+            var batch = ToRawBatch(page, records, result.Validation.Outcome);
+            if (result.RetainedObservationPages?.Contains(page) == true)
+            {
+                // The engine stops at a terminal batch; retained attempts must not hide fallback-only files.
+                // Their original HTTP terminal/failure receipts remain unchanged in ReferenceCollector.
+                batch = batch with { IsTerminal = false };
+            }
+            if (invalidFileIdentityScopes.Contains(scope.ScopeKey))
+            {
+                batch = batch with
+                {
+                    TerminalOutcome = batch.IsTerminal && IsComplete(batch.TerminalOutcome)
+                        ? DiscoveryTerminalOutcome.Unknown : batch.TerminalOutcome,
+                    GapCode = MissingFileIdentity,
+                    GapDetail = "Folder authority returned an ASPX file without a real File.UniqueId; no physical identity was minted.",
+                };
+            }
+            yield return batch;
         }
+    }
+
+    /// <summary>Retains missing-identity gaps and suppresses duplicate physical file facts without deriving GUIDs from locators.</summary>
+    private IReadOnlyList<RawDiscoveryRecord> ObservePhysicalRecords(LiveScope scope, IEnumerable<RawDiscoveryRecord> records)
+    {
+        var observed = new List<RawDiscoveryRecord>();
+        foreach (var record in records)
+        {
+            if (!Guid.TryParse(record.FileUniqueId, out var fileId) || fileId == Guid.Empty)
+            {
+                if (AspxAdmission.Evaluate(record).IsAspx)
+                {
+                    invalidFileIdentityScopes.Add(scope.ScopeKey);
+                    ReferenceCollector.AddGap("files:" + scope.ScopeKey + ":" + MissingFileIdentity);
+                }
+                continue;
+            }
+            var identity = fileId.ToString("D");
+            if (!emittedFileScopes.TryAdd(identity, scope.ScopeKey))
+            {
+                continue;
+            }
+            observed.Add(record);
+        }
+        return observed;
     }
 
     private async IAsyncEnumerable<RawDiscoveryBatch> ReadTargetedFileAsync(LiveScope scope,
@@ -347,6 +411,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             IsTerminal: true, DiscoveryTerminalOutcome.Complete);
     }
 
+    /// <summary>Enumerates Forms or Views as declaration-only evidence with their original pagination and system-list disposition.</summary>
     private async IAsyncEnumerable<RawDiscoveryBatch> ReadReferencesAsync(LiveScope scope, bool isForm,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -377,120 +442,82 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
         foreach (var page in result.Pages)
         {
-            var records = new List<RawDiscoveryRecord>();
             foreach (var item in page.Page.Items)
             {
                 var objectId = PropertyString(item, "Id") ?? DiscoveryHash.Of(item.GetRawText());
-                var locator = PropertyString(item, "ServerRelativeUrl");
-                var candidate = await ResolveReferenceAsync(scope, isForm, objectId, locator,
-                    EvidenceRef(endpoint, page.Page, select), cancellationToken).ConfigureAwait(false);
-                ReferenceCollector.AddReference(candidate.Candidate);
-                if (candidate.Physical != null) records.Add(candidate.Physical);
+                ReferenceCollector.AddReference(DeclaredReference(scope,
+                    isForm ? AspxReferenceSourceKinds.ListForm : AspxReferenceSourceKinds.ListView,
+                    objectId, PropertyString(item, "ServerRelativeUrl"),
+                    "SharePoint REST List." + name, EvidenceRef(endpoint, page.Page, select)));
             }
-            yield return ToRawBatch(page, records, result.Validation.Outcome);
+            // Metadata enumerations retain their own pagination and failures, but cannot mint a physical file.
+            yield return ToRawBatch(page, Array.Empty<RawDiscoveryRecord>(), result.Validation.Outcome);
         }
     }
 
-    /// <summary>
-    /// Reads the pages a list exposes that own no file of their own: a list item addressed through a
-    /// shared display form as "&lt;displayForm&gt;?ID=&lt;n&gt;".
-    /// </summary>
-    /// <remarks>
-    /// One form file backs N of these pages, so they are acquired from the item stream rather than from
-    /// a physical file enumeration. The form file itself is already inventoried by the file surfaces;
-    /// what is discovered here is the set of addresses that render content through it.
-    /// </remarks>
-    private async IAsyncEnumerable<RawDiscoveryBatch> ReadDisplayFormItemsAsync(LiveScope scope,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    /// <summary>Records a form, view, or welcome-page locator as role evidence without resolving it into inventory authority.</summary>
+    private AspxReferenceCandidate DeclaredReference(LiveScope scope, string sourceKind, string objectId,
+        string locator, string method, params string[] evidence)
     {
-        // The forms were read with the owning list, so they are keyed by its scope rather than by this
-        // surface's.
-        var (listForm, contentTypeForms) = ResolveDisplayForms(scopes[scope.ParentScopeKey]);
-        var endpoint = Endpoint(scope.WebUrl,
-            $"_api/web/lists(guid'{scope.ListId:D}')/items?$select={ItemsSelect}");
-        var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
-            "items:" + scope.ScopeKey, endpoint, ItemsSelect, string.Empty,
-            AspxSurfaceApplicability.Applicable, "AllListItemsAuthority", cancellationToken).ConfigureAwait(false);
-        foreach (var page in result.Pages)
+        var canonical = ReferenceLocator(scope, locator);
+        var disposition = string.IsNullOrWhiteSpace(locator) ? AspxReferenceDispositions.Unknown
+            : string.Equals(Path.GetExtension(canonical), ".aspx", StringComparison.OrdinalIgnoreCase)
+                ? AspxReferenceDispositions.Declared : AspxReferenceDispositions.NonAspx;
+        return Candidate(sourceKind, scope.ListId == null ? objectId : scope.ListId.Value.ToString("D") + ":" + objectId,
+            method, canonical, disposition, string.IsNullOrWhiteSpace(locator) ? "locator_missing" : null,
+            null, "declared-reference", evidence) with { ListId = scope.ListId };
+    }
+
+    /// <summary>Normalizes tenant-local role locators but keeps external origins intact so path-only enrichment cannot mislink them.</summary>
+    private static string ReferenceLocator(LiveScope scope, string locator)
+    {
+        if (Uri.TryCreate(locator, UriKind.Absolute, out var absolute) &&
+            (absolute.Scheme == Uri.UriSchemeHttps || absolute.Scheme == Uri.UriSchemeHttp) &&
+            !string.Equals(absolute.GetLeftPart(UriPartial.Authority), scope.WebUrl.GetLeftPart(UriPartial.Authority),
+                StringComparison.OrdinalIgnoreCase))
         {
-            var records = new List<RawDiscoveryRecord>();
-            foreach (var item in page.Page.Items)
-            {
-                var itemId = PropertyInt(item, "Id");
-                var contentTypeId = PropertyString(item, "ContentTypeId");
-                var form = DisplayFormUrlPolicy.Resolve(contentTypeForms, listForm, contentTypeId);
-                // An item whose own content type resolves to the stock form is an ordinary data row even
-                // when a sibling content type in the same list names a content page form.
-                if (itemId == null || !DisplayFormUrlPolicy.IsContentPageForm(form)) continue;
-                records.Add(new RawDiscoveryRecord(
-                    scope.ListId?.ToString("D") + ":" + itemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    // No FileUniqueId: the page owns no file. The form file has one, and it belongs to the
-                    // form, not to this address.
-                    null,
-                    scope.ListId?.ToString("D") ?? scope.ScopeKey,
-                    // Admission matches on the leaf name, so it is the form's file name rather than the
-                    // addressed URL, which carries a query string.
-                    Path.GetFileName(form),
-                    $"{form}?ID={itemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
-                    LocatorIsGuaranteedPhysicalFilePath: false,
-                    scope.PermissionContext,
-                    EvidenceMetadata(endpoint, ItemsSelect, string.Empty, "pnp-list-item-display-form",
-                        ("displayFormUrl", form), ("listItemId", itemId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))),
-                    SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
-                    WebId: MetadataGuid(scope.Metadata, "webId"),
-                    ListId: scope.ListId,
-                    FolderUniqueId: null,
-                    ListItemId: itemId,
-                    // A list display form is never the web's welcome page: a welcome page is always a
-                    // physical file.
-                    HomePage: false,
-                    ContentTypeId: contentTypeId,
-                    PageType: InferPageType(contentTypeId),
-                    LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
-                    CustomizedPageStatusRaw: null,
-                    SetupPath: null,
-                    ObservationMethod: DiscoverySourceKind.ListItemDisplayFormPages.ToString()));
-            }
-            yield return ToRawBatch(page, records, result.Validation.Outcome);
+            return locator;
         }
+        return DisplayFormUrlPolicy.ToServerRelative(locator, scope.WebUrl.AbsolutePath,
+            Uri.TryCreate(MetadataString(scope.Metadata, "siteUrl"), UriKind.Absolute, out var site)
+                ? site.AbsolutePath : scope.WebUrl.AbsolutePath) ?? locator;
     }
 
     /// <summary>
-    /// Whether a list can expose pages that own no file of their own.
+    /// Records list and registered content-type display-form declarations without querying list items.
+    /// A declaration identifies a possible renderer; it does not assert an item count or a page address.
     /// </summary>
-    /// <remarks>
-    /// A document library cannot: its items are files, already inventoried by the physical file surfaces
-    /// with a real FileUniqueId, and its DispForm.aspx shows an item's metadata form rather than page
-    /// content. Nor can a list whose every candidate form is the stock list form — those hold ordinary
-    /// data rows (announcements, tasks, contacts) viewed through a system form, and enumerating them
-    /// would report every list item in the tenant as a page.
-    /// </remarks>
-    private bool HasDisplayFormPages(LiveScope list)
+    private void RecordDisplayFormDeclarations(LiveScope list, JsonElement row)
     {
-        if (list.BaseType == (int)ListBaseType.DocumentLibrary) return false;
-        var (listForm, contentTypeForms) = ResolveDisplayForms(list);
-        return contentTypeForms.Select(candidate => candidate.FormUrl).Append(listForm)
-            .Any(DisplayFormUrlPolicy.IsContentPageForm);
+        var forms = ReadDisplayForms(row);
+        var sourceId = list.ListId?.ToString("D") ?? list.ScopeKey;
+        var method = sharedLists != null ? "PnP.Core shared Web.Lists metadata" : "SharePoint REST _api/web/lists metadata";
+        RecordDisplayFormDeclaration(list, AspxReferenceSourceKinds.ListDefaultDisplayForm, sourceId + ":default",
+            method, forms.DefaultFormUrl);
+        foreach (var form in forms.ContentTypeForms)
+        {
+            RecordDisplayFormDeclaration(list, AspxReferenceSourceKinds.ContentTypeDisplayForm,
+                sourceId + ":ct:" + form.ContentTypeId, method, form.FormUrl, form.ContentTypeId);
+        }
     }
 
-    // Normalizes both display-form tiers to server-relative URLs so they can be compared with each
-    // other and with the stock form. The content-type tier keeps the longest-id-first order it was
-    // read in, so resolving an item by prefix match picks its most specific type.
-    private (string ListForm, IReadOnlyList<(string ContentTypeId, string FormUrl)> ContentTypeForms)
-        ResolveDisplayForms(LiveScope list)
+    /// <summary>Retains each list or CT declaration independently without resolving or creating a file fact.</summary>
+    private void RecordDisplayFormDeclaration(LiveScope list, string kind, string objectId, string method,
+        string rawUrl, string contentTypeId = null)
     {
-        var webRoot = list.WebUrl?.AbsolutePath ?? "/";
-        var siteRoot = Uri.TryCreate(MetadataString(list.Metadata, "siteUrl"), UriKind.Absolute, out var siteUri)
-            ? siteUri.AbsolutePath : webRoot;
-        var forms = displayForms.GetValueOrDefault(list.ScopeKey);
-        var contentTypeForms = (forms?.ContentTypeForms ?? Array.Empty<ContentTypeForm>())
-            .Select(form => (form.ContentTypeId,
-                FormUrl: DisplayFormUrlPolicy.ToServerRelative(form.FormUrl, webRoot, siteRoot)))
-            .Where(candidate => candidate.FormUrl != null)
-            .ToArray();
-        return (DisplayFormUrlPolicy.ToServerRelative(forms?.DefaultFormUrl, webRoot, siteRoot), contentTypeForms);
+        if (string.IsNullOrWhiteSpace(rawUrl))
+        {
+            return;
+        }
+        ReferenceCollector.AddReference(Candidate(kind, objectId, method, ReferenceLocator(list, rawUrl),
+            AspxReferenceDispositions.Declared, null, null, "declared-display-form") with
+        {
+            ListId = list.ListId,
+            ContentTypeId = contentTypeId,
+        });
     }
 
+    /// <summary>Resolves the explicitly requested HOME file and requires a real GUID; full-inventory role declarations never call this path.</summary>
     private async Task<(AspxReferenceCandidate Candidate, RawDiscoveryRecord Physical,
         DiscoveryTerminalOutcome Outcome)> ResolveReferenceAsync(
         LiveScope scope, bool isForm, string objectId, string locator, string evidenceRef,
@@ -510,16 +537,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
         var client = await clientFactory.GetAsync(scope.WebUrl, cancellationToken).ConfigureAwait(false);
         var resolved = await client.ResolveFileAsync(locator, cancellationToken).ConfigureAwait(false);
-        if (resolved.Outcome != DiscoveryTerminalOutcome.Complete || string.IsNullOrWhiteSpace(resolved.FileUniqueId))
+        if (resolved.Outcome != DiscoveryTerminalOutcome.Complete ||
+            !Guid.TryParse(resolved.FileUniqueId, out var resolvedId) || resolvedId == Guid.Empty)
         {
             var disposition = resolved.Outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed
                 ? AspxReferenceDispositions.ReferenceUnavailable : AspxReferenceDispositions.Unknown;
             return (Candidate(sourceKind, sourceObjectIdentity, method, locator, disposition,
-                resolved.ErrorCode, null, "unavailable", evidenceRef, resolved.EvidenceRef) with
+                resolved.ErrorCode ?? (resolved.Outcome == DiscoveryTerminalOutcome.Complete ? MissingFileIdentity : null),
+                null, "unavailable", evidenceRef, resolved.EvidenceRef) with
                 {
                     ErrorStage = resolved.ErrorStage,
                     ErrorDetail = resolved.ErrorDetail,
-                }, null, resolved.Outcome);
+                }, null, resolved.Outcome == DiscoveryTerminalOutcome.Complete
+                    ? DiscoveryTerminalOutcome.Unknown : resolved.Outcome);
         }
 
         var ghosted = string.Equals(resolved.CustomizedPageStatus, nameof(CustomizedPageStatus.Uncustomized),
@@ -558,6 +588,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             DiscoveryTerminalOutcome.Complete);
     }
 
+    /// <summary>Records the welcome-page declaration for inventory and resolves a physical file only for explicit HOME acquisition.</summary>
     private async Task<WelcomePageAcquisition> AcquireWelcomePageAsync(LiveScope web,
         CancellationToken cancellationToken)
     {
@@ -588,6 +619,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
         var absolutePath = value.StartsWith('/') ? value : web.WebUrl.AbsolutePath.TrimEnd('/') + "/" + value.TrimStart('/');
         welcomePageByWeb[web.WebUrl.AbsoluteUri.TrimEnd('/')] = NormalizeServerRelativePath(absolutePath);
+        if (options.Intent != AspxDiscoveryIntent.HomePageOnly)
+        {
+            ReferenceCollector.AddReference(DeclaredReference(web, AspxReferenceSourceKinds.WebWelcomePage,
+                web.ScopeKey, absolutePath, result.Provider + ":" + result.Operation, result.EvidenceRef));
+            return new(outcome, absolutePath, null, null);
+        }
         var resolved = await ResolveReferenceAsync(web with { ListId = null }, isForm: false,
             web.ScopeKey, absolutePath, result.EvidenceRef,
             cancellationToken, AspxReferenceSourceKinds.WebWelcomePage,
@@ -628,6 +665,10 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         ReferenceCollector.AddSurface(row, Array.Empty<AspxPaginationPageReceipt>());
     }
 
+    /// <summary>
+    /// Records actual BaseType provenance and per-surface applicability for legacy library, physical-root, Forms-tree, and form/view authorities.
+    /// Keeps missing authority unknown and distinguishes library classification from admission of all observed list roots.
+    /// </summary>
     private void RecordListApplicability(LiveScope web, LiveScope list, int? template)
     {
         var decision = AspxListApplicabilityPolicy.Evaluate(list.BaseType);
@@ -643,15 +684,14 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             $"surface-family={ClassifyListSurface(list, template)}",
             $"Hidden={list.Metadata?.GetValueOrDefault("hidden", "missing") ?? "missing"}",
             $"IsCatalog={list.Metadata?.GetValueOrDefault("isCatalog", "missing") ?? "missing"}",
-            "Applicability is selected from actual BaseType; template/catalog flags remain explicit provenance.",
+            "Document-library classification uses actual BaseType; every observed list root is traversed for physical files.",
         };
         ReferenceCollector.AddSurface(SurfaceRow(web.ScopeKey, web.ScopeKey,
             "list-applicability:" + list.ScopeKey, list.Locator, string.Empty, string.Empty,
             "ActualListBaseTypeAuthority", applicability, outcome,
             expectedState == AspxExpectedCountState.Known ? 1 : null, expectedState,
             1, DiscoveryHash.Of("list-applicability", list.ScopeKey), 0, evidence,
-            applicability == AspxSurfaceApplicability.Applicable ? "raw-files+physical-forms+forms+views"
-                : "forms+views") with
+            "list-root-files+physical-forms+forms+views") with
             {
                 ActualMethod = sharedLists == null ? "GET" : "MODEL",
                 ActualEndpoint = sharedLists == null ? list.Locator : "PnP.Core:Web.Lists(raw Web response projection)",
@@ -668,6 +708,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 : AspxSurfaceApplicability.SystemOrVirtualOnly,
             list.BaseType == null ? DiscoveryTerminalOutcome.Unknown : DiscoveryTerminalOutcome.Complete,
             "DocumentLibraryFilesAuthority", evidence);
+        RecordMatrixDisposition(web, list, "list-root-files",
+            string.IsNullOrWhiteSpace(list.FolderUrl) ? AspxSurfaceApplicability.Unknown
+                : AspxSurfaceApplicability.Applicable,
+            string.IsNullOrWhiteSpace(list.FolderUrl) ? DiscoveryTerminalOutcome.Unknown
+                : DiscoveryTerminalOutcome.Complete,
+            "ListRootFilesAuthority", evidence);
         RecordMatrixDisposition(web, list, "physical-forms-tree",
             string.IsNullOrWhiteSpace(list.FolderUrl) ? AspxSurfaceApplicability.Unknown
                 : AspxSurfaceApplicability.Applicable,
@@ -713,43 +759,163 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         return list.BaseType == (int)ListBaseType.DocumentLibrary ? "document-library" : "list";
     }
 
-    private async Task<SharePointModeledFolderResult> ReadModeledFolderAsync(LiveScope scope,
-        CancellationToken cancellationToken)
+    /// <summary>Reads only a Web-root folder identity; neither SDK child collection can bypass bounded REST acquisition.</summary>
+    private async Task<LiveScope> ReadFolderIdentityAsync(LiveScope scope, CancellationToken cancellationToken)
     {
-        var key = scope.WebUrl.AbsoluteUri.TrimEnd('/').ToLowerInvariant() + "|" + scope.FolderUrl;
-        if (modeledFolders.TryGetValue(key, out var existing)) return existing;
-        var client = await clientFactory.GetAsync(scope.WebUrl, cancellationToken).ConfigureAwait(false);
-        var result = await client.ReadFolderAsync(scope.FolderUrl, cancellationToken).ConfigureAwait(false);
-        modeledFolders[key] = result;
-        return result;
-    }
-
-    private void RecordModeledFolderSurface(LiveScope scope, SharePointModeledFolderResult result, bool files)
-    {
-        var observed = files ? result.Files.Count : result.Folders.Count;
-        var known = result.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty;
-        var outcome = known && observed == 0 ? DiscoveryTerminalOutcome.Empty : result.Outcome;
-        var select = files ? "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,Properties"
-            : "UniqueId,Name,ServerRelativeUrl";
-        var surfaceId = (files ? "web-root-files:" : "web-root-folders:") + scope.ScopeKey;
-        var row = SurfaceRow(scope.ScopeKey, scope.ParentScopeKey, surfaceId, scope.FolderUrl,
-            select, string.Empty, "PnPCoreModeledWebRootAuthority", AspxSurfaceApplicability.Applicable,
-            outcome, known ? observed : null,
-            known ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown, observed,
-            DiscoveryHash.Of(result.Provider, result.Operation, scope.FolderUrl, files.ToString(),
-                observed.ToString(System.Globalization.CultureInfo.InvariantCulture)), 0,
+        scope = PhysicalScope(scope);
+        if (scope.SourceKind != DiscoverySourceKind.WebRootFiles || MetadataGuid(scope.Metadata, "folderUniqueId") != null)
+        {
+            return scope;
+        }
+        var key = FolderIdentity(scope);
+        if (!modeledFolders.TryGetValue(key, out var result))
+        {
+            var client = await clientFactory.GetAsync(scope.WebUrl, cancellationToken).ConfigureAwait(false);
+            result = await client.ReadFolderAsync(scope.FolderUrl, cancellationToken).ConfigureAwait(false);
+            modeledFolders[key] = result;
+        }
+        var known = Guid.TryParse(result.FolderUniqueId, out var identity) && identity != Guid.Empty &&
+            string.Equals(NormalizeServerRelativePath(result.FolderServerRelativeUrl)?.TrimEnd('/'),
+                NormalizeServerRelativePath(scope.FolderUrl)?.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+        if (known)
+        {
+            observedFolderIds[key] = identity.ToString("D");
+        }
+        var outcome = known ? DiscoveryTerminalOutcome.Complete : result.Outcome;
+        var surfaceId = "folder-identity:" + scope.ScopeKey;
+        var surface = SurfaceRow(scope.ScopeKey, scope.ParentScopeKey, surfaceId, scope.FolderUrl,
+            "UniqueId,ServerRelativeUrl", string.Empty, "PnPCoreFolderIdentityMetadata",
+            AspxSurfaceApplicability.Applicable, outcome, known ? 1 : null,
+            known ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown, known ? 1 : 0,
+            DiscoveryHash.Of(result.Provider, result.Operation, result.FolderUniqueId), 0,
             new[] { result.EvidenceRef, "provider=" + result.Provider, "operation=" + result.Operation },
-            files ? "PnPCoreWebRootFilesAuthority" : "PnPCoreWebRootFoldersAuthority",
-            known && observed == 0 ? "AuthorityTerminalZero" : null,
-            known && observed == 0 ? scope.FolderUrl : null) with
+            "FolderIdentityMetadataLookup", null, null) with
         {
             ActualMethod = "MODEL",
             ActualEndpoint = result.Provider + ":" + result.Operation,
             AsOfUtc = result.ReceivedAtUtc,
+            ClassificationEffect = "metadata-only",
         };
-        ReferenceCollector.AddSurface(row, Array.Empty<AspxPaginationPageReceipt>(), known
-            ? Array.Empty<string>() : new[] { surfaceId + ":" + (result.ErrorCode ?? "modeled_authority_incomplete") });
+        ReferenceCollector.AddSurface(surface, Array.Empty<AspxPaginationPageReceipt>(), known
+            ? Array.Empty<string>() : new[] { surfaceId + ":folder_identity_unavailable" });
+        return PhysicalScope(scope);
     }
+
+    /// <summary>Shares successful Files/Folders collection content without collapsing the distinct parent scopes or fabricating HTTP receipts.</summary>
+    private async Task<LiveCollectionResult> ReadFolderCollectionAsync(LiveScope scope, bool files,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var child = files ? "Files" : "Folders";
+        var key = FolderIdentity(scope) + "|" + child;
+        if (folderCollections.TryGetValue(key, out var existing))
+        {
+            if (existing.Surface.ScopeKey != scope.ScopeKey)
+            {
+                ReferenceCollector.AddSurface(existing.Surface with
+                {
+                    ScopeKey = scope.ScopeKey,
+                    ParentScopeKey = scope.ParentScopeKey,
+                    SurfaceId = child.ToLowerInvariant() + ":" + scope.ScopeKey,
+                    ActualMethod = "CACHE",
+                    EvidenceRefs = existing.Surface.EvidenceRefs.Concat(new[]
+                    {
+                        "reused-surface=" + existing.Surface.SurfaceId,
+                        "reused-pagination-chain=" + existing.Surface.PaginationChainHash,
+                    }).ToArray(),
+                }, Array.Empty<AspxPaginationPageReceipt>());
+            }
+            return existing;
+        }
+
+        var select = files ? FilesSelect : FoldersSelect;
+        var endpoint = FolderEndpoint(scope, child, select, files ? FilesExpand : null);
+        var adapter = !files ? "RecursiveFolderAuthority" : scope.Role == "physical-forms"
+            ? "PhysicalFormsTreeAuthority" : scope.SourceKind == DiscoverySourceKind.RawListFolderFiles
+                ? "ListRootFilesAuthority" : "DocumentLibraryFilesAuthority";
+        var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
+            child.ToLowerInvariant() + ":" + scope.ScopeKey, endpoint, select, string.Empty,
+            AspxSurfaceApplicability.Applicable, adapter, cancellationToken, filePaging: files).ConfigureAwait(false);
+        if (files && (result.Validation.Outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed))
+        {
+            // ListItemAllFields and property bags are optional enrichment, not a physical-file admission requirement.
+            const string physicalSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,Length";
+            var enriched = result;
+            result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
+                "physical-files:" + scope.ScopeKey, FolderEndpoint(scope, child, physicalSelect), physicalSelect,
+                string.Empty, AspxSurfaceApplicability.Applicable, "PhysicalFolderFilesAuthorityFallback",
+                cancellationToken, filePaging: true).ConfigureAwait(false);
+            // Retain every physical observation, but keep the two HTTP chains and coverage proofs separate.
+            result = result with { RetainedObservationPages = enriched.ObservationPages.ToArray() };
+        }
+        if (!files && result.Items.Any(item => string.IsNullOrWhiteSpace(PropertyString(item, "ServerRelativeUrl"))))
+        {
+            var incomplete = result.Surface with
+            {
+                TerminalOutcome = DiscoveryTerminalOutcome.Unknown,
+                ExpectedCount = null,
+                ExpectedCountState = AspxExpectedCountState.Unknown,
+                AggregateEffect = "unknown",
+            };
+            ReferenceCollector.AddSurface(incomplete, Array.Empty<AspxPaginationPageReceipt>(),
+                new[] { incomplete.SurfaceId + ":folder_url_missing" });
+            result = result with { Validation = result.Validation with { Outcome = DiscoveryTerminalOutcome.Unknown }, Surface = incomplete };
+        }
+        if (files && result.Items.Any(item => IsAspxRow(item) &&
+            (!Guid.TryParse(PropertyString(item, "UniqueId"), out var id) || id == Guid.Empty)))
+        {
+            var incomplete = result.Surface with
+            {
+                TerminalOutcome = DiscoveryTerminalOutcome.Unknown,
+                ExpectedCount = null,
+                ExpectedCountState = AspxExpectedCountState.Unknown,
+                AggregateEffect = "unknown",
+            };
+            ReferenceCollector.AddSurface(incomplete, Array.Empty<AspxPaginationPageReceipt>(),
+                new[] { incomplete.SurfaceId + ":" + MissingFileIdentity });
+            result = result with { Validation = result.Validation with { Outcome = DiscoveryTerminalOutcome.Unknown }, Surface = incomplete };
+        }
+        if (IsComplete(result.Validation.Outcome))
+        {
+            folderCollections[key] = result with { RetainedObservationPages = null };
+        }
+        return result;
+    }
+
+    /// <summary>Recognizes ASPX physical rows solely by file name or the guaranteed folder-file locator.</summary>
+    private static bool IsAspxRow(JsonElement item) => string.Equals(Path.GetExtension(
+        PropertyString(item, "Name") ?? PropertyString(item, "ServerRelativeUrl")), ".aspx", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Identifies one physical folder within this provider's authorized Web and permission boundary, independently of its scope entrance.</summary>
+    private static string FolderIdentity(LiveScope scope) => scope.WebUrl.GetLeftPart(UriPartial.Authority) +
+        "|" + (NormalizeServerRelativePath(scope.FolderUrl) ?? string.Empty).TrimEnd('/');
+
+    /// <summary>Selects only observed list-root containment as physical ownership; a form/view declaration never authorizes an owner GUID.</summary>
+    private LiveScope PhysicalOwner(LiveScope scope, string path) => listRoots
+        .Where(root => !string.IsNullOrWhiteSpace(root.FolderUrl) &&
+            (string.Equals(NormalizeServerRelativePath(path)?.TrimEnd('/'),
+                NormalizeServerRelativePath(root.FolderUrl)?.TrimEnd('/'), StringComparison.OrdinalIgnoreCase) ||
+             NormalizeServerRelativePath(path)?.StartsWith(NormalizeServerRelativePath(root.FolderUrl).TrimEnd('/') + "/",
+                StringComparison.OrdinalIgnoreCase) == true))
+        .OrderByDescending(root => root.FolderUrl.Length).FirstOrDefault();
+
+    /// <summary>Applies physical root ownership while preserving the original parent scope and the current folder's observed GUID.</summary>
+    private LiveScope PhysicalScope(LiveScope scope)
+    {
+        var owner = PhysicalOwner(scope, scope.FolderUrl);
+        return scope with
+        {
+            ListId = owner?.ListId,
+            BaseType = owner?.BaseType,
+            Metadata = WithMetadata(owner?.Metadata ?? scope.Metadata,
+                ("folderUniqueId", observedFolderIds.GetValueOrDefault(FolderIdentity(scope)) ??
+                    MetadataString(scope.Metadata, "folderUniqueId") ?? string.Empty)),
+        };
+    }
+
+    /// <summary>Limits cross-entrance content reuse to terminal successful collection outcomes.</summary>
+    private static bool IsComplete(DiscoveryTerminalOutcome outcome) =>
+        outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty;
 
     private void RecordModeledValueSurface(LiveScope scope, string surfaceId, SharePointModeledValue result,
         DiscoveryTerminalOutcome outcome, AspxSurfaceApplicability applicability, string adapter)
@@ -772,30 +938,37 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             ? Array.Empty<string>() : new[] { surfaceId + ":" + (result.ErrorCode ?? "modeled_authority_incomplete") });
     }
 
+    /// <summary>Retains paginated authority receipts and terminal failures, including partial evidence before cancellation.</summary>
     private async Task<LiveCollectionResult> ReadCollectionAsync(string scopeKey, string parentScopeKey,
         string surfaceId, Uri initialEndpoint, string select, string filter,
         AspxSurfaceApplicability applicability, string adapter, CancellationToken cancellationToken,
-        AspxSurfaceDispositionRule dispositionRule = null)
+        AspxSurfaceDispositionRule dispositionRule = null, bool filePaging = false)
     {
         var client = await clientFactory.GetAsync(WebUrlFromEndpoint(initialEndpoint), cancellationToken)
             .ConfigureAwait(false);
         var pages = new List<LivePage>();
         var items = new List<JsonElement>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        Uri next = initialEndpoint;
+        var fileReader = filePaging ? new SharePointFolderFilePageReader(client, initialEndpoint) : null;
+        Uri next = fileReader?.NextEndpoint ?? initialEndpoint;
         string requestToken = null;
         var providerOutcome = DiscoveryTerminalOutcome.Complete;
+        var cancelled = false;
         for (var ordinal = 0; next != null; ordinal++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             SharePointRestPage page;
             try
             {
-                page = await client.GetPageAsync(next, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                page = fileReader == null
+                    ? await client.GetPageAsync(next, cancellationToken).ConfigureAwait(false)
+                    : await fileReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw;
+                providerOutcome = DiscoveryTerminalOutcome.Cancelled;
+                cancelled = true;
+                break;
             }
             catch (Exception ex)
             {
@@ -842,6 +1015,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
 
         var validation = AspxPaginationContract.Validate(pages.Select(page => page.Receipt).ToArray(), providerOutcome);
+        if (cancelled) validation = validation with { Outcome = DiscoveryTerminalOutcome.Cancelled };
         var expectedState = validation.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty
             ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown;
         int? expected = expectedState == AspxExpectedCountState.Known ? items.Count : null;
@@ -853,11 +1027,15 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         var row = SurfaceRow(scopeKey, parentScopeKey, surfaceId, initialEndpoint.AbsoluteUri, select,
             filter ?? string.Empty, "SharePointRestCollectionAuthority", applicability, outcome,
             expected, expectedState, items.Count, validation.ChainHash, validation.OutstandingTokenCount,
-            pages.Select(page => EvidenceRef(initialEndpoint, page.Page, select)).ToArray(), adapter,
+            pages.Select(page => EvidenceRef(initialEndpoint, page.Page, select))
+                .Concat(fileReader?.Attempts.Select(attempt => "file-page-attempt;" +
+                    AspxDurableRequestEvidence.Reference(attempt.RequestUri, attempt, select)) ?? Array.Empty<string>())
+                .Distinct(StringComparer.Ordinal).ToArray(), adapter,
             absenceKind, absenceKind == null ? null : initialEndpoint.AbsoluteUri, appliedDispositionRule);
         ReferenceCollector.AddSurface(row, pages.Select(page => page.Receipt).ToArray(),
             validation.GapCodes.Select(code => surfaceId + ":" + code).ToArray());
-        return new(items, pages, validation with { Outcome = outcome }, appliedDispositionRule);
+        if (cancelled) throw new OperationCanceledException(cancellationToken);
+        return new(items, pages, validation with { Outcome = outcome }, appliedDispositionRule, row);
     }
 
     private AspxSurfaceDenominatorRow SurfaceRow(string scopeKey, string parentScopeKey, string surfaceId,
@@ -944,6 +1122,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
 
     private string Key(params string[] values) => DiscoveryHash.Of(values)[..24];
     private static Uri Endpoint(Uri webUrl, string relative) => new(webUrl.AbsoluteUri.TrimEnd('/') + "/" + relative.TrimStart('/'));
+    /// <summary>Builds a folder collection request from its decoded ResourcePath, preserving literal percent sequences as OData parameter data.</summary>
     private static Uri FolderEndpoint(LiveScope scope, string child, string select, string expand = null)
     {
         var query = $"$select={select}" + (string.IsNullOrWhiteSpace(expand) ? string.Empty : $"&$expand={expand}");
@@ -951,7 +1130,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             return Endpoint(scope.WebUrl, $"_api/web/RootFolder/{child}?{query}");
         // Keep decoded ResourcePath values unambiguous inside the HTTP URI. In particular, a raw '#'
         // would otherwise start the URI fragment and silently truncate the requested folder and query.
-        var decoded = (scope.FolderUrl ?? string.Empty).Replace("%20", " ", StringComparison.Ordinal)
+        var decoded = (scope.FolderUrl ?? string.Empty)
             .Replace('\\', '/').Replace("'", "''", StringComparison.Ordinal);
         var encoded = WebUtility.UrlEncode(decoded).Replace("+", "%20", StringComparison.Ordinal);
         return Endpoint(scope.WebUrl,
@@ -967,22 +1146,19 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private static string PropertyString(JsonElement item, string name) =>
         PnPContextSharePointAspxRestClient.TryProperty(item, name, out var value) &&
         value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined) ? value.ToString() : null;
+    /// <summary>Reads optional numeric classification metadata without rejecting null or malformed BaseType values as list-admission failures.</summary>
     private static int? PropertyInt(JsonElement item, string name) =>
         PnPContextSharePointAspxRestClient.TryProperty(item, name, out var value) &&
-        (value.TryGetInt32(out var number) || int.TryParse(value.ToString(), out number)) ? number : null;
+        ((value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)) ||
+            int.TryParse(value.ToString(), out number)) ? number : null;
     private static bool? PropertyBool(JsonElement item, string name) =>
         PnPContextSharePointAspxRestClient.TryProperty(item, name, out var value) &&
         (value.ValueKind is JsonValueKind.True or JsonValueKind.False || bool.TryParse(value.ToString(), out _))
             ? value.ValueKind == JsonValueKind.True || bool.Parse(value.ToString()) : null;
+    /// <summary>Accepts only observed nonempty GUIDs for list authority identities.</summary>
     private static Guid? PropertyGuid(JsonElement item, string name) =>
-        Guid.TryParse(PropertyString(item, name), out var value) ? value : null;
-    /// <summary>
-    /// Reads the display-form surfaces a list exposes from its all-lists row.
-    /// </summary>
-    /// <remarks>
-    /// Content-type forms are ordered longest content type id first, so resolving an item's form by
-    /// prefix match picks the most specific type in the id hierarchy rather than its ancestor.
-    /// </remarks>
+        Guid.TryParse(PropertyString(item, name), out var value) && value != Guid.Empty ? value : null;
+    /// <summary>Reads registered display-form declarations from the list metadata row.</summary>
     private static ListDisplayForms ReadDisplayForms(JsonElement item)
     {
         var contentTypeForms = NestedArray(item, "ContentTypes")
@@ -990,7 +1166,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 PropertyString(contentType, "DisplayFormUrl")))
             .Where(form => !string.IsNullOrWhiteSpace(form.ContentTypeId) &&
                 !string.IsNullOrWhiteSpace(form.FormUrl))
-            .OrderByDescending(form => form.ContentTypeId.Length)
+            .OrderBy(form => form.ContentTypeId, StringComparer.Ordinal)
             .ToArray();
         return new ListDisplayForms(PropertyString(item, "DefaultDisplayFormUrl"), contentTypeForms);
     }
@@ -1023,13 +1199,16 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         PnPContextSharePointAspxRestClient.TryProperty(item, parent, out var nested) ? PropertyString(nested, child) : null;
     private static int? NestedInt(JsonElement item, string parent, string child) =>
         PnPContextSharePointAspxRestClient.TryProperty(item, parent, out var nested) ? PropertyInt(nested, child) : null;
+    /// <summary>Preserves unknown identity as null rather than claiming Guid.Empty as an observed site, Web or folder GUID.</summary>
     private static Guid? MetadataGuid(IReadOnlyDictionary<string, string> metadata, string key) =>
-        metadata != null && metadata.TryGetValue(key, out var value) && Guid.TryParse(value, out var parsed) ? parsed : null;
+        metadata != null && metadata.TryGetValue(key, out var value) && Guid.TryParse(value, out var parsed) &&
+            parsed != Guid.Empty ? parsed : null;
     private static string MetadataString(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
     private static bool? MetadataBool(IReadOnlyDictionary<string, string> metadata, string key) =>
         metadata != null && metadata.TryGetValue(key, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
-    private static string InferPageType(string contentTypeId)
+    /// <summary>Reuses the existing content-type prefix heuristics for discovery and business export without changing their precedence.</summary>
+    internal static string InferPageType(string contentTypeId)
     {
         if (string.IsNullOrWhiteSpace(contentTypeId)) return null;
         if (contentTypeId.StartsWith("0x0101009D1CB255DA76424F860D91F20E6C4118", StringComparison.OrdinalIgnoreCase))
@@ -1110,5 +1289,12 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         IReadOnlyList<JsonElement> Items,
         IReadOnlyList<LivePage> Pages,
         AspxPaginationValidation Validation,
-        AspxSurfaceDispositionRule AppliedDispositionRule);
+        AspxSurfaceDispositionRule AppliedDispositionRule,
+        AspxSurfaceDenominatorRow Surface,
+        IReadOnlyList<LivePage> RetainedObservationPages = null)
+    {
+        /// <summary>Combines file observations without combining their independent pagination chains or coverage proofs.</summary>
+        internal IEnumerable<LivePage> ObservationPages => RetainedObservationPages == null
+            ? Pages : RetainedObservationPages.Concat(Pages);
+    }
 }

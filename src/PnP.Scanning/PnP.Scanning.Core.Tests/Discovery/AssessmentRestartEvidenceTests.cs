@@ -17,6 +17,40 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     public AssessmentRestartEvidenceTests(ScanContextFixture database) => this.database = database;
     private AssessmentDiscoveryWriter Writer() => new(database.CreateContext);
 
+    /// <summary>
+    /// Reads all discovered web roots for one scan across keyset batches, excluding scheduled assessment roots and other scans.
+    /// </summary>
+    [Fact]
+    public async Task Scan_wide_acquisition_reads_only_discovered_web_roots_across_keyset_batches()
+    {
+        var scan = Guid.NewGuid();
+        var siteId = Guid.NewGuid();
+        var roots = Enumerable.Range(0, 130).Select(index => new ClassicPageDiscovery
+        {
+            ScanId = scan, RecordKey = $"scope:web-{index:D3}", RowType = "Scope", ScopeType = "Web",
+            SiteUrl = Site, WebUrl = "/web" + index, Url = Site + "/web" + index,
+            SiteCollectionId = siteId, WebId = Guid.NewGuid(), DiscoveryStatus = "Complete",
+        }).ToArray();
+        await Writer().WriteAsync(roots.Append(new ClassicPageDiscovery
+        {
+            ScanId = scan, RecordKey = "assessment:scheduled-web", RowType = "Scope", ScopeType = "Web",
+            SiteUrl = Site, WebUrl = "/scheduled", Url = Site + "/scheduled",
+            DiscoveryStatus = "Complete",
+        }).Append(new ClassicPageDiscovery
+        {
+            ScanId = Guid.NewGuid(), RecordKey = "scope:other-scan", RowType = "Scope", ScopeType = "Web",
+            SiteUrl = Site, WebUrl = "/other", Url = Site + "/other",
+            SiteCollectionId = siteId, WebId = Guid.NewGuid(), DiscoveryStatus = "Complete",
+        }));
+
+        var discovered = new List<ClassicPageDiscovery>();
+        await foreach (var root in Writer().ReadDiscoveredWebScopesAsync(scan)) discovered.Add(root);
+
+        discovered.Should().HaveCount(130);
+        discovered.Select(root => root.RecordKey).Should().BeInAscendingOrder();
+        discovered.Select(root => root.WebUrl).Should().Contain("/web129");
+    }
+
     [Fact]
     public async Task Native_restart_projection_preserves_templates_and_only_returns_this_sites_queued_webs()
     {
