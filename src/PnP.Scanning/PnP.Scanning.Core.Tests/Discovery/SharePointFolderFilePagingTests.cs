@@ -38,6 +38,8 @@ public sealed class SharePointFolderFilePagingTests
             Query(uri, "$select") == "UniqueId,Name,ServerRelativeUrl" && Query(uri, "$expand") == "Properties" &&
             Query(uri, "@u") == "'/sites/a/Pages'");
         reader.Attempts.Should().HaveCount(3);
+        reader.Attempts.Should().OnlyContain(attempt => attempt.Page.Items.Count == 0,
+            "attempt evidence must not keep consumed JSON payloads alive");
     }
 
     /// <summary>Size failures reduce the same cursor only, and the successful minimum size remains in force for the rest of the folder.</summary>
@@ -62,7 +64,7 @@ public sealed class SharePointFolderFilePagingTests
         client.Requests.Select(uri => Number(uri, "$skip")).Should().Equal(0, 1000, 1000, 1000, 1200, 1211);
         client.Requests.Select(uri => Number(uri, "$top")).Should().Equal(1000, 1000, 500, 200, 200, 200);
         reader.RequestedPageSize.Should().Be(200);
-        reader.Attempts.Select(page => page.ErrorCode).Should().Equal(null, "json_response_size_limit",
+        reader.Attempts.Select(attempt => attempt.Page.ErrorCode).Should().Equal(null, "json_response_size_limit",
             "json_response_size_limit", null, null, null);
         reduced.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
         reader.NextEndpoint.Should().BeNull();
@@ -130,7 +132,10 @@ public sealed class SharePointFolderFilePagingTests
         reader.NextEndpoint.Should().BeNull();
         client.Requests.Select(uri => Number(uri, "$top")).Should().Equal(1000, 500, 200);
         client.Requests.Select(uri => Number(uri, "$skip")).Should().Equal(0, 0, 0);
-        reader.Attempts.Select(attempt => attempt.Items.Count).Should().Equal(1001, 501, 201);
+        reader.Attempts.Should().HaveCount(3).And.OnlyContain(attempt => attempt.Page.Items.Count == 0);
+        reader.Attempts.Select(attempt => attempt.ResponseItemCount).Should().Equal(1001, 501, 201);
+        reader.Attempts.Select(attempt => Number(attempt.Page.RequestUri, "$top")).Should().Equal(1000, 500, 200);
+        reader.Attempts.Should().OnlyContain(attempt => !string.IsNullOrEmpty(attempt.Page.ResponseDigest));
     }
 
     /// <summary>Successful recovery from an ignored top retains only the resolved page and does not advance by discarded rows.</summary>

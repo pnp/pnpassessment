@@ -30,6 +30,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
     private const string PhysicalListsSelect = "Id,Title,BaseType,BaseTemplate,Hidden,IsCatalog,RootFolder/ServerRelativeUrl,RootFolder/UniqueId";
     private readonly Dictionary<string, SharePointModeledFolderResult> modeledFolders = new(StringComparer.Ordinal);
     private readonly Dictionary<string, LiveCollectionResult> folderCollections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, AspxSurfaceDenominatorRow> completedFileCollections = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> emittedFileScopes = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> invalidFileIdentityScopes = new(StringComparer.Ordinal);
     private readonly HashSet<string> invalidFolderScopes = new(StringComparer.Ordinal);
@@ -280,7 +281,7 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         }
 
         parent = await ReadFolderIdentityAsync(parent, cancellationToken).ConfigureAwait(false);
-        var result = await ReadFolderCollectionAsync(parent, files: false, cancellationToken).ConfigureAwait(false);
+        var result = await ReadFolderCollectionAsync(parent, cancellationToken).ConfigureAwait(false);
         var rawChildren = result.Items.Select(item => FolderChild(parent,
                 PropertyString(item, "ServerRelativeUrl"), PropertyString(item, "UniqueId")))
             .Where(child => child != null).ToArray();
@@ -327,49 +328,77 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         cancellationToken.ThrowIfCancellationRequested();
         scope = PhysicalScope(scope);
         scope = await ReadFolderIdentityAsync(scope, cancellationToken).ConfigureAwait(false);
-        var result = await ReadFolderCollectionAsync(scope, files: true, cancellationToken).ConfigureAwait(false);
-        foreach (var page in result.ObservationPages)
+        var key = FolderIdentity(scope);
+        if (completedFileCollections.TryGetValue(key, out var completed))
         {
-            var records = ObservePhysicalRecords(scope, page.Page.Items.Select(item => new RawDiscoveryRecord(
-                PropertyString(item, "UniqueId"), PropertyString(item, "UniqueId"),
-                scope.ListId?.ToString("D") ?? scope.ScopeKey, PropertyString(item, "Name"),
-                PropertyString(item, "ServerRelativeUrl"), true, options.PermissionContext,
-                EvidenceMetadata(page.Page.RequestUri, page.Receipt.ActualSelect, string.Empty, page.Page.SchemaFlavor,
-                    ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown"),
-                    ("length", PropertyString(item, "Length") ?? "unknown")),
-                SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
-                WebId: MetadataGuid(scope.Metadata, "webId"),
-                ListId: scope.ListId,
-                FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId"),
-                ListItemId: NestedInt(item, "ListItemAllFields", "Id"),
-                HomePage: IsHomePage(scope, PropertyString(item, "ServerRelativeUrl")),
-                ContentTypeId: NestedString(item, "ListItemAllFields", "ContentTypeId"),
-                PageType: InferPageType(NestedString(item, "ListItemAllFields", "ContentTypeId")),
-                LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
-                CustomizedPageStatusRaw: PropertyString(item, "CustomizedPageStatus"),
-                SetupPath: NestedString(item, "Properties", RestSetupPathProperty),
-                ObservationMethod: "SharePoint REST folder files",
-                WelcomePageStatus: HomePageStatus(scope, PropertyString(item, "ServerRelativeUrl")),
-                SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
-                WebUrl: scope.WebUrl?.AbsoluteUri)));
-            var batch = ToRawBatch(page, records, result.Validation.Outcome);
-            if (result.RetainedObservationPages?.Contains(page) == true)
+            RecordCacheSurface(completed, scope, "files");
+            yield return new RawDiscoveryBatch(0, DiscoveryHash.Of("cached-files", key),
+                completed.PaginationChainHash, Array.Empty<RawDiscoveryRecord>(), true, completed.TerminalOutcome);
+            yield break;
+        }
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            const string physicalSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,Length";
+            var select = attempt == 0 ? FilesSelect : physicalSelect;
+            var endpoint = FolderEndpoint(scope, "Files", select, attempt == 0 ? FilesExpand : null);
+            var adapter = attempt != 0 ? "PhysicalFolderFilesAuthorityFallback" : scope.Role == "physical-forms"
+                ? "PhysicalFormsTreeAuthority" : scope.SourceKind == DiscoverySourceKind.RawListFolderFiles
+                    ? "ListRootFilesAuthority" : "DocumentLibraryFilesAuthority";
+            var surfaceId = (attempt == 0 ? "files:" : "physical-files:") + scope.ScopeKey;
+            bool retryPhysical = false;
+            await foreach (var page in ReadCollectionPagesAsync(scope.ScopeKey, scope.ParentScopeKey,
+                surfaceId, endpoint, select, string.Empty, AspxSurfaceApplicability.Applicable, adapter,
+                cancellationToken, filePaging: true).ConfigureAwait(false))
             {
-                // The engine stops at a terminal batch; retained attempts must not hide fallback-only files.
-                // Their original HTTP terminal/failure receipts remain unchanged in ReferenceCollector.
-                batch = batch with { IsTerminal = false };
-            }
-            if (invalidFileIdentityScopes.Contains(scope.ScopeKey))
-            {
-                batch = batch with
+                var records = ObservePhysicalRecords(scope, page.Page.Items.Select(item => new RawDiscoveryRecord(
+                    PropertyString(item, "UniqueId"), PropertyString(item, "UniqueId"),
+                    scope.ListId?.ToString("D") ?? scope.ScopeKey, PropertyString(item, "Name"),
+                    PropertyString(item, "ServerRelativeUrl"), true, options.PermissionContext,
+                    EvidenceMetadata(page.Page.RequestUri, page.Receipt.ActualSelect, string.Empty, page.Page.SchemaFlavor,
+                        ("customizedPageStatus", PropertyString(item, "CustomizedPageStatus") ?? "unknown"),
+                        ("length", PropertyString(item, "Length") ?? "unknown")),
+                    SiteCollectionId: MetadataGuid(scope.Metadata, "siteCollectionId"),
+                    WebId: MetadataGuid(scope.Metadata, "webId"),
+                    ListId: scope.ListId,
+                    FolderUniqueId: MetadataGuid(scope.Metadata, "folderUniqueId"),
+                    ListItemId: NestedInt(item, "ListItemAllFields", "Id"),
+                    HomePage: IsHomePage(scope, PropertyString(item, "ServerRelativeUrl")),
+                    ContentTypeId: NestedString(item, "ListItemAllFields", "ContentTypeId"),
+                    PageType: InferPageType(NestedString(item, "ListItemAllFields", "ContentTypeId")),
+                    LibraryHidden: MetadataBool(scope.Metadata, "hidden"),
+                    CustomizedPageStatusRaw: PropertyString(item, "CustomizedPageStatus"),
+                    SetupPath: NestedString(item, "Properties", RestSetupPathProperty),
+                    ObservationMethod: "SharePoint REST folder files",
+                    WelcomePageStatus: HomePageStatus(scope, PropertyString(item, "ServerRelativeUrl")),
+                    SiteUrl: MetadataString(scope.Metadata, "siteUrl") ?? scope.WebUrl?.GetLeftPart(UriPartial.Authority),
+                    WebUrl: scope.WebUrl?.AbsoluteUri)));
+                var outcome = page.Completion?.Validation.Outcome ?? DiscoveryTerminalOutcome.Pending;
+                var batch = ToRawBatch(page, records, outcome);
+                retryPhysical = attempt == 0 &&
+                    outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed;
+                if (retryPhysical)
                 {
-                    TerminalOutcome = batch.IsTerminal && IsComplete(batch.TerminalOutcome)
-                        ? DiscoveryTerminalOutcome.Unknown : batch.TerminalOutcome,
-                    GapCode = MissingFileIdentity,
-                    GapDetail = "Folder authority returned an ASPX file without a real File.UniqueId; no physical identity was minted.",
-                };
+                    // Finish the enriched evidence chain, but do not stop the consumer before fallback.
+                    batch = batch with { IsTerminal = false };
+                }
+                if (invalidFileIdentityScopes.Contains(scope.ScopeKey))
+                {
+                    batch = batch with
+                    {
+                        TerminalOutcome = batch.IsTerminal && IsComplete(batch.TerminalOutcome)
+                            ? DiscoveryTerminalOutcome.Unknown : batch.TerminalOutcome,
+                        GapCode = MissingFileIdentity,
+                        GapDetail = "Folder authority returned an ASPX file without a real File.UniqueId; no physical identity was minted.",
+                    };
+                }
+                if (batch.IsTerminal && IsComplete(batch.TerminalOutcome))
+                {
+                    completedFileCollections[key] = page.Completion.Surface;
+                }
+                yield return batch;
             }
-            yield return batch;
+            if (!retryPhysical) yield break;
         }
     }
 
@@ -772,7 +801,11 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         {
             var client = await clientFactory.GetAsync(scope.WebUrl, cancellationToken).ConfigureAwait(false);
             result = await client.ReadFolderAsync(scope.FolderUrl, cancellationToken).ConfigureAwait(false);
-            modeledFolders[key] = result;
+            modeledFolders[key] = result with
+            {
+                Files = Array.Empty<SharePointModeledFile>(),
+                Folders = Array.Empty<SharePointModeledFolder>(),
+            };
         }
         var known = Guid.TryParse(result.FolderUniqueId, out var identity) && identity != Guid.Empty &&
             string.Equals(NormalizeServerRelativePath(result.FolderServerRelativeUrl)?.TrimEnd('/'),
@@ -801,54 +834,23 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         return PhysicalScope(scope);
     }
 
-    /// <summary>Shares successful Files/Folders collection content without collapsing the distinct parent scopes or fabricating HTTP receipts.</summary>
-    private async Task<LiveCollectionResult> ReadFolderCollectionAsync(LiveScope scope, bool files,
+    /// <summary>Shares child-folder traversal metadata without collapsing parent scopes or fabricating HTTP receipts.</summary>
+    private async Task<LiveCollectionResult> ReadFolderCollectionAsync(LiveScope scope,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var child = files ? "Files" : "Folders";
-        var key = FolderIdentity(scope) + "|" + child;
+        var key = FolderIdentity(scope);
         if (folderCollections.TryGetValue(key, out var existing))
         {
-            if (existing.Surface.ScopeKey != scope.ScopeKey)
-            {
-                ReferenceCollector.AddSurface(existing.Surface with
-                {
-                    ScopeKey = scope.ScopeKey,
-                    ParentScopeKey = scope.ParentScopeKey,
-                    SurfaceId = child.ToLowerInvariant() + ":" + scope.ScopeKey,
-                    ActualMethod = "CACHE",
-                    EvidenceRefs = existing.Surface.EvidenceRefs.Concat(new[]
-                    {
-                        "reused-surface=" + existing.Surface.SurfaceId,
-                        "reused-pagination-chain=" + existing.Surface.PaginationChainHash,
-                    }).ToArray(),
-                }, Array.Empty<AspxPaginationPageReceipt>());
-            }
+            RecordCacheSurface(existing.Surface, scope, "folders");
             return existing;
         }
 
-        var select = files ? FilesSelect : FoldersSelect;
-        var endpoint = FolderEndpoint(scope, child, select, files ? FilesExpand : null);
-        var adapter = !files ? "RecursiveFolderAuthority" : scope.Role == "physical-forms"
-            ? "PhysicalFormsTreeAuthority" : scope.SourceKind == DiscoverySourceKind.RawListFolderFiles
-                ? "ListRootFilesAuthority" : "DocumentLibraryFilesAuthority";
+        var endpoint = FolderEndpoint(scope, "Folders", FoldersSelect);
         var result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
-            child.ToLowerInvariant() + ":" + scope.ScopeKey, endpoint, select, string.Empty,
-            AspxSurfaceApplicability.Applicable, adapter, cancellationToken, filePaging: files).ConfigureAwait(false);
-        if (files && (result.Validation.Outcome is DiscoveryTerminalOutcome.Denied or DiscoveryTerminalOutcome.Failed))
-        {
-            // ListItemAllFields and property bags are optional enrichment, not a physical-file admission requirement.
-            const string physicalSelect = "UniqueId,Name,ServerRelativeUrl,CustomizedPageStatus,Length";
-            var enriched = result;
-            result = await ReadCollectionAsync(scope.ScopeKey, scope.ParentScopeKey,
-                "physical-files:" + scope.ScopeKey, FolderEndpoint(scope, child, physicalSelect), physicalSelect,
-                string.Empty, AspxSurfaceApplicability.Applicable, "PhysicalFolderFilesAuthorityFallback",
-                cancellationToken, filePaging: true).ConfigureAwait(false);
-            // Retain every physical observation, but keep the two HTTP chains and coverage proofs separate.
-            result = result with { RetainedObservationPages = enriched.ObservationPages.ToArray() };
-        }
-        if (!files && result.Items.Any(item => string.IsNullOrWhiteSpace(PropertyString(item, "ServerRelativeUrl"))))
+            "folders:" + scope.ScopeKey, endpoint, FoldersSelect, string.Empty,
+            AspxSurfaceApplicability.Applicable, "RecursiveFolderAuthority", cancellationToken).ConfigureAwait(false);
+        if (result.Items.Any(item => string.IsNullOrWhiteSpace(PropertyString(item, "ServerRelativeUrl"))))
         {
             var incomplete = result.Surface with
             {
@@ -861,25 +863,28 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
                 new[] { incomplete.SurfaceId + ":folder_url_missing" });
             result = result with { Validation = result.Validation with { Outcome = DiscoveryTerminalOutcome.Unknown }, Surface = incomplete };
         }
-        if (files && result.Items.Any(item => IsAspxRow(item) &&
-            (!Guid.TryParse(PropertyString(item, "UniqueId"), out var id) || id == Guid.Empty)))
-        {
-            var incomplete = result.Surface with
-            {
-                TerminalOutcome = DiscoveryTerminalOutcome.Unknown,
-                ExpectedCount = null,
-                ExpectedCountState = AspxExpectedCountState.Unknown,
-                AggregateEffect = "unknown",
-            };
-            ReferenceCollector.AddSurface(incomplete, Array.Empty<AspxPaginationPageReceipt>(),
-                new[] { incomplete.SurfaceId + ":" + MissingFileIdentity });
-            result = result with { Validation = result.Validation with { Outcome = DiscoveryTerminalOutcome.Unknown }, Surface = incomplete };
-        }
         if (IsComplete(result.Validation.Outcome))
         {
-            folderCollections[key] = result with { RetainedObservationPages = null };
+            folderCollections[key] = result;
         }
         return result;
+    }
+
+    private void RecordCacheSurface(AspxSurfaceDenominatorRow surface, LiveScope scope, string child)
+    {
+        if (surface.ScopeKey == scope.ScopeKey) return;
+        ReferenceCollector.AddSurface(surface with
+        {
+            ScopeKey = scope.ScopeKey,
+            ParentScopeKey = scope.ParentScopeKey,
+            SurfaceId = child + ":" + scope.ScopeKey,
+            ActualMethod = "CACHE",
+            EvidenceRefs = surface.EvidenceRefs.Concat(new[]
+            {
+                "reused-surface=" + surface.SurfaceId,
+                "reused-pagination-chain=" + surface.PaginationChainHash,
+            }).ToArray(),
+        }, Array.Empty<AspxPaginationPageReceipt>());
     }
 
     /// <summary>Recognizes ASPX physical rows solely by file name or the guaranteed folder-file locator.</summary>
@@ -938,104 +943,159 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             ? Array.Empty<string>() : new[] { surfaceId + ":" + (result.ErrorCode ?? "modeled_authority_incomplete") });
     }
 
-    /// <summary>Retains paginated authority receipts and terminal failures, including partial evidence before cancellation.</summary>
+    /// <summary>Collects metadata needed for list/reference authority and overlapping child-folder traversal.</summary>
     private async Task<LiveCollectionResult> ReadCollectionAsync(string scopeKey, string parentScopeKey,
         string surfaceId, Uri initialEndpoint, string select, string filter,
         AspxSurfaceApplicability applicability, string adapter, CancellationToken cancellationToken,
+        AspxSurfaceDispositionRule dispositionRule = null)
+    {
+        var pages = new List<LivePage>();
+        var items = new List<JsonElement>();
+        await foreach (var page in ReadCollectionPagesAsync(scopeKey, parentScopeKey, surfaceId,
+            initialEndpoint, select, filter, applicability, adapter, cancellationToken, dispositionRule)
+            .ConfigureAwait(false))
+        {
+            pages.Add(page);
+            items.AddRange(page.Page.Items);
+        }
+        var completion = pages[^1].Completion;
+        return new(items, pages, completion.Validation, completion.AppliedDispositionRule, completion.Surface);
+    }
+
+    /// <summary>
+    /// Yields each response before requesting another. Only counts, receipts and request evidence survive
+    /// consumption; cancellation or early disposal records incomplete coverage, never a successful cache entry.
+    /// </summary>
+    private async IAsyncEnumerable<LivePage> ReadCollectionPagesAsync(string scopeKey, string parentScopeKey,
+        string surfaceId, Uri initialEndpoint, string select, string filter,
+        AspxSurfaceApplicability applicability, string adapter,
+        [EnumeratorCancellation] CancellationToken cancellationToken,
         AspxSurfaceDispositionRule dispositionRule = null, bool filePaging = false)
     {
         var client = await clientFactory.GetAsync(WebUrlFromEndpoint(initialEndpoint), cancellationToken)
             .ConfigureAwait(false);
-        var pages = new List<LivePage>();
-        var items = new List<JsonElement>();
+        var receipts = new List<AspxPaginationPageReceipt>();
+        var evidenceRefs = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var fileReader = filePaging ? new SharePointFolderFilePageReader(client, initialEndpoint) : null;
         Uri next = fileReader?.NextEndpoint ?? initialEndpoint;
         string requestToken = null;
-        var providerOutcome = DiscoveryTerminalOutcome.Complete;
-        var cancelled = false;
-        for (var ordinal = 0; next != null; ordinal++)
+        int observed = 0;
+        bool missingFileIdentity = false;
+        bool dispositionApplies = false;
+        bool recorded = false;
+        var providerOutcome = DiscoveryTerminalOutcome.Truncated;
+        try
         {
-            SharePointRestPage page;
-            try
+            for (var ordinal = 0; next != null; ordinal++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                page = fileReader == null
-                    ? await client.GetPageAsync(next, cancellationToken).ConfigureAwait(false)
-                    : await fileReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                SharePointRestPage page;
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    page = fileReader == null
+                        ? await client.GetPageAsync(next, cancellationToken).ConfigureAwait(false)
+                        : await fileReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    providerOutcome = DiscoveryTerminalOutcome.Cancelled;
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    page = new SharePointRestPage(next, 0, Array.Empty<JsonElement>(), null,
+                        DiscoveryHash.Of(ex.GetType().FullName, ex.Message), "transport-error",
+                        DiscoveryTerminalOutcome.Failed, "transport_failure",
+                        SharePointSemanticDetectorResults.None, DateTimeOffset.UtcNow,
+                        AttemptCount: 1, AttemptLimit: 1);
+                }
+                var nextLink = page.NextLink;
+                var terminal = string.IsNullOrWhiteSpace(nextLink) || page.Outcome != DiscoveryTerminalOutcome.Complete;
+                var nextUri = terminal ? null : ResolveNext(initialEndpoint, nextLink);
+                var receipt = new AspxPaginationPageReceipt(AspxAcquisitionVersions.PaginationReceipt,
+                    surfaceId, options.AuthorityRevision,
+                    DiscoveryHash.Of(initialEndpoint.GetLeftPart(UriPartial.Path), select, filter ?? string.Empty),
+                    "GET", AspxDurableRequestEvidence.Endpoint(page.RequestUri), select, filter ?? string.Empty, ordinal,
+                    AspxPaginationContract.TokenHash(requestToken), page.Items.Count,
+                    AspxPaginationContract.TokenHash(nextLink), page.ResponseDigest,
+                    page.StatusCode == 0 ? null : (int)page.StatusCode, page.SemanticDetectorResult,
+                    page.AttemptCount, page.AttemptLimit, page.RequestId, page.CorrelationId, page.ErrorCode,
+                    terminal, page.ReceivedAtUtc == default ? DateTimeOffset.UtcNow : page.ReceivedAtUtc);
+                receipts.Add(receipt);
+                evidenceRefs.Add(EvidenceRef(initialEndpoint, page, select));
+                observed += page.Items.Count;
+                dispositionApplies |= dispositionRule?.Applies(page) == true;
+                missingFileIdentity |= filePaging && page.Items.Any(item => IsAspxRow(item) &&
+                    (!Guid.TryParse(PropertyString(item, "UniqueId"), out var id) || id == Guid.Empty));
+                if (page.Outcome != DiscoveryTerminalOutcome.Complete)
+                {
+                    providerOutcome = page.Outcome;
+                    next = null;
+                }
+                else if (nextUri == null)
+                {
+                    providerOutcome = DiscoveryTerminalOutcome.Complete;
+                    next = null;
+                }
+                else if (!seen.Add(nextLink))
+                {
+                    providerOutcome = DiscoveryTerminalOutcome.Unknown;
+                    ReferenceCollector.AddGap(surfaceId + ":pagination_token_loop_or_loss");
+                    next = null;
+                }
+                else
+                {
+                    requestToken = nextLink;
+                    next = nextUri;
+                }
+                var completion = next == null ? RecordCompletion() : null;
+                yield return new LivePage(page, receipt, completion);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        }
+        finally
+        {
+            if (!recorded)
             {
-                providerOutcome = DiscoveryTerminalOutcome.Cancelled;
-                cancelled = true;
-                break;
-            }
-            catch (Exception ex)
-            {
-                page = new SharePointRestPage(next, 0, Array.Empty<JsonElement>(), null,
-                    DiscoveryHash.Of(ex.GetType().FullName, ex.Message), "transport-error",
-                    DiscoveryTerminalOutcome.Failed, "transport_failure",
-                    SharePointSemanticDetectorResults.None, DateTimeOffset.UtcNow,
-                    AttemptCount: 1, AttemptLimit: 1);
-            }
-            var nextLink = page.NextLink;
-            var terminal = string.IsNullOrWhiteSpace(nextLink) || page.Outcome != DiscoveryTerminalOutcome.Complete;
-            var nextUri = terminal ? null : ResolveNext(initialEndpoint, nextLink);
-            var receipt = new AspxPaginationPageReceipt(AspxAcquisitionVersions.PaginationReceipt,
-                surfaceId, options.AuthorityRevision,
-                DiscoveryHash.Of(initialEndpoint.GetLeftPart(UriPartial.Path), select, filter ?? string.Empty),
-                "GET", AspxDurableRequestEvidence.Endpoint(page.RequestUri), select, filter ?? string.Empty, ordinal,
-                AspxPaginationContract.TokenHash(requestToken), page.Items.Count,
-                AspxPaginationContract.TokenHash(nextLink), page.ResponseDigest,
-                page.StatusCode == 0 ? null : (int)page.StatusCode, page.SemanticDetectorResult,
-                page.AttemptCount, page.AttemptLimit, page.RequestId, page.CorrelationId, page.ErrorCode,
-                terminal, page.ReceivedAtUtc == default ? DateTimeOffset.UtcNow : page.ReceivedAtUtc);
-            pages.Add(new LivePage(page, receipt));
-            items.AddRange(page.Items);
-            if (page.Outcome != DiscoveryTerminalOutcome.Complete)
-            {
-                providerOutcome = page.Outcome;
-                next = null;
-            }
-            else if (nextUri == null)
-            {
-                next = null;
-            }
-            else if (!seen.Add(nextLink))
-            {
-                providerOutcome = DiscoveryTerminalOutcome.Unknown;
-                ReferenceCollector.AddGap(surfaceId + ":pagination_token_loop_or_loss");
-                next = null;
-            }
-            else
-            {
-                requestToken = nextLink;
-                next = nextUri;
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    providerOutcome = DiscoveryTerminalOutcome.Cancelled;
+                }
+                RecordCompletion();
             }
         }
 
-        var validation = AspxPaginationContract.Validate(pages.Select(page => page.Receipt).ToArray(), providerOutcome);
-        if (cancelled) validation = validation with { Outcome = DiscoveryTerminalOutcome.Cancelled };
-        var expectedState = validation.Outcome is DiscoveryTerminalOutcome.Complete or DiscoveryTerminalOutcome.Empty
-            ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown;
-        int? expected = expectedState == AspxExpectedCountState.Known ? items.Count : null;
-        var outcome = validation.Outcome == DiscoveryTerminalOutcome.Complete && items.Count == 0
-            ? DiscoveryTerminalOutcome.Empty : validation.Outcome;
-        var appliedDispositionRule = dispositionRule != null && pages.Any(page => dispositionRule.Applies(page.Page))
-            ? dispositionRule : null;
-        var absenceKind = outcome == DiscoveryTerminalOutcome.Empty ? "AuthorityTerminalZero" : null;
-        var row = SurfaceRow(scopeKey, parentScopeKey, surfaceId, initialEndpoint.AbsoluteUri, select,
-            filter ?? string.Empty, "SharePointRestCollectionAuthority", applicability, outcome,
-            expected, expectedState, items.Count, validation.ChainHash, validation.OutstandingTokenCount,
-            pages.Select(page => EvidenceRef(initialEndpoint, page.Page, select))
-                .Concat(fileReader?.Attempts.Select(attempt => "file-page-attempt;" +
-                    AspxDurableRequestEvidence.Reference(attempt.RequestUri, attempt, select)) ?? Array.Empty<string>())
-                .Distinct(StringComparer.Ordinal).ToArray(), adapter,
-            absenceKind, absenceKind == null ? null : initialEndpoint.AbsoluteUri, appliedDispositionRule);
-        ReferenceCollector.AddSurface(row, pages.Select(page => page.Receipt).ToArray(),
-            validation.GapCodes.Select(code => surfaceId + ":" + code).ToArray());
-        if (cancelled) throw new OperationCanceledException(cancellationToken);
-        return new(items, pages, validation with { Outcome = outcome }, appliedDispositionRule, row);
+        LiveCollectionEvidence RecordCompletion()
+        {
+            var validation = AspxPaginationContract.Validate(receipts, providerOutcome);
+            if (providerOutcome == DiscoveryTerminalOutcome.Cancelled)
+            {
+                validation = validation with { Outcome = DiscoveryTerminalOutcome.Cancelled };
+            }
+            if (missingFileIdentity && IsComplete(validation.Outcome))
+            {
+                validation = validation with { Outcome = DiscoveryTerminalOutcome.Unknown };
+            }
+            var expectedState = IsComplete(validation.Outcome) ? AspxExpectedCountState.Known : AspxExpectedCountState.Unknown;
+            int? expected = expectedState == AspxExpectedCountState.Known ? observed : null;
+            var outcome = validation.Outcome == DiscoveryTerminalOutcome.Complete && observed == 0
+                ? DiscoveryTerminalOutcome.Empty : validation.Outcome;
+            var appliedDispositionRule = dispositionApplies ? dispositionRule : null;
+            var absenceKind = outcome == DiscoveryTerminalOutcome.Empty ? "AuthorityTerminalZero" : null;
+            var row = SurfaceRow(scopeKey, parentScopeKey, surfaceId, initialEndpoint.AbsoluteUri, select,
+                filter ?? string.Empty, "SharePointRestCollectionAuthority", applicability, outcome,
+                expected, expectedState, observed, validation.ChainHash, validation.OutstandingTokenCount,
+                evidenceRefs.Concat(fileReader?.Attempts.Select(attempt => "file-page-attempt;" +
+                        AspxDurableRequestEvidence.Reference(attempt.Page.RequestUri, attempt.Page, select) +
+                        ";responseItemCount=" + attempt.ResponseItemCount.ToString(System.Globalization.CultureInfo.InvariantCulture)) ?? Array.Empty<string>())
+                    .Distinct(StringComparer.Ordinal).ToArray(), adapter,
+                absenceKind, absenceKind == null ? null : initialEndpoint.AbsoluteUri, appliedDispositionRule);
+            ReferenceCollector.AddSurface(row, receipts,
+                validation.GapCodes.Select(code => surfaceId + ":" + code)
+                    .Concat(missingFileIdentity ? new[] { surfaceId + ":" + MissingFileIdentity } : Array.Empty<string>()).ToArray());
+            recorded = true;
+            return new(validation with { Outcome = outcome }, appliedDispositionRule, row);
+        }
     }
 
     private AspxSurfaceDenominatorRow SurfaceRow(string scopeKey, string parentScopeKey, string surfaceId,
@@ -1276,7 +1336,10 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         internal string PermissionContext => "live:" + Role;
     }
 
-    private sealed record LivePage(SharePointRestPage Page, AspxPaginationPageReceipt Receipt);
+    private sealed record LivePage(SharePointRestPage Page, AspxPaginationPageReceipt Receipt,
+        LiveCollectionEvidence Completion = null);
+    private sealed record LiveCollectionEvidence(AspxPaginationValidation Validation,
+        AspxSurfaceDispositionRule AppliedDispositionRule, AspxSurfaceDenominatorRow Surface);
     private sealed record ContentTypeForm(string ContentTypeId, string FormUrl);
     private sealed record ListDisplayForms(string DefaultFormUrl,
         IReadOnlyList<ContentTypeForm> ContentTypeForms);
@@ -1290,11 +1353,5 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
         IReadOnlyList<LivePage> Pages,
         AspxPaginationValidation Validation,
         AspxSurfaceDispositionRule AppliedDispositionRule,
-        AspxSurfaceDenominatorRow Surface,
-        IReadOnlyList<LivePage> RetainedObservationPages = null)
-    {
-        /// <summary>Combines file observations without combining their independent pagination chains or coverage proofs.</summary>
-        internal IEnumerable<LivePage> ObservationPages => RetainedObservationPages == null
-            ? Pages : RetainedObservationPages.Concat(Pages);
-    }
+        AspxSurfaceDenominatorRow Surface);
 }

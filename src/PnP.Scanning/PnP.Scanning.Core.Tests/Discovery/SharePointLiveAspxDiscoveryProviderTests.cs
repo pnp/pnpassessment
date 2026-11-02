@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Tests.Discovery;
 
 /// <summary>Proves physical folder authority, overlapping-root evidence and declaration-only enrichment without live SharePoint calls.</summary>
 [Trait("Category", "ClassicDiscoveryIntegration")]
-public sealed class SharePointLiveAspxDiscoveryProviderTests
+public sealed partial class SharePointLiveAspxDiscoveryProviderTests
 {
     private static readonly Uri WebUrl = new("https://contoso.sharepoint.com/sites/a");
     private static readonly Guid ListId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -226,14 +226,25 @@ public sealed class SharePointLiveAspxDiscoveryProviderTests
         using var provider = Provider(factory);
         var root = await ListRootAsync(provider);
 
-        var action = () => ReadBatchesAsync(provider, root, cancellation.Token);
+        var delivered = new List<RawDiscoveryRecord>();
+        var action = async () =>
+        {
+            await foreach (var batch in provider.CreateRawSource(root).ReadBatchesAsync(cancellation.Token))
+            {
+                delivered.AddRange(batch.Records);
+            }
+        };
         await action.Should().ThrowAsync<OperationCanceledException>();
 
+        delivered.Should().ContainSingle(record => record.FileName == "one.aspx",
+            "the first page is consumed before a later request is cancelled");
         provider.ReferenceCollector.ReadPaginationEvidence().Should().Contain(receipt => receipt.CollectionScopeKey == "files:" + root.ScopeKey && !receipt.TerminalFlag);
         provider.ReferenceCollector.ReadSurfaceEvidence().Should().Contain(row => row.SurfaceId == "files:" + root.ScopeKey && row.TerminalOutcome == DiscoveryTerminalOutcome.Cancelled && row.ContinuationRemaining);
         factory.Client.CancelOnSecondFilePage = null;
         var retried = await ReadBatchesAsync(provider, root);
-        retried.SelectMany(batch => batch.Records).Should().HaveCount(2);
+        retried.SelectMany(batch => batch.Records).Should().ContainSingle(record => record.FileName == "two.aspx");
+        delivered.Concat(retried.SelectMany(batch => batch.Records)).Select(record => record.FileUniqueId)
+            .Should().HaveCount(2).And.OnlyHaveUniqueItems();
     }
 
     /// <summary>A truncated folder response retains uncertainty and is reread rather than reused as a successful census.</summary>

@@ -17,7 +17,7 @@ internal sealed class SharePointFolderFilePageReader
     private const string RequestBudgetError = "file_page_request_budget_exceeded";
     private readonly ISharePointAspxRestClient client;
     private readonly Uri collectionEndpoint;
-    private readonly List<SharePointRestPage> attempts = new();
+    private readonly List<(SharePointRestPage Page, int ResponseItemCount)> attempts = new();
     private readonly HashSet<string> observedIdentities = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> usedContinuations = new(StringComparer.Ordinal);
     private int offset;
@@ -38,7 +38,7 @@ internal sealed class SharePointFolderFilePageReader
 
     internal Uri NextEndpoint { get; private set; }
     internal int RequestedPageSize => requestedPageSize;
-    internal IReadOnlyList<SharePointRestPage> Attempts => attempts;
+    internal IReadOnlyList<(SharePointRestPage Page, int ResponseItemCount)> Attempts => attempts;
 
     /// <summary>
     /// Reads the current cursor, reducing only an oversized response from 1000 to 500 to 200 rows.
@@ -65,7 +65,8 @@ internal sealed class SharePointFolderFilePageReader
             }
             var request = SetQuery(cursor, "$top", requestedPageSize.ToString(CultureInfo.InvariantCulture));
             page = await client.GetPageAsync(request, cancellationToken).ConfigureAwait(false);
-            attempts.Add(page);
+            // Attempts retain request/response evidence, never the consumed JSON body.
+            attempts.Add((page with { Items = Array.Empty<JsonElement>() }, page.Items.Count));
             requestCount += Math.Max(1, page.AttemptCount);
             cancellationToken.ThrowIfCancellationRequested();
             var oversizedItems = page.Outcome == DiscoveryTerminalOutcome.Complete && page.Items.Count > requestedPageSize;
