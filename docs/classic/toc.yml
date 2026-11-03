@@ -10,8 +10,6 @@
   href: migrate-minimal-permissions.md
 - name: CSV files
   items:
-    - name: classicaspx.csv
-      href: csv-classicaspx.md
     - name: discovery.csv
       href: csv-discovery.md
     - name: classicpages.csv

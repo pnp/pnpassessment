@@ -1,5 +1,4 @@
-using PnP.Scanning.Core.Services;
-using PnP.Scanning.Core.Storage;
+﻿using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -14,11 +13,6 @@ namespace PnP.Scanning.Core.Scanners
     /// </summary>
     internal static class ClassicStartRequestBuilder
     {
-        private const string BooleanPropertyType = "bool";
-        private const string IntegerPropertyType = "int";
-        private const string StringPropertyType = "string";
-
-        /// <summary>Appends Classic component and option properties, declaring the native ASPX contract and frozen scope inputs only when Pages is selected.</summary>
         internal static void AddClassicProperties(
             StartRequest request,
             IEnumerable<ClassicComponent> components,
@@ -26,18 +20,16 @@ namespace PnP.Scanning.Core.Scanners
             bool skipUsageInformation,
             bool skipUserInformation,
             bool homePageOnly,
-            int auditLogWindowDays = 14,
-            string excludeSiteTemplates = null)
+            int auditLogWindowDays = 14)
         {
             // Each requested scan component is keyed by its enum name and is always "on" (true);
             // FromScannerInput reads these as the set of enabled ClassicComponents.
-            var selectedComponents = components.ToArray();
-            foreach (var classicComponent in selectedComponents)
+            foreach (var classicComponent in components)
             {
                 request.Properties.Add(new PropertyRequest
                 {
                     Property = $"{classicComponent}",
-                    Type = BooleanPropertyType,
+                    Type = "bool",
                     Value = true.ToString(),
                 });
             }
@@ -49,39 +41,17 @@ namespace PnP.Scanning.Core.Scanners
             request.Properties.Add(new PropertyRequest
             {
                 Property = Constants.StartClassicAuditLogWindowDays,
-                Type = IntegerPropertyType,
+                Type = "int",
                 Value = auditLogWindowDays.ToString(),
             });
-            if (selectedComponents.Contains(ClassicComponent.Pages))
-            {
-                request.Properties.Add(new PropertyRequest
-                {
-                    Property = ClassicAspxProjectionContract.PropertyName,
-                    Type = StringPropertyType,
-                    Value = ClassicAspxProjectionContract.Version
-                });
-                request.Properties.Add(new PropertyRequest
-                {
-                    Property = ClassicAspxProjectionContract.ScopeModePropertyName,
-                    Type = StringPropertyType,
-                    Value = homePageOnly ? ClassicAspxProjectionContract.HomePageOnly : ClassicAspxProjectionContract.DeclaredFullInventory
-                });
-                request.Properties.Add(new PropertyRequest
-                {
-                    Property = Constants.StartExcludeSiteTemplates,
-                    Type = StringPropertyType,
-                    Value = Discovery.Aspx.SiteTemplateExclusionPolicy.Parse(excludeSiteTemplates).CanonicalValue,
-                });
-            }
         }
 
-        /// <summary>Appends a Boolean property using the existing request type and value serialization contract.</summary>
         private static void AddBool(StartRequest request, string property, bool value)
         {
             request.Properties.Add(new PropertyRequest
             {
                 Property = property,
-                Type = BooleanPropertyType,
+                Type = "bool",
                 Value = value.ToString(),
             });
         }

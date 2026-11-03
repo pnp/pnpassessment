@@ -1,4 +1,4 @@
-using Google.Protobuf.WellKnownTypes;
+﻿using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
 using PnP.Core.Services;
@@ -80,7 +80,6 @@ namespace PnP.Scanning.Core.Services
 
         internal static int ParallelSiteCollectionProcessingThreads { get; private set; } = 4;
 
-        /// <summary>Creates the scan with frozen options and catalog evidence, handles an authoritative empty selection, then preserves existing prescan and queue startup ordering.</summary>
         internal async Task<Guid> StartScanAsync(StartRequest start, AuthenticationManager authenticationManager, List<string> siteCollectionList,
             IReadOnlyList<ClassicPageDiscovery> discoveryEvidence = null)
         {
@@ -93,7 +92,6 @@ namespace PnP.Scanning.Core.Services
 
             Log.Information("Assessment id is {ScanId}", scanId);
 
-            var options = OptionsBase.FromScannerInput(start);
             await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
             if (discoveryEvidence != null)
             {
@@ -119,7 +117,9 @@ namespace PnP.Scanning.Core.Services
             // Configure threading for the site collection and web queues
             siteCollectionQueue.ConfigureParallelProcessing(start.Threads);
 
-            // The start options/catalog were frozen before LaunchNewScanAsync.
+            // Get the scan configuration options to use
+            OptionsBase options = OptionsBase.FromScannerInput(start);
+
             Log.Information("Add assessment request {ScanId} to in-memory list", scanId);
             var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager, cancellationTokenSource)
             {

@@ -1,15 +1,15 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
 namespace PnP.Scanning.Core.Storage
 {
     /// <summary>
     /// Scan database context used to work with the database
-    ///
+    /// 
     /// Note: For each new scan component work is needed here. Check the PER SCAN COMPONENT: strings to find the right places to add code
     /// </summary>
     internal class ScanContext : DbContext
-    {
+    {        
 
         internal DbSet<Scan> Scans { get; set; }
 
@@ -17,7 +17,7 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<History> History { get; set; }
 
-        internal DbSet<Cache> Cache { get; set; }
+        internal DbSet<Cache> Cache { get; set; } 
 
         internal DbSet<SiteCollection> SiteCollections { get; set; }
 
@@ -47,8 +47,6 @@ namespace PnP.Scanning.Core.Storage
         internal DbSet<ClassicPage> ClassicPages { get; set; }
 
         internal DbSet<ClassicPageDiscovery> ClassicPageDiscoveries { get; set; }
-
-        internal DbSet<SPFile> SPFiles { get; set; }
 
         internal DbSet<ClassicPageWebPart> ClassicPageWebParts { get; set; }
 
@@ -84,8 +82,9 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<Alerts> Alerts { get; set; }
 
-        // The persisted model is configuration-independent; only Debug exposes the test scanner/report UI.
+#if DEBUG
         internal DbSet<TestDelay> TestDelays { get; set; }
+#endif
 
         internal string DbPath { get; }
 
@@ -105,7 +104,6 @@ namespace PnP.Scanning.Core.Storage
         {
         }
 
-        /// <summary>Targets the assessment database under its scan-owned data directory, creating that directory when needed.</summary>
         internal ScanContext(Guid scanId)
         {
             var path = StorageManager.GetScanDataFolder(scanId);
@@ -116,7 +114,7 @@ namespace PnP.Scanning.Core.Storage
             DbPath = Path.Join(path, StorageManager.DbName);
         }
 
-        /// <summary>Configures the scan-owned SQLite database only when externally supplied options have not selected a provider.</summary>
+        // The following configures EF to create a Sqlite database file
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             // When options were supplied through the constructor (e.g. an in-memory SQLite
@@ -132,7 +130,6 @@ namespace PnP.Scanning.Core.Storage
             base.OnConfiguring(optionsBuilder);
         }
 
-        /// <summary>Configures existing compound keys and real SharePoint-file identity constraints without deriving observations or classification from migration.</summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Extend the model defined via annotations, typically used for defining compound keys
@@ -223,21 +220,6 @@ namespace PnP.Scanning.Core.Storage
                 entity.Property(e => e.DiscoveryStatus).IsRequired();
             });
 
-            modelBuilder.Entity<SPFile>(entity =>
-            {
-                entity.ToTable("SPFile", table => table.HasCheckConstraint(
-                    "CK_SPFile_RealFile",
-                    "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND " +
-                    "\"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'"));
-                entity.HasKey(e => new { e.SiteCollectionId, e.FileUniqueId });
-                entity.Property(e => e.FileReadState).IsRequired();
-                entity.Property(e => e.CoverageState).IsRequired();
-                entity.Property(e => e.ProvenanceJson).IsRequired();
-                entity.Property(e => e.ItemMetadataReadState).IsRequired();
-                entity.Property(e => e.ItemMetadataFieldStatesJson).IsRequired();
-                entity.Property(e => e.NoExecuteReadState).IsRequired();
-            });
-
             modelBuilder.Entity<ClassicPage>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl });
@@ -291,7 +273,7 @@ namespace PnP.Scanning.Core.Storage
 
             #region AddIn and ACS scanner
 
-            modelBuilder.Entity<ClassicAddIn>(entity =>
+            modelBuilder.Entity<ClassicAddIn>(entity => 
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.AppInstanceId });
             });
@@ -327,10 +309,12 @@ namespace PnP.Scanning.Core.Storage
             });
             #endregion
 
+#if DEBUG
             modelBuilder.Entity<TestDelay>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
             });
+#endif
 
             base.OnModelCreating(modelBuilder);
         }
