@@ -1,0 +1,231 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html lang="en">
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>classicaspx.csv file details | Microsoft 365 Assessment Tool </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="classicaspx.csv file details | Microsoft 365 Assessment Tool ">
+    <meta name="generator" content="docfx 2.56.5.0">
+    <meta name="description" content="The Microsoft 365 SharePoint Assessment tool is enabling various deprecation and adoption scenarios by enabling you to assess your tenant.">
+    <link rel="shortcut icon" href="https://c.s-microsoft.com/favicon.ico?v2">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> 
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    <meta property="docfx:newtab" content="true">
+  </head>  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <!--
+        <a class="navbar-brand" href="../index.html">
+          <img id="logo" class="svg" src="../logo.svg" alt="" >
+        </a>
+        -->
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <label class="glyphicon glyphicon-search" for="search-query"></label>
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+                  <div class="contribution-panel mobile-hide pull-right">
+                      <a href="https://github.com/pnp/pnpassessment/blob/main/docs/classic/csv-classicaspx.md/#L1" title="Improve this Doc" class="improve-doc-lg"><i class="glyphicon glyphicon-pencil"></i></a>
+                  </div>
+                    <h1 id="classicaspxcsv-file-details">classicaspx.csv file details</h1>
+
+<h2 id="summary">Summary</h2>
+<p>This csv file is the Classic ASPX business projection of the raw physical files stored for an assessment. It is not a dump of the SPFile SQL table. The table keeps observed file facts independently of file type; this export selects physical ASPX files and excludes files identified as modern pages by the existing Classic assessment heuristics.</p>
+<p>One row represents one real SiteCollectionId and FileUniqueId pair, not a list-item address. Stock forms/views and unclassified ASPX files remain visible. Missing or failed metadata is not evidence that a file is modern or absent. Legacy item-only Blog/CP4 assessment remains in <a href="csv-classicpages.html">classicpages.csv</a>; it does not multiply physical-file rows.</p>
+<p>With <code>--homepageonly</code>, the input facts are limited to observed welcome-page targets. Use <a href="csv-discovery.html">discovery.csv</a> for scopes, references, pagination, gaps and scan-wide coverage. The accompanying <code>classicaspxsummary.json</code> counts selected business rows and unknown/poison observations, records scope and CSV hash, and does not assert tenant completeness. An empty result still exports its typed header.</p>
+<h2 id="columns">Columns</h2>
+<p>The following columns are included:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ScanId</td>
+<td>Id of the assessment; ordinary scan ownership, not part of the physical file key.</td>
+</tr>
+<tr>
+<td>SiteCollectionId</td>
+<td>Real site collection id. Together with FileUniqueId this identifies the physical file.</td>
+</tr>
+<tr>
+<td>WebId</td>
+<td>Observed web id, when available.</td>
+</tr>
+<tr>
+<td>ListId</td>
+<td>Observed list or library id, when available.</td>
+</tr>
+<tr>
+<td>FileUniqueId</td>
+<td>Real SPFile.UniqueId. No key is generated from a URL.</td>
+</tr>
+<tr>
+<td>SiteUrl</td>
+<td>Fully qualified site collection URL.</td>
+</tr>
+<tr>
+<td>WebUrl</td>
+<td>Fully qualified web context URL associated with the observation.</td>
+</tr>
+<tr>
+<td>Url</td>
+<td>Server-relative file URL encoded from the stored decoded ResourcePath. Literal percent sequences, spaces and hash names remain distinct; the original SQL path is not changed.</td>
+</tr>
+<tr>
+<td>FileName</td>
+<td>Leaf name of the physical file.</td>
+</tr>
+<tr>
+<td>ClassicPageType</td>
+<td>Result of the existing item-field heuristics or existing content-type fallback. ModernPage and ModernSitePage results are excluded. This PR does not introduce a new classification algorithm or precedence.</td>
+</tr>
+<tr>
+<td>PageRole</td>
+<td>Existing SetupPathClassifier template-family result, such as ListView, ListForm, WebPartPage or Unknown. Existing blank-setup fallback remains a heuristic, not proof that unavailable metadata establishes an unghosted file.</td>
+</tr>
+<tr>
+<td>ClassificationState</td>
+<td>ItemMetadata when existing heuristics use restored item inputs, FileOnlyFallback when only existing content-type inference is available, or Unknown when no result can be inferred.</td>
+</tr>
+<tr>
+<td>ClassificationReason</td>
+<td>Identifies the existing heuristic or fallback used; unavailable item-field snapshots are explicit.</td>
+</tr>
+<tr>
+<td>ContentTypeId</td>
+<td>Content type id observed in the raw metadata, when available.</td>
+</tr>
+<tr>
+<td>CustomizedPageStatus</td>
+<td>Observed SharePoint customization status: Uncustomized, Customized or None. Unavailable values do not prove ghosting.</td>
+</tr>
+<tr>
+<td>SetupPath</td>
+<td>Observed vti_setuppath, when available. Absence of an observation is not proof of user-authored content.</td>
+</tr>
+<tr>
+<td>NoExecute</td>
+<td>True when an available, trusted server NoExecute value is exactly <code>1</code>; False for exactly <code>0</code>; empty when unavailable, invalid or conflicting. This is the only execution/poison column. False means this flag does not block execution, not a guarantee of actual HTTP rendering.</td>
+</tr>
+<tr>
+<td>MetadataReadState</td>
+<td>Read outcome for the selected item metadata used by classification. Successful physical discovery does not imply these fields were available.</td>
+</tr>
+<tr>
+<td>ErrorCodes</td>
+<td>Retained file/item observation error codes, when present.</td>
+</tr>
+<tr>
+<td>ErrorDetail</td>
+<td>Retained details of the observation errors, when present.</td>
+</tr>
+<tr>
+<td>ObservedAtUtc</td>
+<td>Latest retained file observation time, in UTC.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="noexecute-evidence">NoExecute evidence</h2>
+<p>The current implementation requests NoExecute with the existing selected-page list-stream metadata query. It does not execute or download the ASPX to test rendering. Missing fields, explicit null, invalid values and failed reads are distinct in SQL; none is replaced with <code>0</code>. SQL retains the original NoExecuteRaw value, source and read state; the CSV exposes only the nullable Boolean NoExecute. Where no backing item or readable field is available, NoExecute is empty, not False. The summary declares <code>poisonEvidenceKind=ServerNoExecuteField</code> and <code>fullDocFlagsCollected=false</code>.</p>
+<h2 id="nullable-text-values">Nullable text values</h2>
+<p>Nullable text uses BackslashNullV1 after CSV quoting is parsed:</p>
+<table>
+<thead>
+<tr>
+<th>CSV field value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>\N</code></td>
+<td>SQL NULL: unavailable or unknown.</td>
+</tr>
+<tr>
+<td>Empty field</td>
+<td>A known empty string, not SQL NULL.</td>
+</tr>
+<tr>
+<td><code>\\N</code></td>
+<td>Literal text <code>\N</code>. For a non-null field beginning with two backslashes, remove exactly one escape backslash.</td>
+</tr>
+</tbody>
+</table>
+<p>This applies to SiteUrl, WebUrl, Url, FileName, ClassicPageType, ContentTypeId, CustomizedPageStatus, SetupPath, ErrorCodes and ErrorDetail. Nullable GUIDs and NoExecute use empty fields when unknown. Other assessment CSV encodings are unchanged.</p>
+</article>
+          </div>
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              </nav>
+            </div>
+          </div>        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            <span>Microsoft 365 Assessment Tool<br>Generated by <strong><a href='https://dotnet.github.io/docfx' alt='Doc FX Website'>DocFX</a></strong> with <strong><a href='https://ovasquez.github.io/docfx-material' alt='DocFx Material Theme'>Material UI</a></strong></span>
+            
+          </div>
+        </div>
+      </footer>    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>  </body>
+</html>
