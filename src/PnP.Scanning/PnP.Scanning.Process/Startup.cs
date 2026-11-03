@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,6 +7,7 @@ namespace PnP.Scanning.Process
 {
     internal class Startup<T> where T : class
     {
+        /// <summary>Registers the existing gRPC services without adding inventory-only transport requirements.</summary>
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddGrpc();

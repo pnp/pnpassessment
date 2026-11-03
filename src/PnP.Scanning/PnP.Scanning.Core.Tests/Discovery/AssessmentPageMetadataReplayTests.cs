@@ -155,6 +155,31 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         fixture.LastViewFields.Should().NotContain("Editor", "SkipUserInformation should avoid requesting user details");
     }
 
+    /// <summary>Requests NoExecute through the existing native list-stream query and captures its original string before legacy classification.</summary>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("1")]
+    [InlineData(" 1 ")]
+    public async Task Native_metadata_query_retains_original_NoExecute_without_changing_page_heuristics(string raw)
+    {
+        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/webpart.aspx", new()
+        {
+            ["ContentTypeId"] = "0x010109006DC758714F143A4FB8A7253506F98C5F",
+            ["HTML_x0020_File_x0020_Type"] = "SharePoint.WebPartPage.Document",
+            ["NoExecute"] = raw
+        });
+
+        var loaded = await PageScanComponent.LoadPhysicalPageAsync(fixture.List, fixture.Row, null, true);
+
+        fixture.LastViewFields.Should().Contain("NoExecute");
+        fixture.StreamRequests.Should().Be(1, "raw capture must not reread or execute the ASPX");
+        loaded.Page.PageType.Should().Be("WebPartPage");
+        loaded.FileFacts.Should().NotBeNull();
+        loaded.FileFacts.NoExecuteRaw.Should().Be(raw);
+        loaded.FileFacts.NoExecuteSource.Should().Be("SPO.ListItem.NoExecute");
+        loaded.FileFacts.NoExecuteReadState.Should().Be("Available");
+    }
+
     [Fact]
     public async Task Native_list_stream_modern_marker_is_classified_without_inflating_classic_rows()
     {
@@ -246,7 +271,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         return csv.GetRecords<T>().ToArray();
     }
 
-    private sealed class MetadataFixture
+    internal sealed class MetadataFixture
     {
         public ClassicPageDiscovery Row { get; }
         public IList List { get; }
@@ -256,14 +281,15 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         public int StreamRequests { get; private set; }
         public string[] LastViewFields { get; private set; } = Array.Empty<string>();
 
-        public MetadataFixture(Guid scan, string path, Dictionary<string, object> fields)
+        public MetadataFixture(Guid scan, string path, Dictionary<string, object> fields,
+            string siteUrl = Site, string webUrl = Web)
         {
             var listId = Guid.NewGuid();
             var fileId = Guid.NewGuid();
             Row = new ClassicPageDiscovery
             {
-                ScanId = scan, SiteUrl = Site, WebUrl = Web, RecordKey = "page:" + fileId,
-                RowType = "Page", ScopeType = "File", Url = Web + "/" + path,
+                ScanId = scan, SiteUrl = siteUrl, WebUrl = webUrl, RecordKey = "page:" + fileId,
+                RowType = "Page", ScopeType = "File", Url = webUrl + "/" + path,
                 SiteCollectionId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 WebId = Guid.Parse("22222222-2222-2222-2222-222222222222"), ListId = listId,
                 FileUniqueId = fileId, ListItemId = 1, FileName = Path.GetFileName(path),
@@ -306,7 +332,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 return Task.FromResult(ReturnedId == null ? null : hasAll ? wildcardItem : minimalItem);
             });
             var folder = StrictProxy.Create<IFolder>((method, _) => method.Name == "get_ServerRelativeUrl"
-                ? Web + "/" + path.Split('/')[0]
+                ? webUrl + "/" + path.Split('/')[0]
                 : throw new InvalidOperationException("Unexpected folder call: " + method.Name));
             List = StrictProxy.Create<IList>((method, args) =>
             {

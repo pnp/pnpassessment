@@ -15,4 +15,6 @@ internal sealed record AspxReferenceCandidate(
     string PermissionContext,
     IReadOnlyList<string> EvidenceRefs,
     string ErrorStage = null,
-    string ErrorDetail = null);
+    string ErrorDetail = null,
+    Guid? ListId = null,
+    string ContentTypeId = null);

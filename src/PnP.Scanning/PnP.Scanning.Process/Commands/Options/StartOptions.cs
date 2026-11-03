@@ -1,4 +1,4 @@
-﻿using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Process.Commands
@@ -41,6 +41,9 @@ namespace PnP.Scanning.Process.Commands
         public bool SkipUserInformation { get; set; }
 
         public bool HomePageOnly { get; set; }
+
+        public string ExcludeSiteTemplates { get; set; }
+
 
         public int AuditLogWindowDays { get; set; } = 14;
 

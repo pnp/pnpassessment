@@ -11,26 +11,16 @@ internal static class ClassicAssessmentInitialization
 {
     internal const int MaxAttempts = 3;
 
+    /// <summary>Retries eligible initialization failures, retaining discovery before final page failure disposition and rethrowing the original error.</summary>
     internal static async Task<T> ExecuteAsync<T>(Func<Task<T>> initialize,
         AssessmentDiscoveryWriter writer, Guid scanId, string siteUrl, string webUrl,
         CancellationToken cancellationToken, Action<int, Exception> onRetry = null,
         Func<TimeSpan, CancellationToken, Task> delay = null,
         Func<Exception, Task> beforeFailureFinalization = null)
     {
-        delay ??= Task.Delay;
         try
         {
-            for (var attempt = 1; ; attempt++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try { return await initialize().ConfigureAwait(false); }
-                catch (Exception error) when (!cancellationToken.IsCancellationRequested &&
-                    attempt < MaxAttempts && IsResponseEnded(error))
-                {
-                    onRetry?.Invoke(attempt, error);
-                    await delay(TimeSpan.FromSeconds(attempt), cancellationToken).ConfigureAwait(false);
-                }
-            }
+            return await RetryAsync(initialize, cancellationToken, onRetry, delay).ConfigureAwait(false);
         }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested)
         {
@@ -42,6 +32,24 @@ internal static class ClassicAssessmentInitialization
             await writer.FailUnassessedPagesAsync(scanId, siteUrl, webUrl, error,
                 "AssessmentInitialization").ConfigureAwait(false);
             throw;
+        }
+    }
+
+    /// <summary>Retries only eligible interrupted response-body reads within the fixed attempt bound, honoring caller cancellation.</summary>
+    internal static async Task<T> RetryAsync<T>(Func<Task<T>> initialize, CancellationToken cancellationToken,
+        Action<int, Exception> onRetry = null, Func<TimeSpan, CancellationToken, Task> delay = null)
+    {
+        delay ??= Task.Delay;
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try { return await initialize().ConfigureAwait(false); }
+            catch (Exception error) when (!cancellationToken.IsCancellationRequested &&
+                attempt < MaxAttempts && IsResponseEnded(error))
+            {
+                onRetry?.Invoke(attempt, error);
+                await delay(TimeSpan.FromSeconds(attempt), cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 

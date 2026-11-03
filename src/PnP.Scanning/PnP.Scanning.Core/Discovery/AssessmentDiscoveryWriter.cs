@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Storage;
 using System.Text.Json;
 
@@ -16,6 +17,19 @@ internal sealed class AssessmentDiscoveryWriter
     internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId)) { }
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
+    /// <summary>Commits bounded physical facts before ASPX admission, so file-type and later assessment decisions cannot discard raw files.</summary>
+    internal async Task WritePhysicalFilesAsync(Guid scanId, IEnumerable<RawDiscoveryRecord> records,
+        CancellationToken cancellationToken)
+    {
+        var files = new SPFileWriter(createContext);
+        foreach (var batch in records.Select(record => SPFileFactProjection.FromPhysicalRecord(scanId, record))
+            .Where(file => file != null).Chunk(128))
+        {
+            await files.WriteAsync(batch, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Persists raw observations without erasing retained failures or rekeying preview evidence during resume.</summary>
     internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
     {
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -95,6 +109,56 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    /// <summary>Streams ordered scan/web page observations in bounded keyset batches, disposing each database reader before yielding rows to acquisition.</summary>
+    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadPageStreamAsync(Guid scanId, string siteUrl, string webUrl,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string after = null;
+        while (true)
+        {
+            List<ClassicPageDiscovery> batch;
+            using (var db = createContext())
+            {
+                batch = await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
+                    row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page" &&
+                    (after == null || string.Compare(row.RecordKey, after) > 0))
+                    .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
+            }
+            if (batch.Count == 0)
+            {
+                yield break;
+            }
+            after = batch[^1].RecordKey;
+            // No live SQLite reader is held while a source read or a projection write awaits.
+            foreach (var row in batch)
+            {
+                yield return row;
+            }
+        }
+    }
+
+    /// <summary>Streams persisted Web discovery roots across the whole scan without holding a SQLite reader during acquisition.</summary>
+    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadDiscoveredWebScopesAsync(Guid scanId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        string after = null;
+        while (true)
+        {
+            List<ClassicPageDiscovery> batch;
+            using (var db = createContext())
+            {
+                batch = await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
+                    row.RowType == "Scope" && row.ScopeType == "Web" && row.ParentScopeKey == null &&
+                    row.SiteCollectionId != null && row.WebId != null && row.RecordKey.StartsWith("scope:") &&
+                    (after == null || string.Compare(row.RecordKey, after) > 0))
+                    .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
+            }
+            if (batch.Count == 0) yield break;
+            after = batch[^1].RecordKey;
+            foreach (var row in batch) yield return row;
+        }
+    }
+
     internal async Task<List<ClassicPageDiscovery>> ReadPagesAsync(Guid scanId, string siteUrl, string webUrl,
         CancellationToken cancellationToken = default)
     {
@@ -159,7 +223,7 @@ internal sealed class AssessmentDiscoveryWriter
                 .Concat(allRows.Where(row => row.RowType == "Reference" ||
                     (row.RowType == "Pagination" && row.DiscoveryStatus is ("Denied" or "Failed" or "Unknown")))
                     .Select(row => row.DiscoveryStatus)).ToArray();
-            var gapCodes = allRows.SelectMany(row => (row.ErrorCodes ?? string.Empty)
+            var gapCodes = allRows.Where(row => row.RowType != "Assessment").SelectMany(row => (row.ErrorCodes ?? string.Empty)
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 .Select(code => code.Contains(':') ? code[(code.LastIndexOf(':') + 1)..] : code)
                 .ToArray();

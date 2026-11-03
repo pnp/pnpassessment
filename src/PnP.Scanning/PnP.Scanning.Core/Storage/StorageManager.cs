@@ -1,4 +1,4 @@
-﻿using EFCore.BulkExtensions;
+using EFCore.BulkExtensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core;
@@ -1396,39 +1396,54 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StorePageSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int modernPageCounter, 
-                                                  int wikiPageCounter, int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter)
+        /// <summary>
+        /// Stores the assessed page counters in the scan-owned database using the shared summary writer.
+        /// </summary>
+        internal async Task StorePageSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template,
+            PnPContext context, HashSet<string> remediationCodes, int modernPageCounter, int wikiPageCounter,
+            int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter)
         {
-            using (var dbContext = new ScanContext(scanId))
+            using var dbContext = new ScanContext(scanId);
+            await StorePageSummaryAsync(dbContext, scanId, siteUrl, webUrl, template, context, remediationCodes,
+                modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter,
+                publishingPageCounter).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Persists the same per-web page summary on a supplied context so offline assessment regressions
+        /// exercise the production rollup and preserve remediation codes from other Classic components.
+        /// </summary>
+        internal static async Task StorePageSummaryAsync(ScanContext dbContext, Guid scanId, string siteUrl,
+            string webUrl, string template, PnPContext context, HashSet<string> remediationCodes,
+            int modernPageCounter, int wikiPageCounter, int blogPageCounter, int webPartPageCounter,
+            int aspxPageCounter, int publishingPageCounter)
+        {
+            var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId &&
+                p.SiteUrl == siteUrl && p.WebUrl == webUrl).ConfigureAwait(false);
+            if (webSummary == null)
             {
-                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
-
-                if (webSummary == null)
+                webSummary = new ClassicWebSummary
                 {
-                    webSummary = new ClassicWebSummary
-                    {
-                        ScanId = scanId,
-                        SiteUrl = siteUrl,
-                        WebUrl = webUrl,
-                        Template = template,
-                        LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,                        
-                    };
-                    
-                    await dbContext.ClassicWebSummaries.AddAsync(webSummary);
-                }
-
-                webSummary.ClassicASPXPages = aspxPageCounter;
-                webSummary.ClassicBlogPages = blogPageCounter;
-                webSummary.ClassicWikiPages = wikiPageCounter;
-                webSummary.ClassicWebPartPages = webPartPageCounter;
-                webSummary.ClassicPublishingPages = publishingPageCounter;
-                webSummary.ModernPages = modernPageCounter;
-                webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter + publishingPageCounter;
-                webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
-
-                await dbContext.SaveChangesAsync();
-                Log.Information("StorePageSummaryAsync succeeded");
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = webUrl,
+                    Template = template,
+                    LastItemUserModifiedDate = context.Web.LastItemUserModifiedDate,
+                };
+                await dbContext.ClassicWebSummaries.AddAsync(webSummary).ConfigureAwait(false);
             }
+
+            webSummary.ClassicASPXPages = aspxPageCounter;
+            webSummary.ClassicBlogPages = blogPageCounter;
+            webSummary.ClassicWikiPages = wikiPageCounter;
+            webSummary.ClassicWebPartPages = webPartPageCounter;
+            webSummary.ClassicPublishingPages = publishingPageCounter;
+            webSummary.ModernPages = modernPageCounter;
+            webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter + publishingPageCounter;
+            webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
+
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+            Log.Information("StorePageSummaryAsync succeeded");
         }
 
         private static string AggregateRemediationCodes(HashSet<string> remediationCodes, ClassicWebSummary webSummary)

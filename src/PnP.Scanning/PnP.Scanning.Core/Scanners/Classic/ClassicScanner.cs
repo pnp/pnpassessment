@@ -1,4 +1,4 @@
-﻿using EFCore.BulkExtensions;
+using EFCore.BulkExtensions;
 using EFQuery = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 using Microsoft.SharePoint.Client;
 using PnP.Core.Model;
@@ -9,6 +9,7 @@ using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Discovery;
 using System.Linq.Expressions;
+using System.Runtime.ExceptionServices;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -23,6 +24,7 @@ namespace PnP.Scanning.Core.Scanners
 
         internal ClassicOptions Options { get; set; }
 
+        /// <summary>Runs selected Classic components against one shared web context.</summary>
         internal async override Task ExecuteAsync()
         {
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
@@ -48,9 +50,8 @@ namespace PnP.Scanning.Core.Scanners
                                                  r => r.ItemCount,
                                                  r => r.LastItemUserModifiedDate,
                                                  r => r.DocumentTemplate,
-                                                 // Display form resolution for list items that have no file of their own:
-                                                 // the item's content type DisplayFormUrl, else the list default. BaseType
-                                                 // tells whether a list's items can lack a file at all.
+                                                 // Capture list and registered content-type display-form declarations
+                                                 // with the shared metadata load, without reading list items.
                                                  r => r.BaseType,
                                                  r => r.DefaultDisplayFormUrl,
                                                  r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl, p => p.UniqueId),
@@ -76,24 +77,32 @@ namespace PnP.Scanning.Core.Scanners
                                                                                                                                                w => w.MasterUrl });
             }
 
-            using (var context = await CreateWebContextAsync(options))
+            using (var context = await CreateWebContextAsync())
             using (var csomContext = GetClientContext(context))
             {
-                List<ClassicPageDiscovery> discoveredPages = null;
-                if (Options.Pages)
+                SharePointListMetadataSnapshot sharedLists = null;
+                Exception metadataFailure = null;
+                if (!(Options.Pages && Options.HomePageOnly))
                 {
+                    // Load shared assessment metadata before the selected components consume it.
+                    // HOME defers this load until after its targeted page discovery.
                     var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
-                    var writer = new AssessmentDiscoveryWriter(ScanId);
-                    discoveredPages = await ClassicAssessmentMetadata.AcquirePagesAsync(Options.HomePageOnly,
-                        () => ClassicAssessmentInitialization.ExecuteAsync(
-                            () => ClassicAssessmentMetadata.LoadAsync(context, options, token),
-                            writer, ScanId, SiteUrl, WebUrl, token,
-                            (attempt, error) => Logger.Warning(error,
-                                "Response ended while initializing page assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
-                                SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1),
-                            beforeFailureFinalization: Options.HomePageOnly ? null :
-                                _ => ClassicPageDiscoveryComponent.ExecuteAsync(this, context)),
-                        sharedLists => ClassicPageDiscoveryComponent.ExecuteAsync(this, context, sharedLists))
+                    try
+                    {
+                        sharedLists = await RetryLoadSharedMetadataAsync(context, options, token).ConfigureAwait(false);
+                    }
+                    catch (Exception error) when (Options.Pages && !token.IsCancellationRequested)
+                    {
+                        // Defer page failure finalization until raw discovery has been retained.
+                        metadataFailure = error;
+                    }
+                }
+
+                if (Options.Pages && (Options.HomePageOnly || metadataFailure != null))
+                {
+                    // HOME must discover its target before the all-lists metadata request.
+                    // A failed full-inventory load also needs raw discovery before finalization.
+                    await ExecutePagesAsync(context, csomContext, options, sharedLists, metadataFailure)
                         .ConfigureAwait(false);
                 }
 
@@ -125,14 +134,9 @@ namespace PnP.Scanning.Core.Scanners
                     Logger.Information("Classic InfoPath assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
                 }
 
-                if (Options.Pages)
+                if (Options.Pages && !Options.HomePageOnly && metadataFailure == null)
                 {
-                    Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the Page scan component
-                    await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
-
-                    Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+                    await ExecutePagesAsync(context, csomContext, options, sharedLists, null).ConfigureAwait(false);
                 }
 
                 if (Options.Lists)
@@ -188,11 +192,11 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
-        private Task<PnPContext> CreateWebContextAsync(PnPContextOptions assessmentOptions)
+        /// <summary>Creates one identity context; the separate shared-metadata step controls when list metadata loads.</summary>
+        private Task<PnPContext> CreateWebContextAsync()
         {
-            if (!Options.Pages) return GetPnPContextAsync(assessmentOptions);
-            // One owner for identity, discovery and assessment. Rich metadata is hydrated into
-            // this context once; a failed hydration still gets a raw discovery fallback.
+            // Create one identity context. Shared assessment metadata is loaded into it once
+            // before the selected components run, except HOME's targeted discovery runs first.
             return GetPnPContextAsync(new PnPContextOptions
             {
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
@@ -200,6 +204,68 @@ namespace PnP.Scanning.Core.Scanners
                     web => web.ServerRelativeUrl,
                 },
             });
+        }
+
+        /// <summary>Runs page discovery with the shared snapshot or targeted fallback, then finalizes retained initialization failures before assessment.</summary>
+        private async Task ExecutePagesAsync(PnPContext context, ClientContext csomContext,
+            PnPContextOptions assessmentOptions, SharePointListMetadataSnapshot sharedLists,
+            Exception metadataFailure)
+        {
+            Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+
+            var discoveredPages = await DiscoverPagesAsync(Options.HomePageOnly, sharedLists,
+                () => LoadSharedMetadataAfterHomeDiscoveryAsync(context, assessmentOptions),
+                snapshot => ClassicPageDiscoveryComponent.ExecuteAsync(this, context, snapshot)).ConfigureAwait(false);
+
+            if (metadataFailure != null)
+            {
+                ScanManager.GetCancellationTokenSource(ScanId).Token.ThrowIfCancellationRequested();
+                await new AssessmentDiscoveryWriter(ScanId).FailUnassessedPagesAsync(
+                    ScanId, SiteUrl, WebUrl, metadataFailure, "AssessmentInitialization").ConfigureAwait(false);
+                ExceptionDispatchInfo.Capture(metadataFailure).Throw();
+            }
+
+            await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
+            Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+        }
+
+        /// <summary>Loads the Web metadata once through the existing bounded response-body retry policy.</summary>
+        private Task<SharePointListMetadataSnapshot> RetryLoadSharedMetadataAsync(PnPContext context,
+            PnPContextOptions assessmentOptions, CancellationToken token)
+        {
+            return ClassicAssessmentInitialization.RetryAsync(
+                () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
+                token, LogMetadataRetry);
+        }
+
+        /// <summary>Loads rich shared assessment metadata only after targeted homepage discovery has completed.</summary>
+        private Task<SharePointListMetadataSnapshot> LoadSharedMetadataAfterHomeDiscoveryAsync(PnPContext context,
+            PnPContextOptions assessmentOptions)
+        {
+            var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
+            return ClassicAssessmentInitialization.ExecuteAsync(
+                () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
+                new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl, token, LogMetadataRetry);
+        }
+
+        /// <summary>Logs the eligible initialization retry without changing retry classification, attempt limits or exception ownership.</summary>
+        private void LogMetadataRetry(int attempt, Exception error) => Logger.Warning(error,
+            "Response ended while initializing classic assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
+            SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1);
+
+        /// <summary>Discovers pages after shared metadata, except HOME which discovers its target first.</summary>
+        internal static async Task<List<ClassicPageDiscovery>> DiscoverPagesAsync(bool homePageOnly,
+            SharePointListMetadataSnapshot sharedLists,
+            Func<Task<SharePointListMetadataSnapshot>> loadHomeMetadata,
+            Func<SharePointListMetadataSnapshot, Task<List<ClassicPageDiscovery>>> discover)
+        {
+            if (homePageOnly)
+            {
+                var pages = await discover(null).ConfigureAwait(false);
+                await loadHomeMetadata().ConfigureAwait(false);
+                return pages;
+            }
+            return await discover(sharedLists).ConfigureAwait(false);
         }
 
         internal async override Task PreScanningAsync()
@@ -310,6 +376,10 @@ namespace PnP.Scanning.Core.Scanners
             return failedSites;
         }
 
+        /// <summary>
+        /// After web workers finish, projects observed ASPX, finalizes coverage, and persists page, web-part, and site rollups plus optional usage.
+        /// Retains optional enrichment and usage diagnostics, then surfaces accumulated acquisition failures after consolidation.
+        /// </summary>
         internal async override Task PostScanningAsync()
         {
 

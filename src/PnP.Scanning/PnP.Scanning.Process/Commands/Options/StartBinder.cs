@@ -1,4 +1,4 @@
-﻿using PnP.Scanning.Core.Authentication;
+using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Services;
 using System.CommandLine;
 using System.CommandLine.Binding;
@@ -28,10 +28,12 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<bool> classicSkipUserInformation;
         private readonly Option<bool> classicHomePageOnly;
         private readonly Option<int> classicAuditLogWindowDays;
+        private readonly Option<string> excludeSiteTemplates;
 #if DEBUG
         private readonly Option<int> testNumberOfSites;
 #endif
 
+        /// <summary>Retains command option instances so parsed start values, including explicit ASPX scope inputs, bind without reinterpreting defaults.</summary>
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
                            Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
                            // PER SCAN COMPONENT: implement scan component specific options
@@ -43,6 +45,7 @@ namespace PnP.Scanning.Process.Commands
                            , Option<bool> classicSkipUserInformationInput
                            , Option<bool> classicHomePageOnlyInput
                            , Option<int> classicAuditLogWindowDaysInput
+                           , Option<string> excludeSiteTemplatesInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
@@ -69,11 +72,13 @@ namespace PnP.Scanning.Process.Commands
             classicSkipUserInformation = classicSkipUserInformationInput;
             classicHomePageOnly = classicHomePageOnlyInput;
             classicAuditLogWindowDays = classicAuditLogWindowDaysInput;
+            excludeSiteTemplates = excludeSiteTemplatesInput;
 #if DEBUG
             testNumberOfSites = testNumberOfSitesInput;
 #endif
         }
 
+        /// <summary>Copies the parser results into start options, preserving the option-defined defaults and explicit scope selection.</summary>
         protected override StartOptions GetBoundValue(BindingContext bindingContext) =>
             new()
             {
@@ -97,6 +102,7 @@ namespace PnP.Scanning.Process.Commands
                 SkipUserInformation = bindingContext.ParseResult.GetValueForOption(classicSkipUserInformation),
                 HomePageOnly = bindingContext.ParseResult.GetValueForOption(classicHomePageOnly),
                 AuditLogWindowDays = bindingContext.ParseResult.GetValueForOption(classicAuditLogWindowDays),
+                ExcludeSiteTemplates = bindingContext.ParseResult.GetValueForOption(excludeSiteTemplates),
 
 #if DEBUG
                 TestNumberOfSites = bindingContext.ParseResult.GetValueForOption(testNumberOfSites),

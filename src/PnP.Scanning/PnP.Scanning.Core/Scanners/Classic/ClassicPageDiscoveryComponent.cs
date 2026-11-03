@@ -1,5 +1,6 @@
 using PnP.Core.Auth;
 using PnP.Scanning.Core.Discovery;
+using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Services;
 
@@ -7,12 +8,14 @@ namespace PnP.Scanning.Core.Scanners;
 
 internal static class ClassicPageDiscoveryComponent
 {
+    /// <summary>Owns a temporary web context while discovering ASPX files for the scheduled web.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner)
     {
         using var context = await scanner.GetPnPContextAsync().ConfigureAwait(false);
         return await ExecuteAsync(scanner, context).ConfigureAwait(false);
     }
 
+    /// <summary>Uses the shared web context to persist physical ASPX discovery before scan-wide acquisition begins.</summary>
     internal static async Task<List<ClassicPageDiscovery>> ExecuteAsync(ClassicScanner scanner,
         PnP.Core.Services.PnPContext context, SharePointListMetadataSnapshot sharedLists = null)
     {
@@ -21,7 +24,7 @@ internal static class ClassicPageDiscoveryComponent
         var auth = new ExternalAuthenticationProvider((_, scopes) =>
             scanner.ScanManager.GetScanAuthenticationManager(scanner.ScanId).GetAccessTokenAsync(scopes));
         // Context creation already loaded Site.Id and Web.Id/Url. Ensure only what is missing.
-        await context.Site.EnsurePropertiesAsync(value => value.Id).ConfigureAwait(false);
+        await context.Site.EnsurePropertiesAsync(value => value.Id, value => value.Url).ConfigureAwait(false);
         await context.Web.EnsurePropertiesAsync(value => value.Id, value => value.Url,
             value => value.ServerRelativeUrl).ConfigureAwait(false);
         var site = context.Site;
@@ -40,17 +43,25 @@ internal static class ClassicPageDiscoveryComponent
         return await writer.ReadPagesAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, token).ConfigureAwait(false);
     }
 
-    internal static Task RecordWebEnumerationScopeAsync(Guid scanId, string siteUrl,
+    /// <summary>Persists original web-enumeration authority without replacing retained evidence with the pending checkpoint replay queue.</summary>
+    internal static async Task RecordWebEnumerationScopeAsync(Guid scanId, string siteUrl,
         WebEnumerationResult enumeration, Exception error = null, AssessmentDiscoveryWriter writer = null)
     {
         // The checkpoint contains only pending work. Do not replace the original authority's
         // child counts (or a retained denial/failure) with the size of this restart queue.
-        if (enumeration.IsCheckpointReplay && error == null) return Task.CompletedTask;
-        return RecordScopeAsync(scanId, siteUrl, "", "SiteCollection",
+        if (enumeration.IsCheckpointReplay && error == null)
+        {
+            return;
+        }
+        var sink = writer ?? new AssessmentDiscoveryWriter(scanId);
+        if (enumeration.ScopeEvidence is { Count: > 0 })
+            await sink.WriteAsync(enumeration.ScopeEvidence).ConfigureAwait(false);
+        await RecordScopeAsync(scanId, siteUrl, "", "SiteCollection",
             error == null ? "Complete" : AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(error)),
-            error, children: error == null ? enumeration.Webs.Count : null, stage: "EnumerateWebs", writer: writer);
+            error, children: error == null ? enumeration.Webs.Count : null, stage: "EnumerateWebs", writer: sink).ConfigureAwait(false);
     }
 
+    /// <summary>Creates one durable scope observation with optional failure evidence and writes it through the assessment sink.</summary>
     internal static Task RecordScopeAsync(Guid scanId, string siteUrl, string webUrl, string scopeType,
         string status, Exception error = null, int? children = null, string stage = "Discovery",
         AssessmentDiscoveryWriter writer = null)

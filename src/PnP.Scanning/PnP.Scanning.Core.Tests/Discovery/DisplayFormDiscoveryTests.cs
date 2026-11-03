@@ -8,20 +8,19 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Discovery;
 
 /// <summary>
-/// Acquisition of pages that own no file of their own: a list item addressed through a shared display
-/// form as "&lt;displayForm&gt;?ID=&lt;n&gt;". One form file backs N such pages, so they are read from
-/// the item stream rather than from a physical file enumeration, as a surface of the owning list.
+/// Captures declared list and registered content-type display forms without enumerating list items.
 /// </summary>
 [Trait("Category", "ClassicDiscoveryIntegration")]
 public sealed class DisplayFormDiscoveryTests
 {
     private static readonly Uri SiteUrl = new("https://contoso.sharepoint.com/sites/a");
 
+    /// <summary>
+    /// Requires the all-lists request to include list-default and content-type form declarations without querying item collections.
+    /// </summary>
     [Fact]
-    public async Task All_lists_request_carries_both_display_form_tiers()
+    public async Task All_lists_request_carries_both_display_form_tiers_without_item_reads()
     {
-        // Both tiers ride along on the existing all-lists request rather than costing a round trip per
-        // list. The content type tier is the one that in practice ever names a content page form.
         using var factory = new DisplayFormFactory();
         using var provider = Provider(factory);
 
@@ -33,205 +32,89 @@ public sealed class DisplayFormDiscoveryTests
         query.Should().Contain("DefaultDisplayFormUrl");
         query.Should().Contain("ContentTypes/DisplayFormUrl");
         query.Should().Contain("$expand=RootFolder,ContentTypes");
+        factory.Client.Requests.Should().NotContain(uri => uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Retains declared form locations and content-type scope as unlinked reference evidence, without deriving per-item pages or requests.
+    /// </summary>
     [Fact]
-    public async Task List_with_a_content_page_form_exposes_a_display_form_surface()
+    public async Task Registered_forms_are_evidence_without_creating_item_page_surfaces()
     {
         using var factory = new DisplayFormFactory();
         using var provider = Provider(factory);
 
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
+        var lists = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren;
+        var posts = lists.Single(scope => scope.Metadata?.GetValueOrDefault("title") == "Posts");
+        var children = await provider.EnumerateChildrenAsync(posts);
 
-        surface.Should().NotBeNull("the blog Posts list resolves a content page form");
-        surface.SourceKind.Should().Be(DiscoverySourceKind.ListItemDisplayFormPages);
+        children.ObservedChildren.Should().NotContain(scope => scope.Locator.Contains("Items REST objects", StringComparison.Ordinal));
+        var references = provider.ReferenceCollector.ReadReferenceEvidence();
+        references.Count(value => value.SourceKind == AspxReferenceSourceKinds.ListDefaultDisplayForm).Should().Be(3);
+        references.Count(value => value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm).Should().Be(2);
+
+        var postForm = references.Single(value => value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm &&
+            value.ListId == Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        postForm.ContentTypeId.Should().Be("0x0110");
+        postForm.RawLocator.Should().Be("/sites/a/Lists/Posts/Post.aspx");
+        postForm.Disposition.Should().Be(AspxReferenceDispositions.Declared);
+        postForm.LinkedFileUniqueId.Should().BeNull();
+        references.Should().NotContain(value => value.RawLocator != null &&
+            value.RawLocator.Contains("?ID=", StringComparison.OrdinalIgnoreCase));
+        factory.Client.Requests.Should().NotContain(uri => uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
     }
 
-    [Theory]
-    // A document library's items are files, already inventoried with a real FileUniqueId.
-    [InlineData("Documents")]
-    // Ordinary data rows viewed through the stock form: enumerating these would report every list item
-    // in the tenant as a page.
-    [InlineData("Announcements")]
-    public async Task Lists_without_content_page_forms_expose_no_display_form_surface(string title)
-    {
-        using var factory = new DisplayFormFactory();
-        using var provider = Provider(factory);
-
-        (await DisplayFormSurfaceAsync(provider, title)).Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Items_become_pages_addressed_through_their_resolved_form()
-    {
-        using var factory = new DisplayFormFactory();
-        using var provider = Provider(factory);
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
-
-        var records = await ReadRecordsAsync(provider.CreateRawSource(surface));
-
-        // Item 7 carries the Post content type, item 9 only the list default (the stock form).
-        records.Select(record => record.PhysicalLocator).Should()
-            .BeEquivalentTo("/sites/a/Lists/Posts/Post.aspx?ID=7");
-        var post = records.Single();
-        post.ListItemId.Should().Be(7);
-        post.ListId.Should().Be(Guid.Parse("22222222-2222-2222-2222-222222222222"));
-        post.FileUniqueId.Should().BeNull("the page owns no file; the form file is not this page");
-        post.HomePage.Should().BeFalse("a display form is never the web's welcome page");
-        post.LocatorIsGuaranteedPhysicalFilePath.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task A_display_form_page_is_admitted_as_aspx()
-    {
-        // Admission matches on the leaf name, so the record must carry the form's file name rather than
-        // the addressed URL, which ends in a query string.
-        using var factory = new DisplayFormFactory();
-        using var provider = Provider(factory);
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
-
-        var record = (await ReadRecordsAsync(provider.CreateRawSource(surface))).Single();
-
-        record.FileName.Should().Be("Post.aspx");
-        AspxAdmission.Evaluate(record).IsAspx.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task A_display_form_page_is_recorded_as_a_list_item_not_a_file()
-    {
-        // "File" asserts the row represents a file. One form file backs N of these addresses, so the
-        // page is a ListItem — and the page scanner routes on exactly that, because such a row cannot
-        // be read as a physical file: the item's FileRef is not the form's URL.
-        using var factory = new DisplayFormFactory();
-        using var provider = Provider(factory);
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
-        var record = (await ReadRecordsAsync(provider.CreateRawSource(surface))).Single();
-
-        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), SiteUrl.AbsoluteUri, "/", surface, record);
-
-        row.ScopeType.Should().Be("ListItem");
-        Core.Scanners.PageScanComponent.IsDisplayFormPage(row).Should().BeTrue();
-        row.Url.Should().Be("/sites/a/Lists/Posts/Post.aspx?ID=7");
-        row.ListItemId.Should().Be(7);
-    }
-
-    [Fact]
-    public async Task The_assessment_loop_must_route_a_display_form_page_before_classifying_its_list()
-    {
-        // Ordering guard. A display-form address lives inside its list's root folder, so the
-        // file-level route's containment check would read its null-free identity as a list-backed
-        // file whose association went unobserved, and fail it. The loop must therefore recognise the
-        // row as a display-form page before it reaches ClassifyListAssociation.
-        using var factory = new DisplayFormFactory();
-        using var provider = Provider(factory);
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
-        var record = (await ReadRecordsAsync(provider.CreateRawSource(surface))).Single();
-        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), SiteUrl.AbsoluteUri, "/", surface, record);
-
-        Core.Scanners.PageScanComponent.IsDisplayFormPage(row)
-            .Should().BeTrue("the loop skips on this before any list classification runs");
-
-        // What the file-level route would have concluded had the guard not run first.
-        Core.Scanners.PageScanComponent.ClassifyListAssociation(row, listMatched: false,
-                new[] { "/sites/a/Lists/Posts" })
-            .Should().Be(Core.Scanners.PageScanComponent.ListAssociationState.OwningListUnresolved,
-                "which AddFileLevelPage records as Failed - the verdict the guard exists to prevent");
-    }
-
-    [Fact]
-    public async Task A_physically_discovered_page_stays_a_file()
-    {
-        using var factory = new DisplayFormFactory();
-        using var provider = Provider(factory);
-        var scope = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.First();
-        var file = new RawDiscoveryRecord(Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"),
-            "container", "default.aspx", "/sites/a/default.aspx", true, "test");
-
-        var row = AssessmentWebDiscovery.Page(Guid.NewGuid(), SiteUrl.AbsoluteUri, "/", scope, file);
-
-        row.ScopeType.Should().Be("File");
-        Core.Scanners.PageScanComponent.IsDisplayFormPage(row).Should().BeFalse();
-    }
-
+    /// <summary>
+    /// Preserves content-type form declarations across verbose and no-metadata collection wrappers and both supported ID shapes.
+    /// </summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public async Task Expanded_content_type_ids_resolve_the_item_specific_form(bool wrappedContentTypes, bool stringContentTypeIds)
+    public async Task Wrapped_and_flattened_content_type_ids_preserve_declarations(bool wrappedContentTypes, bool stringContentTypeIds)
     {
-        // SP.ContentType.Id is an SP.ContentTypeId object with StringValue. Also retain support
-        // for already-flattened string identifiers; OData may wrap the expanded collection in results.
         using var factory = new DisplayFormFactory(wrappedContentTypes, stringContentTypeIds);
         using var provider = Provider(factory);
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
 
-        var records = await ReadRecordsAsync(provider.CreateRawSource(surface));
+        await provider.EnumerateChildrenAsync(provider.RootScope);
 
-        records.Should().ContainSingle().Which.PhysicalLocator.Should().Be("/sites/a/Lists/Posts/Post.aspx?ID=7");
-        records[0].ContentTypeId.Should().Be("0x0110007C4E8A");
+        provider.ReferenceCollector.ReadReferenceEvidence().Should().Contain(value =>
+            value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm &&
+            value.SourceObjectId.EndsWith(":ct:0x0110", StringComparison.Ordinal) &&
+            value.RawLocator == "/sites/a/Lists/Posts/Post.aspx");
+        factory.Client.Requests.Should().NotContain(uri => uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
         factory.Client.ResponseSchemaFlavors.Should().OnlyContain(flavor =>
             flavor == (wrappedContentTypes ? "odata-verbose" : "odata-nometadata"));
     }
 
+    /// <summary>
+    /// Keeps each registered content type and its declared form path distinct instead of collapsing them into one list-level reference.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Object_content_type_ids_keep_the_most_specific_form_first(bool wrappedContentTypes)
+    public async Task Multiple_registered_content_type_forms_remain_separate_references(bool wrappedContentTypes)
     {
-        const string forms = """
-            [{ "Id": { "StringValue": "0x0110" }, "DisplayFormUrl": "Lists/Posts/Post.aspx" },
-             { "Id": { "StringValue": "0x0110007C4E" }, "DisplayFormUrl": "Lists/Posts/Special.aspx" }]
-            """;
+        const string forms = "[{ \"Id\": { \"StringValue\": \"0x0110\" }, \"DisplayFormUrl\": \"Lists/Posts/Post.aspx\" }, " +
+            "{ \"Id\": { \"StringValue\": \"0x0110007C4E\" }, \"DisplayFormUrl\": \"Lists/Posts/Special.aspx\" }]";
         using var factory = new DisplayFormFactory(wrappedContentTypes, postContentTypesJson: forms);
         using var provider = Provider(factory);
-        var surface = await DisplayFormSurfaceAsync(provider, "Posts");
 
-        var records = await ReadRecordsAsync(provider.CreateRawSource(surface));
+        await provider.EnumerateChildrenAsync(provider.RootScope);
 
-        records.Should().ContainSingle().Which.PhysicalLocator.Should().Be("/sites/a/Lists/Posts/Special.aspx?ID=7");
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("null")]
-    [InlineData("{}")]
-    [InlineData("{\"StringValue\":null}")]
-    [InlineData("{\"StringValue\":123}")]
-    [InlineData("[]")]
-    [InlineData("123")]
-    [InlineData("true")]
-    public async Task Missing_or_non_string_content_type_ids_do_not_invent_a_display_form_surface(string idJson)
-    {
-        var form = new JsonObject { ["DisplayFormUrl"] = "Lists/Posts/Post.aspx" };
-        if (idJson != null) form["Id"] = JsonNode.Parse(idJson);
-        var forms = new JsonArray(form);
-        using var factory = new DisplayFormFactory(postContentTypesJson: forms.ToJsonString());
-        using var provider = Provider(factory);
-
-        (await DisplayFormSurfaceAsync(provider, "Posts")).Should().BeNull();
-    }
-
-    private static async Task<DiscoveryScopeRegistration> DisplayFormSurfaceAsync(
-        SharePointLiveAspxDiscoveryProvider provider, string listTitle)
-    {
-        var containers = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren;
-        var list = containers.Single(scope => scope.Metadata?.GetValueOrDefault("title") == listTitle);
-        return (await provider.EnumerateChildrenAsync(list)).ObservedChildren
-            .SingleOrDefault(scope => scope.SourceKind == DiscoverySourceKind.ListItemDisplayFormPages);
+        var postReferences = provider.ReferenceCollector.ReadReferenceEvidence()
+            .Where(value => value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm &&
+                value.ListId == Guid.Parse("22222222-2222-2222-2222-222222222222")).ToArray();
+        postReferences.Select(value => value.ContentTypeId).Should().BeEquivalentTo("0x0110", "0x0110007C4E");
+        postReferences.Select(value => value.RawLocator).Should().BeEquivalentTo(
+            "/sites/a/Lists/Posts/Post.aspx", "/sites/a/Lists/Posts/Special.aspx");
     }
 
     private static SharePointLiveAspxDiscoveryProvider Provider(DisplayFormFactory factory) =>
         new(new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64)),
             factory, new AspxWebAcquisitionContext(Guid.NewGuid(), SiteUrl, Guid.NewGuid(), SiteUrl,
                 "/sites/a", "STS#3"));
-
-    private static async Task<List<RawDiscoveryRecord>> ReadRecordsAsync(IRawDiscoverySource source)
-    {
-        var records = new List<RawDiscoveryRecord>();
-        await foreach (var batch in source.ReadBatchesAsync()) records.AddRange(batch.Records);
-        return records;
-    }
 
     private sealed class DisplayFormFactory : ISharePointAspxRestClientFactory
     {

@@ -13,11 +13,13 @@ using Xunit;
 namespace PnP.Scanning.Core.Tests.Discovery;
 
 [Trait("Category", "ClassicDiscoveryIntegration")]
-public sealed class AssessmentDiscoveryIntegrationTests : IClassFixture<ScanContextFixture>
+public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
 {
     private const string Site = "https://contoso.sharepoint.com/sites/a";
-    private readonly ScanContextFixture database;
-    public AssessmentDiscoveryIntegrationTests(ScanContextFixture database) => this.database = database;
+    private readonly ScanContextFixture database = new();
+
+    /// <summary>Disposes the test-owned scan database; separate assessments do not share one physical-file table in production.</summary>
+    public void Dispose() => database.Dispose();
 
     [Fact]
     public async Task Denied_list_and_partial_folder_are_scope_rows_and_do_not_discard_pages()

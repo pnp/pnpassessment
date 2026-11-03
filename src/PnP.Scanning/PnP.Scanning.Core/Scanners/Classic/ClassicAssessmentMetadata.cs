@@ -1,11 +1,10 @@
 using PnP.Core.Model;
 using PnP.Core.Services;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners;
 
-/// <summary>Loads assessment metadata once and shares a proven complete list response with discovery.</summary>
+/// <summary>Loads shared assessment metadata and returns a proven complete list response when available.</summary>
 internal static class ClassicAssessmentMetadata
 {
     internal static async Task<SharePointListMetadataSnapshot> LoadAsync(PnPContext context,
@@ -45,20 +44,5 @@ internal static class ClassicAssessmentMetadata
             mapping.PostMappingHandler = previousMapping;
             context.GraphFirst = previousGraphFirst;
         }
-    }
-
-    internal static async Task<List<ClassicPageDiscovery>> AcquirePagesAsync(bool homePageOnly,
-        Func<Task<SharePointListMetadataSnapshot>> loadMetadata,
-        Func<SharePointListMetadataSnapshot, Task<List<ClassicPageDiscovery>>> discover)
-    {
-        // A home-page scan must retain its targeted discovery path, not preload an all-lists authority.
-        if (homePageOnly)
-        {
-            var pages = await discover(null).ConfigureAwait(false);
-            await loadMetadata().ConfigureAwait(false);
-            return pages;
-        }
-        var sharedLists = await loadMetadata().ConfigureAwait(false);
-        return await discover(sharedLists).ConfigureAwait(false);
     }
 }
