@@ -1140,6 +1140,271 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                     b.ToTable("History");
                 });
 
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.AnalysisReportRowEntry", b =>
+                {
+                    b.Property<Guid>("AnalysisRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RowKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AnalysisRunId", "Kind", "RowKey");
+
+                    b.ToTable("AnalysisReportRows", (string)null);
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.AnalysisResultRow", b =>
+                {
+                    b.Property<Guid>("AnalysisRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ObservationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CommittedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AnalysisRunId", "ObservationId");
+
+                    b.HasIndex("AnalysisRunId", "SnapshotId");
+
+                    b.HasIndex("ObservationId", "SnapshotId");
+
+                    b.ToTable("AnalysisResults", (string)null);
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", b =>
+                {
+                    b.Property<Guid>("AnalysisRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ManifestDigest")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModuleKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ParametersJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReportDigest")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReportPublishedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RuleVersion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AnalysisRunId");
+
+                    b.ToTable("AnalysisRuns", (string)null);
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AssessmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CheckpointJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CompletedRecords")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrentPhase")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EndedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ErrorCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InputVersion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModuleKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ParametersJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ParentRunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RuleVersion")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalRecords")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("RunId");
+
+                    b.HasIndex("ParentRunId", "AssessmentId");
+
+                    b.HasIndex("SnapshotId", "AssessmentId");
+
+                    b.HasIndex("AssessmentId", "ParentRunId", "CreatedAtUtc");
+
+                    b.ToTable("PhaseRuns", (string)null);
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceObservationRow", b =>
+                {
+                    b.Property<Guid>("ObservationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AcquisitionError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AcquisitionStatus")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("Length")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("RawBytes")
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("Sha256")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceIdentity")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceRevision")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ObservationId");
+
+                    b.HasIndex("SnapshotId", "SourceIdentity")
+                        .IsUnique();
+
+                    b.ToTable("SourceObservations", (string)null);
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceSnapshotRow", b =>
+                {
+                    b.Property<Guid>("SnapshotId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AssessmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FormatVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InputVersion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsSealed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ManifestDigest")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ManifestJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MemberIdsJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModuleKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ScopeJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SealedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SnapshotId");
+
+                    b.HasIndex("AssessmentId");
+
+                    b.ToTable("SourceSnapshots", (string)null);
+                });
+
             modelBuilder.Entity("PnP.Scanning.Core.Storage.Property", b =>
                 {
                     b.Property<Guid>("ScanId")
@@ -1168,6 +1433,9 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("FileUniqueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AspxEvidenceJson")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("BSN")
@@ -2005,6 +2273,76 @@ namespace PnP.Scanning.Core.Storage.DatabaseMigration
                         .IsUnique();
 
                     b.ToTable("Workflows");
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.AnalysisReportRowEntry", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", null)
+                        .WithMany()
+                        .HasForeignKey("AnalysisRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.AnalysisResultRow", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", null)
+                        .WithMany()
+                        .HasForeignKey("AnalysisRunId", "SnapshotId")
+                        .HasPrincipalKey("AnalysisRunId", "SnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.SourceObservationRow", null)
+                        .WithMany()
+                        .HasForeignKey("ObservationId", "SnapshotId")
+                        .HasPrincipalKey("ObservationId", "SnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", null)
+                        .WithOne()
+                        .HasForeignKey("PnP.Scanning.Core.Storage.Pipeline.AnalysisRunRow", "AnalysisRunId", "SnapshotId")
+                        .HasPrincipalKey("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", "RunId", "SnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.PhaseRunRow", null)
+                        .WithMany()
+                        .HasForeignKey("ParentRunId", "AssessmentId")
+                        .HasPrincipalKey("RunId", "AssessmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.SourceSnapshotRow", null)
+                        .WithMany()
+                        .HasForeignKey("SnapshotId", "AssessmentId")
+                        .HasPrincipalKey("SnapshotId", "AssessmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceObservationRow", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Pipeline.SourceSnapshotRow", null)
+                        .WithMany()
+                        .HasForeignKey("SnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PnP.Scanning.Core.Storage.Pipeline.SourceSnapshotRow", b =>
+                {
+                    b.HasOne("PnP.Scanning.Core.Storage.Scan", null)
+                        .WithMany()
+                        .HasForeignKey("AssessmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

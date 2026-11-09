@@ -44,7 +44,8 @@ public sealed class SPFileSchemaTests
         ["ItemMetadataFieldStatesJson"] = typeof(string),
         ["NoExecuteRaw"] = typeof(string),
         ["NoExecuteSource"] = typeof(string),
-        ["NoExecuteReadState"] = typeof(string)
+        ["NoExecuteReadState"] = typeof(string),
+        ["AspxEvidenceJson"] = typeof(string)
     };
 
     /// <summary>Creates a context over the caller-owned connection so independent units of work inspect the same migrated schema.</summary>
@@ -71,7 +72,7 @@ public sealed class SPFileSchemaTests
         ObservedAtUtc = new DateTime(2026, 1, 1, 0, 2, 0, DateTimeKind.Utc)
     };
 
-    /// <summary>Locks the raw fact entity to the approved 32 properties and CLR types without coupling the entity to business CSV fields.</summary>
+    /// <summary>Locks the raw fact entity to its observation properties and CLR types without coupling it to business CSV fields.</summary>
     [Fact]
     public void EntityHasExactlyTheApprovedRawFieldsAndTypes()
     {
@@ -81,7 +82,7 @@ public sealed class SPFileSchemaTests
         {
             properties[expected.Key].Should().Be(expected.Value);
         }
-        properties.Should().HaveCount(32);
+        properties.Should().HaveCount(33);
         properties.Keys.Should().NotContain(new[] { "AspxKey", "Url", "IsClassic", "IsPoisoned", "PageType", "DocFlagsRaw", "DocFlagsSource", "DocFlagsReadState" });
     }
 
@@ -109,7 +110,7 @@ public sealed class SPFileSchemaTests
             .Should().NotContain(new[] { "ClassicAspxInventories", "ClassicAspxItemBindings" });
     }
 
-    /// <summary>Round-trips all 32 raw facts, including long sizes, empty values, nullable booleans, original paths, and uninterpreted NoExecute field text.</summary>
+    /// <summary>Round-trips raw facts, including long sizes, empty values, nullable booleans, original paths, and uninterpreted NoExecute field text.</summary>
     [Fact]
     public async Task AllRawObservationFactsRoundTripWithoutDerivedBusinessState()
     {
@@ -139,6 +140,7 @@ public sealed class SPFileSchemaTests
         file.NoExecuteRaw = " 1 ";
         file.NoExecuteSource = "synthetic-noexecute-source";
         file.NoExecuteReadState = "Available";
+        file.AspxEvidenceJson = "{\"schemaVersion\":1,\"value\":{\"state\":\"Unknown\"}}";
         context.Add(file);
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
@@ -172,6 +174,7 @@ public sealed class SPFileSchemaTests
         saved.ItemMetadataFieldStatesJson.Should().Be("{}");
         saved.ItemMetadataReadState.Should().Be("NotAttempted");
         saved.NoExecuteReadState.Should().Be("NotAttempted");
+        saved.AspxEvidenceJson.Should().BeNull();
     }
 
     /// <summary>Rejects a duplicate physical pair across both same-scan and cross-scan direct EF inserts, regardless of changed path metadata.</summary>
@@ -235,7 +238,7 @@ public sealed class SPFileSchemaTests
         await FluentActions.Awaiting(() => context.SaveChangesAsync()).Should().ThrowAsync<DbUpdateException>();
     }
 
-    /// <summary>Requires the final generated migration to create exactly the 32 approved SPFile columns without legacy synthetic-identity tables.</summary>
+    /// <summary>Requires the migrated SPFile columns to match the raw model without legacy synthetic-identity tables.</summary>
     [Fact]
     public async Task MigratedDatabaseHasOnlyApprovedRawColumns()
     {
@@ -253,7 +256,7 @@ public sealed class SPFileSchemaTests
                 names.Add(reader.GetString(1));
             }
         }
-        names.Should().HaveCount(32).And.BeEquivalentTo(ExpectedFields.Keys);
+        names.Should().HaveCount(33).And.BeEquivalentTo(ExpectedFields.Keys);
         await using var tables = connection.CreateCommand();
         tables.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('ClassicAspxInventories', 'ClassicAspxItemBindings')";
         Convert.ToInt64(await tables.ExecuteScalarAsync()).Should().Be(0);
@@ -268,9 +271,8 @@ public sealed class SPFileSchemaTests
         await using var context = Context(connection);
         var migrations = context.Database.GetMigrations().ToArray();
         migrations.Length.Should().BeGreaterThan(1);
-        var prior = migrations[^2];
+        var prior = migrations.TakeWhile(migration => !migration.EndsWith("_SPFileFacts", StringComparison.Ordinal)).Last();
         var latest = migrations[^1];
-        latest.Should().EndWith("_SPFileFacts");
         var migrator = context.GetService<IMigrator>();
         await migrator.MigrateAsync(prior);
         var scan = Guid.NewGuid();
