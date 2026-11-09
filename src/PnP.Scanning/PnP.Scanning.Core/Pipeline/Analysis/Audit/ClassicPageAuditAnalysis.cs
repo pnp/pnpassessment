@@ -23,20 +23,38 @@ internal static class ClassicPageAuditAnalysis
         using JsonDocument? doc = JsonDocument.Parse(body);
         if (!doc.RootElement.TryGetProperty("value", out JsonElement values) || values.ValueKind != JsonValueKind.Array)
             throw new SnapshotIntegrityException("Succeeded audit query has no records array.");
-        Dictionary<string, (int Views, int Creates, int Edits, HashSet<string> Users)>? results = new Dictionary<string, (int Views, int Creates, int Edits, HashSet<string> Users)>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, (int Views, int Creates, int Edits, HashSet<string> Users)>? results =
+            new Dictionary<string, (int Views, int Creates, int Edits, HashSet<string> Users)>(
+                StringComparer.OrdinalIgnoreCase);
         foreach (JsonElement record in values.EnumerateArray())
         {
-            if (!record.TryGetProperty("operation", out JsonElement operation) || !record.TryGetProperty("objectId", out JsonElement objectId)) continue;
-            string? url = objectId.GetString(); string? op = operation.GetString();
+            if (!record.TryGetProperty("operation", out JsonElement operation) ||
+                !record.TryGetProperty("objectId", out JsonElement objectId))
+                continue;
+            string? url = objectId.GetString();
+            string? op = operation.GetString();
             if (string.IsNullOrEmpty(url) || !url.EndsWith(".aspx", StringComparison.OrdinalIgnoreCase)) continue;
-            if (!results.TryGetValue(url, out (int Views, int Creates, int Edits, HashSet<string> Users) value)) value = (0, 0, 0, new(StringComparer.Ordinal));
-            if (record.TryGetProperty("userId", out JsonElement user) && !string.IsNullOrEmpty(user.GetString()) && value.Users.Count < 10_000)
-                value.Users.Add(Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(user.GetString()!.ToUpperInvariant()))));
-            results[url] = (value.Views + (string.Equals(op, "ClassicPageViewed", StringComparison.OrdinalIgnoreCase) ? 1 : 0),
+            if (!results.TryGetValue(url, out (int Views, int Creates, int Edits, HashSet<string> Users) value))
+                value = (0, 0, 0, new(StringComparer.Ordinal));
+            if (record.TryGetProperty("userId", out JsonElement user) && !string.IsNullOrEmpty(user.GetString()) &&
+                value.Users.Count < 10_000)
+                value.Users.Add(
+                    Convert.ToHexString(
+                        SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(user.GetString()!.ToUpperInvariant()))));
+            results[url] = (
+                value.Views + (string.Equals(op, "ClassicPageViewed", StringComparison.OrdinalIgnoreCase) ? 1 : 0),
                 value.Creates + (string.Equals(op, "ClassicPageCreated", StringComparison.OrdinalIgnoreCase) ? 1 : 0),
-                value.Edits + (string.Equals(op, "ClassicPageEdited", StringComparison.OrdinalIgnoreCase) ? 1 : 0), value.Users);
+                value.Edits + (string.Equals(op, "ClassicPageEdited", StringComparison.OrdinalIgnoreCase) ? 1 : 0),
+                value.Users);
         }
+
         return results.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(x => new ClassicAuditPageStats(x.Key, x.Value.Views, x.Value.Creates, x.Value.Edits, x.Value.Users.OrderBy(y => y, StringComparer.Ordinal).ToArray())).ToArray();
+            .Select(x => new ClassicAuditPageStats(
+                x.Key,
+                x.Value.Views,
+                x.Value.Creates,
+                x.Value.Edits,
+                x.Value.Users.OrderBy(y => y, StringComparer.Ordinal).ToArray()))
+            .ToArray();
     }
 }

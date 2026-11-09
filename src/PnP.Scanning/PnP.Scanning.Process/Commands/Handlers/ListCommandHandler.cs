@@ -30,52 +30,39 @@ namespace PnP.Scanning.Process.Commands
             runningOption = new(
                 name: $"--{Constants.ListRunning}",
                 getDefaultValue: () => false,
-                description: "Lists running Microsoft 365 Assessments"
-                )
-            {
-                IsRequired = false,
-            };
+                description: "Lists running Microsoft 365 Assessments") { IsRequired = false, };
             cmd.AddOption(runningOption);
 
             pausedOption = new(
                 name: $"--{Constants.ListPaused}",
                 getDefaultValue: () => false,
-                description: "Lists paused Microsoft 365 Assessments"
-                )
-            {
-                IsRequired = false,
-            };
+                description: "Lists paused Microsoft 365 Assessments") { IsRequired = false, };
             cmd.AddOption(pausedOption);
 
             finishedOption = new(
                 name: $"--{Constants.ListFinished}",
                 getDefaultValue: () => false,
-                description: "Lists finished Microsoft 365 Assessments"
-                )
-            {
-                IsRequired = false,
-            };
+                description: "Lists finished Microsoft 365 Assessments") { IsRequired = false, };
             cmd.AddOption(finishedOption);
 
             terminatedOption = new(
                 name: $"--{Constants.ListTerminated}",
                 getDefaultValue: () => false,
-                description: "Lists terminated Microsoft 365 Assessments"
-                )
-            {
-                IsRequired = false,
-            };
+                description: "Lists terminated Microsoft 365 Assessments") { IsRequired = false, };
             cmd.AddOption(terminatedOption);
-
         }
 
         public Command Create()
         {
-            cmd.SetHandler(async (bool running, bool paused, bool finished, bool terminated) =>
-                            {
-                                await HandleStartAsync(running, paused, finished, terminated);
-                            },
-                            runningOption, pausedOption, finishedOption, terminatedOption);
+            cmd.SetHandler(
+                async (bool running, bool paused, bool finished, bool terminated) =>
+                {
+                    await HandleStartAsync(running, paused, finished, terminated);
+                },
+                runningOption,
+                pausedOption,
+                finishedOption,
+                terminatedOption);
 
             return cmd;
         }
@@ -88,13 +75,11 @@ namespace PnP.Scanning.Process.Commands
             // Setup client to talk to scanner
             Core.Services.PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
-            Core.Services.ListReply listResult = await client.ListAsync(new Core.Services.ListRequest
-            {
-                Running = running,
-                Paused = paused,
-                Finished = finished,
-                Terminated = terminated,
-            });
+            Core.Services.ListReply listResult = await client.ListAsync(
+                new Core.Services.ListRequest
+                {
+                    Running = running, Paused = paused, Finished = finished, Terminated = terminated,
+                });
 
             if (listResult.Status.Count > 0)
             {
@@ -114,38 +99,45 @@ namespace PnP.Scanning.Process.Commands
 
                 foreach (Core.Services.ListScanResponse item in listResult.Status)
                 {
-                    double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
+                    double procentDone = Math.Round(
+                        (double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
                     Markup status;
                     Markup procent;
                     if (item.Status == ScanStatus.Running.ToString())
                     {
                         status = new Markup($"[orange3]{item.Status}[/]");
-                        procent = new Markup($"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");
+                        procent = new Markup(
+                            $"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");
                     }
                     else if (item.Status == ScanStatus.Finished.ToString())
                     {
                         status = new Markup($"[green]{item.Status}[/]");
-                        procent = new Markup($"[green]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([green]{procentDone}%[/])");
+                        procent = new Markup(
+                            $"[green]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([green]{procentDone}%[/])");
                     }
                     else if (item.Status == ScanStatus.Terminated.ToString())
                     {
                         status = new Markup($"[maroon]{item.Status}[/]");
-                        procent = new Markup($"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
+                        procent = new Markup(
+                            $"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
                     }
                     else if (item.Status == ScanStatus.Paused.ToString())
                     {
                         status = new Markup($"[grey50]{item.Status}[/]");
-                        procent = new Markup($"[grey50]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([grey50]{procentDone}%[/])");
+                        procent = new Markup(
+                            $"[grey50]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([grey50]{procentDone}%[/])");
                     }
                     else if (item.Status == ScanStatus.Pausing.ToString())
                     {
                         status = new Markup($"[grey70]{item.Status}[/]");
-                        procent = new Markup($"[grey70]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([grey70]{procentDone}%[/])");
+                        procent = new Markup(
+                            $"[grey70]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([grey70]{procentDone}%[/])");
                     }
                     else
                     {
                         status = new Markup($"{item.Status}");
-                        procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
+                        procent = new Markup(
+                            $"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
                     }
 
                     if (item.ExecutionPath == "pipeline")
@@ -161,16 +153,18 @@ namespace PnP.Scanning.Process.Commands
                         endedAt = new Markup($"{item.ScanEnded.ToDateTime().ToLocalTime()}");
                     }
 
-                    table.AddRow(new Markup($"{item.Id}"),
-                                 new Markup($"{item.Mode}"),
-                                 new Markup(Markup.Escape($"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
-                                 status,
-                                 procent,
-                                 new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),
-                                 endedAt,
-                                 new Markup(Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
-                                 new Markup(Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}"))
-                                 );
+                    table.AddRow(
+                        new Markup($"{item.Id}"),
+                        new Markup($"{item.Mode}"),
+                        new Markup(
+                            Markup.Escape(
+                                $"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
+                        status,
+                        procent,
+                        new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),
+                        endedAt,
+                        new Markup(Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
+                        new Markup(Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}")));
                 }
 
                 AnsiConsole.Write(table);

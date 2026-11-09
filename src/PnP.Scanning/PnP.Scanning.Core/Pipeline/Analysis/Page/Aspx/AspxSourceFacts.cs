@@ -10,7 +10,11 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 /// Retains source digest, declared handler, parsing disposition, and unresolved diagnostics.
 /// </summary>
 internal sealed record AspxSourceFacts(
-    string Sha256, string? Handler, string Resolution, string? Declaration, string? Error);
+    string Sha256,
+    string? Handler,
+    string Resolution,
+    string? Declaration,
+    string? Error);
 
 /// <summary>
 /// Parses bounded ASPX declarations without compiling or executing source content.
@@ -34,6 +38,7 @@ internal static class AspxSourceParser
         {
             return new(hash, null, "Unresolved", null, "SourceExceedsAnalysisLimit");
         }
+
         if (bytes.AsSpan().StartsWith(new byte[] { 0xff, 0xfe, 0, 0 }))
             return new(hash, null, "Unresolved", null, "UnsupportedSourceEncoding: UTF32");
         string text;
@@ -43,14 +48,15 @@ internal static class AspxSourceParser
                 ? Utf16LittleEndian.GetString(bytes, 2, bytes.Length - 2)
                 : bytes.AsSpan().StartsWith(new byte[] { 0xfe, 0xff })
                     ? Utf16BigEndian.GetString(bytes, 2, bytes.Length - 2)
-                    : Utf8.GetString(bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? bytes.AsSpan(3) : bytes);
+                    : Utf8.GetString(
+                        bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? bytes.AsSpan(3) : bytes);
         }
         catch (DecoderFallbackException error)
         {
             return new(hash, null, "Unresolved", null, "UnsupportedSourceEncoding: " + error.Message);
         }
-        if (text.Contains('\0'))
-            return new(hash, null, "Unresolved", null, "BinaryOrUnsupportedSourceEncoding");
+
+        if (text.Contains('\0')) return new(hash, null, "Unresolved", null, "BinaryOrUnsupportedSourceEncoding");
 
         string? declaration = null;
         Dictionary<string, string>? attributes = null;
@@ -65,6 +71,7 @@ internal static class AspxSourceParser
                 position = endComment + 4;
                 continue;
             }
+
             int end = EndBlock(text, start + 2);
             if (end < 0) return new(hash, null, "Unresolved", declaration, "UnterminatedServerBlock");
             position = end + 2;
@@ -78,6 +85,7 @@ internal static class AspxSourceParser
             if (!TryAttributes(body.AsSpan(nameEnd), out attributes))
                 return new(hash, null, "Unresolved", declaration, "MalformedPageDirective");
         }
+
         if (attributes == null || !attributes.TryGetValue("Inherits", out string? inherits))
             return new(hash, DefaultHandler, "DefaultAssumed", declaration, null);
         string? handler = inherits.Split(',')[0].Trim();
@@ -99,9 +107,11 @@ internal static class AspxSourceParser
             {
                 if (c == quote) quote = '\0';
             }
-            else if (c is '"' or '\'') quote = c;
+            else if (c is '"' or '\'')
+                quote = c;
             else if (c == '%' && text[i + 1] == '>') return i;
         }
+
         return -1;
     }
 
@@ -130,6 +140,7 @@ internal static class AspxSourceParser
             if (i == text.Length || !values.TryAdd(name, text[start..i].ToString())) return false;
             i++;
         }
+
         return true;
     }
 
@@ -137,7 +148,7 @@ internal static class AspxSourceParser
     /// Checks that each qualified handler-name segment is a valid identifier.
     /// </summary>
     private static bool ValidHandler(string value) =>
-        value.Split(new[] { '.', '+' }).All(part => part.Length > 0 &&
-            (char.IsLetter(part[0]) || part[0] == '_') &&
-            part.All(c => char.IsLetterOrDigit(c) || c == '_'));
+        value.Split(new[] { '.', '+' })
+            .All(part => part.Length > 0 && (char.IsLetter(part[0]) || part[0] == '_') &&
+                         part.All(c => char.IsLetterOrDigit(c) || c == '_'));
 }

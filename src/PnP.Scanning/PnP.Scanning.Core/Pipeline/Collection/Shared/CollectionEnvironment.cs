@@ -13,7 +13,8 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Shared;
 /// Groups authenticated context creation and shared site enumeration for one collection.
 /// </summary>
 internal sealed record CollectionServices(
-    AuthenticationManager Authentication, IPnPContextFactory ContextFactory,
+    AuthenticationManager Authentication,
+    IPnPContextFactory ContextFactory,
     SiteEnumerationManager SiteEnumeration);
 
 /// <summary>
@@ -31,7 +32,9 @@ internal sealed class CollectionEnvironment(
     {
         StartRequest? copy = options.Clone();
         if (!string.IsNullOrEmpty(copy.CertPassword))
-            copy.CertPassword = protectionProvider().CreateProtector("Pipeline.Collection.Configuration.v1").Protect(copy.CertPassword);
+            copy.CertPassword = protectionProvider()
+                .CreateProtector("Pipeline.Collection.Configuration.v1")
+                .Protect(copy.CertPassword);
         return copy;
     }
 
@@ -42,7 +45,9 @@ internal sealed class CollectionEnvironment(
     {
         StartRequest? copy = options.Clone();
         if (!string.IsNullOrEmpty(copy.CertPassword))
-            copy.CertPassword = protectionProvider().CreateProtector("Pipeline.Collection.Configuration.v1").Unprotect(copy.CertPassword);
+            copy.CertPassword = protectionProvider()
+                .CreateProtector("Pipeline.Collection.Configuration.v1")
+                .Unprotect(copy.CertPassword);
         return copy;
     }
 

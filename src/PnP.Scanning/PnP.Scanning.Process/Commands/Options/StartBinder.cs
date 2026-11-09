@@ -37,22 +37,33 @@ namespace PnP.Scanning.Process.Commands
 #endif
 
         /// <summary>Retains command option instances so parsed start values, including explicit ASPX scope inputs, bind without reinterpreting defaults.</summary>
-        public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
-                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
-                           // PER SCAN COMPONENT: implement scan component specific options
-                           , Option<bool> syntexDeepScanInput
-                           , Option<bool> workflowAnalyzeInput
-                           , Option<List<ClassicComponent>> classicIncludeOptionInput
-                           , Option<bool> classicExportWebPartPropertiesInput
-                           , Option<bool> classicSkipUsageInformationInput
-                           , Option<bool> classicSkipUserInformationInput
-                           , Option<bool> classicHomePageOnlyInput
-                           , Option<int> classicAuditLogWindowDaysInput
-                           , Option<string> excludeSiteTemplatesInput
+        public StartBinder(
+            Option<Mode> modeInput,
+            Option<string> tenantInput,
+            Option<List<string>> sitesListInput,
+            Option<FileInfo> sitesFileInput,
+            Option<AuthenticationMode> authModeInput,
+            Option<Guid> applicationIdInput,
+            Option<string> tenantIdInput,
+            Option<string> certPathInput,
+            Option<FileInfo> certFileInput,
+            Option<string> certPasswordInput,
+            Option<int> threadsInput
+            // PER SCAN COMPONENT: implement scan component specific options
+            ,
+            Option<bool> syntexDeepScanInput,
+            Option<bool> workflowAnalyzeInput,
+            Option<List<ClassicComponent>> classicIncludeOptionInput,
+            Option<bool> classicExportWebPartPropertiesInput,
+            Option<bool> classicSkipUsageInformationInput,
+            Option<bool> classicSkipUserInformationInput,
+            Option<bool> classicHomePageOnlyInput,
+            Option<int> classicAuditLogWindowDaysInput,
+            Option<string> excludeSiteTemplatesInput
 #if DEBUG
                            , Option<int> testNumberOfSitesInput
 #endif
-            )
+        )
         {
             mode = modeInput;
             tenant = tenantInput;

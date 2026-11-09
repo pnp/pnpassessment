@@ -14,9 +14,10 @@ internal static class ClassicPageRuleMetadata
     {
         get
         {
-            using Stream? resource = typeof(ClassicPageRuleMetadata).Assembly.GetManifestResourceStream(
-                "PnP.Scanning.Core.Scanners.Classic.WebPartMapping.webpartmapping.xml")
-                ?? throw new InvalidOperationException("The pinned mapping resource is unavailable.");
+            using Stream? resource =
+                typeof(ClassicPageRuleMetadata).Assembly.GetManifestResourceStream(
+                    "PnP.Scanning.Core.Scanners.Classic.WebPartMapping.webpartmapping.xml") ??
+                throw new InvalidOperationException("The pinned mapping resource is unavailable.");
             return Convert.ToHexString(SHA256.HashData(resource)).ToLowerInvariant();
         }
     }
@@ -39,6 +40,7 @@ internal static class ClassicPageRuleMetadata
             parameters.Value.EnumerateObject().Any(x => x.Name != "mappingDigest") ||
             parameters.Value.TryGetProperty("mappingDigest", out JsonElement digest) &&
             (digest.ValueKind != JsonValueKind.String || digest.GetString() != MappingDigest))
-            throw new NotSupportedException("The selected Classic Page rule or pinned mapping resource is unavailable.");
+            throw new NotSupportedException(
+                "The selected Classic Page rule or pinned mapping resource is unavailable.");
     }
 }

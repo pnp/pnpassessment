@@ -8,15 +8,23 @@ namespace PnP.Scanning.Core.Pipeline.Orchestration;
 /// <summary>
 /// Binds a collector factory to an explicit input version and preflight validators.
 /// </summary>
-internal sealed record CollectionRegistration(string ModuleKey, string InputVersion,
-    Func<ICollectionModule> Create, Action<VersionedJson>? ValidateParameters = null, Action<PnP.Scanning.Core.Services.StartRequest>? ValidateOptions = null);
+internal sealed record CollectionRegistration(
+    string ModuleKey,
+    string InputVersion,
+    Func<ICollectionModule> Create,
+    Action<VersionedJson>? ValidateParameters = null,
+    Action<PnP.Scanning.Core.Services.StartRequest>? ValidateOptions = null);
 
 /// <summary>
 /// Binds an offline analyzer to a rule version, accepted inputs, and parameter pinning.
 /// </summary>
-internal sealed record AnalysisRegistration(string ModuleKey, string RuleVersion,
-    IReadOnlyCollection<string> InputVersions, Func<IAnalysisModule> Create,
-    Action<VersionedJson>? ValidateParameters = null, Func<VersionedJson, VersionedJson>? PinParameters = null);
+internal sealed record AnalysisRegistration(
+    string ModuleKey,
+    string RuleVersion,
+    IReadOnlyCollection<string> InputVersions,
+    Func<IAnalysisModule> Create,
+    Action<VersionedJson>? ValidateParameters = null,
+    Func<VersionedJson, VersionedJson>? PinParameters = null);
 
 /// <summary>
 /// Resolves immutable module registrations without constructing authenticated services.
@@ -30,18 +38,24 @@ internal sealed class ModuleRegistry
     /// <summary>
     /// Initializes Module Registry with the supplied dependencies and fixed scope.
     /// </summary>
-    public ModuleRegistry(IEnumerable<CollectionRegistration>? collection = null,
-        IEnumerable<AnalysisRegistration>? analysis = null, IReadOnlyDictionary<string, string>? current = null)
+    public ModuleRegistry(
+        IEnumerable<CollectionRegistration>? collection = null,
+        IEnumerable<AnalysisRegistration>? analysis = null,
+        IReadOnlyDictionary<string, string>? current = null)
     {
         CollectionRegistration[]? collectionRows = (collection ?? []).ToArray();
-        AnalysisRegistration[]? analysisRows = (analysis ?? []).Select(x => x with { InputVersions = x.InputVersions.ToArray() }).ToArray();
-        if (collectionRows.Any(x => string.IsNullOrWhiteSpace(x.ModuleKey) || string.IsNullOrWhiteSpace(x.InputVersion)) ||
+        AnalysisRegistration[]? analysisRows =
+            (analysis ?? []).Select(x => x with { InputVersions = x.InputVersions.ToArray() }).ToArray();
+        if (collectionRows.Any(x =>
+                string.IsNullOrWhiteSpace(x.ModuleKey) || string.IsNullOrWhiteSpace(x.InputVersion)) ||
             analysisRows.Any(x => string.IsNullOrWhiteSpace(x.ModuleKey) || string.IsNullOrWhiteSpace(x.RuleVersion) ||
-                x.InputVersions.Count == 0 || x.InputVersions.Any(string.IsNullOrWhiteSpace)))
+                                  x.InputVersions.Count == 0 || x.InputVersions.Any(string.IsNullOrWhiteSpace)))
             throw new ArgumentException("Module, input and rule versions must be explicitly registered.");
         collectors = collectionRows.ToDictionary(x => x.ModuleKey, StringComparer.OrdinalIgnoreCase);
         analyzers = analysisRows.ToDictionary(x => (Normalize(x.ModuleKey), x.RuleVersion));
-        currentRules = new Dictionary<string, string>(current ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+        currentRules = new Dictionary<string, string>(
+            current ?? new Dictionary<string, string>(),
+            StringComparer.OrdinalIgnoreCase);
         foreach (KeyValuePair<string, string> entry in currentRules) _ = GetAnalyzer(entry.Key, entry.Value);
     }
 
@@ -51,9 +65,11 @@ internal sealed class ModuleRegistry
     public CollectionRegistration GetCollector(string key, string? inputVersion = null)
     {
         if (!collectors.TryGetValue(key, out CollectionRegistration? registration))
-            throw new NotSupportedException($"Module '{key}' does not support collect; its existing start path is legacy.");
+            throw new NotSupportedException(
+                $"Module '{key}' does not support collect; its existing start path is legacy.");
         if (inputVersion != null && inputVersion != registration.InputVersion)
-            throw new NotSupportedException($"Collector for pinned input version '{inputVersion}' is unavailable for '{key}'.");
+            throw new NotSupportedException(
+                $"Collector for pinned input version '{inputVersion}' is unavailable for '{key}'.");
         return registration;
     }
 
@@ -67,7 +83,8 @@ internal sealed class ModuleRegistry
         if (!analyzers.TryGetValue((Normalize(key), ruleVersion!), out AnalysisRegistration? registration))
             throw new NotSupportedException($"Analysis rule '{ruleVersion}' is unavailable for module '{key}'.");
         if (inputVersion != null && !registration.InputVersions.Contains(inputVersion, StringComparer.Ordinal))
-            throw new NotSupportedException($"Analysis rule '{ruleVersion}' cannot consume input version '{inputVersion}'.");
+            throw new NotSupportedException(
+                $"Analysis rule '{ruleVersion}' cannot consume input version '{inputVersion}'.");
         return registration;
     }
 

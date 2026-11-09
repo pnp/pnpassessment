@@ -29,7 +29,8 @@ public sealed class ContractAndSnapshotTests
     [InlineData("[]")]
     [InlineData("\"source-rule-parameters\"")]
     [InlineData("{\"runtime\":{\"custom\":true}}")]
-    public async Task Foundation_analysis_parameters_preserve_non_object_values_and_unrelated_runtime_properties(string json)
+    public async Task Foundation_analysis_parameters_preserve_non_object_values_and_unrelated_runtime_properties(
+        string json)
     {
         using StoreCase? data = new StoreCase("pipeline-parameter-compatibility");
         (Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer) seed = await data.UnsealedAsync();
@@ -37,17 +38,27 @@ public sealed class ContractAndSnapshotTests
         using System.Text.Json.JsonDocument? document = System.Text.Json.JsonDocument.Parse(json);
         VersionedJson? parameters = VersionedJson.From(document.RootElement);
         Guid runId = Guid.NewGuid();
-        await data.Store.CreateAnalysisAsync(new PhaseRunRow
-        {
-            AssessmentId = seed.Assessment, SnapshotId = seed.Snapshot, RunId = runId,
-            Kind = PhaseKind.Analysis, CurrentPhase = PhaseKind.Analysis, Status = ScanStatus.Queued,
-            ModuleKey = FixedSource.ModuleKey, InputVersion = FixedSource.InputVersion,
-            RuleVersion = FixedSource.Rule1, ParametersJson = parameters.Json, CreatedAtUtc = DateTime.UtcNow,
-        });
+        await data.Store.CreateAnalysisAsync(
+            new PhaseRunRow
+            {
+                AssessmentId = seed.Assessment,
+                SnapshotId = seed.Snapshot,
+                RunId = runId,
+                Kind = PhaseKind.Analysis,
+                CurrentPhase = PhaseKind.Analysis,
+                Status = ScanStatus.Queued,
+                ModuleKey = FixedSource.ModuleKey,
+                InputVersion = FixedSource.InputVersion,
+                RuleVersion = FixedSource.Rule1,
+                ParametersJson = parameters.Json,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
         await data.Store.SetRunningAsync(seed.Assessment, runId);
         Assert.Empty(await data.Store.ResultWriter(seed.Assessment, runId).GetCompletedObservationIdsAsync(default));
         using ScanContext? db = data.Store.CreateContext(seed.Assessment);
-        Assert.Equal(parameters.Json, (await db.AnalysisRuns.SingleAsync(x => x.AnalysisRunId == runId)).ParametersJson);
+        Assert.Equal(
+            parameters.Json,
+            (await db.AnalysisRuns.SingleAsync(x => x.AnalysisRunId == runId)).ParametersJson);
     }
 
     /// <summary>
@@ -56,17 +67,38 @@ public sealed class ContractAndSnapshotTests
     [Fact]
     public void Analysis_entrypoints_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
-        bool PurePageType(Type type) => type.Namespace == "PnP.Scanning.Core.Discovery" &&
-            new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(type.Name);
-        Type[]? types = typeof(AnalysisExecutor).Assembly.GetTypes().Where(x =>
-            x.Namespace == "PnP.Scanning.Core.Pipeline.Analysis.Module" && x.Name != "ClassicPageInputIndex" ||
-            x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) == true || PurePageType(x) || x.DeclaringType != null && PurePageType(x.DeclaringType)).ToArray();
-        IEnumerable<Type>? referenced = types.SelectMany(x => x.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
-            .Select(f => f.FieldType).Concat(x.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
-            .SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType))))
-            .Concat(types.SelectMany(x => x.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
-                .Cast<MethodBase>().Concat(x.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)))
-                .SelectMany(IlDependencies));
+        bool PurePageType(Type type) =>
+            type.Namespace == "PnP.Scanning.Core.Discovery" &&
+            new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(
+                type.Name);
+
+        Type[]? types = typeof(AnalysisExecutor).Assembly.GetTypes()
+            .Where(x =>
+                x.Namespace == "PnP.Scanning.Core.Pipeline.Analysis.Module" && x.Name != "ClassicPageInputIndex" ||
+                x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) == true ||
+                PurePageType(x) || x.DeclaringType != null && PurePageType(x.DeclaringType))
+            .ToArray();
+        IEnumerable<Type>? referenced = types
+            .SelectMany(x =>
+                x.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                    .Select(f => f.FieldType)
+                    .Concat(
+                        x.GetMethods(
+                                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance |
+                                BindingFlags.Static)
+                            .SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType))))
+            .Concat(
+                types.SelectMany(x =>
+                        x.GetMethods(
+                                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance |
+                                BindingFlags.Static |
+                                BindingFlags.DeclaredOnly)
+                            .Cast<MethodBase>()
+                            .Concat(
+                                x.GetConstructors(
+                                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance |
+                                    BindingFlags.Static)))
+                    .SelectMany(IlDependencies));
         foreach (Type? type in referenced.SelectMany(Unwrap))
         {
             string? name = type.FullName ?? "";
@@ -76,18 +108,27 @@ public sealed class ContractAndSnapshotTests
             Assert.False(name.StartsWith("PnP.Scanning.Core.Authentication", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Pipeline.Collection", StringComparison.Ordinal), name);
             bool compatibilityProjection = name == "PnP.Scanning.Core.Storage.Pipeline.ClassicCompatibility";
-            Assert.False(name.StartsWith("PnP.Scanning.Core.Storage", StringComparison.Ordinal) && !compatibilityProjection, name);
+            Assert.False(
+                name.StartsWith("PnP.Scanning.Core.Storage", StringComparison.Ordinal) && !compatibilityProjection,
+                name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Services", StringComparison.Ordinal), name);
             bool pureMapping = name == "PnP.Scanning.Core.Scanners.WebPartMapping.WebPartMappingManager";
             Assert.False(name.StartsWith("PnP.Scanning.Core.Scanners", StringComparison.Ordinal) && !pureMapping, name);
             Assert.False(name.StartsWith("Microsoft.AspNetCore.DataProtection", StringComparison.Ordinal), name);
             if (name.StartsWith("PnP.Scanning.Core.", StringComparison.Ordinal))
-                Assert.True(name.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) ||
-                    name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) || pureMapping || compatibilityProjection ||
-                    PurePageType(type) || type.DeclaringType != null && PurePageType(type.DeclaringType), name);
+                Assert.True(
+                    name.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) ||
+                    name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) || pureMapping ||
+                    compatibilityProjection || PurePageType(type) ||
+                    type.DeclaringType != null && PurePageType(type.DeclaringType),
+                    name);
         }
-        Assert.DoesNotContain(typeof(ISnapshotReader).GetMethods(), x => x.Name.Contains("Write", StringComparison.Ordinal));
-        Assert.DoesNotContain(typeof(IAnalysisModule).GetMethods().SelectMany(x => x.GetParameters()),
+
+        Assert.DoesNotContain(
+            typeof(ISnapshotReader).GetMethods(),
+            x => x.Name.Contains("Write", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            typeof(IAnalysisModule).GetMethods().SelectMany(x => x.GetParameters()),
             p => p.ParameterType == typeof(ISnapshotWriter));
     }
 
@@ -99,20 +140,26 @@ public sealed class ContractAndSnapshotTests
         byte[]? bytes = method.GetMethodBody()?.GetILAsByteArray();
         if (bytes == null) yield break;
         Dictionary<short, OpCode>? codes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(x => x.FieldType == typeof(OpCode)).Select(x => (OpCode)x.GetValue(null)!)
+            .Where(x => x.FieldType == typeof(OpCode))
+            .Select(x => (OpCode)x.GetValue(null)!)
             .ToDictionary(x => x.Value);
         for (int offset = 0; offset < bytes.Length;)
         {
             short value = bytes[offset++];
             if (value == 0xfe) value = unchecked((short)(0xfe00 | bytes[offset++]));
             OpCode code = codes[value];
-            if (code.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType or OperandType.InlineTok)
+            if (code.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType
+                or OperandType.InlineTok)
             {
-                MemberInfo? member = method.Module.ResolveMember(BitConverter.ToInt32(bytes, offset),
-                    method.DeclaringType?.GetGenericArguments(), method.IsGenericMethod ? method.GetGenericArguments() : null);
-                if (member is Type type) yield return type;
+                MemberInfo? member = method.Module.ResolveMember(
+                    BitConverter.ToInt32(bytes, offset),
+                    method.DeclaringType?.GetGenericArguments(),
+                    method.IsGenericMethod ? method.GetGenericArguments() : null);
+                if (member is Type type)
+                    yield return type;
                 else if (member?.DeclaringType is Type owner) yield return owner;
             }
+
             offset += code.OperandType switch
             {
                 OperandType.InlineNone => 0,
@@ -132,9 +179,11 @@ public sealed class ContractAndSnapshotTests
     {
         yield return type;
         if (type.HasElementType)
-            foreach (Type? item in Unwrap(type.GetElementType()!)) yield return item;
+            foreach (Type? item in Unwrap(type.GetElementType()!))
+                yield return item;
         foreach (Type? argument in type.GetGenericArguments())
-            foreach (Type? item in Unwrap(argument)) yield return item;
+        foreach (Type? item in Unwrap(argument))
+            yield return item;
     }
 
     /// <summary>
@@ -149,12 +198,18 @@ public sealed class ContractAndSnapshotTests
         PipelineStore? reopened = new PipelineStore(data.DirectoryPath);
         FixtureControl? control = new FixtureControl();
         ForbiddenOnlineEnvironment? environment = new ForbiddenOnlineEnvironment { ForbidRestore = true };
-        PipelineCoordinator? coordinator = new PipelineCoordinator(reopened, FixedSource.Registry(control, collector: false), environment);
+        PipelineCoordinator? coordinator = new PipelineCoordinator(
+            reopened,
+            FixedSource.Registry(control, collector: false),
+            environment);
         await coordinator.StartAsync(default);
-        PhaseReply? ticket = await coordinator.AnalyzeAsync(new AnalyzeRequest
-        {
-            Id = seed.Assessment.ToString(), SnapshotId = seed.Snapshot.ToString(), RuleVersion = FixedSource.Rule1,
-        });
+        PhaseReply? ticket = await coordinator.AnalyzeAsync(
+            new AnalyzeRequest
+            {
+                Id = seed.Assessment.ToString(),
+                SnapshotId = seed.Snapshot.ToString(),
+                RuleVersion = FixedSource.Rule1,
+            });
         Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(seed.Assessment));
         Assert.Equal(0, environment.OnlineRequests);
         Assert.Equal(0, environment.ProtectionRequests);
@@ -166,7 +221,9 @@ public sealed class ContractAndSnapshotTests
         SourceRecord? record = await reader.ReadAsync(FixedSource.Read()[0].ObservationId, default);
         byte[]? copy = record.Artifact.GetBytes()!;
         copy[0] ^= 255;
-        Assert.Equal(FixedSource.Read()[0].RawBytes, (await reader.ReadAsync(record.ObservationId, default)).Artifact.GetBytes());
+        Assert.Equal(
+            FixedSource.Read()[0].RawBytes,
+            (await reader.ReadAsync(record.ObservationId, default)).Artifact.GetBytes());
         Assert.Equal(info.ManifestDigest, (await reader.OpenAsync(default)).ManifestDigest);
         using ScanContext? db = reopened.CreateContext(seed.Assessment);
         Assert.Equal(6, await db.SourceObservations.CountAsync());
@@ -206,11 +263,16 @@ public sealed class ContractAndSnapshotTests
             Assert.Equal(expected.AcquisitionError, actual.AcquisitionError);
             Assert.Equal(expected.RawBytes, actual.Artifact.GetBytes());
             Assert.Equal(expected.RawBytes?.LongLength, actual.Artifact.Length);
-            Assert.Equal(expected.RawBytes == null ? null : FixedSource.Digest(expected.RawBytes), actual.Artifact.Sha256);
+            Assert.Equal(
+                expected.RawBytes == null ? null : FixedSource.Digest(expected.RawBytes),
+                actual.Artifact.Sha256);
         }
+
         using ScanContext? db = reopened.CreateContext(seed.Assessment);
         Assert.Equal(1, await db.SourceObservations.CountAsync(x => x.Length == 0 && x.RawBytes != null));
-        Assert.Equal(3, await db.SourceObservations.CountAsync(x => x.RawBytes == null && x.Length == null && x.Sha256 == null));
+        Assert.Equal(
+            3,
+            await db.SourceObservations.CountAsync(x => x.RawBytes == null && x.Length == null && x.Sha256 == null));
         Assert.Equal(4, (await db.PhaseRuns.SingleAsync(x => x.RunId == seed.Run)).ErrorCount);
     }
 
@@ -235,23 +297,38 @@ public sealed class ContractAndSnapshotTests
             switch (fault)
             {
                 case "missing":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM SourceObservations WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"DELETE FROM SourceObservations WHERE ObservationId = {id}");
+                    break;
                 case "null-content":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET RawBytes = NULL WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE SourceObservations SET RawBytes = NULL WHERE ObservationId = {id}");
+                    break;
                 case "owner":
                     await db.Database.OpenConnectionAsync();
                     await db.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF");
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET SnapshotId = {Guid.NewGuid()} WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE SourceObservations SET SnapshotId = {Guid.NewGuid()} WHERE ObservationId = {id}");
+                    break;
                 case "length":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET Length = Length + 1 WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE SourceObservations SET Length = Length + 1 WHERE ObservationId = {id}");
+                    break;
                 case "digest":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET Sha256 = 'incorrect' WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE SourceObservations SET Sha256 = 'incorrect' WHERE ObservationId = {id}");
+                    break;
                 case "bytes":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET RawBytes = X'ffffffff00' WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE SourceObservations SET RawBytes = X'ffffffff00' WHERE ObservationId = {id}");
+                    break;
                 case "schema":
-                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE SourceObservations SET MetadataJson = '{{\"schemaVersion\":0,\"value\":{{}}}}' WHERE ObservationId = {id}"); break;
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE SourceObservations SET MetadataJson = '{{\"schemaVersion\":0,\"value\":{{}}}}' WHERE ObservationId = {id}");
+                    break;
             }
         }
+
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => seed.Writer.SealAsync(default));
         using ScanContext? read = data.Store.CreateContext(seed.Assessment);
         SourceSnapshotRow? snapshot = await read.SourceSnapshots.SingleAsync();
@@ -270,11 +347,20 @@ public sealed class ContractAndSnapshotTests
         using StoreCase? data = new StoreCase("pipeline-transaction");
         (Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer) seed = await data.UnsealedAsync([]);
         FailSourceCommitOnce? interceptor = new FailSourceCommitOnce();
-        PipelineStore? store = new PipelineStore(data.DirectoryPath, id => new ScanContext(new DbContextOptionsBuilder<ScanContext>()
-            .UseSqlite(new SqliteConnectionStringBuilder { DataSource = data.Store.DatabasePath(id), Pooling = false }.ToString())
-            .AddInterceptors(interceptor).Options));
+        PipelineStore? store = new PipelineStore(
+            data.DirectoryPath,
+            id => new ScanContext(
+                new DbContextOptionsBuilder<ScanContext>()
+                    .UseSqlite(
+                        new SqliteConnectionStringBuilder { DataSource = data.Store.DatabasePath(id), Pooling = false }
+                            .ToString())
+                    .AddInterceptors(interceptor)
+                    .Options));
         ISnapshotWriter? writer = store.SnapshotWriter(seed.Assessment, seed.Snapshot, seed.Run);
-        CollectionRecord? record = new CollectionRecord(FixedSource.Read()[0], VersionedJson.From(new { nextIndex = 1 }), 1);
+        CollectionRecord? record = new CollectionRecord(
+            FixedSource.Read()[0],
+            VersionedJson.From(new { nextIndex = 1 }),
+            1);
         await Assert.ThrowsAsync<IOException>(() => writer.CommitAsync(record, default));
         using (ScanContext? db = data.Store.CreateContext(seed.Assessment))
         {
@@ -283,6 +369,7 @@ public sealed class ContractAndSnapshotTests
             Assert.Equal(0, phase.CompletedRecords);
             Assert.Null(phase.CheckpointJson);
         }
+
         await writer.CommitAsync(record, default);
         await writer.SealAsync(default);
         Assert.Single((await store.OpenSnapshotAsync(seed.Assessment, seed.Snapshot)).ObservationIds);
@@ -294,17 +381,22 @@ public sealed class ContractAndSnapshotTests
     private sealed class FailSourceCommitOnce : DbTransactionInterceptor
     {
         private bool failed;
+
         /// <summary>
         /// Injects the configured storage failure before durable commit for atomicity assertions.
         /// </summary>
-        public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
-            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction,
+            TransactionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default)
         {
             if (!failed && eventData.Context is ScanContext context && context.SourceObservations.Local.Count > 0)
             {
                 failed = true;
                 throw new IOException("fixture interruption after SQL writes and before transaction commit");
             }
+
             return ValueTask.FromResult(result);
         }
     }
@@ -319,7 +411,8 @@ public sealed class ContractAndSnapshotTests
         (Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer) seed = await data.UnsealedAsync();
         await seed.Writer.SealAsync(default);
         await Assert.ThrowsAsync<InvalidOperationException>(() => seed.Writer.CommitAsync(
-            new(FixedSource.Read()[0], VersionedJson.Empty), default));
+            new(FixedSource.Read()[0], VersionedJson.Empty),
+            default));
         SnapshotInfo? before = await data.Store.OpenSnapshotAsync(seed.Assessment, seed.Snapshot);
         SnapshotInfo? after = await seed.Writer.SealAsync(default);
         Assert.Equal(before.ManifestDigest, after.ManifestDigest);
@@ -333,14 +426,20 @@ public sealed class ContractAndSnapshotTests
     {
         using StoreCase? data = new StoreCase("pipeline-reject-input");
         (Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer) seed = await data.UnsealedAsync();
-        PipelineCoordinator? coordinator = new PipelineCoordinator(data.Store, FixedSource.Registry(new()), new ForbiddenOnlineEnvironment());
-        AnalyzeRequest? request = new AnalyzeRequest { Id = seed.Assessment.ToString(), SnapshotId = seed.Snapshot.ToString() };
+        PipelineCoordinator? coordinator = new PipelineCoordinator(
+            data.Store,
+            FixedSource.Registry(new()),
+            new ForbiddenOnlineEnvironment());
+        AnalyzeRequest? request =
+            new AnalyzeRequest { Id = seed.Assessment.ToString(), SnapshotId = seed.Snapshot.ToString() };
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => coordinator.AnalyzeAsync(request));
         await seed.Writer.SealAsync(default);
         using (ScanContext? db = data.Store.CreateContext(seed.Assessment))
         {
-            await db.Database.ExecuteSqlRawAsync("UPDATE SourceObservations SET Length = Length + 1 WHERE RawBytes IS NOT NULL");
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE SourceObservations SET Length = Length + 1 WHERE RawBytes IS NOT NULL");
         }
+
         await Assert.ThrowsAsync<SnapshotIntegrityException>(() => coordinator.AnalyzeAsync(request));
         using ScanContext? read = data.Store.CreateContext(seed.Assessment);
         Assert.Equal(0, await read.AnalysisRuns.CountAsync());

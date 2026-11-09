@@ -8,7 +8,7 @@
         internal ScanResultFromDatabase(Guid scanId, ScanStatus status, int sitesToScan)
         {
             ScanId = scanId;
-            Status = status;    
+            Status = status;
             SiteCollectionsToScan = sitesToScan;
         }
 

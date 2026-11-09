@@ -17,7 +17,10 @@ namespace PnP.Scanning.Process.Commands
         /// <summary>
         /// Initializes Root Command Handler with the supplied dependencies and fixed scope.
         /// </summary>
-        public RootCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance,
+        public RootCommandHandler(
+            ScannerManager processManagerInstance,
+            IDataProtectionProvider dataProtectionProviderInstance,
+            ConfigurationOptions configurationOptionsInstance,
             Func<StartOptions, Task> authenticate = null)
         {
             this.authenticate = authenticate;
@@ -39,7 +42,9 @@ namespace PnP.Scanning.Process.Commands
             rootCommand.AddCommand(new PauseCommandHandler(processManager).Create());
             rootCommand.AddCommand(new ReportCommandHandler(processManager).Create());
             rootCommand.AddCommand(new RestartCommandHandler(processManager, configurationOptions).Create());
-            rootCommand.AddCommand(new StartCommandHandler(processManager, dataProtectionProvider, configurationOptions, authenticate).Create());
+            rootCommand.AddCommand(
+                new StartCommandHandler(processManager, dataProtectionProvider, configurationOptions, authenticate)
+                    .Create());
             rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
 

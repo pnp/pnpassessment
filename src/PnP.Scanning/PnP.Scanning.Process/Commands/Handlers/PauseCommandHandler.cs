@@ -26,18 +26,14 @@ namespace PnP.Scanning.Process.Commands
 
             scanIdOption = new(
                 name: $"--{Constants.PauseScanId}",
-                description: "Id of the Microsoft 365 Assessment to pause")
-            {
-                IsRequired = false,
-            };
+                description: "Id of the Microsoft 365 Assessment to pause") { IsRequired = false, };
             cmd.AddOption(scanIdOption);
 
-            allScansOption = new(
-                name: $"--{Constants.PauseAll}",
-                description: "Pause all Microsoft 365 Assessments")
-            {
-                IsRequired = false,
-            };
+            allScansOption =
+                new(name: $"--{Constants.PauseAll}", description: "Pause all Microsoft 365 Assessments")
+                {
+                    IsRequired = false,
+                };
             allScansOption.SetDefaultValue(false);
 
             cmd.AddOption(allScansOption);
@@ -51,20 +47,22 @@ namespace PnP.Scanning.Process.Commands
             // Custom validation of provided command input, use to validate option combinations
             cmd.AddValidator(commandResult =>
             {
-
-                if (// no arguments
-                    (commandResult.FindResultFor(scanIdOption) == null && commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == false) ||
+                if ( // no arguments
+                    (commandResult.FindResultFor(scanIdOption) == null &&
+                     commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == false) ||
                     // --scanid and --all
-                    (commandResult.FindResultFor(scanIdOption) != null && commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == true)
-                   )
+                    (commandResult.FindResultFor(scanIdOption) != null &&
+                     commandResult.FindResultFor(allScansOption).GetValueOrDefault<bool>() == true))
                 {
-                    commandResult.ErrorMessage = $"You need to either use the --{Constants.PauseScanId} with a valid Microsoft 365 Assessment id or the --{Constants.PauseAll} option"; 
+                    commandResult.ErrorMessage =
+                        $"You need to either use the --{Constants.PauseScanId} with a valid Microsoft 365 Assessment id or the --{Constants.PauseAll} option";
                 }
             });
 
             cmd.SetHandler(async context =>
             {
-                context.ExitCode = await HandleStartAsync(context.ParseResult.GetValueForOption(scanIdOption),
+                context.ExitCode = await HandleStartAsync(
+                    context.ParseResult.GetValueForOption(scanIdOption),
                     context.ParseResult.GetValueForOption(allScansOption));
             });
 
@@ -77,34 +75,38 @@ namespace PnP.Scanning.Process.Commands
         private async Task<int> HandleStartAsync(Guid scanId, bool all)
         {
             int exitCode = 0;
-            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Pausing Microsoft 365 Assessment...", async ctx =>
-            {
-                // Setup client to talk to scanner
-                Core.Services.PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
-
-                // Start the pausing work
-                AsyncServerStreamingCall<Core.Services.PauseStatus> call = client.Pause(new Core.Services.PauseRequest { Id = scanId.ToString(), All = all });
-                await foreach (Core.Services.PauseStatus message in call.ResponseStream.ReadAllAsync())
-                {
-                    if (message.Type == Constants.MessageError)
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.BouncingBar)
+                .StartAsync(
+                    "Pausing Microsoft 365 Assessment...",
+                    async ctx =>
                     {
-                        exitCode = 1;
-                        AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
-                    }
-                    else if (message.Type == Constants.MessageWarning)
-                    {
-                        AnsiConsole.MarkupLine($"[orange3]{message.Status}[/]");
-                    }
-                    else
-                    {
-                        AnsiConsole.MarkupLine($"[gray]{message.Status}[/]");
-                    }
+                        // Setup client to talk to scanner
+                        Core.Services.PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
-                    // Add delay for an improved "visual" experience
-                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                        // Start the pausing work
+                        AsyncServerStreamingCall<Core.Services.PauseStatus> call = client.Pause(
+                            new Core.Services.PauseRequest { Id = scanId.ToString(), All = all });
+                        await foreach (Core.Services.PauseStatus message in call.ResponseStream.ReadAllAsync())
+                        {
+                            if (message.Type == Constants.MessageError)
+                            {
+                                exitCode = 1;
+                                AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
+                            }
+                            else if (message.Type == Constants.MessageWarning)
+                            {
+                                AnsiConsole.MarkupLine($"[orange3]{message.Status}[/]");
+                            }
+                            else
+                            {
+                                AnsiConsole.MarkupLine($"[gray]{message.Status}[/]");
+                            }
 
-                }
-            });
+                            // Add delay for an improved "visual" experience
+                            await Task.Delay(TimeSpan.FromMilliseconds(500));
+                        }
+                    });
             return exitCode;
         }
     }

@@ -27,19 +27,44 @@ namespace PnP.Scanning.Core.Scanners
     {
         // Web part type constants returned by the property-signature based type detection. Ported from
         // the legacy WebParts constants (only the subset GetTypeFromProperties can return is needed).
-        private const string XsltListViewType = "Microsoft.SharePoint.WebPartPages.XsltListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ListViewType = "Microsoft.SharePoint.WebPartPages.ListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string MediaType = "Microsoft.SharePoint.Publishing.WebControls.MediaWebPart, Microsoft.SharePoint.Publishing, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string PictureLibrarySlideshowType = "Microsoft.SharePoint.WebPartPages.PictureLibrarySlideshowWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ChartType = "Microsoft.Office.Server.WebControls.ChartWebPart, Microsoft.Office.Server.Chart, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string MembersType = "Microsoft.SharePoint.WebPartPages.MembersWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string SilverlightType = "Microsoft.SharePoint.WebPartPages.SilverlightWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ClientType = "Microsoft.SharePoint.WebPartPages.ClientWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ContentEditorType = "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ImageType = "Microsoft.SharePoint.WebPartPages.ImageWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string TitleBarType = "Microsoft.SharePoint.WebPartPages.TitleBarWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ScriptEditorType = "Microsoft.SharePoint.WebPartPages.ScriptEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string SPUserCodeType = "Microsoft.SharePoint.WebPartPages.SPUserCodeWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+        private const string XsltListViewType =
+            "Microsoft.SharePoint.WebPartPages.XsltListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ListViewType =
+            "Microsoft.SharePoint.WebPartPages.ListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string MediaType =
+            "Microsoft.SharePoint.Publishing.WebControls.MediaWebPart, Microsoft.SharePoint.Publishing, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string PictureLibrarySlideshowType =
+            "Microsoft.SharePoint.WebPartPages.PictureLibrarySlideshowWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ChartType =
+            "Microsoft.Office.Server.WebControls.ChartWebPart, Microsoft.Office.Server.Chart, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string MembersType =
+            "Microsoft.SharePoint.WebPartPages.MembersWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string SilverlightType =
+            "Microsoft.SharePoint.WebPartPages.SilverlightWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ClientType =
+            "Microsoft.SharePoint.WebPartPages.ClientWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ContentEditorType =
+            "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ImageType =
+            "Microsoft.SharePoint.WebPartPages.ImageWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string TitleBarType =
+            "Microsoft.SharePoint.WebPartPages.TitleBarWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ScriptEditorType =
+            "Microsoft.SharePoint.WebPartPages.ScriptEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string SPUserCodeType =
+            "Microsoft.SharePoint.WebPartPages.SPUserCodeWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
 
         private const string UnsupportedWebPartType = "Unsupported Web Part Type";
 
@@ -54,8 +79,11 @@ namespace PnP.Scanning.Core.Scanners
         /// <param name="page">The discovered classic page the rows belong to.</param>
         /// <param name="exportWebPartProperties">When set, the web part properties are serialized to JSON.</param>
         /// <param name="includeTitleBarWebPart">Include the TitleBar zone web part (off by default, as legacy).</param>
-        internal static async Task<List<ClassicPageWebPart>> ExtractFromWebPartPageAsync(ClientContext csomContext, ClassicPage page,
-                                                                                         bool exportWebPartProperties, bool includeTitleBarWebPart = false)
+        internal static async Task<List<ClassicPageWebPart>> ExtractFromWebPartPageAsync(
+            ClientContext csomContext,
+            ClassicPage page,
+            bool exportWebPartProperties,
+            bool includeTitleBarWebPart = false)
         {
             var webPartPage = csomContext.Web.GetFileByServerRelativeUrl(page.PageUrl);
 
@@ -65,9 +93,16 @@ namespace PnP.Scanning.Core.Scanners
             var limitedWPManager = webPartPage.GetLimitedWebPartManager(PersonalizationScope.Shared);
             csomContext.Load(limitedWPManager);
 
-            var webParts = csomContext.LoadQuery(limitedWPManager.WebParts.IncludeWithDefaultProperties(
-                wp => wp.Id, wp => wp.ZoneId, wp => wp.WebPart.ExportMode, wp => wp.WebPart.Title,
-                wp => wp.WebPart.ZoneIndex, wp => wp.WebPart.IsClosed, wp => wp.WebPart.Hidden, wp => wp.WebPart.Properties));
+            var webParts = csomContext.LoadQuery(
+                limitedWPManager.WebParts.IncludeWithDefaultProperties(
+                    wp => wp.Id,
+                    wp => wp.ZoneId,
+                    wp => wp.WebPart.ExportMode,
+                    wp => wp.WebPart.Title,
+                    wp => wp.WebPart.ZoneIndex,
+                    wp => wp.WebPart.IsClosed,
+                    wp => wp.WebPart.Hidden,
+                    wp => wp.WebPart.Properties));
             await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
             var layout = GetWebPartPageLayout(pageProperties);
@@ -78,7 +113,9 @@ namespace PnP.Scanning.Core.Scanners
             bool isDirty = false;
             foreach (var foundWebPart in webParts)
             {
-                if (!includeTitleBarWebPart && foundWebPart.ZoneId.Equals("TitleBar", StringComparison.InvariantCultureIgnoreCase))
+                if (!includeTitleBarWebPart && foundWebPart.ZoneId.Equals(
+                        "TitleBar",
+                        StringComparison.InvariantCultureIgnoreCase))
                 {
                     continue;
                 }
@@ -89,6 +126,7 @@ namespace PnP.Scanning.Core.Scanners
                     isDirty = true;
                 }
             }
+
             if (isDirty)
             {
                 await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
@@ -97,29 +135,34 @@ namespace PnP.Scanning.Core.Scanners
             var entities = new List<WebPartEntity>();
             foreach (var foundWebPart in webParts)
             {
-                if (!includeTitleBarWebPart && foundWebPart.ZoneId.Equals("TitleBar", StringComparison.InvariantCultureIgnoreCase))
+                if (!includeTitleBarWebPart && foundWebPart.ZoneId.Equals(
+                        "TitleBar",
+                        StringComparison.InvariantCultureIgnoreCase))
                 {
                     continue;
                 }
 
                 exportedXml.TryGetValue(foundWebPart.Id, out var xml);
-                string webPartType = xml != null ? GetTypeFromXml(xml.Value) : GetTypeFromProperties(foundWebPart.WebPart.Properties.FieldValues);
+                string webPartType = xml != null
+                    ? GetTypeFromXml(xml.Value)
+                    : GetTypeFromProperties(foundWebPart.WebPart.Properties.FieldValues);
 
-                entities.Add(new WebPartEntity
-                {
-                    Title = foundWebPart.WebPart.Title,
-                    Type = webPartType,
-                    Id = foundWebPart.Id,
-                    ServerControlId = foundWebPart.Id.ToString(),
-                    Row = GetRow(foundWebPart.ZoneId, layout),
-                    Column = GetColumn(foundWebPart.ZoneId, layout),
-                    Order = foundWebPart.WebPart.ZoneIndex,
-                    ZoneId = foundWebPart.ZoneId,
-                    ZoneIndex = (uint)foundWebPart.WebPart.ZoneIndex,
-                    IsClosed = foundWebPart.WebPart.IsClosed,
-                    Hidden = foundWebPart.WebPart.Hidden,
-                    Properties = ToStringProperties(foundWebPart.WebPart.Properties.FieldValues),
-                });
+                entities.Add(
+                    new WebPartEntity
+                    {
+                        Title = foundWebPart.WebPart.Title,
+                        Type = webPartType,
+                        Id = foundWebPart.Id,
+                        ServerControlId = foundWebPart.Id.ToString(),
+                        Row = GetRow(foundWebPart.ZoneId, layout),
+                        Column = GetColumn(foundWebPart.ZoneId, layout),
+                        Order = foundWebPart.WebPart.ZoneIndex,
+                        ZoneId = foundWebPart.ZoneId,
+                        ZoneIndex = (uint)foundWebPart.WebPart.ZoneIndex,
+                        IsClosed = foundWebPart.WebPart.IsClosed,
+                        Hidden = foundWebPart.WebPart.Hidden,
+                        Properties = ToStringProperties(foundWebPart.WebPart.Properties.FieldValues),
+                    });
             }
 
             return ToRows(page, entities, exportWebPartProperties);
@@ -133,8 +176,11 @@ namespace PnP.Scanning.Core.Scanners
         /// <param name="page">The discovered classic page the rows belong to.</param>
         /// <param name="wikiFieldHtml">The page's <c>WikiField</c> HTML.</param>
         /// <param name="exportWebPartProperties">When set, the web part properties are serialized to JSON.</param>
-        internal static async Task<List<ClassicPageWebPart>> ExtractFromWikiPageAsync(ClientContext csomContext, ClassicPage page,
-                                                                                      string wikiFieldHtml, bool exportWebPartProperties)
+        internal static async Task<List<ClassicPageWebPart>> ExtractFromWikiPageAsync(
+            ClientContext csomContext,
+            ClassicPage page,
+            string wikiFieldHtml,
+            bool exportWebPartProperties)
         {
             // Pure HTML parsing: text blocks + embedded media parts + placeholders for the embedded web parts.
             var parsed = WikiContentParser.Parse(wikiFieldHtml);
@@ -162,15 +208,24 @@ namespace PnP.Scanning.Core.Scanners
                         using (scope.StartTry())
                         {
                             var definition = limitedWPManager.WebParts.GetByControlId(placeholder.ControlId);
-                            csomContext.Load(definition, wp => wp.Id, wp => wp.WebPart.ExportMode, wp => wp.WebPart.Title,
-                                             wp => wp.WebPart.ZoneIndex, wp => wp.WebPart.IsClosed, wp => wp.WebPart.Hidden, wp => wp.WebPart.Properties);
+                            csomContext.Load(
+                                definition,
+                                wp => wp.Id,
+                                wp => wp.WebPart.ExportMode,
+                                wp => wp.WebPart.Title,
+                                wp => wp.WebPart.ZoneIndex,
+                                wp => wp.WebPart.IsClosed,
+                                wp => wp.WebPart.Hidden,
+                                wp => wp.WebPart.Properties);
                             definitions[placeholder] = definition;
                         }
+
                         using (scope.StartCatch())
                         {
                         }
                     }
                 }
+
                 await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
                 // Export the web part XML for the parts that allow it.
@@ -178,12 +233,14 @@ namespace PnP.Scanning.Core.Scanners
                 bool isDirty = false;
                 foreach (var (placeholder, definition) in definitions)
                 {
-                    if (definition.ServerObjectIsNull == false && definition.WebPart.ExportMode == WebPartExportMode.All)
+                    if (definition.ServerObjectIsNull == false &&
+                        definition.WebPart.ExportMode == WebPartExportMode.All)
                     {
                         exportedXml[placeholder] = limitedWPManager.ExportWebPart(definition.Id);
                         isDirty = true;
                     }
                 }
+
                 if (isDirty)
                 {
                     await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
@@ -191,29 +248,33 @@ namespace PnP.Scanning.Core.Scanners
 
                 foreach (var placeholder in parsed.Placeholders)
                 {
-                    if (!definitions.TryGetValue(placeholder, out var definition) || definition.ServerObjectIsNull != false)
+                    if (!definitions.TryGetValue(placeholder, out var definition) ||
+                        definition.ServerObjectIsNull != false)
                     {
                         continue;
                     }
 
                     exportedXml.TryGetValue(placeholder, out var xml);
-                    string webPartType = xml != null ? GetTypeFromXml(xml.Value) : GetTypeFromProperties(definition.WebPart.Properties.FieldValues);
+                    string webPartType = xml != null
+                        ? GetTypeFromXml(xml.Value)
+                        : GetTypeFromProperties(definition.WebPart.Properties.FieldValues);
 
-                    entities.Add(new WebPartEntity
-                    {
-                        Title = definition.WebPart.Title,
-                        Type = webPartType,
-                        Id = definition.Id,
-                        ServerControlId = placeholder.Id,
-                        Row = placeholder.Row,
-                        Column = placeholder.Column,
-                        Order = placeholder.Order,
-                        ZoneId = "",
-                        ZoneIndex = (uint)definition.WebPart.ZoneIndex,
-                        IsClosed = definition.WebPart.IsClosed,
-                        Hidden = definition.WebPart.Hidden,
-                        Properties = ToStringProperties(definition.WebPart.Properties.FieldValues),
-                    });
+                    entities.Add(
+                        new WebPartEntity
+                        {
+                            Title = definition.WebPart.Title,
+                            Type = webPartType,
+                            Id = definition.Id,
+                            ServerControlId = placeholder.Id,
+                            Row = placeholder.Row,
+                            Column = placeholder.Column,
+                            Order = placeholder.Order,
+                            ZoneId = "",
+                            ZoneIndex = (uint)definition.WebPart.ZoneIndex,
+                            IsClosed = definition.WebPart.IsClosed,
+                            Hidden = definition.WebPart.Hidden,
+                            Properties = ToStringProperties(definition.WebPart.Properties.FieldValues),
+                        });
                 }
             }
 
@@ -242,8 +303,10 @@ namespace PnP.Scanning.Core.Scanners
         /// <param name="csomContext">CSOM context for the web (already throttle-aware).</param>
         /// <param name="page">The discovered classic page the rows belong to.</param>
         /// <param name="exportWebPartProperties">When set, the web part properties are serialized to JSON.</param>
-        internal static async Task<List<ClassicPageWebPart>> ExtractFromPublishingPageAsync(ClientContext csomContext, ClassicPage page,
-                                                                                            bool exportWebPartProperties)
+        internal static async Task<List<ClassicPageWebPart>> ExtractFromPublishingPageAsync(
+            ClientContext csomContext,
+            ClassicPage page,
+            bool exportWebPartProperties)
         {
             var publishingPage = csomContext.Web.GetFileByServerRelativeUrl(page.PageUrl);
 
@@ -254,9 +317,16 @@ namespace PnP.Scanning.Core.Scanners
             var limitedWPManager = publishingPage.GetLimitedWebPartManager(PersonalizationScope.Shared);
             csomContext.Load(limitedWPManager);
 
-            var webParts = csomContext.LoadQuery(limitedWPManager.WebParts.IncludeWithDefaultProperties(
-                wp => wp.Id, wp => wp.ZoneId, wp => wp.WebPart.ExportMode, wp => wp.WebPart.Title,
-                wp => wp.WebPart.ZoneIndex, wp => wp.WebPart.IsClosed, wp => wp.WebPart.Hidden, wp => wp.WebPart.Properties));
+            var webParts = csomContext.LoadQuery(
+                limitedWPManager.WebParts.IncludeWithDefaultProperties(
+                    wp => wp.Id,
+                    wp => wp.ZoneId,
+                    wp => wp.WebPart.ExportMode,
+                    wp => wp.WebPart.Title,
+                    wp => wp.WebPart.ZoneIndex,
+                    wp => wp.WebPart.IsClosed,
+                    wp => wp.WebPart.Hidden,
+                    wp => wp.WebPart.Properties));
             await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
 
             // Parity with the legacy PublishingAnalyzer: the recorded layout is the actual page layout name
@@ -276,6 +346,7 @@ namespace PnP.Scanning.Core.Scanners
                     isDirty = true;
                 }
             }
+
             if (isDirty)
             {
                 await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
@@ -286,53 +357,60 @@ namespace PnP.Scanning.Core.Scanners
             foreach (var foundWebPart in webParts.OrderBy(wp => wp.WebPart.ZoneIndex))
             {
                 exportedXml.TryGetValue(foundWebPart.Id, out var xml);
-                string webPartType = xml != null ? GetTypeFromXml(xml.Value) : GetTypeFromProperties(foundWebPart.WebPart.Properties.FieldValues);
+                string webPartType = xml != null
+                    ? GetTypeFromXml(xml.Value)
+                    : GetTypeFromProperties(foundWebPart.WebPart.Properties.FieldValues);
 
-                entities.Add(new WebPartEntity
-                {
-                    Title = foundWebPart.WebPart.Title,
-                    Type = webPartType,
-                    Id = foundWebPart.Id,
-                    ServerControlId = foundWebPart.Id.ToString(),
-                    // The legacy scanner does not map publishing zones to a row/column grid (that is layout
-                    // detection, deferred to T7); only the zone index is meaningful here.
-                    Order = foundWebPart.WebPart.ZoneIndex,
-                    ZoneId = foundWebPart.ZoneId,
-                    ZoneIndex = (uint)foundWebPart.WebPart.ZoneIndex,
-                    IsClosed = foundWebPart.WebPart.IsClosed,
-                    Hidden = foundWebPart.WebPart.Hidden,
-                    Properties = ToStringProperties(foundWebPart.WebPart.Properties.FieldValues),
-                });
+                entities.Add(
+                    new WebPartEntity
+                    {
+                        Title = foundWebPart.WebPart.Title,
+                        Type = webPartType,
+                        Id = foundWebPart.Id,
+                        ServerControlId = foundWebPart.Id.ToString(),
+                        // The legacy scanner does not map publishing zones to a row/column grid (that is layout
+                        // detection, deferred to T7); only the zone index is meaningful here.
+                        Order = foundWebPart.WebPart.ZoneIndex,
+                        ZoneId = foundWebPart.ZoneId,
+                        ZoneIndex = (uint)foundWebPart.WebPart.ZoneIndex,
+                        IsClosed = foundWebPart.WebPart.IsClosed,
+                        Hidden = foundWebPart.WebPart.Hidden,
+                        Properties = ToStringProperties(foundWebPart.WebPart.Properties.FieldValues),
+                    });
             }
 
             return ToRows(page, entities, exportWebPartProperties);
         }
 
-        private static List<ClassicPageWebPart> ToRows(ClassicPage page, List<WebPartEntity> entities, bool exportWebPartProperties)
+        private static List<ClassicPageWebPart> ToRows(
+            ClassicPage page,
+            List<WebPartEntity> entities,
+            bool exportWebPartProperties)
         {
             var rows = new List<ClassicPageWebPart>();
             int index = 0;
             foreach (var entity in entities)
             {
-                rows.Add(new ClassicPageWebPart
-                {
-                    ScanId = page.ScanId,
-                    SiteUrl = page.SiteUrl,
-                    WebUrl = page.WebUrl,
-                    PageUrl = page.PageUrl,
-                    WebPartIndex = index++,
-                    WebPartType = entity.Type,
-                    WebPartTypeShort = entity.TypeShort(),
-                    WebPartTitle = entity.Title,
-                    WebPartProperties = exportWebPartProperties ? SerializeProperties(entity.Properties) : null,
-                    ZoneId = entity.ZoneId,
-                    Row = entity.Row,
-                    Column = entity.Column,
-                    Order = entity.Order,
-                    Hidden = entity.Hidden,
-                    IsClosed = entity.IsClosed,
-                    // IsMappable is computed later (mapping percentage task).
-                });
+                rows.Add(
+                    new ClassicPageWebPart
+                    {
+                        ScanId = page.ScanId,
+                        SiteUrl = page.SiteUrl,
+                        WebUrl = page.WebUrl,
+                        PageUrl = page.PageUrl,
+                        WebPartIndex = index++,
+                        WebPartType = entity.Type,
+                        WebPartTypeShort = entity.TypeShort(),
+                        WebPartTitle = entity.Title,
+                        WebPartProperties = exportWebPartProperties ? SerializeProperties(entity.Properties) : null,
+                        ZoneId = entity.ZoneId,
+                        Row = entity.Row,
+                        Column = entity.Column,
+                        Order = entity.Order,
+                        Hidden = entity.Hidden,
+                        IsClosed = entity.IsClosed,
+                        // IsMappable is computed later (mapping percentage task).
+                    });
             }
 
             return rows;
@@ -375,13 +453,18 @@ namespace PnP.Scanning.Core.Scanners
             {
                 var xml = XElement.Parse(webPartXml);
                 var xmlns = xml.XPathSelectElement("*").GetDefaultNamespace();
-                if (xmlns.NamespaceName.Equals("http://schemas.microsoft.com/WebPart/v3", StringComparison.InvariantCultureIgnoreCase))
+                if (xmlns.NamespaceName.Equals(
+                        "http://schemas.microsoft.com/WebPart/v3",
+                        StringComparison.InvariantCultureIgnoreCase))
                 {
                     type = xml.Descendants(xmlns + "type").FirstOrDefault()?.Attribute("name")?.Value ?? type;
                 }
-                else if (xmlns.NamespaceName.Equals("http://schemas.microsoft.com/WebPart/v2", StringComparison.InvariantCultureIgnoreCase))
+                else if (xmlns.NamespaceName.Equals(
+                             "http://schemas.microsoft.com/WebPart/v2",
+                             StringComparison.InvariantCultureIgnoreCase))
                 {
-                    type = $"{xml.Descendants(xmlns + "TypeName").FirstOrDefault()?.Value}, {xml.Descendants(xmlns + "Assembly").FirstOrDefault()?.Value}";
+                    type =
+                        $"{xml.Descendants(xmlns + "TypeName").FirstOrDefault()?.Value}, {xml.Descendants(xmlns + "Assembly").FirstOrDefault()?.Value}";
                 }
             }
 
@@ -393,26 +476,45 @@ namespace PnP.Scanning.Core.Scanners
         // Internal (not private) so the publishing/web-part type detection has its own unit tests.
         internal static string GetTypeFromProperties(IDictionary<string, object> properties)
         {
-            if (HasAll(properties, "ListUrl", "ListId", "Xsl", "JSLink", "ShowTimelineIfAvailable")) return XsltListViewType;
-            if (HasAll(properties, "ListViewXml", "ListName", "ListId", "ViewContentTypeId", "PageType")) return ListViewType;
-            if (HasAll(properties, "AutoPlay", "MediaSource", "Loop", "IsPreviewImageSourceOverridenForVideoSet", "PreviewImageSource")) return MediaType;
-            if (HasAll(properties, "LibraryGuid", "Layout", "Speed", "ShowToolbar", "ViewGuid")) return PictureLibrarySlideshowType;
-            if (HasAll(properties, "ConnectionPointEnabled", "ChartXml", "DataBindingsString", "DesignerChartTheme")) return ChartType;
+            if (HasAll(properties, "ListUrl", "ListId", "Xsl", "JSLink", "ShowTimelineIfAvailable"))
+                return XsltListViewType;
+            if (HasAll(properties, "ListViewXml", "ListName", "ListId", "ViewContentTypeId", "PageType"))
+                return ListViewType;
+            if (HasAll(
+                    properties,
+                    "AutoPlay",
+                    "MediaSource",
+                    "Loop",
+                    "IsPreviewImageSourceOverridenForVideoSet",
+                    "PreviewImageSource"))
+                return MediaType;
+            if (HasAll(properties, "LibraryGuid", "Layout", "Speed", "ShowToolbar", "ViewGuid"))
+                return PictureLibrarySlideshowType;
+            if (HasAll(properties, "ConnectionPointEnabled", "ChartXml", "DataBindingsString", "DesignerChartTheme"))
+                return ChartType;
             if (HasAll(properties, "NumberLimit", "DisplayType", "MembershipGroupId", "Toolbar")) return MembersType;
-            if (HasAll(properties, "MinRuntimeVersion", "WindowlessMode", "CustomInitParameters", "Url", "ApplicationXml")) return SilverlightType;
+            if (HasAll(
+                    properties,
+                    "MinRuntimeVersion",
+                    "WindowlessMode",
+                    "CustomInitParameters",
+                    "Url",
+                    "ApplicationXml"))
+                return SilverlightType;
             if (HasAll(properties, "FeatureId", "ProductWebId", "ProductId")) return ClientType;
             if (HasAll(properties, "Content")) return ScriptEditorType;
-            if (HasAll(properties, "CatalogIconImageUrl", "AllowEdit", "TitleIconImageUrl", "ExportMode")) return SPUserCodeType;
+            if (HasAll(properties, "CatalogIconImageUrl", "AllowEdit", "TitleIconImageUrl", "ExportMode"))
+                return SPUserCodeType;
 
             return UnsupportedWebPartType;
         }
 
         internal static string GetPublishingPageLayoutUrl(IDictionary<string, object> fieldValues)
         {
-            return fieldValues != null &&
-                fieldValues.TryGetValue(PublishingPageLayoutField, out var value) &&
-                value is FieldUrlValue url && !string.IsNullOrWhiteSpace(url.Url)
-                ? url.Url : null;
+            return fieldValues != null && fieldValues.TryGetValue(PublishingPageLayoutField, out var value) &&
+                   value is FieldUrlValue url && !string.IsNullOrWhiteSpace(url.Url)
+                ? url.Url
+                : null;
         }
 
         // Reads the publishing page layout name from the page list item's PublishingPageLayout field.
@@ -422,10 +524,8 @@ namespace PnP.Scanning.Core.Scanners
         // is integration-only.
         internal static string GetPublishingPageLayoutName(IDictionary<string, object> fieldValues)
         {
-            if (fieldValues != null &&
-                fieldValues.TryGetValue(PublishingPageLayoutField, out var value) &&
-                value != null &&
-                !string.IsNullOrEmpty(value.ToString()))
+            if (fieldValues != null && fieldValues.TryGetValue(PublishingPageLayoutField, out var value) &&
+                value != null && !string.IsNullOrEmpty(value.ToString()))
             {
                 var description = (value as FieldUrlValue)?.Description;
                 return string.IsNullOrEmpty(description) ? "" : description;
@@ -540,7 +640,8 @@ namespace PnP.Scanning.Core.Scanners
                     break;
                 case PageLayout.WebPart_HeaderFooter4ColumnsTopRow:
                     if (IsZone(zoneId, "Header")) return 1;
-                    if (IsZone(zoneId, "LeftColumn", "TopRow", "RightColumn", "CenterLeftColumn", "CenterRightColumn")) return 2;
+                    if (IsZone(zoneId, "LeftColumn", "TopRow", "RightColumn", "CenterLeftColumn", "CenterRightColumn"))
+                        return 2;
                     if (IsZone(zoneId, "Footer")) return 3;
                     break;
                 case PageLayout.WebPart_LeftColumnHeaderFooterTopRow3Columns:

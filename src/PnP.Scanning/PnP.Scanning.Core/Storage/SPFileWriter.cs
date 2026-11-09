@@ -57,6 +57,7 @@ internal sealed class SPFileWriter
             merged.ItemMetadataFieldStatesJson = JsonSerializer.Serialize(states);
             if (merged.FirstObservedAtUtc == default) merged.FirstObservedAtUtc = merged.ObservedAtUtc;
         }
+
         return merged;
     }
 
@@ -68,26 +69,32 @@ internal sealed class SPFileWriter
         {
             return;
         }
+
         foreach (var file in files)
         {
             Validate(file);
         }
+
         var scan = files[0].ScanId;
         if (files.Any(row => row.ScanId != scan))
         {
             throw new ArgumentException("A raw-file batch belongs to exactly one scan.");
         }
+
         await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             using var db = createContext();
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            await using var transaction =
+                await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
             foreach (var observation in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var previous = await db.SPFiles.FindAsync(
-                    new object[] { observation.SiteCollectionId, observation.FileUniqueId }, cancellationToken).ConfigureAwait(false);
+                        new object[] { observation.SiteCollectionId, observation.FileUniqueId },
+                        cancellationToken)
+                    .ConfigureAwait(false);
                 if (previous == null)
                 {
                     observation.ProvenanceJson = UnionProvenance(EmptyProvenance, observation.ProvenanceJson);
@@ -98,6 +105,7 @@ internal sealed class SPFileWriter
                     {
                         observation.FirstObservedAtUtc = observation.ObservedAtUtc;
                     }
+
                     db.SPFiles.Add(observation);
                 }
                 else
@@ -106,9 +114,11 @@ internal sealed class SPFileWriter
                     {
                         throw new InvalidOperationException("The physical file already belongs to a different scan.");
                     }
+
                     Merge(previous, observation);
                 }
             }
+
             // Storage failures propagate; no part of the batch is reported as an acquisition gap or committed separately.
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -127,6 +137,7 @@ internal sealed class SPFileWriter
         {
             throw new ArgumentException("Raw-file batches must remain bounded.");
         }
+
         return result;
     }
 
@@ -138,14 +149,17 @@ internal sealed class SPFileWriter
         {
             throw new ArgumentException("An observed scan is required.");
         }
+
         if (row.SiteCollectionId == Guid.Empty || row.FileUniqueId == Guid.Empty)
         {
             throw new ArgumentException("Physical identity requires observed nonempty site-collection and file GUIDs.");
         }
+
         if (row.WebId == Guid.Empty || row.ListId == Guid.Empty || row.FolderUniqueId == Guid.Empty)
         {
             throw new ArgumentException("Optional observation GUIDs must be real or absent, never empty placeholders.");
         }
+
         _ = UnionProvenance(EmptyProvenance, row.ProvenanceJson);
         var states = ReadFieldStates(row.ItemMetadataFieldStatesJson);
         ValidateItemValue(states, ClientSideApplicationIdField, row.ClientSideApplicationId);
@@ -164,34 +178,92 @@ internal sealed class SPFileWriter
         previous.CoverageState = MergeCoverage(previous.CoverageState, incoming.CoverageState);
         previous.SiteUrl = MergeText(previous, nameof(previous.SiteUrl), previous.SiteUrl, incoming.SiteUrl);
         previous.WebUrl = MergeText(previous, nameof(previous.WebUrl), previous.WebUrl, incoming.WebUrl);
-        previous.ServerRelativeUrl = MergeText(previous, nameof(previous.ServerRelativeUrl), previous.ServerRelativeUrl, incoming.ServerRelativeUrl);
+        previous.ServerRelativeUrl = MergeText(
+            previous,
+            nameof(previous.ServerRelativeUrl),
+            previous.ServerRelativeUrl,
+            incoming.ServerRelativeUrl);
         previous.WebId = MergeValue(previous, nameof(previous.WebId), previous.WebId, incoming.WebId);
         previous.ListId = MergeValue(previous, nameof(previous.ListId), previous.ListId, incoming.ListId);
-        previous.FolderUniqueId = MergeValue(previous, nameof(previous.FolderUniqueId), previous.FolderUniqueId, incoming.FolderUniqueId);
-        previous.ListItemId = MergeValue(previous, nameof(previous.ListItemId), previous.ListItemId, incoming.ListItemId);
+        previous.FolderUniqueId = MergeValue(
+            previous,
+            nameof(previous.FolderUniqueId),
+            previous.FolderUniqueId,
+            incoming.FolderUniqueId);
+        previous.ListItemId = MergeValue(
+            previous,
+            nameof(previous.ListItemId),
+            previous.ListItemId,
+            incoming.ListItemId);
         previous.Length = MergeValue(previous, nameof(previous.Length), previous.Length, incoming.Length);
         previous.FileName = MergeText(previous, nameof(previous.FileName), previous.FileName, incoming.FileName);
         SortedDictionary<string, string> itemStates = ReadFieldStates(incoming.ItemMetadataFieldStatesJson);
-        previous.ContentTypeId = MergeItemText(previous, nameof(previous.ContentTypeId), ContentTypeIdField, previous.ContentTypeId, incoming.ContentTypeId, itemStates);
-        previous.CustomizedPageStatus = MergeText(previous, nameof(previous.CustomizedPageStatus), previous.CustomizedPageStatus, incoming.CustomizedPageStatus);
+        previous.ContentTypeId = MergeItemText(
+            previous,
+            nameof(previous.ContentTypeId),
+            ContentTypeIdField,
+            previous.ContentTypeId,
+            incoming.ContentTypeId,
+            itemStates);
+        previous.CustomizedPageStatus = MergeText(
+            previous,
+            nameof(previous.CustomizedPageStatus),
+            previous.CustomizedPageStatus,
+            incoming.CustomizedPageStatus);
         previous.SetupPath = MergeText(previous, nameof(previous.SetupPath), previous.SetupPath, incoming.SetupPath);
-        previous.AspxEvidenceJson = MergeText(previous, nameof(previous.AspxEvidenceJson), previous.AspxEvidenceJson, incoming.AspxEvidenceJson);
-        previous.ClientSideApplicationId = MergeItemText(previous, nameof(previous.ClientSideApplicationId), ClientSideApplicationIdField, previous.ClientSideApplicationId, incoming.ClientSideApplicationId, itemStates);
-        previous.HtmlFileType = MergeItemText(previous, nameof(previous.HtmlFileType), HtmlFileTypeField, previous.HtmlFileType, incoming.HtmlFileType, itemStates);
-        previous.FileType = MergeItemText(previous, nameof(previous.FileType), FileTypeField, previous.FileType, incoming.FileType, itemStates);
+        previous.AspxEvidenceJson = MergeText(
+            previous,
+            nameof(previous.AspxEvidenceJson),
+            previous.AspxEvidenceJson,
+            incoming.AspxEvidenceJson);
+        previous.ClientSideApplicationId = MergeItemText(
+            previous,
+            nameof(previous.ClientSideApplicationId),
+            ClientSideApplicationIdField,
+            previous.ClientSideApplicationId,
+            incoming.ClientSideApplicationId,
+            itemStates);
+        previous.HtmlFileType = MergeItemText(
+            previous,
+            nameof(previous.HtmlFileType),
+            HtmlFileTypeField,
+            previous.HtmlFileType,
+            incoming.HtmlFileType,
+            itemStates);
+        previous.FileType = MergeItemText(
+            previous,
+            nameof(previous.FileType),
+            FileTypeField,
+            previous.FileType,
+            incoming.FileType,
+            itemStates);
         previous.BSN = MergeItemText(previous, nameof(previous.BSN), BsnField, previous.BSN, incoming.BSN, itemStates);
         if (!itemStates.TryGetValue(WikiField, out string wikiState) || wikiState != FieldOmitted)
         {
             bool? wikiValue = wikiState == FieldNull ? false : incoming.WikiFieldHasValue;
-            previous.WikiFieldHasValue = MergeValue(previous, nameof(previous.WikiFieldHasValue), previous.WikiFieldHasValue, wikiValue);
+            previous.WikiFieldHasValue = MergeValue(
+                previous,
+                nameof(previous.WikiFieldHasValue),
+                previous.WikiFieldHasValue,
+                wikiValue);
         }
+
         MergeNoExecute(previous, incoming, itemStates);
-        previous.FileReadState = MergeReadState(previous, nameof(previous.FileReadState), previous.FileReadState, incoming.FileReadState);
-        previous.ItemMetadataReadState = MergeReadState(previous, nameof(previous.ItemMetadataReadState), previous.ItemMetadataReadState, incoming.ItemMetadataReadState);
+        previous.FileReadState = MergeReadState(
+            previous,
+            nameof(previous.FileReadState),
+            previous.FileReadState,
+            incoming.FileReadState);
+        previous.ItemMetadataReadState = MergeReadState(
+            previous,
+            nameof(previous.ItemMetadataReadState),
+            previous.ItemMetadataReadState,
+            incoming.ItemMetadataReadState);
         previous.ItemMetadataFieldStatesJson = MergeFieldStates(previous, incoming.ItemMetadataFieldStatesJson);
         previous.FileErrorCodes = Join(previous.FileErrorCodes, incoming.FileErrorCodes);
         previous.FileErrorDetail = Join(previous.FileErrorDetail, incoming.FileErrorDetail);
-        previous.FirstObservedAtUtc = Earliest(previous.FirstObservedAtUtc,
+        previous.FirstObservedAtUtc = Earliest(
+            previous.FirstObservedAtUtc,
             incoming.FirstObservedAtUtc == default ? incoming.ObservedAtUtc : incoming.FirstObservedAtUtc);
         previous.ObservedAtUtc = Latest(previous.ObservedAtUtc, incoming.ObservedAtUtc);
     }
@@ -202,13 +274,26 @@ internal sealed class SPFileWriter
         states.TryGetValue(NoExecuteField, out var state);
         if (state != FieldOmitted)
         {
-            if (state == FieldValue && previous.NoExecuteRaw == null && previous.NoExecuteReadState == NoExecuteNullReadState)
+            if (state == FieldValue && previous.NoExecuteRaw == null &&
+                previous.NoExecuteReadState == NoExecuteNullReadState)
             {
                 RecordConflict(previous, nameof(previous.NoExecuteRaw), null, incoming.NoExecuteRaw);
             }
-            previous.NoExecuteRaw = MergeItemText(previous, nameof(previous.NoExecuteRaw), NoExecuteField, previous.NoExecuteRaw, incoming.NoExecuteRaw, states);
-            previous.NoExecuteSource = MergeText(previous, nameof(previous.NoExecuteSource), previous.NoExecuteSource, incoming.NoExecuteSource);
+
+            previous.NoExecuteRaw = MergeItemText(
+                previous,
+                nameof(previous.NoExecuteRaw),
+                NoExecuteField,
+                previous.NoExecuteRaw,
+                incoming.NoExecuteRaw,
+                states);
+            previous.NoExecuteSource = MergeText(
+                previous,
+                nameof(previous.NoExecuteSource),
+                previous.NoExecuteSource,
+                incoming.NoExecuteSource);
         }
+
         previous.NoExecuteReadState = MergeNoExecuteReadState(previous, incoming.NoExecuteReadState, state);
     }
 
@@ -216,8 +301,9 @@ internal sealed class SPFileWriter
     private static string MergeNoExecuteReadState(SPFile row, string incoming, string fieldState)
     {
         var previous = row.NoExecuteReadState;
-        var returned = fieldState != FieldOmitted &&
-            ((fieldState is FieldNull or FieldValue) || (incoming is ClassicAspxReadStates.Available or NoExecuteNullReadState));
+        var returned = fieldState != FieldOmitted && ((fieldState is FieldNull or FieldValue) ||
+                                                      (incoming is ClassicAspxReadStates.Available
+                                                          or NoExecuteNullReadState));
         if (returned)
         {
             if ((previous is ClassicAspxReadStates.Available or NoExecuteNullReadState) &&
@@ -225,16 +311,21 @@ internal sealed class SPFileWriter
             {
                 RecordConflict(row, nameof(row.NoExecuteReadState), previous, incoming);
             }
+
             return incoming;
         }
+
         if (previous == NoExecuteNullReadState)
         {
-            if (incoming is not (null or ClassicAspxReadStates.NotRequested or ClassicAspxReadStates.NotAttempted or NoExecuteNullReadState))
+            if (incoming is not (null or ClassicAspxReadStates.NotRequested or ClassicAspxReadStates.NotAttempted
+                or NoExecuteNullReadState))
             {
                 RecordConflict(row, nameof(row.NoExecuteReadState), previous, incoming);
             }
+
             return previous;
         }
+
         return MergeReadState(row, nameof(row.NoExecuteReadState), previous, incoming);
     }
 
@@ -250,7 +341,10 @@ internal sealed class SPFileWriter
     /// <summary>Applies explicit null and omission to initial known item fields without inventing returned values or interpreting unknown field names.</summary>
     private static void NormalizeInitialItemFacts(SPFile row, IReadOnlyDictionary<string, string> states)
     {
-        row.ClientSideApplicationId = InitialItemText(ClientSideApplicationIdField, row.ClientSideApplicationId, states);
+        row.ClientSideApplicationId = InitialItemText(
+            ClientSideApplicationIdField,
+            row.ClientSideApplicationId,
+            states);
         row.HtmlFileType = InitialItemText(HtmlFileTypeField, row.HtmlFileType, states);
         row.FileType = InitialItemText(FileTypeField, row.FileType, states);
         row.BSN = InitialItemText(BsnField, row.BSN, states);
@@ -274,7 +368,13 @@ internal sealed class SPFileWriter
     }
 
     /// <summary>Preserves omitted known item text, clears explicit null with before/after evidence, and merges actual returned values.</summary>
-    private static string MergeItemText(SPFile row, string field, string key, string previous, string incoming, IReadOnlyDictionary<string, string> states)
+    private static string MergeItemText(
+        SPFile row,
+        string field,
+        string key,
+        string previous,
+        string incoming,
+        IReadOnlyDictionary<string, string> states)
     {
         if (states.TryGetValue(key, out var state))
         {
@@ -282,15 +382,18 @@ internal sealed class SPFileWriter
             {
                 return previous;
             }
+
             if (state == FieldNull)
             {
                 if (previous != null)
                 {
                     RecordConflict(row, field, previous, null);
                 }
+
                 return null;
             }
         }
+
         return MergeText(row, field, previous, incoming);
     }
 
@@ -301,20 +404,24 @@ internal sealed class SPFileWriter
         {
             return previous;
         }
+
         if (previous != null && !string.Equals(previous, incoming, StringComparison.Ordinal))
         {
             RecordConflict(row, field, previous, incoming);
         }
+
         return incoming;
     }
 
     /// <summary>Merges an optional raw scalar, preserving acquired facts on omission and recording both conflicting observations.</summary>
     private static T? MergeValue<T>(SPFile row, string field, T? previous, T? incoming) where T : struct
     {
-        if (previous.HasValue && incoming.HasValue && !EqualityComparer<T>.Default.Equals(previous.Value, incoming.Value))
+        if (previous.HasValue && incoming.HasValue &&
+            !EqualityComparer<T>.Default.Equals(previous.Value, incoming.Value))
         {
             RecordConflict(row, field, previous.Value, incoming.Value);
         }
+
         return incoming ?? previous;
     }
 
@@ -325,11 +432,13 @@ internal sealed class SPFileWriter
         {
             return previous;
         }
+
         if (previous == ClassicAspxReadStates.Available && incoming != ClassicAspxReadStates.Available)
         {
             RecordConflict(row, field, previous, incoming);
             return previous;
         }
+
         return incoming;
     }
 
@@ -345,13 +454,20 @@ internal sealed class SPFileWriter
                 {
                     continue;
                 }
+
                 if (previous != FieldOmitted && previous != incoming.Value)
                 {
-                    RecordConflict(row, nameof(SPFile.ItemMetadataFieldStatesJson) + "." + incoming.Key, previous, incoming.Value);
+                    RecordConflict(
+                        row,
+                        nameof(SPFile.ItemMetadataFieldStatesJson) + "." + incoming.Key,
+                        previous,
+                        incoming.Value);
                 }
             }
+
             states[incoming.Key] = incoming.Value;
         }
+
         return JsonSerializer.Serialize(states);
     }
 
@@ -363,6 +479,7 @@ internal sealed class SPFileWriter
         {
             throw new ArgumentException("Item metadata field states must be a JSON object.");
         }
+
         var states = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var field in document.RootElement.EnumerateObject())
         {
@@ -373,6 +490,7 @@ internal sealed class SPFileWriter
                 throw new ArgumentException("Each item metadata field must have one omitted, null, or value state.");
             }
         }
+
         return states;
     }
 
@@ -380,7 +498,8 @@ internal sealed class SPFileWriter
     private static void RecordConflict(SPFile row, string field, object before, object after)
     {
         row.CoverageState = ClassicAspxCoverageStates.ChangedDuringScan;
-        row.ProvenanceJson = UnionProvenance(row.ProvenanceJson,
+        row.ProvenanceJson = UnionProvenance(
+            row.ProvenanceJson,
             JsonSerializer.Serialize(new[] { new { observation = MetadataChangedObservation, field, before, after } }));
     }
 
@@ -391,18 +510,22 @@ internal sealed class SPFileWriter
         {
             return ClassicAspxCoverageStates.ChangedDuringScan;
         }
+
         if (left == ClassicAspxCoverageStates.Incomplete || right == ClassicAspxCoverageStates.Incomplete)
         {
             return ClassicAspxCoverageStates.Incomplete;
         }
+
         if (left == ClassicAspxCoverageStates.Complete || right == ClassicAspxCoverageStates.Complete)
         {
             return ClassicAspxCoverageStates.Complete;
         }
+
         if (left == ClassicAspxCoverageStates.Observed || right == ClassicAspxCoverageStates.Observed)
         {
             return ClassicAspxCoverageStates.Observed;
         }
+
         return right ?? left ?? ClassicAspxCoverageStates.Unknown;
     }
 
@@ -417,22 +540,28 @@ internal sealed class SPFileWriter
             {
                 throw new ArgumentException("Provenance must be a JSON array.");
             }
+
             foreach (var entry in document.RootElement.EnumerateArray())
             {
                 entries.Add(Canonical(entry));
             }
         }
+
         return "[" + string.Join(',', entries) + "]";
     }
 
     /// <summary>Orders object properties recursively while preserving array order and raw scalar JSON values for evidence equality.</summary>
-    private static string Canonical(JsonElement element) => element.ValueKind switch
-    {
-        JsonValueKind.Object => "{" + string.Join(',', element.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal)
-            .Select(p => JsonSerializer.Serialize(p.Name) + ":" + Canonical(p.Value))) + "}",
-        JsonValueKind.Array => "[" + string.Join(',', element.EnumerateArray().Select(Canonical)) + "]",
-        _ => element.GetRawText()
-    };
+    private static string Canonical(JsonElement element) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.Object => "{" + string.Join(
+                ',',
+                element.EnumerateObject()
+                    .OrderBy(p => p.Name, StringComparer.Ordinal)
+                    .Select(p => JsonSerializer.Serialize(p.Name) + ":" + Canonical(p.Value))) + "}",
+            JsonValueKind.Array => "[" + string.Join(',', element.EnumerateArray().Select(Canonical)) + "]",
+            _ => element.GetRawText()
+        };
 
     /// <summary>Preserves null, empty, and multiline error blocks while avoiding duplicate blocks when observations are replayed.</summary>
     private static string Join(string left, string right)
@@ -441,13 +570,16 @@ internal sealed class SPFileWriter
         {
             return right;
         }
+
         if (right == null || string.Equals(left, right, StringComparison.Ordinal) ||
             left.StartsWith(right + "\n", StringComparison.Ordinal) ||
-            left.EndsWith("\n" + right, StringComparison.Ordinal) ||
-            left.Contains("\n" + right + "\n", StringComparison.Ordinal))
+            left.EndsWith("\n" + right, StringComparison.Ordinal) || left.Contains(
+                "\n" + right + "\n",
+                StringComparison.Ordinal))
         {
             return left;
         }
+
         return left + "\n" + right;
     }
 
@@ -464,6 +596,7 @@ internal sealed class SPFileWriter
         {
             return right;
         }
+
         return right == default || left < right ? left : right;
     }
 }

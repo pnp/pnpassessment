@@ -19,32 +19,48 @@ internal sealed class AssessmentDiscoveryWriter
     /// <summary>
     /// Binds the discovery writer to a collection source sink so provider evidence can be captured without legacy table writes.
     /// </summary>
-    internal AssessmentDiscoveryWriter(Func<IEnumerable<ClassicPageDiscovery>, CancellationToken, Task> sourceSink,
+    internal AssessmentDiscoveryWriter(
+        Func<IEnumerable<ClassicPageDiscovery>, CancellationToken, Task> sourceSink,
         Func<IEnumerable<SPFile>, CancellationToken, Task> fileSink = null)
     {
         this.sourceSink = sourceSink;
         this.fileSink = fileSink;
     }
 
-    internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId)) { }
+    internal AssessmentDiscoveryWriter(Guid scanId) : this(() => new ScanContext(scanId))
+    {
+    }
+
     internal AssessmentDiscoveryWriter(Func<ScanContext> createContext) => this.createContext = createContext;
 
     /// <summary>Commits bounded physical facts before ASPX admission, so file-type and later assessment decisions cannot discard raw files.</summary>
-    internal async Task WritePhysicalFilesAsync(Guid scanId, IEnumerable<RawDiscoveryRecord> records,
+    internal async Task WritePhysicalFilesAsync(
+        Guid scanId,
+        IEnumerable<RawDiscoveryRecord> records,
         CancellationToken cancellationToken)
     {
         foreach (SPFile[] batch in records.Select(record => SPFileFactProjection.FromPhysicalRecord(scanId, record))
-            .Where(file => file != null).Chunk(128))
+                     .Where(file => file != null)
+                     .Chunk(128))
         {
-            if (fileSink != null) await fileSink(batch, cancellationToken).ConfigureAwait(false);
-            else await new SPFileWriter(createContext).WriteAsync(batch, cancellationToken).ConfigureAwait(false);
+            if (fileSink != null)
+                await fileSink(batch, cancellationToken).ConfigureAwait(false);
+            else
+                await new SPFileWriter(createContext).WriteAsync(batch, cancellationToken).ConfigureAwait(false);
         }
     }
 
     /// <summary>Persists raw observations without erasing retained failures or rekeying preview evidence during resume.</summary>
-    internal async Task WriteAsync(IEnumerable<ClassicPageDiscovery> rows, CancellationToken cancellationToken = default)
+    internal async Task WriteAsync(
+        IEnumerable<ClassicPageDiscovery> rows,
+        CancellationToken cancellationToken = default)
     {
-        if (sourceSink != null) { await sourceSink(rows, cancellationToken); return; }
+        if (sourceSink != null)
+        {
+            await sourceSink(rows, cancellationToken);
+            return;
+        }
+
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -52,21 +68,31 @@ internal sealed class AssessmentDiscoveryWriter
             foreach (ClassicPageDiscovery row in rows)
             {
                 ClassicPageDiscovery previous = await db.ClassicPageDiscoveries.FindAsync(
-                    new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
-                if (previous == null) db.ClassicPageDiscoveries.Add(row);
+                        new object[] { row.ScanId, row.RecordKey },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (previous == null)
+                    db.ClassicPageDiscoveries.Add(row);
                 else
                 {
                     Reconcile(previous, row);
                     db.Entry(previous).CurrentValues.SetValues(row);
                 }
             }
+
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        finally { WriteGate.Release(); }
+        finally
+        {
+            WriteGate.Release();
+        }
     }
 
     /// <summary>Streams ordered scan/web page observations in bounded keyset batches, disposing each database reader before yielding rows to acquisition.</summary>
-    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadPageStreamAsync(Guid scanId, string siteUrl, string webUrl,
+    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadPageStreamAsync(
+        Guid scanId,
+        string siteUrl,
+        string webUrl,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         string after = null;
@@ -75,15 +101,21 @@ internal sealed class AssessmentDiscoveryWriter
             List<ClassicPageDiscovery> batch;
             using (var db = createContext())
             {
-                batch = await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
-                    row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page" &&
-                    (after == null || string.Compare(row.RecordKey, after) > 0))
-                    .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
+                batch = await db.ClassicPageDiscoveries.AsNoTracking()
+                    .Where(row =>
+                        row.ScanId == scanId && row.SiteUrl == siteUrl && row.WebUrl == webUrl &&
+                        row.RowType == "Page" && (after == null || string.Compare(row.RecordKey, after) > 0))
+                    .OrderBy(row => row.RecordKey)
+                    .Take(128)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
             }
+
             if (batch.Count == 0)
             {
                 yield break;
             }
+
             after = batch[^1].RecordKey;
             // No live SQLite reader is held while a source read or a projection write awaits.
             foreach (var row in batch)
@@ -94,7 +126,8 @@ internal sealed class AssessmentDiscoveryWriter
     }
 
     /// <summary>Streams persisted Web discovery roots across the whole scan without holding a SQLite reader during acquisition.</summary>
-    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadDiscoveredWebScopesAsync(Guid scanId,
+    internal async IAsyncEnumerable<ClassicPageDiscovery> ReadDiscoveredWebScopesAsync(
+        Guid scanId,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         string after = null;
@@ -103,28 +136,40 @@ internal sealed class AssessmentDiscoveryWriter
             List<ClassicPageDiscovery> batch;
             using (var db = createContext())
             {
-                batch = await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
-                    row.RowType == "Scope" && row.ScopeType == "Web" && row.ParentScopeKey == null &&
-                    row.SiteCollectionId != null && row.WebId != null && row.RecordKey.StartsWith("scope:") &&
-                    (after == null || string.Compare(row.RecordKey, after) > 0))
-                    .OrderBy(row => row.RecordKey).Take(128).ToListAsync(cancellationToken).ConfigureAwait(false);
+                batch = await db.ClassicPageDiscoveries.AsNoTracking()
+                    .Where(row => row.ScanId == scanId && row.RowType == "Scope" && row.ScopeType == "Web" &&
+                                  row.ParentScopeKey == null && row.SiteCollectionId != null && row.WebId != null &&
+                                  row.RecordKey.StartsWith("scope:") &&
+                                  (after == null || string.Compare(row.RecordKey, after) > 0))
+                    .OrderBy(row => row.RecordKey)
+                    .Take(128)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
             }
+
             if (batch.Count == 0) yield break;
             after = batch[^1].RecordKey;
             foreach (var row in batch) yield return row;
         }
     }
 
-    internal async Task<List<ClassicPageDiscovery>> ReadPagesAsync(Guid scanId, string siteUrl, string webUrl,
+    internal async Task<List<ClassicPageDiscovery>> ReadPagesAsync(
+        Guid scanId,
+        string siteUrl,
+        string webUrl,
         CancellationToken cancellationToken = default)
     {
         using var db = createContext();
-        return await db.ClassicPageDiscoveries.AsNoTracking().Where(row => row.ScanId == scanId &&
-            row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page")
-            .OrderBy(row => row.RecordKey).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return await db.ClassicPageDiscoveries.AsNoTracking()
+            .Where(row =>
+                row.ScanId == scanId && row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page")
+            .OrderBy(row => row.RecordKey)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    internal async Task UpdateExistingAsync(IEnumerable<ClassicPageDiscovery> rows,
+    internal async Task UpdateExistingAsync(
+        IEnumerable<ClassicPageDiscovery> rows,
         CancellationToken cancellationToken = default)
     {
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -134,11 +179,18 @@ internal sealed class AssessmentDiscoveryWriter
             db.ClassicPageDiscoveries.UpdateRange(rows);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        finally { WriteGate.Release(); }
+        finally
+        {
+            WriteGate.Release();
+        }
     }
 
-    internal async Task<int> FailUnassessedPagesAsync(Guid scanId, string siteUrl, string webUrl,
-        Exception error, string stage)
+    internal async Task<int> FailUnassessedPagesAsync(
+        Guid scanId,
+        string siteUrl,
+        string webUrl,
+        Exception error,
+        string stage)
     {
         // This is failure finalization, not discovery: retain file identities and existence,
         // and never overwrite pages that already reached an assessment disposition.
@@ -147,25 +199,36 @@ internal sealed class AssessmentDiscoveryWriter
         {
             using var db = createContext();
             var unfinished = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
-                row.SiteUrl == siteUrl && row.WebUrl == webUrl && row.RowType == "Page" &&
-                (row.AssessmentStatus == null || row.AssessmentStatus == "")).ToListAsync().ConfigureAwait(false);
+                                                                          row.SiteUrl == siteUrl &&
+                                                                          row.WebUrl == webUrl &&
+                                                                          row.RowType == "Page" &&
+                                                                          (row.AssessmentStatus == null ||
+                                                                           row.AssessmentStatus == ""))
+                .ToListAsync()
+                .ConfigureAwait(false);
             foreach (var row in unfinished)
             {
                 row.AssessmentStatus = "Failed";
-                AssessmentWebDiscovery.AddError(row, stage, AssessmentWebDiscovery.ErrorCode(error),
+                AssessmentWebDiscovery.AddError(
+                    row,
+                    stage,
+                    AssessmentWebDiscovery.ErrorCode(error),
                     "Page assessment did not finish because its Web failed: " + error.GetBaseException().Message);
             }
+
             await db.SaveChangesAsync().ConfigureAwait(false);
             return unfinished.Count;
         }
-        finally { WriteGate.Release(); }
+        finally
+        {
+            WriteGate.Release();
+        }
     }
 
     /// <summary>
     /// Computes and persists assessment coverage from retained discovery evidence.
     /// </summary>
-    internal async Task<DiscoveryVerdict> FinalizeScanAsync(Guid scanId,
-        CancellationToken cancellationToken = default)
+    internal async Task<DiscoveryVerdict> FinalizeScanAsync(Guid scanId, CancellationToken cancellationToken = default)
     {
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -173,42 +236,56 @@ internal sealed class AssessmentDiscoveryWriter
             using ScanContext db = createContext();
             List<ClassicPageDiscovery> allRows = await db.ClassicPageDiscoveries.AsNoTracking()
                 .Where(row => row.ScanId == scanId)
-                .ToListAsync(cancellationToken).ConfigureAwait(false);
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
             ClassicPageDiscovery current = BuildCoverage(scanId, allRows, DateTime.UtcNow);
             DiscoveryVerdict verdict = Enum.Parse<DiscoveryVerdict>(current.DiscoveryStatus);
             ClassicPageDiscovery summary = await db.ClassicPageDiscoveries.FindAsync(
-                new object[] { scanId, "summary:coverage" }, cancellationToken).ConfigureAwait(false);
-            if (summary == null) db.ClassicPageDiscoveries.Add(current);
-            else db.Entry(summary).CurrentValues.SetValues(current);
+                    new object[] { scanId, "summary:coverage" },
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (summary == null)
+                db.ClassicPageDiscoveries.Add(current);
+            else
+                db.Entry(summary).CurrentValues.SetValues(current);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return verdict;
         }
-        finally { WriteGate.Release(); }
+        finally
+        {
+            WriteGate.Release();
+        }
     }
 
     /// <summary>
     /// Builds a deterministic coverage verdict from scope, pagination, reference, and gap evidence.
     /// </summary>
-    internal static ClassicPageDiscovery BuildCoverage(Guid scanId,
-        IReadOnlyList<ClassicPageDiscovery> allRows, DateTime observedAtUtc)
+    internal static ClassicPageDiscovery BuildCoverage(
+        Guid scanId,
+        IReadOnlyList<ClassicPageDiscovery> allRows,
+        DateTime observedAtUtc)
     {
         ClassicPageDiscovery[] coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
         ClassicPageDiscovery[] scopes = coverageRows.Where(row => row.RowType == "Scope").ToArray();
         ClassicPageDiscovery selection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:site-selection");
         ClassicPageDiscovery pageSelection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:page-selection");
         string[] statuses = coverageRows.Select(row => row.DiscoveryStatus)
-            .Concat(allRows.Where(row => row.RowType == "Reference" ||
-                (row.RowType == "Pagination" && row.DiscoveryStatus is ("Denied" or "Failed" or "Unknown")))
-                .Select(row => row.DiscoveryStatus)).ToArray();
-        string[] gapCodes = allRows.Where(row => row.RowType != "Assessment").SelectMany(row => (row.ErrorCodes ?? string.Empty)
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Concat(
+                allRows.Where(row => row.RowType == "Reference" || (row.RowType == "Pagination" &&
+                                                                    row.DiscoveryStatus is ("Denied" or "Failed"
+                                                                        or "Unknown")))
+                    .Select(row => row.DiscoveryStatus))
+            .ToArray();
+        string[] gapCodes = allRows.Where(row => row.RowType != "Assessment")
+            .SelectMany(row => (row.ErrorCodes ?? string.Empty).Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(code => code.Contains(':') ? code[(code.LastIndexOf(':') + 1)..] : code)
             .ToArray();
 
         DiscoveryVerdict verdict;
         if (scopes.Length == 0 || selection?.ScopeType is not ("Tenant" or "SiteSelection") ||
-            statuses.Any(status => status is "Pending" or "Unknown") ||
-            gapCodes.Any(DiscoveryGapCodes.ForcesUnknown))
+            statuses.Any(status => status is "Pending" or "Unknown") || gapCodes.Any(DiscoveryGapCodes.ForcesUnknown))
         {
             verdict = DiscoveryVerdict.Unknown;
         }
@@ -227,7 +304,8 @@ internal sealed class AssessmentDiscoveryWriter
         }
 
         int pageCount = allRows.Count(row => row.RowType == "Page");
-        int gapCount = coverageRows.Count(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
+        int gapCount =
+            coverageRows.Count(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
         ClassicPageDiscovery current = new ClassicPageDiscovery
         {
             ScanId = scanId,
@@ -239,18 +317,22 @@ internal sealed class AssessmentDiscoveryWriter
             DiscoveryStatus = verdict.ToString(),
             ExpectedChildCount = selection?.ExpectedChildCount,
             ObservedChildCount = pageCount,
-            ErrorCodes = string.Join(';', gapCodes.Distinct(StringComparer.Ordinal)
-                .OrderBy(value => value, StringComparer.Ordinal)),
-            EvidenceJson = JsonSerializer.Serialize(new
-            {
-                verdict = verdict.ToString(),
-                declaredScope = selection?.ScopeType == "SiteSelection" || pageSelection != null,
-                pageScope = pageSelection?.ObservationMethod ?? AspxDiscoveryIntent.FullInventory.ToString(),
-                siteCount = selection?.ObservedChildCount,
-                pageCount,
-                scopeCount = scopes.Length,
-                incompleteScopeCount = gapCount,
-            }),
+            ErrorCodes =
+                string.Join(
+                    ';',
+                    gapCodes.Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)),
+            EvidenceJson = JsonSerializer.Serialize(
+                new
+                {
+                    verdict = verdict.ToString(),
+                    declaredScope = selection?.ScopeType == "SiteSelection" || pageSelection != null,
+                    pageScope =
+                        pageSelection?.ObservationMethod ?? AspxDiscoveryIntent.FullInventory.ToString(),
+                    siteCount = selection?.ObservedChildCount,
+                    pageCount,
+                    scopeCount = scopes.Length,
+                    incompleteScopeCount = gapCount,
+                }),
             ObservedAtUtc = observedAtUtc,
         };
         return current;
@@ -268,13 +350,21 @@ internal sealed class AssessmentDiscoveryWriter
             List<string> changed = new List<string>();
             if (!string.Equals(previous.Url, row.Url, StringComparison.OrdinalIgnoreCase)) changed.Add("Url");
             if (previous.ListId.HasValue && row.ListId.HasValue && previous.ListId != row.ListId) changed.Add("ListId");
-            if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");
-            if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage) changed.Add("HomePage");
-            if (previous.ContentTypeId != null && row.ContentTypeId != null && previous.ContentTypeId != row.ContentTypeId) changed.Add("ContentTypeId");
+            if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId)
+                changed.Add("ListItemId");
+            if (previous.HomePage.HasValue && row.HomePage.HasValue && previous.HomePage != row.HomePage)
+                changed.Add("HomePage");
+            if (previous.ContentTypeId != null && row.ContentTypeId != null &&
+                previous.ContentTypeId != row.ContentTypeId)
+                changed.Add("ContentTypeId");
             if (previous.CustomizedPageStatus != null && row.CustomizedPageStatus != null &&
-                previous.CustomizedPageStatus != row.CustomizedPageStatus) changed.Add("CustomizedPageStatus");
+                previous.CustomizedPageStatus != row.CustomizedPageStatus)
+                changed.Add("CustomizedPageStatus");
             if (changed.Count != 0)
-                AssessmentWebDiscovery.AddError(row, "DiscoveryMetadata", DiscoveryGapCodes.ChangedDuringScan,
+                AssessmentWebDiscovery.AddError(
+                    row,
+                    "DiscoveryMetadata",
+                    DiscoveryGapCodes.ChangedDuringScan,
                     "Repeated file identity changed: " + string.Join(", ", changed));
             row.ListId ??= previous.ListId;
             row.FolderUniqueId ??= previous.FolderUniqueId;
@@ -293,28 +383,34 @@ internal sealed class AssessmentDiscoveryWriter
                 previous.FileUniqueId != row.FileUniqueId)
             {
                 row.DiscoveryStatus = "Unknown";
-                AssessmentWebDiscovery.AddError(row, "ReferenceReconciliation",
+                AssessmentWebDiscovery.AddError(
+                    row,
+                    "ReferenceReconciliation",
                     DiscoveryGapCodes.MetadataConflict,
                     "Repeated reference identity resolved to a different physical file.");
                 row.FileUniqueId = previous.FileUniqueId;
             }
+
             row.FileUniqueId ??= previous.FileUniqueId;
         }
-        else if (row.RowType == "Pagination" && previous.EvidenceJson != null &&
-                 row.EvidenceJson != null && previous.EvidenceJson != row.EvidenceJson)
+        else if (row.RowType == "Pagination" && previous.EvidenceJson != null && row.EvidenceJson != null &&
+                 previous.EvidenceJson != row.EvidenceJson)
         {
             row.DiscoveryStatus = "Unknown";
-            AssessmentWebDiscovery.AddError(row, "PaginationReconciliation",
+            AssessmentWebDiscovery.AddError(
+                row,
+                "PaginationReconciliation",
                 DiscoveryGapCodes.ChangedDuringScan,
                 "Repeated pagination evidence changed for the same request identity.");
         }
-        else if (row.RowType == "Scope" && row.ScopeType == "Surface" &&
-                 !TerminalSuccess(previous.DiscoveryStatus) && TerminalSuccess(row.DiscoveryStatus))
+        else if (row.RowType == "Scope" && row.ScopeType == "Surface" && !TerminalSuccess(previous.DiscoveryStatus) &&
+                 TerminalSuccess(row.DiscoveryStatus))
         {
             // A later successful visit cannot erase a retained denied/failed/unknown surface.
             row.DiscoveryStatus = previous.DiscoveryStatus;
             row.EvidenceJson = previous.EvidenceJson;
         }
+
         row.ErrorStage = Join(previous.ErrorStage, row.ErrorStage);
         row.ErrorCodes = Join(previous.ErrorCodes, row.ErrorCodes);
         row.ErrorDetail = Join(previous.ErrorDetail, row.ErrorDetail, "\n");
@@ -326,8 +422,11 @@ internal sealed class AssessmentDiscoveryWriter
         var values = new[] { left, right }.Where(value => !string.IsNullOrWhiteSpace(value));
         // Preserve complete human-readable messages, including embedded newlines and commas.
         if (separator == "\n") return string.Join(separator, values.Distinct(StringComparer.Ordinal));
-        return string.Join(separator, values.SelectMany(value => value.Split(separator, StringSplitOptions.RemoveEmptyEntries))
-            .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal));
+        return string.Join(
+            separator,
+            values.SelectMany(value => value.Split(separator, StringSplitOptions.RemoveEmptyEntries))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal));
     }
 
     private static bool TerminalSuccess(string status) =>
@@ -336,10 +435,12 @@ internal sealed class AssessmentDiscoveryWriter
     internal async Task<string> ReadWebCoverageAsync(Guid scanId, string siteUrl, string webUrl)
     {
         using var db = createContext();
-        var incomplete = await db.ClassicPageDiscoveries.AsNoTracking().AnyAsync(row => row.ScanId == scanId &&
-            row.SiteUrl == siteUrl && row.WebUrl == webUrl && (row.RowType == "Scope" || row.RowType == "Gap") &&
-            (row.ObservationMethod == null || row.ObservationMethod != "WebScan") &&
-            row.DiscoveryStatus != "Complete" && row.DiscoveryStatus != "Empty" && row.DiscoveryStatus != "PolicyExcluded");
+        var incomplete = await db.ClassicPageDiscoveries.AsNoTracking()
+            .AnyAsync(row => row.ScanId == scanId && row.SiteUrl == siteUrl && row.WebUrl == webUrl &&
+                             (row.RowType == "Scope" || row.RowType == "Gap") &&
+                             (row.ObservationMethod == null || row.ObservationMethod != "WebScan") &&
+                             row.DiscoveryStatus != "Complete" && row.DiscoveryStatus != "Empty" &&
+                             row.DiscoveryStatus != "PolicyExcluded");
         return incomplete ? "Partial" : "Complete";
     }
 }

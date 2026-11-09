@@ -46,37 +46,44 @@ namespace PnP.Scanning.Process
             // Launching PnP.Scanning.Process.exe as CLI
             if (isCliProcess)
             {
+                await AnsiConsole.Status()
+                    .Spinner(Spinner.Known.BouncingBar)
+                    .StartAsync(
+                        "Version check...",
+                        async ctx =>
+                        {
+                            Tuple<string, string> versions = await VersionManager.LatestVersionAsync();
 
-                await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
-                {
-                    Tuple<string, string> versions = await VersionManager.LatestVersionAsync();
-
-                    // There's a newer version to download                
-                    if (!string.IsNullOrEmpty(versions.Item2))
-                    {
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine($"Version [yellow]{versions.Item2}[/] is available, you are currently using version {versions.Item1}");
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine($"Download the latest version from [yellow]{VersionManager.newVersionDownloadUrl}[/]");
-                        AnsiConsole.WriteLine();
-                    }
-                    else
-                    {
-                        AnsiConsole.WriteLine();
-                        AnsiConsole.MarkupLine($"You are using the latest version {versions.Item1}");
-                        AnsiConsole.WriteLine();
-                    }
-                });
+                            // There's a newer version to download
+                            if (!string.IsNullOrEmpty(versions.Item2))
+                            {
+                                AnsiConsole.WriteLine();
+                                AnsiConsole.MarkupLine(
+                                    $"Version [yellow]{versions.Item2}[/] is available, you are currently using version {versions.Item1}");
+                                AnsiConsole.WriteLine();
+                                AnsiConsole.MarkupLine(
+                                    $"Download the latest version from [yellow]{VersionManager.newVersionDownloadUrl}[/]");
+                                AnsiConsole.WriteLine();
+                            }
+                            else
+                            {
+                                AnsiConsole.WriteLine();
+                                AnsiConsole.MarkupLine($"You are using the latest version {versions.Item1}");
+                                AnsiConsole.WriteLine();
+                            }
+                        });
 
                 // Configure needed services
                 IHost host = ConfigureCliHost(args);
 
                 // Get ProcessManager instance from the cli executable
                 ScannerManager processManager = host.Services.GetRequiredService<ScannerManager>();
-                IDataProtectionProvider dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
+                IDataProtectionProvider dataProtectionProvider =
+                    host.Services.GetRequiredService<IDataProtectionProvider>();
                 ConfigurationOptions configurationData = host.Services.GetRequiredService<ConfigurationOptions>();
 
-                Command root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
+                Command root =
+                    new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
                 CommandLineBuilder builder = new CommandLineBuilder(root);
                 Parser parser = builder.UseDefaults().Build();
 
@@ -112,17 +119,18 @@ namespace PnP.Scanning.Process
                 // Use fully qualified paths as otherwise on MacOS the files end up in the wrong location
                 string logFolder = Path.GetDirectoryName(Environment.ProcessPath);
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
-                Log.Logger = new LoggerConfiguration()
-                           .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-                           .Enrich.FromLogContext()
+                Log.Logger = new LoggerConfiguration().MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                    .Enrich.FromLogContext()
 #if DEBUG
                            .WriteTo.Console()
 #endif
-                           .WriteTo.File(Path.Combine(logFolder, $"log_{timestamp}.txt"))
-                           // Duplicate all log entries generated for an actual scan component
-                           // to a separate log file in the folder per scan
-                           .WriteTo.Map("ScanId", (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt")))
-                           .CreateLogger();
+                    .WriteTo.File(Path.Combine(logFolder, $"log_{timestamp}.txt"))
+                    // Duplicate all log entries generated for an actual scan component
+                    // to a separate log file in the folder per scan
+                    .WriteTo.Map(
+                        "ScanId",
+                        (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt")))
+                    .CreateLogger();
 
 
                 try
@@ -156,31 +164,32 @@ namespace PnP.Scanning.Process
                     Log.CloseAndFlush();
                 }
             }
+
             return 0;
         }
 
         private static IHost ConfigureCliHost(string[] args)
         {
             return Host.CreateDefaultBuilder(args)
-                       .ConfigureLogging((context, logging) =>
-                       {
-                           // Clear all previously registered providers, don't want logger output to mess with the CLI console output
-                           logging.ClearProviders();
-                       })
-                       .ConfigureServices((context, services) =>
-                       {
-                           // Inject configuration data
-                           var customSettings = new ConfigurationOptions();
-                           context.Configuration.Bind("CustomSettings", customSettings);
-                           services.AddSingleton(customSettings);
+                .ConfigureLogging((context, logging) =>
+                {
+                    // Clear all previously registered providers, don't want logger output to mess with the CLI console output
+                    logging.ClearProviders();
+                })
+                .ConfigureServices((context, services) =>
+                {
+                    // Inject configuration data
+                    var customSettings = new ConfigurationOptions();
+                    context.Configuration.Bind("CustomSettings", customSettings);
+                    services.AddSingleton(customSettings);
 
-                           services.AddDataProtection();
+                    services.AddDataProtection();
 
-                           services.AddSingleton<ScannerManager>();
-                           services.AddTransient<AuthenticationManager>();
-                       })
-                       .UseConsoleLifetime()
-                       .Build();
+                    services.AddSingleton<ScannerManager>();
+                    services.AddTransient<AuthenticationManager>();
+                })
+                .UseConsoleLifetime()
+                .Build();
         }
 
         /// <summary>
@@ -189,59 +198,58 @@ namespace PnP.Scanning.Process
         private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)
-                  .UseSerilog()
-                  .ConfigureWebHostDefaults(webBuilder =>
-                  {
-                      webBuilder.UseStartup<Startup<Scanner>>();
+                .UseSerilog()
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseStartup<Startup<Scanner>>();
 
-                      webBuilder.ConfigureKestrel(options =>
-                      {
-                          options.ListenLocalhost(orchestratorPort, listenOptions =>
-                          {
-                              listenOptions.Protocols = HttpProtocols.Http2;
-                          });
-                      });
+                    webBuilder.ConfigureKestrel(options =>
+                    {
+                        options.ListenLocalhost(
+                            orchestratorPort,
+                            listenOptions => { listenOptions.Protocols = HttpProtocols.Http2; });
+                    });
 
-                      webBuilder.ConfigureServices((context, services) =>
-                      {
-                          services.AddDataProtection();
+                    webBuilder.ConfigureServices((context, services) =>
+                    {
+                        services.AddDataProtection();
 
-                          // Add the PnP Core SDK library
-                          services.AddPnPCore(options =>
-                          {
-                              // Set Graph first to false to optimize performance
-                              options.PnPContext.GraphFirst = false;
-                              // Remove the HTTP timeout to ensure the request does not end before the throttling is over
-                              options.HttpRequests.Timeout = -1;
-                              // Disable PnP Core SDK telemetry
-                              options.DisableTelemetry = true;
-                          });
-                          services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
-                          services.AddPnPCoreAuthentication();
-                          services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
+                        // Add the PnP Core SDK library
+                        services.AddPnPCore(options =>
+                        {
+                            // Set Graph first to false to optimize performance
+                            options.PnPContext.GraphFirst = false;
+                            // Remove the HTTP timeout to ensure the request does not end before the throttling is over
+                            options.HttpRequests.Timeout = -1;
+                            // Disable PnP Core SDK telemetry
+                            options.DisableTelemetry = true;
+                        });
+                        services.Configure<PnPCoreOptions>(context.Configuration.GetSection("PnPCore"));
+                        services.AddPnPCoreAuthentication();
+                        services.Configure<PnPCoreAuthenticationOptions>(context.Configuration.GetSection("PnPCore"));
 
-                          services.AddSingleton<StorageManager>();
-                          services.AddSingleton(new PipelineStore(StorageManager.GetScannerFolder()));
-                          services.AddSingleton<IHostedService, LegacyAssessmentRecovery>();
-                          services.AddSingleton(PnP.Scanning.Core.Pipeline.Collection.Module.ClassicPageModule.Registry());
-                          services.AddSingleton<ICollectionEnvironment>(provider => new CollectionEnvironment(
-                              () => provider.GetRequiredService<IDataProtectionProvider>(),
-                              () => provider.GetRequiredService<PnP.Core.Services.IPnPContextFactory>(),
-                              () => provider.GetRequiredService<SiteEnumerationManager>()));
-                          services.AddSingleton<PipelineCoordinator>();
-                          services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<PipelineCoordinator>());
-                          services.AddSingleton<Scanner>();
-                          services.AddSingleton<RateLimiter>();
-                          services.AddSingleton<ScanManager>();
-                          services.AddSingleton<TelemetryManager>();
-                          services.AddTransient<SiteEnumerationManager>();
-                          services.AddTransient<ReportManager>();
-                      });
-
-                  })
-
-                  .UseConsoleLifetime()
-                  .Build();
+                        services.AddSingleton<StorageManager>();
+                        services.AddSingleton(new PipelineStore(StorageManager.GetScannerFolder()));
+                        services.AddSingleton<IHostedService, LegacyAssessmentRecovery>();
+                        services.AddSingleton(
+                            PnP.Scanning.Core.Pipeline.Collection.Module.ClassicPageModule.Registry());
+                        services.AddSingleton<ICollectionEnvironment>(provider => new CollectionEnvironment(
+                            () => provider.GetRequiredService<IDataProtectionProvider>(),
+                            () => provider.GetRequiredService<PnP.Core.Services.IPnPContextFactory>(),
+                            () => provider.GetRequiredService<SiteEnumerationManager>()));
+                        services.AddSingleton<PipelineCoordinator>();
+                        services.AddSingleton<IHostedService>(provider =>
+                            provider.GetRequiredService<PipelineCoordinator>());
+                        services.AddSingleton<Scanner>();
+                        services.AddSingleton<RateLimiter>();
+                        services.AddSingleton<ScanManager>();
+                        services.AddSingleton<TelemetryManager>();
+                        services.AddTransient<SiteEnumerationManager>();
+                        services.AddTransient<ReportManager>();
+                    });
+                })
+                .UseConsoleLifetime()
+                .Build();
         }
     }
 }

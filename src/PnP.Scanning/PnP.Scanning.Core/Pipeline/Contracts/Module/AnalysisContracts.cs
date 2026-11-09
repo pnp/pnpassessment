@@ -3,15 +3,29 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts.Module;
 
-internal enum AnalysisOutcome { Analyzed, Unknown, Failed, NotApplicable }
+internal enum AnalysisOutcome
+{
+    Analyzed,
+    Unknown,
+    Failed,
+    NotApplicable
+}
 
-internal sealed record AnalysisResult(Guid ObservationId, AnalysisOutcome Outcome, string Reason, VersionedJson Payload);
+internal sealed record AnalysisResult(
+    Guid ObservationId,
+    AnalysisOutcome Outcome,
+    string Reason,
+    VersionedJson Payload);
 
 internal interface IAnalysisModule
 {
     string ModuleKey { get; }
     string RuleVersion { get; }
-    Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken cancellationToken);
+
+    Task<AnalysisResult> AnalyzeAsync(
+        SourceRecord source,
+        VersionedJson parameters,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -33,8 +47,12 @@ internal interface IAnalysisFinalizer
     /// <summary>
     /// Publishes fixed projections using only sealed source and committed result capabilities.
     /// </summary>
-    Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results,
-        IAnalysisReportWriter reports, VersionedJson parameters, CancellationToken cancellationToken);
+    Task FinalizeAsync(
+        ISnapshotReader snapshot,
+        IAnalysisResultReader results,
+        IAnalysisReportWriter reports,
+        VersionedJson parameters,
+        CancellationToken cancellationToken);
 }
 
 internal interface IAnalysisResultWriter

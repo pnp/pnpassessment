@@ -1,7 +1,7 @@
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page
 {
-
     /// <summary>
     /// Carries detached page identity, readiness, classification, and acquisition provenance.
     /// </summary>

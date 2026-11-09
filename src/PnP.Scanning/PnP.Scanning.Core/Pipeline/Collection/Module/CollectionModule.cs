@@ -15,6 +15,7 @@ internal interface ICollectionModule
 {
     string ModuleKey { get; }
     string InputVersion { get; }
+
     /// <summary>
     /// Produces versioned source observations and checkpoints while honoring cancellation.
     /// </summary>
@@ -25,8 +26,12 @@ internal interface ICollectionModule
 /// Binds fixed collection options, checkpoint, online capabilities, and assessment identity.
 /// </summary>
 internal sealed record CollectionContext(
-    StartRequest Options, VersionedJson Parameters, VersionedJson? Checkpoint,
-    ICollectionEnvironment Environment, Guid AssessmentId = default, ICollectionJournal? Journal = null);
+    StartRequest Options,
+    VersionedJson Parameters,
+    VersionedJson? Checkpoint,
+    ICollectionEnvironment Environment,
+    Guid AssessmentId = default,
+    ICollectionJournal? Journal = null);
 
 /// <summary>
 /// Provides bound receipt commits and replay reads for one collection snapshot.
@@ -37,10 +42,14 @@ internal interface ICollectionJournal
     /// Atomically commits an observation and its collector checkpoint.
     /// </summary>
     Task CommitAsync(CollectionRecord record, CancellationToken cancellationToken);
+
     /// <summary>
     /// Returns committed receipts, optionally omitting BLOBs for bounded replay indexing.
     /// </summary>
-    Task<IReadOnlyList<CollectedObservation>> ReadCommittedAsync(CancellationToken cancellationToken, bool metadataOnly = false);
+    Task<IReadOnlyList<CollectedObservation>> ReadCommittedAsync(
+        CancellationToken cancellationToken,
+        bool metadataOnly = false);
+
     /// <summary>
     /// Returns one validated detached receipt from the bound collection snapshot.
     /// </summary>
@@ -67,10 +76,12 @@ internal interface ICollectionEnvironment
     /// Clones collection options and protects secrets before persistence.
     /// </summary>
     StartRequest Protect(StartRequest options);
+
     /// <summary>
     /// Restores protected collection options only when online collection resumes.
     /// </summary>
     StartRequest Restore(StartRequest options);
+
     /// <summary>
     /// Initializes authentication and resolves online services only for collection execution.
     /// </summary>

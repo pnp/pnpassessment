@@ -1,5 +1,6 @@
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Discovery;
+
 #nullable enable
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
@@ -8,8 +9,12 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 /// Describes page taxonomy, retirement impact, and the evidence supporting that verdict.
 /// </summary>
 internal sealed record AspxPageClassification(
-    string PageType, string ProductFamily, string Experience,
-    string ImpactStatus, string? ImpactedBy, string Reason);
+    string PageType,
+    string ProductFamily,
+    string Experience,
+    string ImpactStatus,
+    string? ImpactedBy,
+    string Reason);
 
 /// <summary>
 /// Classifies exact handlers using independent list-role and catalog evidence.
@@ -20,10 +25,12 @@ internal static class AspxPageClassifier
     internal const string MessageCenterUrl = "https://msmessagecenter.com/MC1464926/";
     private const string WebPartPageHandler = "Microsoft.SharePoint.WebPartPages.WebPartPage";
     private const string DeprecatedMobileHandler = "Microsoft.SharePoint.MobileControls.SPMobilePage";
+
     private static readonly string[] CatalogRoots =
     [
         "masterpage", "users", "wp", "lt", "wt", "theme", "design", "solutions", "appdata", "appfiles",
     ];
+
     private static readonly HashSet<string> ModernHandlers = new(StringComparer.Ordinal)
     {
         "Microsoft.SharePoint.WebControls.ClientSidePage",
@@ -37,7 +44,11 @@ internal static class AspxPageClassifier
     /// Derives page taxonomy and impact only from exact handlers and observed role evidence.
     /// </summary>
     internal static AspxPageClassification Classify(
-        string? handler, int? listTemplate, bool? listView, bool? listForm, bool? catalog,
+        string? handler,
+        int? listTemplate,
+        bool? listView,
+        bool? listForm,
+        bool? catalog,
         string? webRelativePath = null)
     {
         string? type = handler switch
@@ -56,22 +67,29 @@ internal static class AspxPageClassifier
         if (catalog == true)
         {
             bool modern = handler != null && ModernHandlers.Contains(handler);
-            bool exactClassic = type is ClassicPageRules.WikiPage or ClassicPageRules.WebPartPage or
-                ClassicPageRules.PublishingPage or ClassicPageRules.ASPXPage or ClassicPageRules.BlogPage;
-            return new(type, CatalogFamily(webRelativePath), modern ? "Modern" : "Classic", "Excluded", null,
-                modern ? "CatalogAsset;ExactModernHandler" : exactClassic ? "CatalogAsset;ExactClassicHandler" :
-                "CatalogAsset;ClassicDefaultAssumed");
+            bool exactClassic = type is ClassicPageRules.WikiPage or ClassicPageRules.WebPartPage
+                or ClassicPageRules.PublishingPage or ClassicPageRules.ASPXPage or ClassicPageRules.BlogPage;
+            return new(
+                type,
+                CatalogFamily(webRelativePath),
+                modern ? "Modern" : "Classic",
+                "Excluded",
+                null,
+                modern
+                    ? "CatalogAsset;ExactModernHandler"
+                    : exactClassic
+                        ? "CatalogAsset;ExactClassicHandler"
+                        : "CatalogAsset;ClassicDefaultAssumed");
         }
-        if (handler == null)
-            return new(type, "Unknown", "Unknown", "Unknown", null, "HandlerUnavailable");
+
+        if (handler == null) return new(type, "Unknown", "Unknown", "Unknown", null, "HandlerUnavailable");
         if (listView == null || listForm == null || catalog == null)
             return new(type, "Unknown", "Unknown", "Unknown", null, "RoleEvidenceIncomplete");
         if (handler == DeprecatedMobileHandler)
             return new(type, "deprecated", "Inapplicable", "Excluded", null, "DeprecatedHandler");
         if (ModernHandlers.Contains(handler))
             return new(type, "User", "Modern", "Excluded", null, "ExactModernHandler");
-        if (type is "Unknown" or "Other")
-            return new(type, "Unknown", "Unknown", "Unknown", null, "UnmappedHandler");
+        if (type is "Unknown" or "Other") return new(type, "Unknown", "Unknown", "Unknown", null, "UnmappedHandler");
         return new(type, "User", "Classic", "Included", MessageCenterUrl, "ClassicUserPage;MC1464926");
     }
 

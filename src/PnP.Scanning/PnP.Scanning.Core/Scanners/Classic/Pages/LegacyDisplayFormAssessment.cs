@@ -28,9 +28,16 @@ internal static class LegacyDisplayFormAssessment
     /// Content-type overrides take precedence over the list form, with the longest matching ID first.
     /// Failed lists retain already assessed items and report failure outside the acquisition handler.
     /// </summary>
-    internal static async Task<List<ClassicPage>> ReadAsync(Guid scanId, string siteUrl, string webUrl,
-        Uri contextUri, IReadOnlyList<IList> lists, bool homePageOnly, bool skipUserInformation,
-        CancellationToken cancellationToken, Func<ClassicPageDiscovery, Exception, Task> onListFailure)
+    internal static async Task<List<ClassicPage>> ReadAsync(
+        Guid scanId,
+        string siteUrl,
+        string webUrl,
+        Uri contextUri,
+        IReadOnlyList<IList> lists,
+        bool homePageOnly,
+        bool skipUserInformation,
+        CancellationToken cancellationToken,
+        Func<ClassicPageDiscovery, Exception, Task> onListFailure)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var pages = new List<ClassicPage>();
@@ -40,9 +47,7 @@ internal static class LegacyDisplayFormAssessment
         }
 
         string webRoot = contextUri.AbsolutePath;
-        string siteRoot = Uri.TryCreate(siteUrl, UriKind.Absolute, out var siteUri)
-            ? siteUri.AbsolutePath
-            : webRoot;
+        string siteRoot = Uri.TryCreate(siteUrl, UriKind.Absolute, out var siteUri) ? siteUri.AbsolutePath : webRoot;
 
         for (int index = 0; index < lists.Count; index++)
         {
@@ -62,8 +67,8 @@ internal static class LegacyDisplayFormAssessment
 
                 var contentTypeForms = list.ContentTypes.AsRequested()
                     .Where(contentType => !string.IsNullOrEmpty(contentType.StringId))
-                    .Select(contentType => (ContentTypeId: contentType.StringId, FormUrl: DisplayFormUrlPolicy.ToServerRelative(
-                        contentType.DisplayFormUrl, webRoot, siteRoot)))
+                    .Select(contentType => (ContentTypeId: contentType.StringId,
+                        FormUrl: DisplayFormUrlPolicy.ToServerRelative(contentType.DisplayFormUrl, webRoot, siteRoot)))
                     .Where(candidate => candidate.FormUrl != null)
                     .OrderByDescending(candidate => candidate.ContentTypeId.Length)
                     .ToList();
@@ -74,23 +79,31 @@ internal static class LegacyDisplayFormAssessment
                 }
 
                 stage = "LegacyDisplayFormItems";
-                await ReadItemsAsync(list, skipUserInformation, cancellationToken, items =>
-                {
-                    foreach (var item in items)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        string form = ResolveDisplayForm(contentTypeForms, listForm,
-                            GetFieldValue(item, ContentTypeIdField, string.Empty));
-                        if (!IsContentPageForm(form))
+                await ReadItemsAsync(
+                        list,
+                        skipUserInformation,
+                        cancellationToken,
+                        items =>
                         {
-                            continue;
-                        }
+                            foreach (var item in items)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                string form = ResolveDisplayForm(
+                                    contentTypeForms,
+                                    listForm,
+                                    GetFieldValue(item, ContentTypeIdField, string.Empty));
+                                if (!IsContentPageForm(form))
+                                {
+                                    continue;
+                                }
 
-                        pages.Add(AssessItem(scanId, siteUrl, webUrl, list, item, form, skipUserInformation));
-                    }
-                }).ConfigureAwait(false);
+                                pages.Add(AssessItem(scanId, siteUrl, webUrl, list, item, form, skipUserInformation));
+                            }
+                        })
+                    .ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException &&
+                                       !cancellationToken.IsCancellationRequested)
             {
                 failure = ex;
             }
@@ -102,8 +115,11 @@ internal static class LegacyDisplayFormAssessment
                     ScanId = scanId,
                     SiteUrl = siteUrl,
                     WebUrl = webUrl,
-                    RecordKey = "assessment:legacy-display-form:" + DiscoveryHash.Of(siteUrl, webUrl,
-                        listId?.ToString("D") ?? "index:" + index.ToString(CultureInfo.InvariantCulture)),
+                    RecordKey =
+                        "assessment:legacy-display-form:" + DiscoveryHash.Of(
+                            siteUrl,
+                            webUrl,
+                            listId?.ToString("D") ?? "index:" + index.ToString(CultureInfo.InvariantCulture)),
                     RowType = "Assessment",
                     ScopeType = "List",
                     ListId = listId,
@@ -112,13 +128,17 @@ internal static class LegacyDisplayFormAssessment
                     DiscoveryStatus = "NotApplicable",
                     AssessmentStatus = "Failed",
                     ObservedAtUtc = DateTime.UtcNow,
-                    EvidenceJson = JsonSerializer.Serialize(new
-                    {
-                        outcome = AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(failure)),
-                        retainedPageCount = pages.Count - previousPageCount,
-                    }),
+                    EvidenceJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            outcome = AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(failure)),
+                            retainedPageCount = pages.Count - previousPageCount,
+                        }),
                 };
-                AssessmentWebDiscovery.AddError(evidence, stage, AssessmentWebDiscovery.ErrorCode(failure),
+                AssessmentWebDiscovery.AddError(
+                    evidence,
+                    stage,
+                    AssessmentWebDiscovery.ErrorCode(failure),
                     AssessmentWebDiscovery.ErrorDetail(failure));
                 // Persistence failures must propagate, not be classified as another unreadable list.
                 await onListFailure(evidence, failure).ConfigureAwait(false);
@@ -142,13 +162,17 @@ internal static class LegacyDisplayFormAssessment
         }
 
         string path = form.Split('?')[0];
-        return !path.Contains(LayoutsPath, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(Path.GetFileName(path), StockDisplayFormName, StringComparison.OrdinalIgnoreCase);
+        return !path.Contains(LayoutsPath, StringComparison.OrdinalIgnoreCase) && !string.Equals(
+            Path.GetFileName(path),
+            StockDisplayFormName,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Resolves the most-specific declared content-type form before the list-level fallback.</summary>
-    private static string ResolveDisplayForm(List<(string ContentTypeId, string FormUrl)> contentTypeForms,
-        string listForm, string itemContentTypeId)
+    private static string ResolveDisplayForm(
+        List<(string ContentTypeId, string FormUrl)> contentTypeForms,
+        string listForm,
+        string itemContentTypeId)
     {
         foreach (var candidate in contentTypeForms)
         {
@@ -165,8 +189,14 @@ internal static class LegacyDisplayFormAssessment
     /// Projects one item into the legacy report model without requesting a File surface or assigning
     /// FileUniqueId. Its web parts belong to the shared form and are not per-item enrichment inputs.
     /// </summary>
-    private static ClassicPage AssessItem(Guid scanId, string siteUrl, string webUrl, IList list,
-        IListItem item, string form, bool skipUserInformation)
+    private static ClassicPage AssessItem(
+        Guid scanId,
+        string siteUrl,
+        string webUrl,
+        IList list,
+        IListItem item,
+        string form,
+        bool skipUserInformation)
     {
         string pageUrl = form + "?ID=" + item.Id.ToString(CultureInfo.InvariantCulture);
         bool blogPost = list.TemplateType == ListTemplateType.Posts;
@@ -196,27 +226,31 @@ internal static class LegacyDisplayFormAssessment
     /// Pages through the native list stream, clearing cached items before each request and honoring
     /// cancellation between pages. Only assessment fields are requested: no file identity or content.
     /// </summary>
-    private static async Task ReadItemsAsync(IList list, bool skipUserInformation,
-        CancellationToken cancellationToken, Action<IEnumerable<IListItem>> processItems)
+    private static async Task ReadItemsAsync(
+        IList list,
+        bool skipUserInformation,
+        CancellationToken cancellationToken,
+        Action<IEnumerable<IListItem>> processItems)
     {
         string paging = null;
         do
         {
             cancellationToken.ThrowIfCancellationRequested();
             list.Items.Clear();
-            var output = await list.LoadListDataAsStreamAsync(new RenderListDataOptions
-            {
-                ViewXml = ItemQuery(skipUserInformation),
-                RenderOptions = RenderListDataOptionsFlags.ListData,
-                Paging = paging,
-            }).ConfigureAwait(false);
+            var output = await list.LoadListDataAsStreamAsync(
+                    new RenderListDataOptions
+                    {
+                        ViewXml = ItemQuery(skipUserInformation),
+                        RenderOptions = RenderListDataOptionsFlags.ListData,
+                        Paging = paging,
+                    })
+                .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             processItems(list.Items.AsRequested());
             paging = output.TryGetValue(NextHrefProperty, out var nextHref)
                 ? nextHref?.ToString()?.TrimStart('?')
                 : null;
-        }
-        while (!string.IsNullOrEmpty(paging));
+        } while (!string.IsNullOrEmpty(paging));
     }
 
     /// <summary>

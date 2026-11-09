@@ -20,7 +20,9 @@ namespace PnP.Scanning.Process.Commands
     {
         private static class ClassicAcquisitionOptionText
         {
-            internal const string TemplateExclusionsHelp = "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.";
+            internal const string TemplateExclusionsHelp =
+                "Web-template patterns to exclude (comma-separated). Replaces defaults SPSPERS#*,APP#*; sole none clears them.";
+
             internal const string PagesComponentRequired = "ASPX scope options require the Pages component.";
         }
 
@@ -59,7 +61,10 @@ namespace PnP.Scanning.Process.Commands
 #endif
 
         /// <summary>Builds start options and their validators, including explicit Classic template-exclusion inputs without starting workers or authentication.</summary>
-        public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance,
+        public StartCommandHandler(
+            ScannerManager processManagerInstance,
+            IDataProtectionProvider dataProtectionProviderInstance,
+            ConfigurationOptions configurationOptionsInstance,
             Func<StartOptions, Task> authenticate = null)
         {
             this.authenticate = authenticate;
@@ -79,11 +84,7 @@ namespace PnP.Scanning.Process.Commands
                 // Workflow was retired (see AssessmentAvailability) and can no longer be the default;
                 // Classic is the current flagship assessment.
                 getDefaultValue: () => Mode.Classic,
-                description: "Assessment mode"
-                )
-            {
-                IsRequired = true,
-            };
+                description: "Assessment mode") { IsRequired = true, };
             cmd.AddOption(modeOption);
 
             tenantOption = new(
@@ -102,16 +103,14 @@ namespace PnP.Scanning.Process.Commands
                     System.CommandLine.Parsing.OptionResult siteFile = result.FindResultFor(sitesFileOption);
                     if (siteFile != null)
                     {
-                        result.ErrorMessage = $"the --{Constants.StartSitesList} option is mutually exclusive with the --{Constants.StartSitesFile} option";
+                        result.ErrorMessage =
+                            $"the --{Constants.StartSitesList} option is mutually exclusive with the --{Constants.StartSitesFile} option";
                         return null;
                     }
 
                     return result.Tokens.Select(t => t.Value).ToList();
                 },
-                description: "List with site collections to assess")
-            {
-                IsRequired = false
-            };
+                description: "List with site collections to assess") { IsRequired = false };
             cmd.AddOption(sitesListOption);
 
             sitesFileOption = new(
@@ -121,32 +120,28 @@ namespace PnP.Scanning.Process.Commands
                     System.CommandLine.Parsing.OptionResult siteList = result.FindResultFor(sitesListOption);
                     if (siteList != null)
                     {
-                        result.ErrorMessage = $"the --{Constants.StartSitesFile} option is mutually exclusive with the --{Constants.StartSitesList} option";
+                        result.ErrorMessage =
+                            $"the --{Constants.StartSitesFile} option is mutually exclusive with the --{Constants.StartSitesList} option";
                         return null;
                     }
 
                     return new FileInfo(result.Tokens[0].Value);
                 },
-                description: "File containing a list of site collections to assess")
-            {
-                IsRequired = false
-            };
+                description: "File containing a list of site collections to assess") { IsRequired = false };
 
             sitesFileOption.ExistingOnly();
 
             cmd.AddOption(sitesFileOption);
+
             #endregion
 
             #region Scan authentication
 
             // Authentication mode
             authenticationModeOption = new(
-                    name: $"--{Constants.StartAuthMode}",
-                    getDefaultValue: () => AuthenticationMode.Interactive,
-                    description: "Authentication mode used for the Microsoft 365 Assessment")
-            {
-                IsRequired = true
-            };
+                name: $"--{Constants.StartAuthMode}",
+                getDefaultValue: () => AuthenticationMode.Interactive,
+                description: "Authentication mode used for the Microsoft 365 Assessment") { IsRequired = true };
 
             cmd.AddOption(authenticationModeOption);
 
@@ -165,7 +160,8 @@ namespace PnP.Scanning.Process.Commands
             // Tenant id
             tenantIdOption = new(
                 name: $"--{Constants.StartTenantId}",
-                description: $"Azure tenant id to use for authenticating the Microsoft 365 Assessment. Will be automatically populated based upon the {Constants.StartTenant} value")
+                description:
+                $"Azure tenant id to use for authenticating the Microsoft 365 Assessment. Will be automatically populated based upon the {Constants.StartTenant} value")
             {
                 IsRequired = false
             };
@@ -177,23 +173,27 @@ namespace PnP.Scanning.Process.Commands
                 parseArgument: (result) =>
                 {
                     // https://github.com/dotnet/command-line-api/issues/1287
-                    System.CommandLine.Parsing.OptionResult authenticationMode = result.FindResultFor(authenticationModeOption);
-                    if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
+                    System.CommandLine.Parsing.OptionResult authenticationMode =
+                        result.FindResultFor(authenticationModeOption);
+                    if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() !=
+                        AuthenticationMode.Application)
                     {
-                        result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
+                        result.ErrorMessage =
+                            $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
                         return "";
                     }
 
                     return result.Tokens[0].Value;
                 },
-                description: "Path to stored certificate in the form of StoreName|StoreLocation|Thumbprint. E.g. My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1")
+                description:
+                "Path to stored certificate in the form of StoreName|StoreLocation|Thumbprint. E.g. My|LocalMachine|3FG496B468BE3828E2359A8A6F092FB701C8CDB1")
             {
                 IsRequired = false,
             };
 
             certPathOption.AddValidator(val =>
             {
-                // Custom validation of the provided option input 
+                // Custom validation of the provided option input
                 string input = val.GetValueOrDefault<string>();
                 if (input == null && input.Split("|", StringSplitOptions.RemoveEmptyEntries).Length != 3)
                 {
@@ -207,20 +207,19 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartCertFile}",
                 parseArgument: (result) =>
                 {
-                    System.CommandLine.Parsing.OptionResult authenticationMode = result.FindResultFor(authenticationModeOption);
-                    if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
+                    System.CommandLine.Parsing.OptionResult authenticationMode =
+                        result.FindResultFor(authenticationModeOption);
+                    if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() !=
+                        AuthenticationMode.Application)
                     {
-                        result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
+                        result.ErrorMessage =
+                            $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
                         return null;
                     }
 
                     return new FileInfo(result.Tokens[0].Value);
                 },
-                description: "Path to certificate PFX file"
-                )
-            {
-                IsRequired = false,
-            };
+                description: "Path to certificate PFX file") { IsRequired = false, };
 
             certPfxFileInfoOption.ExistingOnly();
             cmd.AddOption(certPfxFileInfoOption);
@@ -230,19 +229,19 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartCertPassword}",
                 parseArgument: (result) =>
                 {
-                    System.CommandLine.Parsing.OptionResult authenticationMode = result.FindResultFor(authenticationModeOption);
-                    if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
+                    System.CommandLine.Parsing.OptionResult authenticationMode =
+                        result.FindResultFor(authenticationModeOption);
+                    if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() !=
+                        AuthenticationMode.Application)
                     {
-                        result.ErrorMessage = $"--{Constants.StartCertPassword} can only be used with --{Constants.StartAuthMode} application";
+                        result.ErrorMessage =
+                            $"--{Constants.StartCertPassword} can only be used with --{Constants.StartAuthMode} application";
                         return "";
                     }
 
                     return result.Tokens[0].Value;
                 },
-                description: "Password for the certificate PFX file")
-            {
-                IsRequired = false
-            };
+                description: "Password for the certificate PFX file") { IsRequired = false };
             cmd.AddOption(certPfxFilePasswordOption);
 
             // Application id
@@ -250,21 +249,19 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartThreads}",
                 // Default application to use the logical processor threads, with a maximum of 10
                 getDefaultValue: () => Math.Min(Environment.ProcessorCount, 10),
-                description: "Number of parallel assessment threads to use")
-            {
-                IsRequired = true
-            };
+                description: "Number of parallel assessment threads to use") { IsRequired = true };
             cmd.AddOption(threadsOption);
-
 
             #endregion
 
             #region Scan component specific handlers
+
             // PER SCAN COMPONENT: implement scan component specific options
             syntexFullOption = new(
                 name: $"--{Constants.StartSyntexFull}",
                 getDefaultValue: () => false,
-                description: "Perform a full Syntex assessment, requires Sites.FullControl.All when using application permissions")
+                description:
+                "Perform a full Syntex assessment, requires Sites.FullControl.All when using application permissions")
             {
                 IsRequired = false
             };
@@ -273,19 +270,15 @@ namespace PnP.Scanning.Process.Commands
             workflowAnalyzeOption = new(
                 name: $"--{Constants.StartWorkflowAnalyze}",
                 getDefaultValue: () => true,
-                description: "Perform workflow analysis")
-            {
-                IsRequired = false
-            };
+                description: "Perform workflow analysis") { IsRequired = false };
             cmd.AddOption(workflowAnalyzeOption);
 
-            classicIncludeOption = new(name: $"--{Constants.StartClassicInclude}",
+            classicIncludeOption = new(
+                name: $"--{Constants.StartClassicInclude}",
                 //getDefaultValue: () => null,
                 description: "Included classic scan components")
             {
-                IsRequired = false,
-                AllowMultipleArgumentsPerToken = true,
-                Arity = ArgumentArity.ZeroOrMore
+                IsRequired = false, AllowMultipleArgumentsPerToken = true, Arity = ArgumentArity.ZeroOrMore
             };
             cmd.AddOption(classicIncludeOption);
 
@@ -320,7 +313,8 @@ namespace PnP.Scanning.Process.Commands
                 max: 180);
             cmd.AddOption(classicAuditLogWindowDaysOption);
 
-            excludeSiteTemplatesOption = new Option<string>($"--{Constants.StartExcludeSiteTemplates}",
+            excludeSiteTemplatesOption = new Option<string>(
+                $"--{Constants.StartExcludeSiteTemplates}",
                 ClassicAcquisitionOptionText.TemplateExclusionsHelp);
             excludeSiteTemplatesOption.AddValidator(result =>
             {
@@ -342,7 +336,8 @@ namespace PnP.Scanning.Process.Commands
                     System.CommandLine.Parsing.OptionResult mode = result.FindResultFor(modeOption);
                     if (mode != null && mode.GetValueOrDefault<Mode>() != Mode.Test)
                     {
-                        result.ErrorMessage = $"--{Constants.StartTestNumberOfSites} can only be used with --{Constants.StartMode} test";
+                        result.ErrorMessage =
+ $"--{Constants.StartTestNumberOfSites} can only be used with --{Constants.StartMode} test";
                         return 10;
                     }
 
@@ -365,7 +360,6 @@ namespace PnP.Scanning.Process.Commands
 #endif
 
             #endregion
-
         }
 
         /// <summary>
@@ -400,10 +394,7 @@ namespace PnP.Scanning.Process.Commands
 
                     return value;
                 },
-                description: description)
-            {
-                IsRequired = false
-            };
+                description: description) { IsRequired = false };
             option.SetDefaultValue(false);
             return option;
         }
@@ -436,10 +427,7 @@ namespace PnP.Scanning.Process.Commands
 
                     return value;
                 },
-                description: description)
-            {
-                IsRequired = false
-            };
+                description: description) { IsRequired = false };
             option.SetDefaultValue(defaultValue);
             return option;
         }
@@ -459,25 +447,27 @@ namespace PnP.Scanning.Process.Commands
             {
                 Option[] classicOnlyOptions = new Option[]
                 {
-                    classicExportWebPartPropertiesOption,
-                    classicSkipUsageInformationOption,
-                    classicSkipUserInformationOption,
-                    classicHomePageOnlyOption,
-                    classicAuditLogWindowDaysOption,
+                    classicExportWebPartPropertiesOption, classicSkipUsageInformationOption,
+                    classicSkipUserInformationOption, classicHomePageOnlyOption, classicAuditLogWindowDaysOption,
                     excludeSiteTemplatesOption,
                 };
                 System.CommandLine.Parsing.OptionResult modeResult = result.FindResultFor(modeOption);
-                if (modeResult?.Tokens.FirstOrDefault()?.Value is string modeText && !Enum.TryParse<Mode>(modeText, true, out _))
+                if (modeResult?.Tokens.FirstOrDefault()?.Value is string modeText &&
+                    !Enum.TryParse<Mode>(modeText, true, out _))
                     return;
                 Mode mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
                 if (mode == Mode.Classic)
                 {
-                    List<ClassicComponent> selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
-                    bool aspxScopeOptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false };
-                    if (aspxScopeOptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
+                    List<ClassicComponent> selected = result.FindResultFor(classicIncludeOption)
+                        ?.GetValueOrDefault<List<ClassicComponent>>();
+                    bool aspxScopeOptionSupplied =
+                        result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false };
+                    if (aspxScopeOptionSupplied && selected is { Count: > 0 } &&
+                        !selected.Contains(ClassicComponent.Pages))
                         result.ErrorMessage = ClassicAcquisitionOptionText.PagesComponentRequired;
                     return;
                 }
+
                 foreach (Option opt in classicOnlyOptions)
                 {
                     // Only complain about options the user actually supplied on the command line.
@@ -490,22 +480,33 @@ namespace PnP.Scanning.Process.Commands
             });
 
             // Binder approach as that one can handle an unlimited number of command line arguments
-            StartBinder startBinder = new StartBinder(modeOption, tenantOption, sitesListOption, sitesFileOption,
-                                              authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
-                                              // PER SCAN COMPONENT: implement scan component specific options
-                                              , syntexFullOption
-                                              , workflowAnalyzeOption
-                                              , classicIncludeOption
-                                              , classicExportWebPartPropertiesOption
-                                              , classicSkipUsageInformationOption
-                                              , classicSkipUserInformationOption
-                                              , classicHomePageOnlyOption
-                                              , classicAuditLogWindowDaysOption
-                                              , excludeSiteTemplatesOption
+            StartBinder startBinder = new StartBinder(
+                modeOption,
+                tenantOption,
+                sitesListOption,
+                sitesFileOption,
+                authenticationModeOption,
+                applicationIdOption,
+                tenantIdOption,
+                certPathOption,
+                certPfxFileInfoOption,
+                certPfxFilePasswordOption,
+                threadsOption
+                // PER SCAN COMPONENT: implement scan component specific options
+                ,
+                syntexFullOption,
+                workflowAnalyzeOption,
+                classicIncludeOption,
+                classicExportWebPartPropertiesOption,
+                classicSkipUsageInformationOption,
+                classicSkipUserInformationOption,
+                classicHomePageOnlyOption,
+                classicAuditLogWindowDaysOption,
+                excludeSiteTemplatesOption
 #if DEBUG
                                               , testNumberOfSitesOption
 #endif
-                                              );
+            );
             cmd.SetHandler(async context =>
             {
                 context.ExitCode = await HandleStartAsync(startBinder.Bind(context.BindingContext));
@@ -537,10 +538,12 @@ namespace PnP.Scanning.Process.Commands
             }
 
             // Additional argument validation
-            if (arguments.AuthMode == AuthenticationMode.Application && string.IsNullOrEmpty(arguments.CertPath) && arguments.CertFile == null)
+            if (arguments.AuthMode == AuthenticationMode.Application && string.IsNullOrEmpty(arguments.CertPath) &&
+                arguments.CertFile == null)
             {
                 // we need certfile or certpath
-                AnsiConsole.MarkupLine($"[red]When using --authMode Application you need to either use --CertPath or --CertFile to specify the certificate to use[/]");
+                AnsiConsole.MarkupLine(
+                    $"[red]When using --authMode Application you need to either use --CertPath or --CertFile to specify the certificate to use[/]");
                 AnsiConsole.MarkupLine("");
 
                 // Show cmd help
@@ -552,146 +555,176 @@ namespace PnP.Scanning.Process.Commands
             }
 
             int exitCode = 0;
-            await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting Microsoft 365 Assessment...", async ctx =>
-            {
-                // Setup client to talk to scanner
-                PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
-
-                // Handle authentication
-                Microsoft365Environment environment = Microsoft365Environment.Production;
-                try
-                {
-                    AnsiConsole.MarkupLine("");
-                    AnsiConsole.MarkupLine($"[gray]Initializing authentication[/]");
-
-                    if (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.Environment))
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.BouncingBar)
+                .StartAsync(
+                    "Starting Microsoft 365 Assessment...",
+                    async ctx =>
                     {
-                        if (Enum.TryParse(typeof(Microsoft365Environment), configurationOptions.Environment, out object parsedEnvironment))
+                        // Setup client to talk to scanner
+                        PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
+
+                        // Handle authentication
+                        Microsoft365Environment environment = Microsoft365Environment.Production;
+                        try
                         {
-                            environment = (Microsoft365Environment)parsedEnvironment;
+                            AnsiConsole.MarkupLine("");
+                            AnsiConsole.MarkupLine($"[gray]Initializing authentication[/]");
+
+                            if (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.Environment))
+                            {
+                                if (Enum.TryParse(
+                                        typeof(Microsoft365Environment),
+                                        configurationOptions.Environment,
+                                        out object parsedEnvironment))
+                                {
+                                    environment = (Microsoft365Environment)parsedEnvironment;
+                                }
+                            }
+
+                            // Initialize authentication, this will result in a local auth cache when succesfull
+                            if (authenticate != null)
+                                await authenticate(arguments);
+                            else
+                            {
+                                await new AuthenticationManager(dataProtectionProvider).VerifyAuthenticationAsync(
+                                    arguments.Tenant,
+                                    arguments.AuthMode.ToString(),
+                                    environment,
+                                    arguments.ApplicationId,
+                                    arguments.TenantId,
+                                    arguments.CertPath,
+                                    arguments.CertFile,
+                                    arguments.CertPassword,
+                                    (deviceCodeResult) =>
+                                    {
+                                        AnsiConsole.MarkupLine(deviceCodeResult.Message);
+
+                                        return Task.FromResult(0);
+                                    });
+                            }
                         }
-                    }
-
-                    // Initialize authentication, this will result in a local auth cache when succesfull
-                    if (authenticate != null) await authenticate(arguments);
-                    else
-                    {
-                        await new AuthenticationManager(dataProtectionProvider)
-                                    .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), environment,
-                                                               arguments.ApplicationId, arguments.TenantId,
-                                                               arguments.CertPath, arguments.CertFile, arguments.CertPassword,
-                                                               (deviceCodeResult) =>
-                                                               {
-                                                                   AnsiConsole.MarkupLine(deviceCodeResult.Message);
-
-                                                                   return Task.FromResult(0);
-                                                               });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    AnsiConsole.WriteException(ex);
-                    exitCode = 1;
-                    return;
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(500));
-
-                // Kick off a scan
-                StartRequest start = new StartRequest
-                {
-                    Mode = arguments.Mode.ToString(),
-                    Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
-                    Environment = environment.ToString(),
-                    SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
-                    SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName : "",
-                    AuthMode = arguments.AuthMode.ToString(),
-                    ApplicationId = arguments.ApplicationId.ToString(),
-                    TenantId = arguments.TenantId != null ? arguments.TenantId : "",
-                    CertPath = arguments.CertPath != null ? arguments.CertPath : "",
-                    CertFile = arguments.CertFile != null ? arguments.CertFile.FullName : "",
-                    CertPassword = arguments.CertPassword != null ? arguments.CertPassword : "",
-                    Threads = arguments.Threads,
-                    AdminCenterUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.AdminCenterUrl)) ? configurationOptions.AdminCenterUrl : "",
-                    MySiteHostUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.MySiteHostUrl)) ? configurationOptions.MySiteHostUrl : "",
-                };
-
-                // PER SCAN COMPONENT: implement scan component specific options
-                //if (arguments.Mode == Mode.Syntex)
-                //{
-                //    start.Properties.Add(new PropertyRequest
-                //    {
-                //        Property = syntexFullOption.Name.TrimStart('-'),
-                //        Type = "bool",
-                //        Value = arguments.SyntexDeepScan.ToString(),
-                //    });
-                //}
-
-                if (arguments.Mode == Mode.Workflow)
-                {
-                    start.Properties.Add(new PropertyRequest
-                    {
-                        Property = workflowAnalyzeOption.Name.TrimStart('-'),
-                        Type = "bool",
-                        Value = arguments.WorkflowAnalyze.ToString(),
-                    });
-                }
-
-                if (arguments.Mode == Mode.Classic)
-                {
-                    List<ClassicComponent> classicComponents;
-                    if (arguments.ClassicInclude.Count > 0)
-                    {
-                        // Only add the requested classic scan components
-                        classicComponents = new List<ClassicComponent>(arguments.ClassicInclude);
-                    }
-                    else
-                    {
-                        // Add all possible classic scan components, excluding any that have been retired
-                        // (e.g. Workflow) so a default Classic run no longer pays for them.
-                        classicComponents = Enum.GetValues(typeof(ClassicComponent)).Cast<ClassicComponent>()
-                            .Where(c => !AssessmentAvailability.IsRetired(c))
-                            .ToList();
-                    }
-
-                    // The Workflow 2013 component has been retired. Drop it from the effective set,
-                    // warning only when a user explicitly requested it via --classicinclude (the default
-                    // "all components" set above already excluded it). Engine code is retained so existing
-                    // Workflow scan databases can still be reported on.
-                    if (classicComponents.Remove(ClassicComponent.Workflow) && arguments.ClassicInclude.Count > 0)
-                    {
-                        AnsiConsole.MarkupLine($"[yellow]{AssessmentAvailability.WorkflowRetiredMessage} Skipping it.[/]");
-                    }
-
-                    // The Azure ACS and SharePoint Add-Ins components are not (yet) implemented as part of a
-                    // Classic assessment; they are covered by the dedicated --mode AddInsACS assessment. Drop
-                    // them so a Classic assessment never silently produces empty data for them, warning when a
-                    // user explicitly requested them via --classicinclude.
-                    foreach (ClassicComponent component in new[] { ClassicComponent.AzureACS, ClassicComponent.SharePointAddIns })
-                    {
-                        if (classicComponents.Remove(component) && arguments.ClassicInclude.Count > 0)
+                        catch (Exception ex)
                         {
-                            AnsiConsole.MarkupLine($"[yellow]The '{component}' component is not available in a Classic assessment; use --mode AddInsACS instead. Skipping it.[/]");
+                            AnsiConsole.WriteException(ex);
+                            exitCode = 1;
+                            return;
                         }
-                    }
 
-                    if (classicComponents.Count == 0)
-                    {
-                        AnsiConsole.MarkupLine($"[red]No supported classic scan components were selected. Supported components: InfoPath, Pages, Lists, Extensibility.[/]");
-                        AnsiConsole.MarkupLine("");
-                        return;
-                    }
+                        await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-                    ClassicStartRequestBuilder.AddClassicProperties(
-                        start,
-                        classicComponents,
-                        arguments.ExportWebPartProperties,
-                        arguments.SkipUsageInformation,
-                        arguments.SkipUserInformation,
-                        arguments.HomePageOnly,
-                        arguments.AuditLogWindowDays,
-                        arguments.ExcludeSiteTemplates);
-                }
+                        // Kick off a scan
+                        StartRequest start = new StartRequest
+                        {
+                            Mode = arguments.Mode.ToString(),
+                            Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
+                            Environment = environment.ToString(),
+                            SitesList = arguments.SitesList != null ? string.Join(",", arguments.SitesList) : "",
+                            SitesFile = arguments.SitesFile != null ? arguments.SitesFile.FullName : "",
+                            AuthMode = arguments.AuthMode.ToString(),
+                            ApplicationId = arguments.ApplicationId.ToString(),
+                            TenantId = arguments.TenantId != null ? arguments.TenantId : "",
+                            CertPath = arguments.CertPath != null ? arguments.CertPath : "",
+                            CertFile = arguments.CertFile != null ? arguments.CertFile.FullName : "",
+                            CertPassword = arguments.CertPassword != null ? arguments.CertPassword : "",
+                            Threads = arguments.Threads,
+                            AdminCenterUrl =
+                                (configurationOptions != null &&
+                                 !string.IsNullOrEmpty(configurationOptions.AdminCenterUrl))
+                                    ? configurationOptions.AdminCenterUrl
+                                    : "",
+                            MySiteHostUrl =
+                                (configurationOptions != null &&
+                                 !string.IsNullOrEmpty(configurationOptions.MySiteHostUrl))
+                                    ? configurationOptions.MySiteHostUrl
+                                    : "",
+                        };
+
+                        // PER SCAN COMPONENT: implement scan component specific options
+                        //if (arguments.Mode == Mode.Syntex)
+                        //{
+                        //    start.Properties.Add(new PropertyRequest
+                        //    {
+                        //        Property = syntexFullOption.Name.TrimStart('-'),
+                        //        Type = "bool",
+                        //        Value = arguments.SyntexDeepScan.ToString(),
+                        //    });
+                        //}
+
+                        if (arguments.Mode == Mode.Workflow)
+                        {
+                            start.Properties.Add(
+                                new PropertyRequest
+                                {
+                                    Property = workflowAnalyzeOption.Name.TrimStart('-'),
+                                    Type = "bool",
+                                    Value = arguments.WorkflowAnalyze.ToString(),
+                                });
+                        }
+
+                        if (arguments.Mode == Mode.Classic)
+                        {
+                            List<ClassicComponent> classicComponents;
+                            if (arguments.ClassicInclude.Count > 0)
+                            {
+                                // Only add the requested classic scan components
+                                classicComponents = new List<ClassicComponent>(arguments.ClassicInclude);
+                            }
+                            else
+                            {
+                                // Add all possible classic scan components, excluding any that have been retired
+                                // (e.g. Workflow) so a default Classic run no longer pays for them.
+                                classicComponents = Enum.GetValues(typeof(ClassicComponent))
+                                    .Cast<ClassicComponent>()
+                                    .Where(c => !AssessmentAvailability.IsRetired(c))
+                                    .ToList();
+                            }
+
+                            // The Workflow 2013 component has been retired. Drop it from the effective set,
+                            // warning only when a user explicitly requested it via --classicinclude (the default
+                            // "all components" set above already excluded it). Engine code is retained so existing
+                            // Workflow scan databases can still be reported on.
+                            if (classicComponents.Remove(ClassicComponent.Workflow) &&
+                                arguments.ClassicInclude.Count > 0)
+                            {
+                                AnsiConsole.MarkupLine(
+                                    $"[yellow]{AssessmentAvailability.WorkflowRetiredMessage} Skipping it.[/]");
+                            }
+
+                            // The Azure ACS and SharePoint Add-Ins components are not (yet) implemented as part of a
+                            // Classic assessment; they are covered by the dedicated --mode AddInsACS assessment. Drop
+                            // them so a Classic assessment never silently produces empty data for them, warning when a
+                            // user explicitly requested them via --classicinclude.
+                            foreach (ClassicComponent component in new[]
+                                     {
+                                         ClassicComponent.AzureACS, ClassicComponent.SharePointAddIns
+                                     })
+                            {
+                                if (classicComponents.Remove(component) && arguments.ClassicInclude.Count > 0)
+                                {
+                                    AnsiConsole.MarkupLine(
+                                        $"[yellow]The '{component}' component is not available in a Classic assessment; use --mode AddInsACS instead. Skipping it.[/]");
+                                }
+                            }
+
+                            if (classicComponents.Count == 0)
+                            {
+                                AnsiConsole.MarkupLine(
+                                    $"[red]No supported classic scan components were selected. Supported components: InfoPath, Pages, Lists, Extensibility.[/]");
+                                AnsiConsole.MarkupLine("");
+                                return;
+                            }
+
+                            ClassicStartRequestBuilder.AddClassicProperties(
+                                start,
+                                classicComponents,
+                                arguments.ExportWebPartProperties,
+                                arguments.SkipUsageInformation,
+                                arguments.SkipUserInformation,
+                                arguments.HomePageOnly,
+                                arguments.AuditLogWindowDays,
+                                arguments.ExcludeSiteTemplates);
+                        }
 
 #if DEBUG
                 if (arguments.Mode == Mode.Test)
@@ -704,38 +737,39 @@ namespace PnP.Scanning.Process.Commands
                     });
                 }
 #endif
-                bool encounteredError = false;
-                AsyncServerStreamingCall<StartStatus> call = client.Start(start);
-                await foreach (StartStatus message in call.ResponseStream.ReadAllAsync())
-                {
-                    if (message.Type == Constants.MessageError)
-                    {
-                        exitCode = 1;
-                        AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
-                        encounteredError = true;
-                    }
-                    else if (message.Type == Constants.MessageWarning)
-                    {
-                        AnsiConsole.MarkupLine($"[orange3]{message.Status}[/]");
-                    }
-                    else
-                    {
-                        AnsiConsole.MarkupLine($"[gray]{message.Status}[/]");
-                    }
+                        bool encounteredError = false;
+                        AsyncServerStreamingCall<StartStatus> call = client.Start(start);
+                        await foreach (StartStatus message in call.ResponseStream.ReadAllAsync())
+                        {
+                            if (message.Type == Constants.MessageError)
+                            {
+                                exitCode = 1;
+                                AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
+                                encounteredError = true;
+                            }
+                            else if (message.Type == Constants.MessageWarning)
+                            {
+                                AnsiConsole.MarkupLine($"[orange3]{message.Status}[/]");
+                            }
+                            else
+                            {
+                                AnsiConsole.MarkupLine($"[gray]{message.Status}[/]");
+                            }
 
-                    // Add delay for an improved "visual" experience
-                    await Task.Delay(TimeSpan.FromMilliseconds(500));
-                }
+                            // Add delay for an improved "visual" experience
+                            await Task.Delay(TimeSpan.FromMilliseconds(500));
+                        }
 
-                if (!encounteredError)
-                {
-                    AnsiConsole.MarkupLine("");
-                    AnsiConsole.MarkupLine($"[gray]Microsoft 365 Assessment is running![/]");
-                    AnsiConsole.MarkupLine($"[gray]Use the [green]status[/] command to get realtime feedback[/]");
-                    AnsiConsole.MarkupLine($"[gray]Use the [green]list[/] command to an overview of all Microsoft 365 Assessments[/]");
-                }
-
-            });
+                        if (!encounteredError)
+                        {
+                            AnsiConsole.MarkupLine("");
+                            AnsiConsole.MarkupLine($"[gray]Microsoft 365 Assessment is running![/]");
+                            AnsiConsole.MarkupLine(
+                                $"[gray]Use the [green]status[/] command to get realtime feedback[/]");
+                            AnsiConsole.MarkupLine(
+                                $"[gray]Use the [green]list[/] command to an overview of all Microsoft 365 Assessments[/]");
+                        }
+                    });
             return exitCode;
         }
     }

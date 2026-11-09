@@ -21,29 +21,51 @@ internal static class ClassicBlogContentReader
     /// <summary>
     /// Captures candidate native list scopes and display-form declarations using a cloned SDK context.
     /// </summary>
-    internal static async Task<ClassicBlogListScopeSource> ReadListsAsync(PnPContext pnp,
-        ClassicPageWebSource web, CancellationToken token)
+    internal static async Task<ClassicBlogListScopeSource> ReadListsAsync(
+        PnPContext pnp,
+        ClassicPageWebSource web,
+        CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         // List reloads replace SDK metadata needed by the other mixed Classic components.
         using PnPContext? contentContext = await pnp.CloneAsync();
-        await contentContext.Web.LoadAsync(w => w.Lists.QueryProperties(l => l.Id, l => l.Title,
-            l => l.TemplateType, l => l.BaseType, l => l.DefaultDisplayFormUrl,
+        await contentContext.Web.LoadAsync(w => w.Lists.QueryProperties(
+            l => l.Id,
+            l => l.Title,
+            l => l.TemplateType,
+            l => l.BaseType,
+            l => l.DefaultDisplayFormUrl,
             l => l.ContentTypes.QueryProperties(type => type.StringId, type => type.DisplayFormUrl),
             l => l.RootFolder.QueryProperties(f => f.ServerRelativeUrl)));
         token.ThrowIfCancellationRequested();
         ClassicBlogListSource[]? lists = contentContext.Web.Lists.AsRequested()
-            .Select(l => new ClassicBlogListSource(l.Id, l.Title, l.RootFolder.ServerRelativeUrl,
-                l.BaseType == ListBaseType.DocumentLibrary ? ClassicPageRules.DelveBlogPage :
-                    l.TemplateType == ListTemplateType.Posts ? ClassicPageRules.BlogPage : ClassicPageRules.ASPXPage,
-                l.BaseType == ListBaseType.DocumentLibrary ? null : NormalizeDisplayForm(l.DefaultDisplayFormUrl, pnp.Uri, web.SiteUrl),
-                l.BaseType == ListBaseType.DocumentLibrary ? null : l.ContentTypes.AsRequested()
-                    .Select(type => new ClassicContentTypeForm(type.StringId,
-                        NormalizeDisplayForm(type.DisplayFormUrl, pnp.Uri, web.SiteUrl)!))
-                    .Where(type => type.FormUrl != null).OrderByDescending(type => type.ContentTypeId.Length).ToArray()))
-            .Where(list => list.PageType != ClassicPageRules.ASPXPage || LegacyDisplayFormAssessment.IsContentPageForm(list.DisplayFormUrl) ||
-                list.ContentTypeForms?.Any(type => LegacyDisplayFormAssessment.IsContentPageForm(type.FormUrl)) == true)
-            .OrderBy(l => l.ListId).ToArray();
+            .Select(l => new ClassicBlogListSource(
+                l.Id,
+                l.Title,
+                l.RootFolder.ServerRelativeUrl,
+                l.BaseType == ListBaseType.DocumentLibrary
+                    ? ClassicPageRules.DelveBlogPage
+                    : l.TemplateType == ListTemplateType.Posts
+                        ? ClassicPageRules.BlogPage
+                        : ClassicPageRules.ASPXPage,
+                l.BaseType == ListBaseType.DocumentLibrary
+                    ? null
+                    : NormalizeDisplayForm(l.DefaultDisplayFormUrl, pnp.Uri, web.SiteUrl),
+                l.BaseType == ListBaseType.DocumentLibrary
+                    ? null
+                    : l.ContentTypes.AsRequested()
+                        .Select(type => new ClassicContentTypeForm(
+                            type.StringId,
+                            NormalizeDisplayForm(type.DisplayFormUrl, pnp.Uri, web.SiteUrl)!))
+                        .Where(type => type.FormUrl != null)
+                        .OrderByDescending(type => type.ContentTypeId.Length)
+                        .ToArray()))
+            .Where(list => list.PageType != ClassicPageRules.ASPXPage ||
+                           LegacyDisplayFormAssessment.IsContentPageForm(list.DisplayFormUrl) ||
+                           list.ContentTypeForms?.Any(type =>
+                               LegacyDisplayFormAssessment.IsContentPageForm(type.FormUrl)) == true)
+            .OrderBy(l => l.ListId)
+            .ToArray();
         return new(web.SiteUrl, web.WebUrl, lists, SourceReadState.Complete);
     }
 
@@ -56,23 +78,33 @@ internal static class ClassicBlogContentReader
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute) &&
             !SharePointAspxUrlPolicy.HasSameHttpsAuthority(site, absolute))
         {
-            Serilog.Log.Warning("A Blog display-form declaration has a foreign authority; its content URL remains unknown");
+            Serilog.Log.Warning(
+                "A Blog display-form declaration has a foreign authority; its content URL remains unknown");
             return null;
         }
+
         return DisplayFormUrlPolicy.ToServerRelative(value!, web.AbsolutePath, site.AbsolutePath);
     }
 
     /// <summary>
     /// Validates the selected native list and acquires one bounded content-item page with its continuation.
     /// </summary>
-    internal static async Task<ClassicPageBlogBatchSource> ReadBatchAsync(PnPContext pnp,
-        ClassicPageWebSource web, ClassicBlogListSource expected, string? paging,
-        bool skipUsers, CancellationToken token)
+    internal static async Task<ClassicPageBlogBatchSource> ReadBatchAsync(
+        PnPContext pnp,
+        ClassicPageWebSource web,
+        ClassicBlogListSource expected,
+        string? paging,
+        bool skipUsers,
+        CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using PnPContext? contentContext = await pnp.CloneAsync();
-        IList? list = await contentContext.Web.Lists.GetByIdAsync(expected.ListId, l => l.Id,
-            l => l.Title, l => l.TemplateType, l => l.BaseType,
+        IList? list = await contentContext.Web.Lists.GetByIdAsync(
+            expected.ListId,
+            l => l.Id,
+            l => l.Title,
+            l => l.TemplateType,
+            l => l.BaseType,
             l => l.RootFolder.QueryProperties(f => f.ServerRelativeUrl));
         token.ThrowIfCancellationRequested();
         if (!string.Equals(list.RootFolder.ServerRelativeUrl, expected.ListUrl, StringComparison.OrdinalIgnoreCase))
@@ -83,7 +115,18 @@ internal static class ClassicBlogContentReader
             (delve && list.BaseType != ListBaseType.DocumentLibrary))
             throw new InvalidDataException("The Blog/Delve source type differs from its selected list.");
         string? query = ClassicPageQuery.Create(new(), false, null, skipUsers, delve);
-        ClassicPageBlogBatchSource? batch = await ClassicPageOnlineSource.LoadBatchAsync(list, query, paging, token, web.SiteUrl, web.WebUrl);
-        return batch with { DisplayFormUrl = expected.DisplayFormUrl, PageType = expected.PageType, ContentTypeForms = expected.ContentTypeForms };
+        ClassicPageBlogBatchSource? batch = await ClassicPageOnlineSource.LoadBatchAsync(
+            list,
+            query,
+            paging,
+            token,
+            web.SiteUrl,
+            web.WebUrl);
+        return batch with
+        {
+            DisplayFormUrl = expected.DisplayFormUrl,
+            PageType = expected.PageType,
+            ContentTypeForms = expected.ContentTypeForms
+        };
     }
 }

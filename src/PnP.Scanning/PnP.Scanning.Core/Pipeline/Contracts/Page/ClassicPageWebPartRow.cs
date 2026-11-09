@@ -1,7 +1,7 @@
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page
 {
-
     /// <summary>
     /// Carries an ordered detached web-part inventory and its readiness verdict.
     /// </summary>

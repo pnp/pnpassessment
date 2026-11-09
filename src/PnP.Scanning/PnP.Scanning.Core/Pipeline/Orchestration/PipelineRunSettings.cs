@@ -10,8 +10,11 @@ namespace PnP.Scanning.Core.Pipeline.Orchestration;
 /// Persists runtime options and analysis selection inside the existing versioned phase parameters.
 /// </summary>
 internal sealed record PipelineRunSettings(
-    int Threads, string CollectionParametersJson, string AnalysisParametersJson,
-    string? CollectionOptionsJson = null, Guid? AnalysisRunId = null)
+    int Threads,
+    string CollectionParametersJson,
+    string AnalysisParametersJson,
+    string? CollectionOptionsJson = null,
+    Guid? AnalysisRunId = null)
 {
     /// <summary>
     /// Encodes runtime selection in the existing versioned phase-parameter envelope.
@@ -22,8 +25,8 @@ internal sealed record PipelineRunSettings(
     /// Reads required pipeline runtime settings from the bound persisted phase.
     /// </summary>
     internal static PipelineRunSettings Read(PhaseRunRow run) =>
-        new VersionedJson(run.ParametersJson).Value.GetProperty("runtime").Deserialize<PipelineRunSettings>()
-        ?? throw new InvalidDataException("Pipeline runtime configuration is absent.");
+        new VersionedJson(run.ParametersJson).Value.GetProperty("runtime").Deserialize<PipelineRunSettings>() ??
+        throw new InvalidDataException("Pipeline runtime configuration is absent.");
 
     /// <summary>
     /// Extracts internal analysis parameters while preserving unrelated foundation parameter shapes.
@@ -32,8 +35,9 @@ internal sealed record PipelineRunSettings(
     {
         JsonElement value = new VersionedJson(run.ParametersJson).Value;
         return value.ValueKind == JsonValueKind.Object &&
-            value.TryGetProperty("pipelineRuntimeVersion", out JsonElement format) && format.ValueKind == JsonValueKind.Number &&
-            format.GetInt32() == 1
-            ? Read(run).AnalysisParametersJson : run.ParametersJson;
+               value.TryGetProperty("pipelineRuntimeVersion", out JsonElement format) &&
+               format.ValueKind == JsonValueKind.Number && format.GetInt32() == 1
+            ? Read(run).AnalysisParametersJson
+            : run.ParametersJson;
     }
 }

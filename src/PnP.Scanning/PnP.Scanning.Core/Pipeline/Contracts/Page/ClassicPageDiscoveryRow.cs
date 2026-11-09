@@ -1,4 +1,5 @@
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 
 /// <summary>

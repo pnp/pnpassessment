@@ -1,6 +1,7 @@
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Pipeline.Analysis.Page;
+
 namespace PnP.Scanning.Core.Pipeline.Collection.List;
 
 /// <summary>
@@ -11,15 +12,19 @@ internal static class ClassicPageQuery
     /// <summary>
     /// Builds a paged CAML query for exact items or explicitly selected content evidence.
     /// </summary>
-    internal static string Create(List<string> extraFields, bool filterOnASPXPages = true,
-        int? itemId = null, bool skipUserInformation = false, bool filterOnDelveBlogs = false)
+    internal static string Create(
+        List<string> extraFields,
+        bool filterOnASPXPages = true,
+        int? itemId = null,
+        bool skipUserInformation = false,
+        bool filterOnDelveBlogs = false)
     {
         string extraViewFields = "";
         string filter = "";
 
         if (extraFields.Count > 0)
         {
-            foreach(string field in extraFields)
+            foreach (string field in extraFields)
             {
                 extraViewFields = $"{extraViewFields}<FieldRef Name='{field}' />";
             }
@@ -27,12 +32,13 @@ internal static class ClassicPageQuery
 
         if (itemId.HasValue)
         {
-            filter = $"<Query><Where><Eq><FieldRef Name='ID' /><Value Type='Counter'>{itemId.Value}</Value></Eq></Where></Query>";
+            filter =
+                $"<Query><Where><Eq><FieldRef Name='ID' /><Value Type='Counter'>{itemId.Value}</Value></Eq></Where></Query>";
         }
         else if (filterOnDelveBlogs)
         {
             filter = "<Query><Where><Eq><FieldRef Name='File_x0020_Type' />" +
-                "<Value Type='Text'>pointpub</Value></Eq></Where></Query>";
+                     "<Value Type='Text'>pointpub</Value></Eq></Where></Query>";
         }
         else if (filterOnASPXPages)
         {

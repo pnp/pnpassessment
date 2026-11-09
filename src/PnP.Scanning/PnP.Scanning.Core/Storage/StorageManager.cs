@@ -10,10 +10,9 @@ using Serilog;
 
 namespace PnP.Scanning.Core.Storage
 {
-
     /// <summary>
     /// Class handling storage of data. This class is loaded as singleton, don't use instance variables unless they're thread-safe
-    /// 
+    ///
     /// Note: For each new scan component work is needed here. Check the PER SCAN COMPONENT: strings to find the right places to add code
     /// </summary>
     internal sealed class StorageManager
@@ -37,42 +36,57 @@ namespace PnP.Scanning.Core.Storage
                 await dbContext.Database.MigrateAsync();
 
                 // Add a scan record
-                dbContext.Scans.Add(new Scan
-                {
-                    ScanId = scanId,
-                    StartDate = DateTime.Now,
-                    Version = VersionManager.GetCurrentVersion(),
-                    Status = ScanStatus.Queued,
-                    PreScanStatus = SiteWebStatus.Queued,
-                    PostScanStatus = SiteWebStatus.Queued,
-                    CLIMode = start.Mode,
-                    CLIEnvironment = start.Environment,
-                    CLITenant = start.Tenant,
-                    CLISiteList = start.SitesList,
-                    CLISiteFile = start.SitesFile,
-                    CLIAuthMode = start.AuthMode,
-                    CLIApplicationId = start.ApplicationId,
-                    CLITenantId = start.TenantId,
-                    CLICertPath = start.CertPath,
-                    CLICertFile = start.CertFile,
-                    CLICertFilePassword = !string.IsNullOrEmpty(start.CertPassword) ? passwordProtector.Protect(start.CertPassword) : start.CertPassword,
-                    CLIThreads = start.Threads,
-                });
+                dbContext.Scans.Add(
+                    new Scan
+                    {
+                        ScanId = scanId,
+                        StartDate = DateTime.Now,
+                        Version = VersionManager.GetCurrentVersion(),
+                        Status = ScanStatus.Queued,
+                        PreScanStatus = SiteWebStatus.Queued,
+                        PostScanStatus = SiteWebStatus.Queued,
+                        CLIMode = start.Mode,
+                        CLIEnvironment = start.Environment,
+                        CLITenant = start.Tenant,
+                        CLISiteList = start.SitesList,
+                        CLISiteFile = start.SitesFile,
+                        CLIAuthMode = start.AuthMode,
+                        CLIApplicationId = start.ApplicationId,
+                        CLITenantId = start.TenantId,
+                        CLICertPath = start.CertPath,
+                        CLICertFile = start.CertFile,
+                        CLICertFilePassword =
+                            !string.IsNullOrEmpty(start.CertPassword)
+                                ? passwordProtector.Protect(start.CertPassword)
+                                : start.CertPassword,
+                        CLIThreads = start.Threads,
+                    });
 
-                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"Set to {ScanStatus.Queued}");
-                await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreAssessmentStatusChange, DateTime.Now, $"Set to {SiteWebStatus.Queued}");
+                await AddHistoryRecordAsync(
+                    dbContext,
+                    scanId,
+                    Constants.EventAssessmentStatusChange,
+                    DateTime.Now,
+                    $"Set to {ScanStatus.Queued}");
+                await AddHistoryRecordAsync(
+                    dbContext,
+                    scanId,
+                    Constants.EventPreAssessmentStatusChange,
+                    DateTime.Now,
+                    $"Set to {SiteWebStatus.Queued}");
 
                 if (start.Properties.Count > 0)
                 {
                     foreach (var property in start.Properties)
                     {
-                        dbContext.Properties.Add(new Property
-                        {
-                            ScanId = scanId,
-                            Name = property.Property,
-                            Type = property.Type,
-                            Value = property.Value
-                        });
+                        dbContext.Properties.Add(
+                            new Property
+                            {
+                                ScanId = scanId,
+                                Name = property.Property,
+                                Type = property.Type,
+                                Value = property.Value
+                            });
                     }
                 }
 
@@ -84,12 +98,8 @@ namespace PnP.Scanning.Core.Storage
                 // Persist the site collections to scan
                 foreach (var site in siteCollectionList)
                 {
-                    siteCollectionsToAdd.Add(new SiteCollection
-                    {
-                        ScanId = scanId,
-                        SiteUrl = site,
-                        Status = SiteWebStatus.Queued,
-                    });
+                    siteCollectionsToAdd.Add(
+                        new SiteCollection { ScanId = scanId, SiteUrl = site, Status = SiteWebStatus.Queued, });
                 }
 
                 await dbContext.BulkInsertAsync(siteCollectionsToAdd);
@@ -103,10 +113,14 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-
                     if (scan.Status != ScanStatus.Finished)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Finished}");
+                        await AddHistoryRecordAsync(
+                            dbContext,
+                            scanId,
+                            Constants.EventAssessmentStatusChange,
+                            DateTime.Now,
+                            $"From {scan.Status} to {ScanStatus.Finished}");
                         scan.Status = ScanStatus.Finished;
                     }
 
@@ -133,16 +147,23 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    Log.Information("Setting Scan table to status {Status} for assessment {ScanId}", scanStatus, scanId);
+                    Log.Information(
+                        "Setting Scan table to status {Status} for assessment {ScanId}",
+                        scanStatus,
+                        scanId);
                     if (scan.Status != scanStatus)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {scanStatus}");
+                        await AddHistoryRecordAsync(
+                            dbContext,
+                            scanId,
+                            Constants.EventAssessmentStatusChange,
+                            DateTime.Now,
+                            $"From {scan.Status} to {scanStatus}");
                         scan.Status = scanStatus;
                     }
 
                     // Consider a scan marked as Finished, Paused or Terminate to have an end date set
-                    if (scanStatus != ScanStatus.Running &&
-                        scanStatus != ScanStatus.Queued &&
+                    if (scanStatus != ScanStatus.Running && scanStatus != ScanStatus.Queued &&
                         scanStatus != ScanStatus.Pausing)
                     {
                         scan.EndDate = DateTime.Now;
@@ -150,7 +171,7 @@ namespace PnP.Scanning.Core.Storage
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in SetScanStatusAsync for assessment {ScanId}", scanId);
-                    
+
                     // Checkpoint the database as the scan is done
                     await CheckPointDatabaseAsync(dbContext);
                 }
@@ -169,10 +190,18 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    Log.Information("Setting Scan table to preassessmentstatus {Status} for assessment {ScanId}", preScanStatus, scanId);
+                    Log.Information(
+                        "Setting Scan table to preassessmentstatus {Status} for assessment {ScanId}",
+                        preScanStatus,
+                        scanId);
                     if (scan.PreScanStatus != preScanStatus)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPreAssessmentStatusChange, DateTime.Now, $"From {scan.PreScanStatus} to {preScanStatus}");
+                        await AddHistoryRecordAsync(
+                            dbContext,
+                            scanId,
+                            Constants.EventPreAssessmentStatusChange,
+                            DateTime.Now,
+                            $"From {scan.PreScanStatus} to {preScanStatus}");
                         scan.PreScanStatus = preScanStatus;
                     }
 
@@ -194,15 +223,25 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    Log.Information("Setting Scan table to postassessmentstatus {Status} for assessment {ScanId}", postScanStatus, scanId);
+                    Log.Information(
+                        "Setting Scan table to postassessmentstatus {Status} for assessment {ScanId}",
+                        postScanStatus,
+                        scanId);
                     if (scan.PostScanStatus != postScanStatus)
                     {
-                        await AddHistoryRecordAsync(dbContext, scanId, Constants.EventPostAssessmentStatusChange, DateTime.Now, $"From {scan.PostScanStatus} to {postScanStatus}");
+                        await AddHistoryRecordAsync(
+                            dbContext,
+                            scanId,
+                            Constants.EventPostAssessmentStatusChange,
+                            DateTime.Now,
+                            $"From {scan.PostScanStatus} to {postScanStatus}");
                         scan.PostScanStatus = postScanStatus;
                     }
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in SetPostScanStatusAsync for assessment {ScanId}", scanId);
+                    Log.Information(
+                        "Database updates pushed in SetPostScanStatusAsync for assessment {ScanId}",
+                        scanId);
                 }
                 else
                 {
@@ -236,16 +275,22 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-
-                var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
+                var siteToUpdate =
+                    await dbContext.SiteCollections.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    Log.Information("Setting SiteCollection table to status Running for assessment {ScanId}, site collection {SiteCollectionUrl}", scanId, siteCollectionUrl);
+                    Log.Information(
+                        "Setting SiteCollection table to status Running for assessment {ScanId}, site collection {SiteCollectionUrl}",
+                        scanId,
+                        siteCollectionUrl);
                     siteToUpdate.Status = SiteWebStatus.Running;
                     siteToUpdate.StartDate = DateTime.Now;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in StartSiteCollectionScanAsync for assessment {ScanId}", scanId);
+                    Log.Information(
+                        "Database updates pushed in StartSiteCollectionScanAsync for assessment {ScanId}",
+                        scanId);
                 }
                 else
                 {
@@ -255,7 +300,11 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreWebsToScanAsync(Guid scanId, string siteCollectionUrl, List<EnumeratedWeb> webs, bool isRestart)
+        internal async Task StoreWebsToScanAsync(
+            Guid scanId,
+            string siteCollectionUrl,
+            List<EnumeratedWeb> webs,
+            bool isRestart)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -269,47 +318,52 @@ namespace PnP.Scanning.Core.Storage
                     bool added = false;
                     foreach (var web in webs)
                     {
-                        var webRecord = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == web.WebUrl);
+                        var webRecord = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                            p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == web.WebUrl);
                         if (webRecord == null)
                         {
                             added = true;
-                            dbContext.Webs.Add(new Web
-                            {
-                                ScanId = scanId,
-                                SiteUrl = siteCollectionUrl,
-                                WebUrl = web.WebUrl,
-                                WebUrlAbsolute = web.WebUrl != "/" ? $"{siteCollectionUrl}{web.WebUrl}" : siteCollectionUrl,
-                                Template = web.WebTemplate,
-                                Status = SiteWebStatus.Queued
-                            });
+                            dbContext.Webs.Add(
+                                new Web
+                                {
+                                    ScanId = scanId,
+                                    SiteUrl = siteCollectionUrl,
+                                    WebUrl = web.WebUrl,
+                                    WebUrlAbsolute =
+                                        web.WebUrl != "/" ? $"{siteCollectionUrl}{web.WebUrl}" : siteCollectionUrl,
+                                    Template = web.WebTemplate,
+                                    Status = SiteWebStatus.Queued
+                                });
                         }
                     }
 
                     if (added)
                     {
                         await dbContext.SaveChangesAsync();
-                        Log.Information("Database updates pushed in StoreWebsToScanAsync for assessment {ScanId}", scanId);
-
+                        Log.Information(
+                            "Database updates pushed in StoreWebsToScanAsync for assessment {ScanId}",
+                            scanId);
                     }
                 }
                 else
                 {
                     foreach (var web in webs)
                     {
-                        dbContext.Webs.Add(new Web
-                        {
-                            ScanId = scanId,
-                            SiteUrl = siteCollectionUrl,
-                            WebUrlAbsolute = web.WebUrl != "/" ? $"{siteCollectionUrl}{web.WebUrl}" : siteCollectionUrl,
-                            WebUrl = web.WebUrl,
-                            Template = web.WebTemplate,
-                            Status = SiteWebStatus.Queued
-                        });
+                        dbContext.Webs.Add(
+                            new Web
+                            {
+                                ScanId = scanId,
+                                SiteUrl = siteCollectionUrl,
+                                WebUrlAbsolute =
+                                    web.WebUrl != "/" ? $"{siteCollectionUrl}{web.WebUrl}" : siteCollectionUrl,
+                                WebUrl = web.WebUrl,
+                                Template = web.WebTemplate,
+                                Status = SiteWebStatus.Queued
+                            });
                     }
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in StoreWebsToScanAsync for assessment {ScanId}", scanId);
-
                 }
             }
         }
@@ -318,10 +372,15 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
-                    Log.Information("Setting Web table to status Running for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+                    Log.Information(
+                        "Setting Web table to status Running for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}",
+                        scanId,
+                        siteCollectionUrl,
+                        webUrl);
                     webToUpdate.Status = SiteWebStatus.Running;
                     webToUpdate.StartDate = DateTime.Now;
 
@@ -340,25 +399,35 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
+                var siteToUpdate =
+                    await dbContext.SiteCollections.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
-                    var failedWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
+                    var failedWeb = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Failed);
 
-                    Log.Information("Setting SiteCollection table to status {Status} for assessment {ScanId}, site collection {SiteCollectionUrl}",
-                        failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished, scanId, siteCollectionUrl);
+                    Log.Information(
+                        "Setting SiteCollection table to status {Status} for assessment {ScanId}, site collection {SiteCollectionUrl}",
+                        failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished,
+                        scanId,
+                        siteCollectionUrl);
 
                     siteToUpdate.Status = failedWeb != null ? SiteWebStatus.Failed : SiteWebStatus.Finished;
                     siteToUpdate.EndDate = DateTime.Now;
                     siteToUpdate.ScanDuration = (siteToUpdate.EndDate - siteToUpdate.StartDate).Seconds;
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndSiteCollectionScanAsync for assessment {ScanId}", scanId);
-
+                    Log.Information(
+                        "Database updates pushed in EndSiteCollectionScanAsync for assessment {ScanId}",
+                        scanId);
                 }
                 else
                 {
-                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in assessment {ScanId}", siteCollectionUrl, scanId);
+                    Log.Error(
+                        "No site collection row for {SiteCollectionUrl} found to update in assessment {ScanId}",
+                        siteCollectionUrl,
+                        scanId);
                     throw new Exception($"No site collection row for {siteCollectionUrl} found to update");
                 }
             }
@@ -368,7 +437,9 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var siteToUpdate = await dbContext.SiteCollections.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
+                var siteToUpdate =
+                    await dbContext.SiteCollections.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.SiteUrl == siteCollectionUrl);
                 if (siteToUpdate != null)
                 {
                     siteToUpdate.Status = SiteWebStatus.Failed;
@@ -377,15 +448,22 @@ namespace PnP.Scanning.Core.Storage
                     siteToUpdate.Error = GetMessageFromException(ex);
                     siteToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
-                    Log.Information("Setting SiteCollections table to status Failed for assessment {ScanId}, web {SiteCollectionUrl}", scanId, siteCollectionUrl);
+                    Log.Information(
+                        "Setting SiteCollections table to status Failed for assessment {ScanId}, web {SiteCollectionUrl}",
+                        scanId,
+                        siteCollectionUrl);
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndSiteCollectionScanWithErrorAsync for assessment {ScanId}", scanId);
-
+                    Log.Information(
+                        "Database updates pushed in EndSiteCollectionScanWithErrorAsync for assessment {ScanId}",
+                        scanId);
                 }
                 else
                 {
-                    Log.Error("No site collection row for {SiteCollectionUrl} found to update in assessment {ScanId}", siteCollectionUrl, scanId);
+                    Log.Error(
+                        "No site collection row for {SiteCollectionUrl} found to update in assessment {ScanId}",
+                        siteCollectionUrl,
+                        scanId);
                     throw new Exception($"No site collection row for {siteCollectionUrl} found to update");
                 }
             }
@@ -395,18 +473,22 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
                     webToUpdate.Status = SiteWebStatus.Finished;
                     webToUpdate.EndDate = DateTime.Now;
                     webToUpdate.ScanDuration = (webToUpdate.EndDate - webToUpdate.StartDate).Seconds;
 
-                    Log.Information("Setting Web table to status Finished for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+                    Log.Information(
+                        "Setting Web table to status Finished for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}",
+                        scanId,
+                        siteCollectionUrl,
+                        webUrl);
 
                     await dbContext.SaveChangesAsync();
                     Log.Information("Database updates pushed in EndWebScanAsync for assessment {ScanId}", scanId);
-
                 }
                 else
                 {
@@ -420,7 +502,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
+                var webToUpdate = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.WebUrl == webUrl);
                 if (webToUpdate != null)
                 {
                     webToUpdate.Status = SiteWebStatus.Failed;
@@ -429,11 +512,16 @@ namespace PnP.Scanning.Core.Storage
                     webToUpdate.Error = GetMessageFromException(ex);
                     webToUpdate.StackTrace = (ex != null && ex.StackTrace != null) ? ex.StackTrace : null;
 
-                    Log.Information("Setting Web table to status Failed for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}", scanId, siteCollectionUrl, webUrl);
+                    Log.Information(
+                        "Setting Web table to status Failed for assessment {ScanId}, web {SiteCollectionUrl}{WebUrl}",
+                        scanId,
+                        siteCollectionUrl,
+                        webUrl);
 
                     await dbContext.SaveChangesAsync();
-                    Log.Information("Database updates pushed in EndWebScanWithErrorAsync for assessment {ScanId}", scanId);
-
+                    Log.Information(
+                        "Database updates pushed in EndWebScanWithErrorAsync for assessment {ScanId}",
+                        scanId);
                 }
                 else
                 {
@@ -449,12 +537,18 @@ namespace PnP.Scanning.Core.Storage
             {
                 dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running).ToListAsync())
+                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running)
+                             .ToListAsync())
                 {
-                    var runningWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running);
+                    var runningWeb = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running);
                     if (runningWeb != null)
                     {
-                        Log.Information("Running web found {SiteCollectionUrl}{WebUrl} for assessment {ScanId}", site.SiteUrl, runningWeb.WebUrl, scanId);
+                        Log.Information(
+                            "Running web found {SiteCollectionUrl}{WebUrl} for assessment {ScanId}",
+                            site.SiteUrl,
+                            runningWeb.WebUrl,
+                            scanId);
                         return true;
                     }
                 }
@@ -469,10 +563,14 @@ namespace PnP.Scanning.Core.Storage
             {
                 dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                var pendingWeb = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Queued);
+                var pendingWeb = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteCollectionUrl && p.Status == SiteWebStatus.Queued);
                 if (pendingWeb == null)
                 {
-                    Log.Information("Site collection {SiteCollectionUrl} was completely done in assessment {ScanId}", siteCollectionUrl, scanId);
+                    Log.Information(
+                        "Site collection {SiteCollectionUrl} was completely done in assessment {ScanId}",
+                        siteCollectionUrl,
+                        scanId);
                     return true;
                 }
 
@@ -484,23 +582,33 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-
                 Log.Information("Starting to consolidate assessment {ScanId} at database level", scanId);
 
                 // Sites and webs in "running" state are reset to "queued"
-                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running).ToListAsync())
+                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Running)
+                             .ToListAsync())
                 {
                     site.Status = SiteWebStatus.Queued;
                     site.StartDate = DateTime.MinValue;
 
-                    Log.Information("Consolidating assessment {ScanId}, site collection {SiteCollection}", scanId, site.SiteUrl);
+                    Log.Information(
+                        "Consolidating assessment {ScanId}, site collection {SiteCollection}",
+                        scanId,
+                        site.SiteUrl);
 
-                    foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.Status == SiteWebStatus.Running).ToListAsync())
+                    foreach (var web in await dbContext.Webs.Where(p =>
+                                     p.ScanId == scanId && p.SiteUrl == site.SiteUrl &&
+                                     p.Status == SiteWebStatus.Running)
+                                 .ToListAsync())
                     {
                         web.Status = SiteWebStatus.Queued;
                         web.StartDate = DateTime.MinValue;
 
-                        Log.Information("Consolidating assessment {ScanId}, web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+                        Log.Information(
+                            "Consolidating assessment {ScanId}, web {SiteCollection}{Web}",
+                            scanId,
+                            site.SiteUrl,
+                            web.WebUrl);
 
                         // All data collected as part of a running web scan is dropped as the web scan will run again when restarted
                         await DropIncompleteWebScanDataAsync(scanId, dbContext, site, web);
@@ -510,23 +618,35 @@ namespace PnP.Scanning.Core.Storage
                 // Sites and webs having an error due to "task cancellation" should be retried on a restart. This typically happens
                 // when a scan was paused and pausing took to long so the cancellationtoken was "cancelled" resulting in exceptions
                 // being thrown
-                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Failed).ToListAsync())
+                foreach (var site in await dbContext.SiteCollections.Where(p => p.Status == SiteWebStatus.Failed)
+                             .ToListAsync())
                 {
-                    if (!string.IsNullOrEmpty(site.Error) && site.Error.Contains("A task was canceled", StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrEmpty(site.Error) && site.Error.Contains(
+                            "A task was canceled",
+                            StringComparison.OrdinalIgnoreCase))
                     {
                         site.Status = SiteWebStatus.Queued;
                         site.StartDate = DateTime.MinValue;
 
-                        Log.Information("Consolidating assessment {ScanId}, site collection {SiteCollection} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl);
+                        Log.Information(
+                            "Consolidating assessment {ScanId}, site collection {SiteCollection} which was errored due to 'A task was cancelled'",
+                            scanId,
+                            site.SiteUrl);
 
                         // Reset the running/failed webs so we can retry them
-                        foreach (var web in await dbContext.Webs.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && 
-                                                                        (p.Status == SiteWebStatus.Running || p.Status == SiteWebStatus.Failed)).ToListAsync())
+                        foreach (var web in await dbContext.Webs.Where(p =>
+                                         p.ScanId == scanId && p.SiteUrl == site.SiteUrl &&
+                                         (p.Status == SiteWebStatus.Running || p.Status == SiteWebStatus.Failed))
+                                     .ToListAsync())
                         {
                             web.Status = SiteWebStatus.Queued;
                             web.StartDate = DateTime.MinValue;
 
-                            Log.Information("Consolidating assessment {ScanId}, web {SiteCollection}{Web} which was errored due to 'A task was cancelled'", scanId, site.SiteUrl, web.WebUrl);
+                            Log.Information(
+                                "Consolidating assessment {ScanId}, web {SiteCollection}{Web} which was errored due to 'A task was cancelled'",
+                                scanId,
+                                site.SiteUrl,
+                                web.WebUrl);
 
                             // All data collected as part of a running web scan is dropped as the web scan will run again when restarted
                             await DropIncompleteWebScanDataAsync(scanId, dbContext, site, web);
@@ -536,14 +656,20 @@ namespace PnP.Scanning.Core.Storage
 
                 // Persist all the changes
                 await dbContext.SaveChangesAsync();
-                Log.Information("Database updates pushed in ConsolidatedScanToEnableRestartAsync for assessment {ScanId}", scanId);
+                Log.Information(
+                    "Database updates pushed in ConsolidatedScanToEnableRestartAsync for assessment {ScanId}",
+                    scanId);
 
 
                 Log.Information("Consolidating assessment {ScanId} at database level is done", scanId);
             }
         }
 
-        private async Task DropIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        private async Task DropIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
         {
             // PER SCAN COMPONENT: For each scan component implement here the method to drop incomplete web scan results
             await DropSyntexIncompleteWebScanDataAsync(scanId, dbContext, site, web);
@@ -564,7 +690,12 @@ namespace PnP.Scanning.Core.Storage
                 var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
                 if (scan != null)
                 {
-                    await AddHistoryRecordAsync(dbContext, scanId, Constants.EventAssessmentStatusChange, DateTime.Now, $"From {scan.Status} to {ScanStatus.Queued}");
+                    await AddHistoryRecordAsync(
+                        dbContext,
+                        scanId,
+                        Constants.EventAssessmentStatusChange,
+                        DateTime.Now,
+                        $"From {scan.Status} to {ScanStatus.Queued}");
                     scan.EndDate = DateTime.MinValue;
                     scan.Status = ScanStatus.Queued;
 
@@ -583,18 +714,20 @@ namespace PnP.Scanning.Core.Storage
                         Environment = scan.CLIEnvironment,
                         CertPath = scan.CLICertPath,
                         CertFile = scan.CLICertFile,
-                        CertPassword = !string.IsNullOrEmpty(scan.CLICertFilePassword) ? passwordProtector.Unprotect(scan.CLICertFilePassword) : scan.CLICertFilePassword,                        
+                        CertPassword =
+                            !string.IsNullOrEmpty(scan.CLICertFilePassword)
+                                ? passwordProtector.Unprotect(scan.CLICertFilePassword)
+                                : scan.CLICertFilePassword,
                         Threads = scan.CLIThreads
                     };
 
-                    foreach(var property in await dbContext.Properties.Where(p=>p.ScanId == scanId).ToListAsync())
+                    foreach (var property in await dbContext.Properties.Where(p => p.ScanId == scanId).ToListAsync())
                     {
-                        start.Properties.Add(new PropertyRequest
-                        {
-                            Property = property.Name,
-                            Type = property.Type,
-                            Value = property.Value
-                        });
+                        start.Properties.Add(
+                            new PropertyRequest
+                            {
+                                Property = property.Name, Type = property.Type, Value = property.Value
+                            });
                     }
 
                     return start;
@@ -615,7 +748,9 @@ namespace PnP.Scanning.Core.Storage
 
                 List<string> siteCollections = new();
 
-                foreach (var site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId && p.Status == SiteWebStatus.Queued).ToListAsync())
+                foreach (var site in await dbContext.SiteCollections
+                             .Where(p => p.ScanId == scanId && p.Status == SiteWebStatus.Queued)
+                             .ToListAsync())
                 {
                     siteCollections.Add(site.SiteUrl);
                 }
@@ -632,7 +767,10 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal static Task<List<EnumeratedWeb>> WebsToRestartScanningAsync(ScanContext dbContext, Guid scanId, string siteUrl)
+        internal static Task<List<EnumeratedWeb>> WebsToRestartScanningAsync(
+            ScanContext dbContext,
+            Guid scanId,
+            string siteUrl)
         {
             // Preserve the original enumeration's template when rebuilding the existing Web queue.
             // Dropping it makes resumed Classic Web/site summaries differ from an uninterrupted scan.
@@ -646,14 +784,9 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                foreach(var data in cacheData)
+                foreach (var data in cacheData)
                 {
-                    dbContext.Cache.Add(new Cache
-                    {
-                        ScanId = scanId,
-                        Key = data.Key,
-                        Value = data.Value,
-                    });
+                    dbContext.Cache.Add(new Cache { ScanId = scanId, Key = data.Key, Value = data.Value, });
                 }
 
                 // Persist all the changes
@@ -686,8 +819,8 @@ namespace PnP.Scanning.Core.Storage
         /// <summary>
         /// Reads the persisted local assessment summary through the shared disk reader.
         /// </summary>
-        internal async Task<ScanResultFromDatabase> GetScanResultAsync(Guid scanId)
-            => await ReadScanResultFromDiskAsync(scanId);
+        internal async Task<ScanResultFromDatabase> GetScanResultAsync(Guid scanId) =>
+            await ReadScanResultFromDiskAsync(scanId);
 
         /// <summary>
         /// Reads status, site counters, and pipeline ownership without constructing the online scan engine.
@@ -711,9 +844,9 @@ namespace PnP.Scanning.Core.Storage
                         int finished = 0;
                         int failed = 0;
 
-                        foreach (SiteCollection site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId).ToListAsync())
+                        foreach (SiteCollection site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId)
+                                     .ToListAsync())
                         {
-
                             switch (site.Status)
                             {
                                 case SiteWebStatus.Queued:
@@ -771,15 +904,15 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task AddHistoryRecordAsync(ScanContext dbContext, Guid scanId, string eventName, DateTime eventDate, string eventMessage)
+        internal async Task AddHistoryRecordAsync(
+            ScanContext dbContext,
+            Guid scanId,
+            string eventName,
+            DateTime eventDate,
+            string eventMessage)
         {
-            await dbContext.History.AddAsync(new History
-            {
-                ScanId = scanId,
-                Event = eventName,
-                EventDate = eventDate,
-                Message = eventMessage
-            });
+            await dbContext.History.AddAsync(
+                new History { ScanId = scanId, Event = eventName, EventDate = eventDate, Message = eventMessage });
         }
 
         internal async static Task<ScanContext> GetScanContextForDataExportAsync(Guid scanId)
@@ -812,7 +945,7 @@ namespace PnP.Scanning.Core.Storage
             {
                 message += $": {pnPException.Error}";
             }
-            
+
             if (ex.InnerException != null)
             {
                 message += ex.InnerException.Message;
@@ -822,12 +955,20 @@ namespace PnP.Scanning.Core.Storage
         }
 
         #region Scanner specific operations
-        
+
         // PER SCAN COMPONENT: storage methods per scanner
+
         #region Syntex
-        internal async Task StoreSyntexInformationAsync(Guid scanId, List<SyntexList> syntexLists, List<SyntexContentType> syntexContentTypes, 
-                                                                     List<SyntexContentTypeField> syntexContentTypeFields, List<SyntexField> syntexFields,
-                                                                     List<SyntexModelUsage> syntexModelUsage, List<SyntexFileType> syntexFileTypes, List<SyntexTermSet> syntexTermSets)
+
+        internal async Task StoreSyntexInformationAsync(
+            Guid scanId,
+            List<SyntexList> syntexLists,
+            List<SyntexContentType> syntexContentTypes,
+            List<SyntexContentTypeField> syntexContentTypeFields,
+            List<SyntexField> syntexFields,
+            List<SyntexModelUsage> syntexModelUsage,
+            List<SyntexFileType> syntexFileTypes,
+            List<SyntexTermSet> syntexTermSets)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -850,7 +991,9 @@ namespace PnP.Scanning.Core.Storage
             {
                 dbContext.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == scanId && p.ContentTypeId == contentTypeId);
+                var contentType =
+                    await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.ContentTypeId == contentTypeId);
 
                 if (contentType != null)
                 {
@@ -867,7 +1010,8 @@ namespace PnP.Scanning.Core.Storage
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p => p.ScanId == scanId && p.ContentTypeId == syntexContentTypeSummary.ContentTypeId);
+                var contentType = await dbContext.SyntexContentTypeOverview.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.ContentTypeId == syntexContentTypeSummary.ContentTypeId);
                 if (contentType == null)
                 {
                     await dbContext.SyntexContentTypeOverview.AddAsync(syntexContentTypeSummary);
@@ -875,9 +1019,11 @@ namespace PnP.Scanning.Core.Storage
                 }
             }
         }
+
         #endregion
 
         #region Workflow
+
         internal async Task StoreWorkflowInformationAsync(Guid scanId, List<Workflow> workflowLists)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -888,9 +1034,11 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("StoreWorkflowInformationAsync succeeded");
             }
         }
+
         #endregion
 
         #region InfoPath
+
         internal async Task StoreInfoPathInformationAsync(Guid scanId, List<ClassicInfoPath> infoPathLists)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -901,9 +1049,11 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("StoreInfoPathInformationAsync succeeded");
             }
         }
+
         #endregion
 
         #region Classic
+
         internal async Task StorePageInformationAsync(Guid scanId, List<ClassicPage> pagesLists)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -935,7 +1085,9 @@ namespace PnP.Scanning.Core.Storage
         // on the supplied context, following the StorePageInformationAsync pattern. A null/empty list
         // is a no-op (no database round-trip), so a page with no web parts does not trigger an empty
         // SaveChanges.
-        internal static async Task StorePageWebPartsAsync(ScanContext dbContext, List<ClassicPageWebPart> pageWebPartsList)
+        internal static async Task StorePageWebPartsAsync(
+            ScanContext dbContext,
+            List<ClassicPageWebPart> pageWebPartsList)
         {
             if (pageWebPartsList == null || pageWebPartsList.Count == 0)
             {
@@ -966,14 +1118,18 @@ namespace PnP.Scanning.Core.Storage
             // Load the page readiness facts once and group per web (avoids an N+1 query per web summary).
             var pagesByWeb = (await dbContext.ClassicPages
                     .Where(p => p.ScanId == scanId)
-                    .Select(p => new { p.SiteUrl, p.WebUrl, p.WebPartCount, p.MappingPercentage, p.UncustomizedHomePage })
-                    .ToListAsync())
-                .GroupBy(p => (p.SiteUrl, p.WebUrl))
+                    .Select(p => new
+                    {
+                        p.SiteUrl,
+                        p.WebUrl,
+                        p.WebPartCount,
+                        p.MappingPercentage,
+                        p.UncustomizedHomePage
+                    })
+                    .ToListAsync()).GroupBy(p => (p.SiteUrl, p.WebUrl))
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            var webSummaries = await dbContext.ClassicWebSummaries
-                .Where(w => w.ScanId == scanId)
-                .ToListAsync();
+            var webSummaries = await dbContext.ClassicWebSummaries.Where(w => w.ScanId == scanId).ToListAsync();
 
             foreach (var web in webSummaries)
             {
@@ -1028,15 +1184,16 @@ namespace PnP.Scanning.Core.Storage
         //                   (e.g. ScriptEditor/SimpleForm) is InMappingFile=true but IsMappable=false. Resolved
         //                   via the same shared WebPartMappingManager the page scan uses.
         //   PageCount     = number of distinct classic pages that reference the type at least once.
-        internal static async Task PopulateWebPartUniqueAsync(ScanContext dbContext, Guid scanId, WebPartMappingManager mappingManager)
+        internal static async Task PopulateWebPartUniqueAsync(
+            ScanContext dbContext,
+            Guid scanId,
+            WebPartMappingManager mappingManager)
         {
-            var rows = await dbContext.ClassicPageWebParts
-                .Where(wp => wp.ScanId == scanId)
+            var rows = await dbContext.ClassicPageWebParts.Where(wp => wp.ScanId == scanId)
                 .Select(wp => new { wp.WebPartType, wp.SiteUrl, wp.WebUrl, wp.PageUrl })
                 .ToListAsync();
 
-            var uniques = rows
-                .GroupBy(wp => wp.WebPartType)
+            var uniques = rows.GroupBy(wp => wp.WebPartType)
                 .Select(g => new ClassicWebPartUnique
                 {
                     ScanId = scanId,
@@ -1086,8 +1243,7 @@ namespace PnP.Scanning.Core.Storage
 
             // Master page data is per web and only present when the Extensibility component ran. MasterPage =
             // the web's MasterUrl (system master), CustomMasterPage = CustomMasterUrl (custom/site master).
-            var extensibilities = await dbContext.ClassicExtensibilities
-                .Where(e => e.ScanId == scanId)
+            var extensibilities = await dbContext.ClassicExtensibilities.Where(e => e.ScanId == scanId)
                 .Select(e => new { e.SiteUrl, e.WebUrl, e.MasterPage, e.CustomMasterPage })
                 .ToListAsync();
 
@@ -1110,10 +1266,12 @@ namespace PnP.Scanning.Core.Storage
                     {
                         continue;
                     }
+
                     if (!string.IsNullOrEmpty(e.CustomMasterPage))
                     {
                         siteMasters.Add(e.CustomMasterPage);
                     }
+
                     if (!string.IsNullOrEmpty(e.MasterPage))
                     {
                         systemMasters.Add(e.MasterPage);
@@ -1128,10 +1286,12 @@ namespace PnP.Scanning.Core.Storage
                     {
                         continue;
                     }
+
                     if (!string.IsNullOrEmpty(page.Layout))
                     {
                         layouts.Add(page.Layout);
                     }
+
                     if (page.ModifiedAt != DateTime.MinValue && page.ModifiedAt != DateTime.MaxValue &&
                         (lastUpdate == null || page.ModifiedAt > lastUpdate))
                     {
@@ -1139,17 +1299,18 @@ namespace PnP.Scanning.Core.Storage
                     }
                 }
 
-                rows.Add(new ClassicPublishingSiteSummary
-                {
-                    ScanId = scanId,
-                    SiteUrl = siteUrl,
-                    NumberOfWebs = siteGroup.Count(),
-                    NumberOfPages = siteGroup.Sum(w => w.ClassicPublishingPages),
-                    UsedSiteMasterPages = siteMasters.Count > 0 ? string.Join(",", siteMasters) : null,
-                    UsedSystemMasterPages = systemMasters.Count > 0 ? string.Join(",", systemMasters) : null,
-                    UsedPageLayouts = layouts.Count > 0 ? string.Join(",", layouts) : null,
-                    LastPageUpdateDate = lastUpdate,
-                });
+                rows.Add(
+                    new ClassicPublishingSiteSummary
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        NumberOfWebs = siteGroup.Count(),
+                        NumberOfPages = siteGroup.Sum(w => w.ClassicPublishingPages),
+                        UsedSiteMasterPages = siteMasters.Count > 0 ? string.Join(",", siteMasters) : null,
+                        UsedSystemMasterPages = systemMasters.Count > 0 ? string.Join(",", systemMasters) : null,
+                        UsedPageLayouts = layouts.Count > 0 ? string.Join(",", layouts) : null,
+                        LastPageUpdateDate = lastUpdate,
+                    });
             }
 
             await dbContext.ClassicPublishingSiteSummaries.AddRangeAsync(rows);
@@ -1169,12 +1330,23 @@ namespace PnP.Scanning.Core.Storage
             // Sovereign cloud check
             PnP.Core.Services.Microsoft365Environment m365env = PnP.Core.Services.Microsoft365Environment.Production;
             Enum.TryParse(environment, out m365env);
-            if (m365env != PnP.Core.Services.Microsoft365Environment.Production && m365env != PnP.Core.Services.Microsoft365Environment.PreProduction)
+            if (m365env != PnP.Core.Services.Microsoft365Environment.Production &&
+                m365env != PnP.Core.Services.Microsoft365Environment.PreProduction)
             {
-                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).Select(p => p.SiteUrl).ToList();
+                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
+                    .Select(p => p.SiteUrl)
+                    .ToList();
                 var skipRecords = new List<ClassicPageAuditUsage>();
                 foreach (var siteUrl in sites)
-                    BuildAuditLogRecords(skipRecords, scanId, siteUrl, null, windowStart, windowEnd, "skipped", "SovereignCloud");
+                    BuildAuditLogRecords(
+                        skipRecords,
+                        scanId,
+                        siteUrl,
+                        null,
+                        windowStart,
+                        windowEnd,
+                        "skipped",
+                        "SovereignCloud");
                 await dbContext.BulkInsertAsync(skipRecords);
                 return;
             }
@@ -1194,10 +1366,20 @@ namespace PnP.Scanning.Core.Storage
             catch (Exception ex)
             {
                 Log.Warning("Failed to acquire audit log token for scan {ScanId}: {Error}", scanId, ex.Message);
-                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).Select(p => p.SiteUrl).ToList();
+                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
+                    .Select(p => p.SiteUrl)
+                    .ToList();
                 var skipRecords = new List<ClassicPageAuditUsage>();
                 foreach (var siteUrl in sites)
-                    BuildAuditLogRecords(skipRecords, scanId, siteUrl, null, windowStart, windowEnd, "skipped", $"TokenError: {ex.Message}");
+                    BuildAuditLogRecords(
+                        skipRecords,
+                        scanId,
+                        siteUrl,
+                        null,
+                        windowStart,
+                        windowEnd,
+                        "skipped",
+                        $"TokenError: {ex.Message}");
                 await dbContext.BulkInsertAsync(skipRecords);
                 return;
             }
@@ -1211,16 +1393,24 @@ namespace PnP.Scanning.Core.Storage
             // Pass site URLs as objectIdFilters only when --siteslist / --sitesfile was explicitly
             // used. For full-tenant scans, pass null so the query covers the whole tenant.
             var scanRecord = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
-            bool hasExplicitSiteList = !string.IsNullOrEmpty(scanRecord?.CLISiteList)
-                                    || !string.IsNullOrEmpty(scanRecord?.CLISiteFile);
+            bool hasExplicitSiteList = !string.IsNullOrEmpty(scanRecord?.CLISiteList) ||
+                                       !string.IsNullOrEmpty(scanRecord?.CLISiteFile);
 
-            var siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).Select(p => p.SiteUrl).ToList();
+            var siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
+                .Select(p => p.SiteUrl)
+                .ToList();
             IReadOnlyList<string> siteUrlsForFilter = hasExplicitSiteList ? siteUrls : null;
 
             Action<string> auditProgress = msg => Log.Information("[AuditLog] {ScanId} {AuditMsg}", scanId, msg);
             var (allStats, skipReason) = await Scanners.AuditLogUsageAnalyzer.QueryAllSitesAuditUsageAsync(
-                Authentication.AuthenticationManager.HttpClient, graphBaseUrl, tokenProvider,
-                siteUrlsForFilter, windowStart, windowEnd, cancellationToken, auditProgress);
+                Authentication.AuthenticationManager.HttpClient,
+                graphBaseUrl,
+                tokenProvider,
+                siteUrlsForFilter,
+                windowStart,
+                windowEnd,
+                cancellationToken,
+                auditProgress);
 
             // allStats != null + skipReason == null → full success
             // allStats != null + skipReason != null → partial success (some chunks failed, data incomplete)
@@ -1254,7 +1444,9 @@ namespace PnP.Scanning.Core.Storage
             Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>> statsBySite = null;
             if (allStats != null)
             {
-                statsBySite = new Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>>(StringComparer.OrdinalIgnoreCase);
+                statsBySite =
+                    new Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>>(
+                        StringComparer.OrdinalIgnoreCase);
                 foreach (var kvp in allStats)
                 {
                     string owningSite = null;
@@ -1266,11 +1458,13 @@ namespace PnP.Scanning.Core.Storage
                             break;
                         }
                     }
-                    if (owningSite == null)
-                        continue; // page under no scanned site — same exclusion as before
+
+                    if (owningSite == null) continue; // page under no scanned site — same exclusion as before
 
                     if (!statsBySite.TryGetValue(owningSite, out var siteDict))
-                        statsBySite[owningSite] = siteDict = new Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>(StringComparer.OrdinalIgnoreCase);
+                        statsBySite[owningSite] = siteDict =
+                            new Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>(
+                                StringComparer.OrdinalIgnoreCase);
                     siteDict[kvp.Key] = kvp.Value;
                 }
             }
@@ -1281,7 +1475,15 @@ namespace PnP.Scanning.Core.Storage
                 IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> siteStats = null;
                 if (statsBySite != null && statsBySite.TryGetValue(siteUrl, out var assigned) && assigned.Count > 0)
                     siteStats = assigned;
-                BuildAuditLogRecords(allRecords, scanId, siteUrl, siteStats, windowStart, windowEnd, globalStatus, skipReason);
+                BuildAuditLogRecords(
+                    allRecords,
+                    scanId,
+                    siteUrl,
+                    siteStats,
+                    windowStart,
+                    windowEnd,
+                    globalStatus,
+                    skipReason);
             }
 
             await dbContext.BulkInsertAsync(allRecords);
@@ -1300,8 +1502,14 @@ namespace PnP.Scanning.Core.Storage
             // Strip scheme+host so stored PageUrl is server-relative (matches classicpages.csv Url column).
             // ApplyAuditUsage looks up record.PageUrl in the stats dict (absolute keys), so we convert after.
             string tenantOrigin = null;
-            try { tenantOrigin = new Uri(siteUrl).GetLeftPart(UriPartial.Authority); }
-            catch { }
+            try
+            {
+                tenantOrigin = new Uri(siteUrl).GetLeftPart(UriPartial.Authority);
+            }
+            catch
+            {
+            }
+
             string Rel(string abs)
             {
                 if (tenantOrigin == null || !abs.StartsWith(tenantOrigin, StringComparison.OrdinalIgnoreCase))
@@ -1313,21 +1521,22 @@ namespace PnP.Scanning.Core.Storage
 
             if (stats == null || stats.Count == 0)
             {
-                target.Add(new ClassicPageAuditUsage
-                {
-                    ScanId = scanId,
-                    SiteUrl = siteUrl,
-                    WebUrl = "/",
-                    PageUrl = Rel(siteUrl),
-                    AuditViewsCount = 0,
-                    AuditCreatesCount = 0,
-                    AuditEditsCount = 0,
-                    AuditUniqueUsers = 0,
-                    AuditWindowStart = windowStart,
-                    AuditWindowEnd = windowEnd,
-                    QueryStatus = queryStatus,
-                    SkipReason = skipReason,
-                });
+                target.Add(
+                    new ClassicPageAuditUsage
+                    {
+                        ScanId = scanId,
+                        SiteUrl = siteUrl,
+                        WebUrl = "/",
+                        PageUrl = Rel(siteUrl),
+                        AuditViewsCount = 0,
+                        AuditCreatesCount = 0,
+                        AuditEditsCount = 0,
+                        AuditUniqueUsers = 0,
+                        AuditWindowStart = windowStart,
+                        AuditWindowEnd = windowEnd,
+                        QueryStatus = queryStatus,
+                        SkipReason = skipReason,
+                    });
             }
             else
             {
@@ -1358,17 +1567,18 @@ namespace PnP.Scanning.Core.Storage
                 // coverage gap is visible in the CSV without polluting per-page rows.
                 if (queryStatus == "partial" && !string.IsNullOrEmpty(skipReason))
                 {
-                    target.Add(new ClassicPageAuditUsage
-                    {
-                        ScanId = scanId,
-                        SiteUrl = siteUrl,
-                        WebUrl = "/",
-                        PageUrl = Rel(siteUrl),
-                        AuditWindowStart = windowStart,
-                        AuditWindowEnd = windowEnd,
-                        QueryStatus = queryStatus,
-                        SkipReason = skipReason,
-                    });
+                    target.Add(
+                        new ClassicPageAuditUsage
+                        {
+                            ScanId = scanId,
+                            SiteUrl = siteUrl,
+                            WebUrl = "/",
+                            PageUrl = Rel(siteUrl),
+                            AuditWindowStart = windowStart,
+                            AuditWindowEnd = windowEnd,
+                            QueryStatus = queryStatus,
+                            SkipReason = skipReason,
+                        });
                 }
             }
         }
@@ -1384,7 +1594,9 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreClassicUserCustomActionInformationAsync(Guid scanId, List<ClassicUserCustomAction> userCustomActionLists)
+        internal async Task StoreClassicUserCustomActionInformationAsync(
+            Guid scanId,
+            List<ClassicUserCustomAction> userCustomActionLists)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -1395,7 +1607,9 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreClassicExtensibilityInformationAsync(Guid scanId, List<ClassicExtensibility> classicExtensibilities)
+        internal async Task StoreClassicExtensibilityInformationAsync(
+            Guid scanId,
+            List<ClassicExtensibility> classicExtensibilities)
         {
             using (var dbContext = new ScanContext(scanId))
             {
@@ -1409,27 +1623,60 @@ namespace PnP.Scanning.Core.Storage
         /// <summary>
         /// Stores the assessed page counters in the scan-owned database using the shared summary writer.
         /// </summary>
-        internal async Task StorePageSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template,
-            PnPContext context, HashSet<string> remediationCodes, int modernPageCounter, int wikiPageCounter,
-            int blogPageCounter, int webPartPageCounter, int aspxPageCounter, int publishingPageCounter)
+        internal async Task StorePageSummaryAsync(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context,
+            HashSet<string> remediationCodes,
+            int modernPageCounter,
+            int wikiPageCounter,
+            int blogPageCounter,
+            int webPartPageCounter,
+            int aspxPageCounter,
+            int publishingPageCounter)
         {
             using var dbContext = new ScanContext(scanId);
-            await StorePageSummaryAsync(dbContext, scanId, siteUrl, webUrl, template, context, remediationCodes,
-                modernPageCounter, wikiPageCounter, blogPageCounter, webPartPageCounter, aspxPageCounter,
-                publishingPageCounter).ConfigureAwait(false);
+            await StorePageSummaryAsync(
+                    dbContext,
+                    scanId,
+                    siteUrl,
+                    webUrl,
+                    template,
+                    context,
+                    remediationCodes,
+                    modernPageCounter,
+                    wikiPageCounter,
+                    blogPageCounter,
+                    webPartPageCounter,
+                    aspxPageCounter,
+                    publishingPageCounter)
+                .ConfigureAwait(false);
         }
 
         /// <summary>
         /// Persists the same per-web page summary on a supplied context so offline assessment regressions
         /// exercise the production rollup and preserve remediation codes from other Classic components.
         /// </summary>
-        internal static async Task StorePageSummaryAsync(ScanContext dbContext, Guid scanId, string siteUrl,
-            string webUrl, string template, PnPContext context, HashSet<string> remediationCodes,
-            int modernPageCounter, int wikiPageCounter, int blogPageCounter, int webPartPageCounter,
-            int aspxPageCounter, int publishingPageCounter)
+        internal static async Task StorePageSummaryAsync(
+            ScanContext dbContext,
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context,
+            HashSet<string> remediationCodes,
+            int modernPageCounter,
+            int wikiPageCounter,
+            int blogPageCounter,
+            int webPartPageCounter,
+            int aspxPageCounter,
+            int publishingPageCounter)
         {
             var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId &&
-                p.SiteUrl == siteUrl && p.WebUrl == webUrl).ConfigureAwait(false);
+                    p.SiteUrl == siteUrl && p.WebUrl == webUrl)
+                .ConfigureAwait(false);
             if (webSummary == null)
             {
                 webSummary = new ClassicWebSummary
@@ -1449,7 +1696,8 @@ namespace PnP.Scanning.Core.Storage
             webSummary.ClassicWebPartPages = webPartPageCounter;
             webSummary.ClassicPublishingPages = publishingPageCounter;
             webSummary.ModernPages = modernPageCounter;
-            webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter + publishingPageCounter;
+            webSummary.ClassicPages = aspxPageCounter + blogPageCounter + wikiPageCounter + webPartPageCounter +
+                                      publishingPageCounter;
             webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
 
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
@@ -1458,7 +1706,9 @@ namespace PnP.Scanning.Core.Storage
 
         private static string AggregateRemediationCodes(HashSet<string> remediationCodes, ClassicWebSummary webSummary)
         {
-            var split = webSummary.AggregatedRemediationCodes?.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var split = webSummary.AggregatedRemediationCodes?.Split(
+                new[] { ',' },
+                StringSplitOptions.RemoveEmptyEntries);
             if (split != null)
             {
                 foreach (var code in split)
@@ -1470,11 +1720,20 @@ namespace PnP.Scanning.Core.Storage
             return string.Join(",", remediationCodes);
         }
 
-        internal async Task StoreListSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int modernListCounter,int classicListCounter)
+        internal async Task StoreListSummaryAsync(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context,
+            HashSet<string> remediationCodes,
+            int modernListCounter,
+            int classicListCounter)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
 
                 if (webSummary == null)
                 {
@@ -1499,14 +1758,23 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreWorkflowSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes)
+        internal async Task StoreWorkflowSummaryAsync(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context,
+            HashSet<string> remediationCodes)
         {
             using (var dbContext = new ScanContext(scanId))
             {
                 // Check if there are workflows for this web
-                var workflows = await dbContext.Workflows.Where(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl).ToListAsync();
+                var workflows = await dbContext.Workflows
+                    .Where(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl)
+                    .ToListAsync();
 
-                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
 
                 if (webSummary == null)
                 {
@@ -1538,11 +1806,19 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreInfoPathSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int infoPathForms)
+        internal async Task StoreInfoPathSummaryAsync(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context,
+            HashSet<string> remediationCodes,
+            int infoPathForms)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
 
                 if (webSummary == null)
                 {
@@ -1574,14 +1850,21 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
-        internal async Task StoreSiteSummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context)
+        internal async Task StoreSiteSummaryAsync(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context)
         {
             using (var dbContext = new ScanContext(scanId))
             {
                 // Check if there are workflows for this web
-                var web = await dbContext.Webs.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+                var web = await dbContext.Webs.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
 
-                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
 
                 if (webSummary == null)
                 {
@@ -1601,10 +1884,7 @@ namespace PnP.Scanning.Core.Storage
 
                 if (!string.IsNullOrEmpty(remediationCode))
                 {
-                    HashSet<string> remediationCodes = new()
-                    {
-                        remediationCode
-                    };
+                    HashSet<string> remediationCodes = new() { remediationCode };
                     webSummary.AggregatedRemediationCodes = AggregateRemediationCodes(remediationCodes, webSummary);
                 }
 
@@ -1625,7 +1905,6 @@ namespace PnP.Scanning.Core.Storage
             {
                 webSummary.IsClassicPublishingSite = true;
                 webSummary.RemediationCode = RemediationCodes.CS2.ToString();
-                
             }
             else if (siteType == SiteType.Communication)
             {
@@ -1639,11 +1918,19 @@ namespace PnP.Scanning.Core.Storage
             return webSummary.RemediationCode;
         }
 
-        internal async Task StoreExtensibilitySummaryAsync(Guid scanId, string siteUrl, string webUrl, string template, PnPContext context, HashSet<string> remediationCodes, int extensibilityCount)
+        internal async Task StoreExtensibilitySummaryAsync(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            PnPContext context,
+            HashSet<string> remediationCodes,
+            int extensibilityCount)
         {
             using (var dbContext = new ScanContext(scanId))
             {
-                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p => p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
+                var webSummary = await dbContext.ClassicWebSummaries.FirstOrDefaultAsync(p =>
+                    p.ScanId == scanId && p.SiteUrl == siteUrl && p.WebUrl == webUrl);
 
                 if (webSummary == null)
                 {
@@ -1679,28 +1966,34 @@ namespace PnP.Scanning.Core.Storage
 
         #region Azure ACS and SharePoint Add-Ins
 
-        internal async Task StoreAzureACSInformationAsync(Guid scanId, List<TempClassicACSPrincipalValidUntil> classicACSPrincipalValidUntils, List<TempClassicACSPrincipal> classicACSPrincipals, List<ClassicACSPrincipalSiteScopedPermissions> siteScopedPermissions, List<ClassicACSPrincipalTenantScopedPermissions> tenantScopedPermissions)
+        internal async Task StoreAzureACSInformationAsync(
+            Guid scanId,
+            List<TempClassicACSPrincipalValidUntil> classicACSPrincipalValidUntils,
+            List<TempClassicACSPrincipal> classicACSPrincipals,
+            List<ClassicACSPrincipalSiteScopedPermissions> siteScopedPermissions,
+            List<ClassicACSPrincipalTenantScopedPermissions> tenantScopedPermissions)
         {
             using (var dbContext = new ScanContext(scanId))
             {
                 await dbContext.TempClassicACSPrincipals.AddRangeAsync(classicACSPrincipals.ToArray());
-                
+
                 if (classicACSPrincipalValidUntils != null)
                 {
-                    await dbContext.TempClassicACSPrincipalValidUntils.AddRangeAsync(classicACSPrincipalValidUntils.ToArray());
+                    await dbContext.TempClassicACSPrincipalValidUntils.AddRangeAsync(
+                        classicACSPrincipalValidUntils.ToArray());
                 }
-                
+
                 await dbContext.ClassicACSPrincipalSiteScopedPermissions.AddRangeAsync(siteScopedPermissions.ToArray());
-                
+
                 // Tenant scoped permissions can be retrieved multiple times, ensure we're not trying to create duplicates
-                foreach(var tenantScopedPermission in tenantScopedPermissions) 
-                { 
-                    if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == tenantScopedPermission.ScanId &&
-                                                                                                            p.AppIdentifier == tenantScopedPermission.AppIdentifier &&
-                                                                                                            p.ProductFeature == tenantScopedPermission.ProductFeature &&
-                                                                                                            p.Scope == tenantScopedPermission.Scope &&
-                                                                                                            p.Right == tenantScopedPermission.Right &&
-                                                                                                            p.ResourceId == tenantScopedPermission.ResourceId) == null)
+                foreach (var tenantScopedPermission in tenantScopedPermissions)
+                {
+                    if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p =>
+                            p.ScanId == tenantScopedPermission.ScanId &&
+                            p.AppIdentifier == tenantScopedPermission.AppIdentifier &&
+                            p.ProductFeature == tenantScopedPermission.ProductFeature &&
+                            p.Scope == tenantScopedPermission.Scope && p.Right == tenantScopedPermission.Right &&
+                            p.ResourceId == tenantScopedPermission.ResourceId) == null)
                     {
                         await dbContext.ClassicACSPrincipalTenantScopedPermissions.AddAsync(tenantScopedPermission);
                     }
@@ -1727,39 +2020,43 @@ namespace PnP.Scanning.Core.Storage
             using (var dbContext = new ScanContext(scanId))
             {
                 // Copy over data from TempClassicACSPrincipals into ClassicACSPrincipals and ClassicACSPrincipalSites
-                foreach (var tempACSPrincipal in await dbContext.TempClassicACSPrincipals.Where(p => p.ScanId == scanId).ToListAsync())
+                foreach (var tempACSPrincipal in await dbContext.TempClassicACSPrincipals.Where(p => p.ScanId == scanId)
+                             .ToListAsync())
                 {
-                    if (await dbContext.ClassicACSPrincipals.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == tempACSPrincipal.AppIdentifier) == null)
+                    if (await dbContext.ClassicACSPrincipals.FirstOrDefaultAsync(p =>
+                            p.ScanId == scanId && p.AppIdentifier == tempACSPrincipal.AppIdentifier) == null)
                     {
-                        await dbContext.ClassicACSPrincipals.AddAsync(new ClassicACSPrincipal
-                        {
-                            ScanId = tempACSPrincipal.ScanId,
-                            AppIdentifier = tempACSPrincipal.AppIdentifier,
-                            AllowAppOnly = tempACSPrincipal.AllowAppOnly,
-                            AppDomains = tempACSPrincipal.AppDomains,
-                            AppId = tempACSPrincipal.AppId,
-                            RedirectUri = tempACSPrincipal.RedirectUri,
-                            Title = tempACSPrincipal.Title,
-                            ValidUntil = tempACSPrincipal.ValidUntil,
-                            RemediationCode = tempACSPrincipal.RemediationCode,
-                            // Will be updated later on
-                            HasExpired = false,
-                            HasSiteCollectionScopedPermissions = false,
-                            HasTenantScopedPermissions = false,
-                        });
+                        await dbContext.ClassicACSPrincipals.AddAsync(
+                            new ClassicACSPrincipal
+                            {
+                                ScanId = tempACSPrincipal.ScanId,
+                                AppIdentifier = tempACSPrincipal.AppIdentifier,
+                                AllowAppOnly = tempACSPrincipal.AllowAppOnly,
+                                AppDomains = tempACSPrincipal.AppDomains,
+                                AppId = tempACSPrincipal.AppId,
+                                RedirectUri = tempACSPrincipal.RedirectUri,
+                                Title = tempACSPrincipal.Title,
+                                ValidUntil = tempACSPrincipal.ValidUntil,
+                                RemediationCode = tempACSPrincipal.RemediationCode,
+                                // Will be updated later on
+                                HasExpired = false,
+                                HasSiteCollectionScopedPermissions = false,
+                                HasTenantScopedPermissions = false,
+                            });
                     }
 
                     // Add the site if needed
-                    if (await dbContext.ClassicACSPrincipalSites.FirstOrDefaultAsync(p => p.ScanId == scanId && 
-                                                                                          p.AppIdentifier == tempACSPrincipal.AppIdentifier && 
-                                                                                          p.ServerRelativeUrl == tempACSPrincipal.ServerRelativeUrl) == null)
+                    if (await dbContext.ClassicACSPrincipalSites.FirstOrDefaultAsync(p => p.ScanId == scanId &&
+                            p.AppIdentifier == tempACSPrincipal.AppIdentifier &&
+                            p.ServerRelativeUrl == tempACSPrincipal.ServerRelativeUrl) == null)
                     {
-                        await dbContext.ClassicACSPrincipalSites.AddAsync(new ClassicACSPrincipalSite
-                        {
-                            ScanId = tempACSPrincipal.ScanId,
-                            AppIdentifier = tempACSPrincipal.AppIdentifier,
-                            ServerRelativeUrl = tempACSPrincipal.ServerRelativeUrl,
-                        });
+                        await dbContext.ClassicACSPrincipalSites.AddAsync(
+                            new ClassicACSPrincipalSite
+                            {
+                                ScanId = tempACSPrincipal.ScanId,
+                                AppIdentifier = tempACSPrincipal.AppIdentifier,
+                                ServerRelativeUrl = tempACSPrincipal.ServerRelativeUrl,
+                            });
                     }
 
                     await dbContext.SaveChangesAsync();
@@ -1767,11 +2064,18 @@ namespace PnP.Scanning.Core.Storage
 
 
                 // Copy over principal validity information from TempClassicACSPrincipalValidUntils into ClassicACSPrincipals
-                foreach (var classicACSPrincipalValidUntil in await dbContext.TempClassicACSPrincipalValidUntils.Where(p => p.ScanId == scanId).OrderByDescending(p => p.ValidUntil).ToListAsync())
+                foreach (var classicACSPrincipalValidUntil in await dbContext.TempClassicACSPrincipalValidUntils
+                             .Where(p => p.ScanId == scanId)
+                             .OrderByDescending(p => p.ValidUntil)
+                             .ToListAsync())
                 {
-                    foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipalValidUntil.AppIdentifier).ToListAsync())
+                    foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p =>
+                                     p.ScanId == scanId &&
+                                     p.AppIdentifier == classicACSPrincipalValidUntil.AppIdentifier)
+                                 .ToListAsync())
                     {
-                        if (classicACSPrincipal.ValidUntil == DateTime.MinValue && classicACSPrincipalValidUntil.ValidUntil != DateTime.MinValue)
+                        if (classicACSPrincipal.ValidUntil == DateTime.MinValue &&
+                            classicACSPrincipalValidUntil.ValidUntil != DateTime.MinValue)
                         {
                             classicACSPrincipal.ValidUntil = classicACSPrincipalValidUntil.ValidUntil;
                         }
@@ -1779,9 +2083,11 @@ namespace PnP.Scanning.Core.Storage
                 }
 
                 // Set the calculated fields
-                foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId).ToListAsync())
-                { 
-                    if (string.IsNullOrEmpty(classicACSPrincipal.AppDomains) && string.IsNullOrEmpty(classicACSPrincipal.RedirectUri))
+                foreach (var classicACSPrincipal in await dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId)
+                             .ToListAsync())
+                {
+                    if (string.IsNullOrEmpty(classicACSPrincipal.AppDomains) &&
+                        string.IsNullOrEmpty(classicACSPrincipal.RedirectUri))
                     {
                         // Support the case where the app was created using Entra registration and then later granted permissions using appinv.aspx.
                         // This only applies to ACS principals scoped to the full tenant created by calling appinv.asxp from tenant admin center.
@@ -1801,22 +2107,25 @@ namespace PnP.Scanning.Core.Storage
                         classicACSPrincipal.HasExpired = classicACSPrincipal.ValidUntil < DateTime.Now;
                     }
 
-                    if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
+                    if (await dbContext.ClassicACSPrincipalTenantScopedPermissions.FirstOrDefaultAsync(p =>
+                            p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
                     {
                         classicACSPrincipal.HasTenantScopedPermissions = true;
                     }
 
-                    if (await dbContext.ClassicACSPrincipalSiteScopedPermissions.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
+                    if (await dbContext.ClassicACSPrincipalSiteScopedPermissions.FirstOrDefaultAsync(p =>
+                            p.ScanId == scanId && p.AppIdentifier == classicACSPrincipal.AppIdentifier) != null)
                     {
                         classicACSPrincipal.HasSiteCollectionScopedPermissions = true;
                     }
                 }
 
-                foreach(var classicAddIn in await dbContext.ClassicAddIns.Where(p => p.ScanId == scanId).ToListAsync())
+                foreach (var classicAddIn in await dbContext.ClassicAddIns.Where(p => p.ScanId == scanId).ToListAsync())
                 {
-                    var usedACSPrincipal = await dbContext.ClassicACSPrincipals.FirstOrDefaultAsync(p => p.ScanId == scanId && p.AppIdentifier == classicAddIn.AppIdentifier);
-                    if (usedACSPrincipal  != null && usedACSPrincipal.HasExpired) 
-                    { 
+                    var usedACSPrincipal = await dbContext.ClassicACSPrincipals.FirstOrDefaultAsync(p =>
+                        p.ScanId == scanId && p.AppIdentifier == classicAddIn.AppIdentifier);
+                    if (usedACSPrincipal != null && usedACSPrincipal.HasExpired)
+                    {
                         classicAddIn.HasExpired = usedACSPrincipal.HasExpired;
                     }
                 }
@@ -1829,6 +2138,7 @@ namespace PnP.Scanning.Core.Storage
         #endregion
 
         #region Alerts
+
         internal async Task StoreAlertsInformationAsync(Guid scanId, List<Alerts> alertsList)
         {
             using (var dbContext = new ScanContext(scanId))
@@ -1839,126 +2149,224 @@ namespace PnP.Scanning.Core.Storage
                 Log.Information("StoreAlertsInformationAsync succeeded");
             }
         }
+
         #endregion
 
         // PER SCAN COMPONENT: implement DropXXXIncompleteWebScanDataAsync methods
-        private async Task DropSyntexIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        private async Task DropSyntexIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
         {
-            foreach (var syntexListResult in await dbContext.SyntexLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var syntexListResult in await dbContext.SyntexLists
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.SyntexLists.Remove(syntexListResult);
             }
-            foreach (var syntexContentTypeFieldResult in await dbContext.SyntexContentTypeFields.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+
+            foreach (var syntexContentTypeFieldResult in await dbContext.SyntexContentTypeFields
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.SyntexContentTypeFields.Remove(syntexContentTypeFieldResult);
             }
-            foreach (var syntexContentTypeResult in await dbContext.SyntexContentTypes.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+
+            foreach (var syntexContentTypeResult in await dbContext.SyntexContentTypes
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.SyntexContentTypes.Remove(syntexContentTypeResult);
             }
-            foreach (var syntexFieldResult in await dbContext.SyntexFields.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+
+            foreach (var syntexFieldResult in await dbContext.SyntexFields
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.SyntexFields.Remove(syntexFieldResult);
             }
-            foreach (var syntexModelUsage in await dbContext.SyntexModelUsage.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+
+            foreach (var syntexModelUsage in await dbContext.SyntexModelUsage
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.SyntexModelUsage.Remove(syntexModelUsage);
             }
-            foreach (var syntexFileType in await dbContext.SyntexFileTypes.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+
+            foreach (var syntexFileType in await dbContext.SyntexFileTypes
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.SyntexFileTypes.Remove(syntexFileType);
             }
-            foreach(var syntexTermSet in await dbContext.SyntexTermSets.Where(p => p.ScanId == scanId).ToListAsync())
+
+            foreach (var syntexTermSet in await dbContext.SyntexTermSets.Where(p => p.ScanId == scanId).ToListAsync())
             {
                 dbContext.SyntexTermSets.Remove(syntexTermSet);
             }
-            Log.Information("Consolidating assessment {ScanId}: dropping Syntex results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+
+            Log.Information(
+                "Consolidating assessment {ScanId}: dropping Syntex results for web {SiteCollection}{Web}",
+                scanId,
+                site.SiteUrl,
+                web.WebUrl);
         }
 
-        private async Task DropWorkflowIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        private async Task DropWorkflowIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
         {
-            foreach (var workflow in await dbContext.Workflows.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
-            {
-                dbContext.Workflows.Remove(workflow);
-            }
-            Log.Information("Consolidating assessment {ScanId}: dropping Workflow results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
-        }
-
-        private async Task DropInfoPathIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
-        {
-            foreach (var infoPath in await dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
-            {
-                dbContext.ClassicInfoPath.Remove(infoPath);
-            }
-            Log.Information("Consolidating assessment {ScanId}: dropping InfoPath results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
-        }
-
-        private async Task DropClassicIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
-        {
-            foreach (var workflow in await dbContext.Workflows.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var workflow in await dbContext.Workflows
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.Workflows.Remove(workflow);
             }
 
-            foreach (var infoPath in await dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            Log.Information(
+                "Consolidating assessment {ScanId}: dropping Workflow results for web {SiteCollection}{Web}",
+                scanId,
+                site.SiteUrl,
+                web.WebUrl);
+        }
+
+        private async Task DropInfoPathIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
+        {
+            foreach (var infoPath in await dbContext.ClassicInfoPath
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicInfoPath.Remove(infoPath);
             }
 
-            foreach (var page in await dbContext.ClassicPages.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            Log.Information(
+                "Consolidating assessment {ScanId}: dropping InfoPath results for web {SiteCollection}{Web}",
+                scanId,
+                site.SiteUrl,
+                web.WebUrl);
+        }
+
+        private async Task DropClassicIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
+        {
+            foreach (var workflow in await dbContext.Workflows
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
+            {
+                dbContext.Workflows.Remove(workflow);
+            }
+
+            foreach (var infoPath in await dbContext.ClassicInfoPath
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
+            {
+                dbContext.ClassicInfoPath.Remove(infoPath);
+            }
+
+            foreach (var page in await dbContext.ClassicPages
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicPages.Remove(page);
             }
 
-            foreach (var pageWebPart in await dbContext.ClassicPageWebParts.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var pageWebPart in await dbContext.ClassicPageWebParts
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicPageWebParts.Remove(pageWebPart);
             }
 
-            foreach (var list in await dbContext.ClassicLists.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var list in await dbContext.ClassicLists
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicLists.Remove(list);
             }
 
-            foreach (var list in await dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var list in await dbContext.ClassicUserCustomActions
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicUserCustomActions.Remove(list);
             }
 
-            foreach (var list in await dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var list in await dbContext.ClassicExtensibilities
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicExtensibilities.Remove(list);
             }
-            
-            foreach (var list in await dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+
+            foreach (var list in await dbContext.ClassicWebSummaries
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicWebSummaries.Remove(list);
             }
 
-            foreach (var list in await dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl).ToListAsync())
+            foreach (var list in await dbContext.ClassicSiteSummaries
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicSiteSummaries.Remove(list);
             }
 
-            Log.Information("Consolidating assessment {ScanId}: dropping Classic results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+            Log.Information(
+                "Consolidating assessment {ScanId}: dropping Classic results for web {SiteCollection}{Web}",
+                scanId,
+                site.SiteUrl,
+                web.WebUrl);
         }
 
-        private async Task DropAddInIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        private async Task DropAddInIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
         {
-            foreach (var addIns in await dbContext.ClassicAddIns.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var addIns in await dbContext.ClassicAddIns
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.ClassicAddIns.Remove(addIns);
             }
-            Log.Information("Consolidating assessment {ScanId}: dropping Add-In results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+
+            Log.Information(
+                "Consolidating assessment {ScanId}: dropping Add-In results for web {SiteCollection}{Web}",
+                scanId,
+                site.SiteUrl,
+                web.WebUrl);
         }
 
-        private async Task DropAlertsIncompleteWebScanDataAsync(Guid scanId, ScanContext dbContext, SiteCollection site, Web web)
+        private async Task DropAlertsIncompleteWebScanDataAsync(
+            Guid scanId,
+            ScanContext dbContext,
+            SiteCollection site,
+            Web web)
         {
-            foreach (var alert in await dbContext.Alerts.Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl).ToListAsync())
+            foreach (var alert in await dbContext.Alerts
+                         .Where(p => p.ScanId == scanId && p.SiteUrl == site.SiteUrl && p.WebUrl == web.WebUrl)
+                         .ToListAsync())
             {
                 dbContext.Alerts.Remove(alert);
             }
-            Log.Information("Consolidating assessment {ScanId}: dropping Alerts results for web {SiteCollection}{Web}", scanId, site.SiteUrl, web.WebUrl);
+
+            Log.Information(
+                "Consolidating assessment {ScanId}: dropping Alerts results for web {SiteCollection}{Web}",
+                scanId,
+                site.SiteUrl,
+                web.WebUrl);
         }
 
 #if DEBUG
@@ -1973,6 +2381,5 @@ namespace PnP.Scanning.Core.Storage
 #endif
 
         #endregion
-
     }
 }

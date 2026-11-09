@@ -25,16 +25,26 @@ public sealed class ClassicReplacementRecoveryTests
     /// Verifies that report materialization failure rolls back and restart reuses sealed analysis without recollection.
     /// </summary>
     [Fact]
-    public async Task Report_materialization_failure_rolls_back_and_restart_reuses_sealed_analysis_without_recollection()
+    public async Task
+        Report_materialization_failure_rolls_back_and_restart_reuses_sealed_analysis_without_recollection()
     {
         using StoreCase? data = new StoreCase("classic-report-rollback");
         FailCompatibilityCommit? interceptor = new FailCompatibilityCommit();
-        PipelineStore? store = new PipelineStore(data.DirectoryPath, id => new ScanContext(new DbContextOptionsBuilder<ScanContext>()
-            .UseSqlite($"Data Source={data.Store.DatabasePath(id)};Pooling=False").AddInterceptors(interceptor).Options));
+        PipelineStore? store = new PipelineStore(
+            data.DirectoryPath,
+            id => new ScanContext(
+                new DbContextOptionsBuilder<ScanContext>()
+                    .UseSqlite($"Data Source={data.Store.DatabasePath(id)};Pooling=False")
+                    .AddInterceptors(interceptor)
+                    .Options));
         ClassicPageFixture? source = new ClassicPageFixture { IncludePhysicalFacts = true, IncludeBlog = true };
         ForbiddenOnlineEnvironment? environment = new ForbiddenOnlineEnvironment();
-        PipelineCoordinator? coordinator = new PipelineCoordinator(store, ClassicPageModule.Registry(source.OpenAsync), environment);
-        Core.Services.PhaseReply? ticket = await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
+        PipelineCoordinator? coordinator = new PipelineCoordinator(
+            store,
+            ClassicPageModule.Registry(source.OpenAsync),
+            environment);
+        Core.Services.PhaseReply? ticket =
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
         Guid assessment = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Terminated, await coordinator.WaitForCompletionAsync(assessment));
         using (ScanContext? db = store.CreateContext(assessment, readOnly: true))
@@ -42,8 +52,11 @@ public sealed class ClassicReplacementRecoveryTests
             Assert.Empty(await db.ClassicPages.ToListAsync());
             Assert.NotNull((await db.AnalysisRuns.SingleAsync()).ReportDigest);
             Assert.True((await db.SourceSnapshots.SingleAsync()).IsSealed);
-            Assert.Equal(ScanStatus.Finished, (await db.PhaseRuns.SingleAsync(x => x.Kind == PhaseKind.Analysis)).Status);
+            Assert.Equal(
+                ScanStatus.Finished,
+                (await db.PhaseRuns.SingleAsync(x => x.Kind == PhaseKind.Analysis)).Status);
         }
+
         KeyValuePair<string, int>[]? calls = source.Calls.OrderBy(x => x.Key).ToArray();
         environment.ForbidRestore = true;
         await coordinator.RestartAsync(assessment);
@@ -52,7 +65,8 @@ public sealed class ClassicReplacementRecoveryTests
         using ScanContext? completed = store.CreateContext(assessment, readOnly: true);
         Assert.True(await completed.ClassicPages.AnyAsync(x => x.PageType == "BlogPage"));
         Assert.Single(await completed.AnalysisRuns.ToListAsync());
-        Assert.True(await completed.History.AnyAsync(x => x.Message.Contains("Synthetic compatibility commit failure")));
+        Assert.True(
+            await completed.History.AnyAsync(x => x.Message.Contains("Synthetic compatibility commit failure")));
     }
 
     /// <summary>
@@ -61,17 +75,22 @@ public sealed class ClassicReplacementRecoveryTests
     private sealed class FailCompatibilityCommit : DbTransactionInterceptor
     {
         private bool failed;
+
         /// <summary>
         /// Injects the configured pre-commit storage failure while leaving unrelated transactions unaffected.
         /// </summary>
-        public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
-            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction,
+            TransactionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default)
         {
             if (!failed && eventData.Context is ScanContext db && db.ClassicPages.Local.Any())
             {
                 failed = true;
                 throw new IOException("Synthetic compatibility commit failure");
             }
+
             return ValueTask.FromResult(result);
         }
     }
@@ -83,20 +102,37 @@ public sealed class ClassicReplacementRecoveryTests
     public void Custom_display_form_items_keep_the_existing_supported_aspx_behavior_in_the_new_collector()
     {
         ClassicPageFixture? source = new ClassicPageFixture();
-        ClassicPageBlogBatchSource? batch = new ClassicPageBlogBatchSource(ClassicPageFixture.Site, "/", ClassicPageFixture.ListId,
-            "Custom content", "/sites/a/Lists/Custom", [], null, SourceReadState.Complete,
-            "/sites/a/Lists/Custom/DispForm.aspx", "ASPXPage",
+        ClassicPageBlogBatchSource? batch = new ClassicPageBlogBatchSource(
+            ClassicPageFixture.Site,
+            "/",
+            ClassicPageFixture.ListId,
+            "Custom content",
+            "/sites/a/Lists/Custom",
+            [],
+            null,
+            SourceReadState.Complete,
+            "/sites/a/Lists/Custom/DispForm.aspx",
+            "ASPXPage",
             ContentTypeForms: [new ClassicContentTypeForm("0x0102", "/sites/a/Lists/Custom/Custom.aspx")]);
         Dictionary<string, SourceField>? fields = new Dictionary<string, SourceField>
         {
-            ["ID"] = SourceField.Of("Int32", 9),
-            ["ContentTypeId"] = SourceField.Of("String", "0x010201"),
+            ["ID"] = SourceField.Of("Int32", 9), ["ContentTypeId"] = SourceField.Of("String", "0x010201"),
         };
-        Core.Pipeline.Contracts.Page.ClassicPageRow? page = ClassicBlogPageProjection.Analyze(Guid.NewGuid(), batch, fields, source.Web(), source.Options);
+        Core.Pipeline.Contracts.Page.ClassicPageRow? page = ClassicBlogPageProjection.Analyze(
+            Guid.NewGuid(),
+            batch,
+            fields,
+            source.Web(),
+            source.Options);
         Assert.Equal("/sites/a/Lists/Custom/Custom.aspx?ID=9", page!.PageUrl);
         Assert.Equal("ASPXPage", page.PageType);
         Assert.Equal("CP5", page.RemediationCode);
-        Assert.Null(ClassicBlogPageProjection.Analyze(Guid.NewGuid(), batch with { ContentTypeForms = null },
-            fields, source.Web(), source.Options));
+        Assert.Null(
+            ClassicBlogPageProjection.Analyze(
+                Guid.NewGuid(),
+                batch with { ContentTypeForms = null },
+                fields,
+                source.Web(),
+                source.Options));
     }
 }

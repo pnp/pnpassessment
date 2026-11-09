@@ -24,6 +24,7 @@ internal static class ClassicPageAuditClient
             chunks.Add((cursor, chunkEnd));
             cursor = chunkEnd;
         }
+
         return chunks;
     }
 
@@ -31,8 +32,10 @@ internal static class ClassicPageAuditClient
     /// Sends with a fresh bearer token per attempt and bounded cancellation-aware retry delays.
     /// </summary>
     internal static async Task<HttpResponseMessage> SendWithRetryAsync(
-        HttpClient client, Func<HttpRequestMessage> requestFactory,
-        Func<CancellationToken, Task<string>> tokenProvider, CancellationToken ct)
+        HttpClient client,
+        Func<HttpRequestMessage> requestFactory,
+        Func<CancellationToken, Task<string>> tokenProvider,
+        CancellationToken ct)
     {
         int attempts = 0;
         int throttleAttempts = 0;
@@ -45,24 +48,37 @@ internal static class ClassicPageAuditClient
             // GetAccessTokenAsync is cache-backed, so this is cheap when the token is still valid.
             string token = await tokenProvider(ct);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            HttpResponseMessage response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                ct);
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 if (++throttleAttempts > 10) return response; // give up after 10 throttle retries
                 int wait = 60;
                 if (response.Headers.TryGetValues("Retry-After", out IEnumerable<string>? vals) &&
-                    int.TryParse(vals.First(), out int ra)) wait = ra;
+                    int.TryParse(vals.First(), out int ra))
+                    wait = ra;
                 response.Dispose(); // Release the superseded response before retrying.
                 await Task.Delay(TimeSpan.FromSeconds(wait), ct);
                 continue;
             }
+
             if ((int)response.StatusCode is 503 or 504)
             {
                 if (++attempts > 3) return response;
                 response.Dispose(); // Release the superseded response before retrying.
-                await Task.Delay(TimeSpan.FromSeconds(attempts == 1 ? 5 : attempts == 2 ? 15 : 30), ct);
+                await Task.Delay(
+                    TimeSpan.FromSeconds(
+                        attempts == 1
+                            ? 5
+                            : attempts == 2
+                                ? 15
+                                : 30),
+                    ct);
                 continue;
             }
+
             return response;
         }
     }

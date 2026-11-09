@@ -32,7 +32,9 @@ internal static class AspxSourceReader
     /// <summary>
     /// Copies original stream bytes under the source bound and propagates cancellation.
     /// </summary>
-    internal static async Task<AspxSourceObservation> ReadStreamAsync(Stream stream, CancellationToken cancellationToken)
+    internal static async Task<AspxSourceObservation> ReadStreamAsync(
+        Stream stream,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stream);
         using MemoryStream? bytes = new MemoryStream();
@@ -45,6 +47,7 @@ internal static class AspxSourceReader
                 return new("TooLarge", null, "SourceExceedsAnalysisLimit");
             await bytes.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
         }
+
         cancellationToken.ThrowIfCancellationRequested();
         return new("Available", bytes.ToArray(), null);
     }

@@ -16,9 +16,10 @@ internal static class SPFileFactConsolidator
     /// Merges detached observations through the existing native-file evidence policy.
     /// </summary>
     internal static SPFileSource Consolidate(SPFileSource? previous, SPFileSource incoming) =>
-        ClassicPageSourceJson.Convert<SPFileSource>(SPFileWriter.Consolidate(
-            previous == null ? null : ClassicPageSourceJson.Convert<SPFile>(previous),
-            ClassicPageSourceJson.Convert<SPFile>(incoming)));
+        ClassicPageSourceJson.Convert<SPFileSource>(
+            SPFileWriter.Consolidate(
+                previous == null ? null : ClassicPageSourceJson.Convert<SPFile>(previous),
+                ClassicPageSourceJson.Convert<SPFile>(incoming)));
 }
 
 /// <summary>
@@ -29,7 +30,9 @@ internal static class SnapshotPageMappingCalculator
     /// <summary>
     /// Applies existing part mapping and copies readiness totals back to detached page results.
     /// </summary>
-    internal static void ApplyMapping(ClassicPageRow page, IReadOnlyList<ClassicPageWebPartRow> parts,
+    internal static void ApplyMapping(
+        ClassicPageRow page,
+        IReadOnlyList<ClassicPageWebPartRow> parts,
         WebPartMappingManager mapping)
     {
         ClassicPage? legacyPage = ClassicPageSourceJson.Convert<ClassicPage>(page);
@@ -52,14 +55,18 @@ internal static class SnapshotPageLayout
     /// </summary>
     internal static string? GetPublishingPageLayoutUrl(Dictionary<string, SourceField> fields) =>
         fields.TryGetValue("PublishingPageLayout", out SourceField? value) && value.Type == "Url" &&
-        value.Value.TryGetProperty("Url", out System.Text.Json.JsonElement url) ? url.GetString() : null;
+        value.Value.TryGetProperty("Url", out System.Text.Json.JsonElement url)
+            ? url.GetString()
+            : null;
 
     /// <summary>
     /// Reads the captured publishing-layout description while preserving an absent declaration.
     /// </summary>
     internal static string GetPublishingPageLayoutName(Dictionary<string, SourceField> fields) =>
         fields.TryGetValue("PublishingPageLayout", out SourceField? value) && value.Type == "Url" &&
-        value.Value.TryGetProperty("Description", out System.Text.Json.JsonElement description) ? description.GetString() ?? "" : "";
+        value.Value.TryGetProperty("Description", out System.Text.Json.JsonElement description)
+            ? description.GetString() ?? ""
+            : "";
 }
 
 /// <summary>
