@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PnP.Scanning.Core.Storage.Pipeline;
 using System.Reflection;
 
 namespace PnP.Scanning.Core.Storage
@@ -49,6 +50,18 @@ namespace PnP.Scanning.Core.Storage
         internal DbSet<ClassicPageDiscovery> ClassicPageDiscoveries { get; set; }
 
         internal DbSet<SPFile> SPFiles { get; set; }
+
+        internal DbSet<SourceSnapshotRow> SourceSnapshots { get; set; }
+
+        internal DbSet<SourceObservationRow> SourceObservations { get; set; }
+
+        internal DbSet<PhaseRunRow> PhaseRuns { get; set; }
+
+        internal DbSet<AnalysisRunRow> AnalysisRuns { get; set; }
+
+        internal DbSet<AnalysisResultRow> AnalysisResults { get; set; }
+
+        internal DbSet<AnalysisReportRowEntry> AnalysisReportRows { get; set; }
 
         internal DbSet<ClassicPageWebPart> ClassicPageWebParts { get; set; }
 
@@ -135,6 +148,8 @@ namespace PnP.Scanning.Core.Storage
         /// <summary>Configures existing compound keys and real SharePoint-file identity constraints without deriving observations or classification from migration.</summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            PipelineModel.Configure(modelBuilder);
+
             // Extend the model defined via annotations, typically used for defining compound keys
 
             modelBuilder.Entity<Property>(entity =>

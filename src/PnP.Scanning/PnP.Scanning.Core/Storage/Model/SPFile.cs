@@ -37,4 +37,5 @@ internal sealed class SPFile
     public string? NoExecuteRaw { get; set; }
     public string? NoExecuteSource { get; set; }
     public string NoExecuteReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
+    public string? AspxEvidenceJson { get; set; }
 }
