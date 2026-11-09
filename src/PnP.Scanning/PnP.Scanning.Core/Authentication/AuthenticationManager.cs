@@ -7,6 +7,9 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace PnP.Scanning.Core.Authentication
 {
+    /// <summary>
+    /// Creates authentication providers and supplies resource tokens for assessment collection.
+    /// </summary>
     internal sealed class AuthenticationManager
     {
         private IClientApplicationBase clientApplication;

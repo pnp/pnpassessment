@@ -9,39 +9,54 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Shared;
 
+/// <summary>
+/// Groups authenticated context creation and shared site enumeration for one collection.
+/// </summary>
 internal sealed record CollectionServices(
     AuthenticationManager Authentication, IPnPContextFactory ContextFactory,
     SiteEnumerationManager SiteEnumeration);
 
+/// <summary>
+/// Defers authentication and online service resolution until collection requests them.
+/// </summary>
 internal sealed class CollectionEnvironment(
     Func<IDataProtectionProvider> protectionProvider,
     Func<IPnPContextFactory> contextFactory,
     Func<SiteEnumerationManager> siteEnumeration) : ICollectionEnvironment
 {
+    /// <summary>
+    /// Clones collection options and protects secrets before persistence.
+    /// </summary>
     public StartRequest Protect(StartRequest options)
     {
-        var copy = options.Clone();
+        StartRequest? copy = options.Clone();
         if (!string.IsNullOrEmpty(copy.CertPassword))
             copy.CertPassword = protectionProvider().CreateProtector("Pipeline.Collection.Configuration.v1").Protect(copy.CertPassword);
         return copy;
     }
 
+    /// <summary>
+    /// Restores protected collection options only when online collection resumes.
+    /// </summary>
     public StartRequest Restore(StartRequest options)
     {
-        var copy = options.Clone();
+        StartRequest? copy = options.Clone();
         if (!string.IsNullOrEmpty(copy.CertPassword))
             copy.CertPassword = protectionProvider().CreateProtector("Pipeline.Collection.Configuration.v1").Unprotect(copy.CertPassword);
         return copy;
     }
 
+    /// <summary>
+    /// Initializes authentication and resolves online services only for collection execution.
+    /// </summary>
     public async Task<CollectionServices> OpenAsync(StartRequest options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var copy = options.Clone();
+        StartRequest? copy = options.Clone();
         if (string.IsNullOrWhiteSpace(copy.TenantId) && !string.IsNullOrWhiteSpace(copy.Tenant))
             copy.TenantId = (await AuthenticationManager.GetAzureADTenantIdAsync(copy.Tenant)).ToString();
         cancellationToken.ThrowIfCancellationRequested();
-        var authentication = AuthenticationManager.Create(copy, protectionProvider());
+        AuthenticationManager? authentication = AuthenticationManager.Create(copy, protectionProvider());
         authentication.SetCollectionDeviceCodeCallback(result =>
         {
             Serilog.Log.Information("Collection authentication: {Message}", result.Message);

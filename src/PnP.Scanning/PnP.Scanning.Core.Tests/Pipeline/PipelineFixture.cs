@@ -17,6 +17,9 @@ using PnP.Scanning.Core.Storage.Pipeline;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Defines synthetic source identities and deterministic rule versions for pipeline tests.
+/// </summary>
 internal static class FixedSource
 {
     internal const string ModuleKey = "snapshot-fixture";
@@ -24,6 +27,9 @@ internal static class FixedSource
     internal const string Rule1 = "fixture/rule-1";
     internal const string Rule2 = "fixture/rule-2";
 
+    /// <summary>
+    /// Returns synthetic native observations preserving absent, empty, partial, denied, and complete byte states.
+    /// </summary>
     internal static IReadOnlyList<CollectedObservation> Read()
     {
         return Enumerable.Range(1, 6).Select(i => new CollectedObservation(
@@ -37,8 +43,14 @@ internal static class FixedSource
             i > 2 ? "Synthetic acquisition unavailable" : null)).ToArray();
     }
 
+    /// <summary>
+    /// Computes the expected SHA-256 of recorded bytes.
+    /// </summary>
     internal static string Digest(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
+    /// <summary>
+    /// Builds a fixed offline collection request with bounded concurrency.
+    /// </summary>
     internal static CollectRequest Request(int threads = 1) => new()
     {
         Module = ModuleKey, ParametersJson = VersionedJson.Empty.Json,
@@ -50,10 +62,13 @@ internal static class FixedSource
         },
     };
 
+    /// <summary>
+    /// Registers recorded collector and explicitly available deterministic rules.
+    /// </summary>
     internal static ModuleRegistry Registry(FixtureControl control, bool collector = true,
         string current = Rule1, bool rule1 = true, bool rule2 = true)
     {
-        var analyzers = new List<AnalysisRegistration>();
+        List<AnalysisRegistration>? analyzers = new List<AnalysisRegistration>();
         if (rule1) analyzers.Add(new(ModuleKey, Rule1, [InputVersion], () => control.CreateAnalyzer(Rule1)));
         if (rule2) analyzers.Add(new(ModuleKey, Rule2, [InputVersion], () => control.CreateAnalyzer(Rule2)));
         return new ModuleRegistry(collector ? [new CollectionRegistration(ModuleKey, InputVersion, () => new FixtureCollector(control))] : [],
@@ -61,6 +76,9 @@ internal static class FixedSource
     }
 }
 
+/// <summary>
+/// Controls recorded acquisition and analysis boundaries and counts their executions.
+/// </summary>
 internal sealed class FixtureControl
 {
     internal int CollectionStarts;
@@ -73,22 +91,34 @@ internal sealed class FixtureControl
     internal TaskCompletionSource Reached { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    /// <summary>
+    /// Resets synchronization gates for the next controlled phase boundary.
+    /// </summary>
     internal void ResetGate()
     {
         Reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
         release = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+    /// <summary>
+    /// Releases blocked recorded work and clears its configured boundary.
+    /// </summary>
     internal void Release()
     {
         BlockCollectionAt = BlockAnalysisAt = null;
         release.TrySetResult();
     }
+    /// <summary>
+    /// Blocks only the selected acquisition or analysis identity until released or canceled.
+    /// </summary>
     internal async Task WaitAsync(bool collection, Guid id, CancellationToken token)
     {
         if ((collection ? BlockCollectionAt : BlockAnalysisAt) != id) return;
         Reached.TrySetResult();
         await release.Task.WaitAsync(token);
     }
+    /// <summary>
+    /// Creates a deterministic recorded rule and optionally injects one construction failure.
+    /// </summary>
     internal IAnalysisModule CreateAnalyzer(string rule)
     {
         Interlocked.Increment(ref AnalysisFactories);
@@ -101,18 +131,24 @@ internal sealed class FixtureControl
     }
 }
 
+/// <summary>
+/// Emits recorded source bytes beginning at the durable collection checkpoint.
+/// </summary>
 internal sealed class FixtureCollector(FixtureControl control) : ICollectionModule
 {
     public string ModuleKey => FixedSource.ModuleKey;
     public string InputVersion => FixedSource.InputVersion;
+    /// <summary>
+    /// Resumes the recorded source sequence from its saved checkpoint and yields remaining receipts.
+    /// </summary>
     public async IAsyncEnumerable<CollectionRecord> CollectAsync(CollectionContext context,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref control.CollectionStarts);
         control.LastCollectionOptions = context.Options.Clone();
-        var records = FixedSource.Read();
-        var next = context.Checkpoint?.Value.GetProperty("nextIndex").GetInt32() ?? 0;
-        for (var index = next; index < records.Count; index++)
+        IReadOnlyList<CollectedObservation>? records = FixedSource.Read();
+        int next = context.Checkpoint?.Value.GetProperty("nextIndex").GetInt32() ?? 0;
+        for (int index = next; index < records.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await control.WaitAsync(true, records[index].ObservationId, cancellationToken);
@@ -121,15 +157,21 @@ internal sealed class FixtureCollector(FixtureControl control) : ICollectionModu
     }
 }
 
+/// <summary>
+/// Evaluates recorded bytes deterministically without authentication or online access.
+/// </summary>
 internal sealed class FixtureAnalyzer(FixtureControl control, string rule) : IAnalysisModule
 {
     public string ModuleKey => FixedSource.ModuleKey;
     public string RuleVersion => rule;
+    /// <summary>
+    /// Returns a deterministic payload from saved bytes, revision, rule, and fixed parameters.
+    /// </summary>
     public async Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken cancellationToken)
     {
         control.AnalysisCalls.AddOrUpdate((rule, source.ObservationId), 1, (_, count) => count + 1);
         await control.WaitAsync(false, source.ObservationId, cancellationToken);
-        var bytes = source.Artifact.GetBytes();
+        byte[]? bytes = source.Artifact.GetBytes();
         return new(source.ObservationId,
             source.AcquisitionStatus == AcquisitionStatus.Complete ? AnalysisOutcome.Analyzed : AnalysisOutcome.Unknown,
             source.AcquisitionStatus == AcquisitionStatus.Complete ? $"{rule}: fixture content acquired" : $"{rule}: {source.AcquisitionStatus}",
@@ -143,6 +185,9 @@ internal sealed class FixtureAnalyzer(FixtureControl control, string rule) : IAn
     }
 }
 
+/// <summary>
+/// Rejects online service resolution and optionally forbids collection configuration restoration.
+/// </summary>
 internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IDataProtectionProvider
 {
     internal int ProtectionRequests;
@@ -150,18 +195,30 @@ internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IData
     internal int RestoreRequests;
     internal bool ForbidRestore;
 
+    /// <summary>
+    /// Clones synthetic options without constructing authentication services.
+    /// </summary>
     public StartRequest Protect(StartRequest options) => options.Clone();
+    /// <summary>
+    /// Counts configuration restoration and rejects it when detached analysis forbids collection resume.
+    /// </summary>
     public StartRequest Restore(StartRequest options)
     {
         Interlocked.Increment(ref RestoreRequests);
         if (ForbidRestore) throw new InvalidOperationException("Collection configuration must not be restored during analysis.");
         return options.Clone();
     }
+    /// <summary>
+    /// Counts and rejects online collection service resolution in offline tests.
+    /// </summary>
     public Task<CollectionServices> OpenAsync(StartRequest options, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref OnlineRequests);
         throw new InvalidOperationException("Online collection services are forbidden in the offline fixture.");
     }
+    /// <summary>
+    /// Counts and rejects authentication-related protection-provider construction.
+    /// </summary>
     public IDataProtector CreateProtector(string purpose)
     {
         Interlocked.Increment(ref ProtectionRequests);
@@ -169,10 +226,16 @@ internal sealed class ForbiddenOnlineEnvironment : ICollectionEnvironment, IData
     }
 }
 
+/// <summary>
+/// Owns a uniquely scoped SQLite store and its bounded test-directory cleanup.
+/// </summary>
 internal sealed class StoreCase : IDisposable
 {
     internal static string TestRoot => Environment.GetEnvironmentVariable("ASSESSMENT_TEST_ROOT") ??
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "assessment-pipeline-tests");
+    /// <summary>
+    /// Initializes Store Case with the supplied dependencies and fixed scope.
+    /// </summary>
     internal StoreCase(string name)
     {
         DirectoryPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(TestRoot, name, Guid.NewGuid().ToString("N")));
@@ -182,19 +245,22 @@ internal sealed class StoreCase : IDisposable
     internal string DirectoryPath { get; }
     internal PipelineStore Store { get; }
 
+    /// <summary>
+    /// Creates a running synthetic snapshot and atomically commits the selected recorded observations.
+    /// </summary>
     internal async Task<(Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer)> UnsealedAsync(
         IReadOnlyList<CollectedObservation>? records = null, Guid? existingAssessment = null)
     {
-        var assessment = existingAssessment ?? Guid.NewGuid();
-        var snapshot = Guid.NewGuid();
-        var run = Guid.NewGuid();
-        var source = new SourceSnapshotRow
+        Guid assessment = existingAssessment ?? Guid.NewGuid();
+        Guid snapshot = Guid.NewGuid();
+        Guid run = Guid.NewGuid();
+        SourceSnapshotRow? source = new SourceSnapshotRow
         {
             AssessmentId = assessment, SnapshotId = snapshot, ModuleKey = FixedSource.ModuleKey,
             InputVersion = FixedSource.InputVersion, ScopeJson = VersionedJson.From(new { scope = "fixed fixture" }).Json,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        var phase = new PhaseRunRow
+        PhaseRunRow? phase = new PhaseRunRow
         {
             AssessmentId = assessment, RunId = run, SnapshotId = snapshot, ModuleKey = FixedSource.ModuleKey,
             InputVersion = FixedSource.InputVersion, Kind = PhaseKind.Collection, CurrentPhase = PhaseKind.Collection,
@@ -204,33 +270,42 @@ internal sealed class StoreCase : IDisposable
             await Store.CreateCollectionAsync(new PnP.Scanning.Core.Storage.Scan { ScanId = assessment, CLIMode = "Pipeline:" + FixedSource.ModuleKey, Status = ScanStatus.Queued }, source, phase, null, default);
         else
         {
-            using var db = Store.CreateContext(assessment);
+            using ScanContext? db = Store.CreateContext(assessment);
             db.SourceSnapshots.Add(source);
             db.PhaseRuns.Add(phase);
             await db.SaveChangesAsync();
         }
         await Store.SetRunningAsync(assessment, run, run, default);
-        var writer = Store.SnapshotWriter(assessment, snapshot, run);
-        var rows = records ?? FixedSource.Read();
+        ISnapshotWriter? writer = Store.SnapshotWriter(assessment, snapshot, run);
+        IReadOnlyList<CollectedObservation>? rows = records ?? FixedSource.Read();
         for (int index = 0; index < rows.Count; index++)
             await writer.CommitAsync(new(rows[index], VersionedJson.From(new { nextIndex = index + 1 }), rows.Count), default);
         return (assessment, snapshot, run, writer);
     }
 
+    /// <summary>
+    /// Counts committed results for the selected recorded analysis run.
+    /// </summary>
     internal async Task<int> ResultCountAsync(Guid assessment, Guid analysisId)
     {
-        using var db = Store.CreateContext(assessment);
+        using ScanContext? db = Store.CreateContext(assessment);
         return await db.AnalysisResults.CountAsync(x => x.AnalysisRunId == analysisId);
     }
+    /// <summary>
+    /// Waits for a recorded asynchronous lifecycle condition with a bounded timeout.
+    /// </summary>
     internal static async Task WaitUntilAsync(Func<Task<bool>> condition)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using CancellationTokenSource? timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         while (!await condition()) await Task.Delay(20, timeout.Token);
     }
+    /// <summary>
+    /// Removes only this fixture's uniquely resolved test directory unless retention was requested.
+    /// </summary>
     public void Dispose()
     {
         if (Environment.GetEnvironmentVariable("ASSESSMENT_TEST_KEEP_DATA") == "1") return;
-        var root = System.IO.Path.GetFullPath(TestRoot).TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
+        string? root = System.IO.Path.GetFullPath(TestRoot).TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
         if (!DirectoryPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Refusing cleanup outside the test root.");
         Directory.Delete(DirectoryPath, true);
     }

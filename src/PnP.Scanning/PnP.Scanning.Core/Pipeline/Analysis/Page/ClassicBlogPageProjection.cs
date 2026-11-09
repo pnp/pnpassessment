@@ -10,19 +10,25 @@ using System.Globalization;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Projects acquired content items into detached page results using captured native identities.
+/// </summary>
 internal static class ClassicBlogPageProjection
 {
+    /// <summary>
+    /// Projects one returned content item using native identity and captured form or FileRef evidence.
+    /// </summary>
     internal static ClassicPage? Analyze(Guid assessmentId, ClassicPageBlogBatchSource input,
         Dictionary<string, SourceField> fields, ClassicPageWebSource web, ClassicPageSourceOptions options)
     {
         if (options.HomePageOnly) return null;
         if (!int.TryParse(fields.GetValueOrDefault("ID")?.Text, NumberStyles.None,
-            CultureInfo.InvariantCulture, out var itemId) || itemId <= 0 ||
+            CultureInfo.InvariantCulture, out int itemId) || itemId <= 0 ||
             input.ListId == Guid.Empty || web.SiteId == Guid.Empty || web.WebId == Guid.Empty)
             throw new InvalidDataException("A Blog/Delve content row requires its observed site, Web, list and item identity.");
         if (input.PageType is not (ClassicPageRules.BlogPage or ClassicPageRules.DelveBlogPage or ClassicPageRules.ASPXPage))
             throw new InvalidDataException("The selected content batch has an unsupported Blog type.");
-        var delve = input.PageType == ClassicPageRules.DelveBlogPage;
+        bool delve = input.PageType == ClassicPageRules.DelveBlogPage;
         string? url;
         if (delve)
         {
@@ -36,8 +42,8 @@ internal static class ClassicBlogPageProjection
         }
         else
         {
-            var contentType = fields.GetValueOrDefault("ContentTypeId")?.Text ?? "";
-            var form = input.ContentTypeForms?.OrderByDescending(type => type.ContentTypeId.Length)
+            string? contentType = fields.GetValueOrDefault("ContentTypeId")?.Text ?? "";
+            string? form = input.ContentTypeForms?.OrderByDescending(type => type.ContentTypeId.Length)
                 .FirstOrDefault(type => contentType.StartsWith(type.ContentTypeId, StringComparison.OrdinalIgnoreCase))?.FormUrl
                 ?? input.DisplayFormUrl;
             if (input.PageType == ClassicPageRules.ASPXPage && !LegacyDisplayFormAssessment.IsContentPageForm(form))
@@ -52,7 +58,7 @@ internal static class ClassicBlogPageProjection
             ListId = input.ListId, ListTitle = input.ListTitle, ListUrl = input.ListUrl,
             SiteCollectionId = web.SiteId, WebId = web.WebId, ListItemId = itemId,
             DiscoveryStatus = "Discovered", AssessmentStatus = url == null ? "Unknown" : "Complete",
-            ModifiedAt = fields.TryGetValue("Modified", out var modified) && modified.ToValue() is DateTime date ? date : default,
+            ModifiedAt = fields.TryGetValue("Modified", out SourceField? modified) && modified.ToValue() is DateTime date ? date : default,
             ModifiedBy = options.SkipUserInformation ? null : ClassicPageProjection.ModifiedBy(fields),
             PageType = input.PageType, HomePage = false, RemediationCode = delve ? null :
                 input.PageType == ClassicPageRules.BlogPage ? "CP4" : "CP5",

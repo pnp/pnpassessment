@@ -31,6 +31,9 @@ namespace PnP.Scanning.Core.Services
         private object scanListLock = new();
         private readonly ConcurrentDictionary<Guid, Scan> scans = new();
 
+        /// <summary>
+        /// Initializes Scan Manager with the supplied dependencies and fixed scope.
+        /// </summary>
         public ScanManager(IHostApplicationLifetime hostApplicationLifetime, StorageManager storageManager, SiteEnumerationManager siteEnumerationManager, TelemetryManager telemetry,
                            IDataProtectionProvider provider, IPnPContextFactory pnpContextFactory, RateLimiter limiter, PipelineCoordinator pipeline = null)
         {
@@ -91,6 +94,9 @@ namespace PnP.Scanning.Core.Services
                 ? StartScanCoreAsync(start, authenticationManager, siteCollectionList, discoveryEvidence)
                 : pipelineCoordinator.AdmitLegacyAsync(() => StartScanCoreAsync(start, authenticationManager, siteCollectionList, discoveryEvidence));
 
+        /// <summary>
+        /// Starts retained assessment queues and persists their original scope and lifecycle ordering.
+        /// </summary>
         private async Task<Guid> StartScanCoreAsync(StartRequest start, AuthenticationManager authenticationManager, List<string> siteCollectionList,
             IReadOnlyList<ClassicPageDiscovery> discoveryEvidence = null)
         {
@@ -103,11 +109,11 @@ namespace PnP.Scanning.Core.Services
 
             Log.Information("Assessment id is {ScanId}", scanId);
 
-            var options = OptionsBase.FromScannerInput(start);
+            OptionsBase options = OptionsBase.FromScannerInput(start);
             await StorageManager.LaunchNewScanAsync(scanId, start, siteCollectionList);
             if (discoveryEvidence != null)
             {
-                foreach (var row in discoveryEvidence) row.ScanId = scanId;
+                foreach (ClassicPageDiscovery row in discoveryEvidence) row.ScanId = scanId;
                 await new PnP.Scanning.Core.Discovery.AssessmentDiscoveryWriter(scanId).WriteAsync(discoveryEvidence);
             }
             if (siteCollectionList.Count == 0)
@@ -124,14 +130,14 @@ namespace PnP.Scanning.Core.Services
             CancellationTokenSource cancellationTokenSource = new();
 
             // Launch a queue to handle this scan
-            var siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token, start.AdminCenterUrl, start.MySiteHostUrl);
+            SiteCollectionQueue siteCollectionQueue = new SiteCollectionQueue(this, StorageManager, scanId, cancellationTokenSource.Token, start.AdminCenterUrl, start.MySiteHostUrl);
 
             // Configure threading for the site collection and web queues
             siteCollectionQueue.ConfigureParallelProcessing(start.Threads);
 
             // The start options/catalog were frozen before LaunchNewScanAsync.
             Log.Information("Add assessment request {ScanId} to in-memory list", scanId);
-            var scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager, cancellationTokenSource)
+            Scan scan = new Scan(scanId, siteCollectionQueue, options, authenticationManager, cancellationTokenSource)
             {
                 SiteCollectionsToScan = siteCollectionList.Count,
                 Status = ScanStatus.Queued,
@@ -147,7 +153,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Run possible prescanning task, use the root web of the first web in the site collection list
-            var scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", null, options, start.AdminCenterUrl, start.MySiteHostUrl);
+            ScannerBase scanner = ScannerBase.NewScanner(this, StorageManager, contextFactory, scanId, siteCollectionList[0], "/", null, options, start.AdminCenterUrl, start.MySiteHostUrl);
             if (scanner != null)
             {
                 try
@@ -176,7 +182,7 @@ namespace PnP.Scanning.Core.Services
 
             Log.Information("Start enqueuing {SiteCollectionCount} site collections for assessment {ScanId}", siteCollectionList.Count, scanId);
             // Enqueue the received site collections
-            foreach (var site in siteCollectionList)
+            foreach (string site in siteCollectionList)
             {
                 await siteCollectionQueue.EnqueueAsync(new SiteCollectionQueueItem(options, contextFactory, site));
             }
@@ -188,6 +194,9 @@ namespace PnP.Scanning.Core.Services
             return scanId;
         }
 
+        /// <summary>
+        /// Rejects retained assessment admission when shared legacy and pipeline capacity is exhausted.
+        /// </summary>
         private void EnforeMaximumParallelRunningScans()
         {
             if (NumberOfScansRunning() + (pipelineCoordinator?.ActiveCount ?? 0) >= MaxParallelScans)
@@ -197,16 +206,22 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>
+        /// Resumes retained assessments through shared admission control.
+        /// </summary>
         internal Task RestartScanAsync(Guid scanId, RestartRequest request, Action<string> feedback) => pipelineCoordinator == null
             ? RestartScanCoreAsync(scanId, request, feedback)
             : pipelineCoordinator.AdmitLegacyAsync(async () => { await RestartScanCoreAsync(scanId, request, feedback); return true; });
 
+        /// <summary>
+        /// Restores retained paused or terminated assessments using their existing restart semantics.
+        /// </summary>
         private async Task RestartScanCoreAsync(Guid scanId, RestartRequest request, Action<string> feedback)
         {
             Log.Information("Restarting assessment {ScanId}", scanId);
 
-            var listedScans = await GetScanListAsync(new ListRequest());
-            var scanToRestart = listedScans.Status.FirstOrDefault(p => p.Id.Equals(scanId.ToString(), StringComparison.OrdinalIgnoreCase));
+            ListReply listedScans = await GetScanListAsync(new ListRequest());
+            ListScanResponse scanToRestart = listedScans.Status.FirstOrDefault(p => p.Id.Equals(scanId.ToString(), StringComparison.OrdinalIgnoreCase));
             if (scanToRestart == null)
             {
                 feedback.Invoke($"Cannot restart assessment {scanId} as it's unknown");
@@ -214,7 +229,7 @@ namespace PnP.Scanning.Core.Services
                 return;
             }
 
-            var scanStatus = (ScanStatus)System.Enum.Parse(typeof(ScanStatus), scanToRestart.Status);
+            ScanStatus scanStatus = (ScanStatus)System.Enum.Parse(typeof(ScanStatus), scanToRestart.Status);
 
             if (scanStatus == ScanStatus.Paused)
             {
@@ -323,12 +338,15 @@ namespace PnP.Scanning.Core.Services
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        /// <summary>
+        /// Returns active retained assessment status and existing site counters.
+        /// </summary>
         internal async Task<StatusReply> GetScanStatusAsync()
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            var statusReply = new StatusReply();
+            StatusReply statusReply = new StatusReply();
 
-            foreach (var runningScan in scans.ToList())
+            foreach (KeyValuePair<Guid, Scan> runningScan in scans.ToList())
             {
                 statusReply.Status.Add(new ScanStatusReply
                 {
@@ -663,6 +681,9 @@ namespace PnP.Scanning.Core.Services
             Log.Warning("Running assessments marked as terminated, Kestrel can shutdown now");
         }
 
+        /// <summary>
+        /// Clears the current retained manager reference after its host stops.
+        /// </summary>
         private void OnStopped()
         {
             Interlocked.CompareExchange(ref current, null, this);

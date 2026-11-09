@@ -14,13 +14,25 @@ internal interface IAnalysisModule
     Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Allows offline analyzers to validate and index their selected sealed snapshot.
+/// </summary>
 internal interface IAnalysisSnapshotPreparation
 {
+    /// <summary>
+    /// Validates and prepares shared indexes from the explicitly selected sealed snapshot.
+    /// </summary>
     Task PrepareAsync(ISnapshotReader snapshot, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Publishes deterministic run-scoped projections after all source results are committed.
+/// </summary>
 internal interface IAnalysisFinalizer
 {
+    /// <summary>
+    /// Publishes fixed projections using only sealed source and committed result capabilities.
+    /// </summary>
     Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results,
         IAnalysisReportWriter reports, VersionedJson parameters, CancellationToken cancellationToken);
 }

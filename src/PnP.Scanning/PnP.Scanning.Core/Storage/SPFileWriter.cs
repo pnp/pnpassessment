@@ -35,10 +35,13 @@ internal sealed class SPFileWriter
         this.createContext = createContext ?? throw new ArgumentNullException(nameof(createContext));
     }
 
+    /// <summary>
+    /// Combines observations only when native assessment/site/file identity matches, preserving conflicting evidence.
+    /// </summary>
     internal static SPFile Consolidate(SPFile previous, SPFile incoming)
     {
         Validate(incoming);
-        var merged = JsonSerializer.Deserialize<SPFile>(JsonSerializer.Serialize(previous ?? incoming));
+        SPFile merged = JsonSerializer.Deserialize<SPFile>(JsonSerializer.Serialize(previous ?? incoming));
         if (previous != null)
         {
             if (previous.ScanId != incoming.ScanId || previous.SiteCollectionId != incoming.SiteCollectionId ||
@@ -49,7 +52,7 @@ internal sealed class SPFileWriter
         else
         {
             merged.ProvenanceJson = UnionProvenance(EmptyProvenance, incoming.ProvenanceJson);
-            var states = ReadFieldStates(merged.ItemMetadataFieldStatesJson);
+            SortedDictionary<string, string> states = ReadFieldStates(merged.ItemMetadataFieldStatesJson);
             NormalizeInitialItemFacts(merged, states);
             merged.ItemMetadataFieldStatesJson = JsonSerializer.Serialize(states);
             if (merged.FirstObservedAtUtc == default) merged.FirstObservedAtUtc = merged.ObservedAtUtc;
@@ -168,7 +171,7 @@ internal sealed class SPFileWriter
         previous.ListItemId = MergeValue(previous, nameof(previous.ListItemId), previous.ListItemId, incoming.ListItemId);
         previous.Length = MergeValue(previous, nameof(previous.Length), previous.Length, incoming.Length);
         previous.FileName = MergeText(previous, nameof(previous.FileName), previous.FileName, incoming.FileName);
-        var itemStates = ReadFieldStates(incoming.ItemMetadataFieldStatesJson);
+        SortedDictionary<string, string> itemStates = ReadFieldStates(incoming.ItemMetadataFieldStatesJson);
         previous.ContentTypeId = MergeItemText(previous, nameof(previous.ContentTypeId), ContentTypeIdField, previous.ContentTypeId, incoming.ContentTypeId, itemStates);
         previous.CustomizedPageStatus = MergeText(previous, nameof(previous.CustomizedPageStatus), previous.CustomizedPageStatus, incoming.CustomizedPageStatus);
         previous.SetupPath = MergeText(previous, nameof(previous.SetupPath), previous.SetupPath, incoming.SetupPath);
@@ -177,9 +180,9 @@ internal sealed class SPFileWriter
         previous.HtmlFileType = MergeItemText(previous, nameof(previous.HtmlFileType), HtmlFileTypeField, previous.HtmlFileType, incoming.HtmlFileType, itemStates);
         previous.FileType = MergeItemText(previous, nameof(previous.FileType), FileTypeField, previous.FileType, incoming.FileType, itemStates);
         previous.BSN = MergeItemText(previous, nameof(previous.BSN), BsnField, previous.BSN, incoming.BSN, itemStates);
-        if (!itemStates.TryGetValue(WikiField, out var wikiState) || wikiState != FieldOmitted)
+        if (!itemStates.TryGetValue(WikiField, out string wikiState) || wikiState != FieldOmitted)
         {
-            var wikiValue = wikiState == FieldNull ? false : incoming.WikiFieldHasValue;
+            bool? wikiValue = wikiState == FieldNull ? false : incoming.WikiFieldHasValue;
             previous.WikiFieldHasValue = MergeValue(previous, nameof(previous.WikiFieldHasValue), previous.WikiFieldHasValue, wikiValue);
         }
         MergeNoExecute(previous, incoming, itemStates);

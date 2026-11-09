@@ -38,21 +38,27 @@ namespace PnP.Scanning.Core.Services
             legacyScanManager = new Lazy<ScanManager>(() => services.GetRequiredService<ScanManager>());
         }
 
+        /// <summary>
+        /// Combines pipeline record progress with already initialized retained assessment status.
+        /// </summary>
         public override async Task<StatusReply> Status(StatusRequest request, ServerCallContext context)
         {
             Log.Information("Status {Message} received", request.Message);
             // Don't send telemetry event here as status is called automatically in a loop from the CLI
-            var reply = await pipeline.StatusAsync(context.CancellationToken);
+            StatusReply reply = await pipeline.StatusAsync(context.CancellationToken);
             if (legacyScanManager.IsValueCreated) reply.Status.AddRange((await scanManager.GetScanStatusAsync()).Status);
             return reply;
         }
 
+        /// <summary>
+        /// Combines persisted pipeline and historical assessment listings without constructing online scan services.
+        /// </summary>
         public override async Task<ListReply> List(ListRequest request, ServerCallContext context)
         {
             Log.Information("List request received");
-            var reply = await pipeline.ListAsync(request, context.CancellationToken);
+            ListReply reply = await pipeline.ListAsync(request, context.CancellationToken);
             bool all = !request.Running && !request.Paused && !request.Finished && !request.Terminated;
-            var legacy = await ScanEnumerationManager.EnumerateScansFromDiskAsync(null,
+            ListReply legacy = await ScanEnumerationManager.EnumerateScansFromDiskAsync(null,
                 all || request.Running, all || request.Paused, all || request.Finished, all || request.Terminated);
             reply.Status.AddRange(legacy.Status);
             if (legacyScanManager.IsValueCreated) await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.List);
@@ -114,7 +120,7 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // Wait for running web scans to complete
-                var waitSucceeded = await scanManager.WaitForPendingWebScansAsync(scanId, request.All
+                bool waitSucceeded = await scanManager.WaitForPendingWebScansAsync(scanId, request.All
 #if DEBUG
                     // Don't retry that long in debug mode
                     , maxChecks: 3
@@ -173,6 +179,9 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>
+        /// Resumes existing phase checkpoints or adopts historical Classic Pages behind the original restart RPC.
+        /// </summary>
         public override async Task Restart(RestartRequest request, IServerStreamWriter<RestartStatus> responseStream, ServerCallContext context)
         {
             await responseStream.WriteAsync(new RestartStatus
@@ -195,7 +204,7 @@ namespace PnP.Scanning.Core.Services
             {
                 try
                 {
-                    var ticket = await pipeline.RestartAsync(scanId, request.Threads, token: context.CancellationToken);
+                    PhaseReply ticket = await pipeline.RestartAsync(scanId, request.Threads, token: context.CancellationToken);
                     await responseStream.WriteAsync(new RestartStatus { Status = $"Pipeline run {ticket.RunId} resumed with snapshot {ticket.SnapshotId} and rule {ticket.RuleVersion}" });
                 }
                 catch (Exception ex)
@@ -207,7 +216,7 @@ namespace PnP.Scanning.Core.Services
 
             try
             {
-                var adopted = await pipeline.RestartLegacyClassicAsync(scanId, request.Threads,
+                PhaseReply adopted = await pipeline.RestartLegacyClassicAsync(scanId, request.Threads,
                     password => dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose).Unprotect(password),
                     context.CancellationToken);
                 if (adopted != null)
@@ -291,6 +300,9 @@ namespace PnP.Scanning.Core.Services
             return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId };
         }
 
+        /// <summary>
+        /// Routes existing Classic Pages selection to internal collection and analysis while retaining other assessment modes.
+        /// </summary>
         public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
         {
             try
@@ -303,7 +315,7 @@ namespace PnP.Scanning.Core.Services
 
                 if (ClassicPageModule.Handles(request))
                 {
-                    var ticket = await pipeline.StartPipelineAsync(new StartPipelineRequest
+                    PhaseReply ticket = await pipeline.StartPipelineAsync(new StartPipelineRequest
                     {
                         Collection = new CollectRequest { Module = ClassicPageModule.Key, CollectionOptions = request },
                     }, context.CancellationToken);
@@ -316,7 +328,7 @@ namespace PnP.Scanning.Core.Services
                 }
 
                 // 1. Handle auth
-                var authenticationManager = AuthenticationManager.Create(request, dataProtectionProvider);
+                AuthenticationManager authenticationManager = AuthenticationManager.Create(request, dataProtectionProvider);
 
                 await responseStream.WriteAsync(new StartStatus
                 {
@@ -324,7 +336,7 @@ namespace PnP.Scanning.Core.Services
                 });
 
                 // 2. Build list of sites to scan
-                var discoveryEvidence = new List<PnP.Scanning.Core.Storage.ClassicPageDiscovery>();
+                List<Storage.ClassicPageDiscovery> discoveryEvidence = new List<PnP.Scanning.Core.Storage.ClassicPageDiscovery>();
                 List<string> sitesToScan = await siteEnumerationManager.EnumerateSiteCollectionsToScanAsync(request, authenticationManager, async (message) =>
                 {
                     await responseStream.WriteAsync(new StartStatus
@@ -351,7 +363,7 @@ namespace PnP.Scanning.Core.Services
                     });
 
                     // 3. Start the scan
-                    var scanId = await scanManager.StartScanAsync(request, authenticationManager, sitesToScan, discoveryEvidence);
+                    Guid scanId = await scanManager.StartScanAsync(request, authenticationManager, sitesToScan, discoveryEvidence);
 
                     await responseStream.WriteAsync(new StartStatus
                     {
@@ -375,6 +387,9 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>
+        /// Validates and exports existing report contracts from completed assessment results without alternate report selectors.
+        /// </summary>
         public async override Task Report(ReportRequest request, IServerStreamWriter<ReportStatus> responseStream, ServerCallContext context)
         {
             try
@@ -400,7 +415,7 @@ namespace PnP.Scanning.Core.Services
                 if (await pipeline.OwnsAssessmentAsync(scanId, context.CancellationToken))
                     await pipeline.EnsureReportReadyAsync(scanId, context.CancellationToken);
 
-                var dataExportPath = await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
+                string dataExportPath = await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
 
                 await responseStream.WriteAsync(new ReportStatus
                 {
@@ -419,7 +434,7 @@ namespace PnP.Scanning.Core.Services
 
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        var exportPath = await reportManager.CreatePowerBiReportAsync(scanId, request.Path, request.Delimiter);
+                        string exportPath = await reportManager.CreatePowerBiReportAsync(scanId, request.Path, request.Delimiter);
 
                         await responseStream.WriteAsync(new ReportStatus
                         {

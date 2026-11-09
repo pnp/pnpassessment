@@ -9,24 +9,30 @@ using PnP.Scanning.Core.Scanners.WebPartMapping;
 namespace PnP.Scanning.Core.Scanners;
 
 // Share the existing pure layout/type helpers without invoking the online extraction methods.
+/// <summary>
+/// Shares page layout and web-part interpretation between existing and detached analysis.
+/// </summary>
 internal static partial class PageWebPartExtractor
 {
+    /// <summary>
+    /// Builds ordered detached web-part rows from captured page fields, definitions, and original exports.
+    /// </summary>
     internal static List<ClassicPageWebPart> Build(ClassicPage page, ClassicPageItemSource source, bool exportProperties, bool includeTitleBar = false)
     {
-        var wiki = source.Fields.GetValueOrDefault("WikiField")?.Text;
-        var entities = new List<WebPartEntity>();
-        var layout = PageLayout.WebPart_Custom;
+        string wiki = source.Fields.GetValueOrDefault("WikiField")?.Text;
+        List<WebPartEntity> entities = new List<WebPartEntity>();
+        PageLayout layout = PageLayout.WebPart_Custom;
         if (page.PageType == ClassicPageRules.WikiPage)
         {
-            var parsed = WikiContentParser.Parse(wiki);
+            WikiContentParseResult parsed = WikiContentParser.Parse(wiki);
             page.Layout = PageLayoutDetector.ToLayoutString(PageLayoutDetector.DetectWikiLayout(wiki));
             entities.AddRange(parsed.TextParts);
             entities.AddRange(parsed.MediaParts);
-            foreach (var placeholder in parsed.Placeholders)
+            foreach (WikiWebPartPlaceholder placeholder in parsed.Placeholders)
             {
-                var part = source.WebParts.FirstOrDefault(x => x.ControlId == placeholder.ControlId);
+                ClassicPageWebPartSource part = source.WebParts.FirstOrDefault(x => x.ControlId == placeholder.ControlId);
                 if (part == null) continue;
-                var entity = Entity(part);
+                WebPartEntity entity = Entity(part);
                 entity.ServerControlId = placeholder.Id;
                 entity.Row = placeholder.Row; entity.Column = placeholder.Column; entity.Order = placeholder.Order;
                 entity.ZoneId = "";
@@ -45,12 +51,12 @@ internal static partial class PageWebPartExtractor
             {
                 page.Layout = SnapshotPageLayout.GetPublishingPageLayoutName(source.Fields);
             }
-            var parts = page.PageType == ClassicPageRules.PublishingPage
+            ClassicPageWebPartSource[] parts = page.PageType == ClassicPageRules.PublishingPage
                 ? source.WebParts.OrderBy(x => x.ZoneIndex).ToArray() : source.WebParts;
-            foreach (var part in parts)
+            foreach (ClassicPageWebPartSource part in parts)
             {
                 if ((page.PageType == ClassicPageRules.WebPartPage || source.FileLevelOnly) && !includeTitleBar && part.ZoneId.Equals("TitleBar", StringComparison.OrdinalIgnoreCase)) continue;
-                var entity = Entity(part);
+                WebPartEntity entity = Entity(part);
                 if (page.PageType == ClassicPageRules.WebPartPage || source.FileLevelOnly)
                 { entity.Row = GetRow(part.ZoneId, layout); entity.Column = GetColumn(part.ZoneId, layout); }
                 entities.Add(entity);
@@ -60,9 +66,12 @@ internal static partial class PageWebPartExtractor
             .Select(ClassicPageSourceJson.Convert<ClassicPageWebPartRow>).ToList();
     }
 
+    /// <summary>
+    /// Restores a detached part entity and resolves its type from captured XML or properties.
+    /// </summary>
     private static WebPartEntity Entity(ClassicPageWebPartSource part)
     {
-        var properties = part.Properties.ToDictionary(x => x.Key, x => x.Value.ToValue());
+        Dictionary<string, object> properties = part.Properties.ToDictionary(x => x.Key, x => x.Value.ToValue());
         return new WebPartEntity
         {
             Id = part.Id, ServerControlId = part.Id.ToString(), Title = part.Title,

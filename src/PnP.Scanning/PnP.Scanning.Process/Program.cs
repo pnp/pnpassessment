@@ -26,6 +26,9 @@ using System.CommandLine.Parsing;
 
 namespace PnP.Scanning.Process
 {
+    /// <summary>
+    /// Bootstraps the CLI or loopback scanner host and composes assessment services.
+    /// </summary>
     internal class Program
     {
         /// <summary>
@@ -46,7 +49,7 @@ namespace PnP.Scanning.Process
 
                 await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
                 {
-                    var versions = await VersionManager.LatestVersionAsync();
+                    Tuple<string, string> versions = await VersionManager.LatestVersionAsync();
 
                     // There's a newer version to download                
                     if (!string.IsNullOrEmpty(versions.Item2))
@@ -66,23 +69,23 @@ namespace PnP.Scanning.Process
                 });
 
                 // Configure needed services
-                var host = ConfigureCliHost(args);
+                IHost host = ConfigureCliHost(args);
 
                 // Get ProcessManager instance from the cli executable
-                var processManager = host.Services.GetRequiredService<ScannerManager>();
-                var dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
-                var configurationData = host.Services.GetRequiredService<ConfigurationOptions>();
+                ScannerManager processManager = host.Services.GetRequiredService<ScannerManager>();
+                IDataProtectionProvider dataProtectionProvider = host.Services.GetRequiredService<IDataProtectionProvider>();
+                ConfigurationOptions configurationData = host.Services.GetRequiredService<ConfigurationOptions>();
 
-                var root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
-                var builder = new CommandLineBuilder(root);
-                var parser = builder.UseDefaults().Build();
+                Command root = new RootCommandHandler(processManager, dataProtectionProvider, configurationData).Create();
+                CommandLineBuilder builder = new CommandLineBuilder(root);
+                Parser parser = builder.UseDefaults().Build();
 
                 if (args.Length == 0)
                 {
                     AnsiConsole.Write(new FigletText("Microsoft 365 Assessment").Centered().Color(Color.Green));
                     AnsiConsole.WriteLine("");
                     AnsiConsole.MarkupLine("Execute a command [gray](<enter> to quit)[/]: ");
-                    var consoleInput = Console.ReadLine();
+                    string consoleInput = Console.ReadLine();
 
                     // Possible enhancement: build custom tab completion for the "console mode"
                     // To get suggestions
@@ -138,7 +141,7 @@ namespace PnP.Scanning.Process
                     Log.Information($"Starting Microsoft 365 Assessment on port {orchestratorPort}");
 
                     // Add and configure needed services
-                    var host = ConfigureScannerHost(args, orchestratorPort);
+                    IHost host = ConfigureScannerHost(args, orchestratorPort);
 
                     Log.Information($"Started Microsoft 365 Assessment on port {orchestratorPort}");
 
@@ -180,6 +183,9 @@ namespace PnP.Scanning.Process
                        .Build();
         }
 
+        /// <summary>
+        /// Builds the loopback gRPC host with internal pipeline, recovery, and deferred legacy services.
+        /// </summary>
         private static IHost ConfigureScannerHost(string[] args, int orchestratorPort)
         {
             return Host.CreateDefaultBuilder(args)

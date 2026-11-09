@@ -9,6 +9,9 @@ using System.Runtime.InteropServices;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Binds existing report options and returns explicit failure without launching invalid output.
+    /// </summary>
     internal sealed class ReportCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -72,6 +75,9 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(openGeneratedReportOption);
         }
 
+        /// <summary>
+        /// Binds existing report options and propagates report failure to the CLI exit code.
+        /// </summary>
         public Command Create()
         {
             // Custom validation of provided command input, use to validate option combinations
@@ -81,7 +87,7 @@ namespace PnP.Scanning.Process.Commands
 
             cmd.SetHandler(async context =>
             {
-                var result = context.ParseResult;
+                System.CommandLine.Parsing.ParseResult result = context.ParseResult;
                 context.ExitCode = await HandleStartAsync(result.GetValueForOption(scanIdOption),
                     result.GetValueForOption(modeOption), result.GetValueForOption(delimiterOption),
                     result.GetValueForOption(exportPathOption), result.GetValueForOption(openGeneratedReportOption));
@@ -90,13 +96,16 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Exports through the existing report RPC and opens output only after successful completion.
+        /// </summary>
         private async Task<int> HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open)
         {
             int exitCode = 0;
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Creating reports...", async ctx =>
             {
                 // Setup client to talk to scanner
-                var client = await processManager.GetScannerClientAsync();
+                PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
                 string delimChar = ",";
                 if (delimiter == Delimiter.Semicolon)
@@ -105,7 +114,7 @@ namespace PnP.Scanning.Process.Commands
                 }
 
                 // Start the pausing work
-                var call = client.Report(new Core.Services.ReportRequest
+                AsyncServerStreamingCall<ReportStatus> call = client.Report(new Core.Services.ReportRequest
                 {
                     Id = scanId.ToString(),
                     Mode = mode.ToString(),
@@ -115,7 +124,7 @@ namespace PnP.Scanning.Process.Commands
 
                 string finalReportPath = "";
 
-                await foreach (var message in call.ResponseStream.ReadAllAsync())
+                await foreach (ReportStatus message in call.ResponseStream.ReadAllAsync())
                 {
                     if (message.Type == Constants.MessageError)
                     {
@@ -149,7 +158,7 @@ namespace PnP.Scanning.Process.Commands
                         if (mode == ReportMode.PowerBI)
                         {
                             // Open the PowerBI Desktop client
-                            var powerBiDesktop = PowerBiManager.LaunchPowerBiAsync(finalReportPath);
+                            System.Diagnostics.Process powerBiDesktop = PowerBiManager.LaunchPowerBiAsync(finalReportPath);
                         }
                         else
                         {

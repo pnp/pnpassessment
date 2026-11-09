@@ -10,30 +10,36 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Page;
 
+/// <summary>
+/// Captures CSOM web-part definitions, properties, and original export XML for offline analysis.
+/// </summary>
 internal static class PageWebPartSourceReader
 {
+    /// <summary>
+    /// Captures page-specific CSOM web parts, original export XML, properties, and explicit read outcomes.
+    /// </summary>
     internal static async Task<(Dictionary<string, SourceField> Properties, ClassicPageWebPartSource[] Parts)> ReadAsync(
         ClientContext context, string pageUrl, string pageType, Dictionary<string, SourceField> fields, CancellationToken token, bool includeTitleBar = false)
     {
         token.ThrowIfCancellationRequested();
-        var properties = new Dictionary<string, SourceField>();
-        var definitions = new List<(string? ControlId, WebPartDefinition Definition)>();
-        var placeholders = pageType == ClassicPageRules.WikiPage
+        Dictionary<string, SourceField>? properties = new Dictionary<string, SourceField>();
+        List<(string? ControlId, WebPartDefinition Definition)>? definitions = new List<(string? ControlId, WebPartDefinition Definition)>();
+        List<WikiWebPartPlaceholder>? placeholders = pageType == ClassicPageRules.WikiPage
             ? WikiContentParser.Parse(fields.GetValueOrDefault("WikiField")?.Text).Placeholders : null;
         if (placeholders?.Count == 0) return (properties, []);
-        var file = context.Web.GetFileByServerRelativeUrl(pageUrl);
-        var manager = file.GetLimitedWebPartManager(PersonalizationScope.Shared);
+        Microsoft.SharePoint.Client.File? file = context.Web.GetFileByServerRelativeUrl(pageUrl);
+        LimitedWebPartManager? manager = file.GetLimitedWebPartManager(PersonalizationScope.Shared);
         if (pageType == ClassicPageRules.WikiPage)
         {
             context.Load(manager);
-            foreach (var placeholder in placeholders!)
+            foreach (WikiWebPartPlaceholder? placeholder in placeholders!)
             {
-                var scope = new ExceptionHandlingScope(context);
+                ExceptionHandlingScope? scope = new ExceptionHandlingScope(context);
                 using (scope.StartScope())
                 {
                     using (scope.StartTry())
                     {
-                        var part = manager.WebParts.GetByControlId(placeholder.ControlId);
+                        WebPartDefinition? part = manager.WebParts.GetByControlId(placeholder.ControlId);
                         context.Load(part, x => x.Id, x => x.WebPart.ExportMode, x => x.WebPart.Title, x => x.WebPart.ZoneIndex,
                             x => x.WebPart.IsClosed, x => x.WebPart.Hidden, x => x.WebPart.Properties);
                         definitions.Add((placeholder.ControlId, part));
@@ -48,21 +54,21 @@ internal static class PageWebPartSourceReader
             if (pageType == ClassicPageRules.WebPartPage) context.Load(file.Properties);
             if (pageType == ClassicPageRules.PublishingPage) context.Load(file.ListItemAllFields);
             context.Load(manager);
-            var parts = context.LoadQuery(manager.WebParts.IncludeWithDefaultProperties(
+            IEnumerable<WebPartDefinition>? parts = context.LoadQuery(manager.WebParts.IncludeWithDefaultProperties(
                 x => x.Id, x => x.ZoneId, x => x.WebPart.ExportMode, x => x.WebPart.Title, x => x.WebPart.ZoneIndex,
                 x => x.WebPart.IsClosed, x => x.WebPart.Hidden, x => x.WebPart.Properties));
             await context.ExecuteQueryAsync();
             definitions.AddRange(parts.Select(x => ((string?)null, x)));
             if (pageType == ClassicPageRules.WebPartPage) properties = ClassicPageOnlineSource.Fields(file.Properties.FieldValues);
-            if (pageType == ClassicPageRules.PublishingPage && file.ListItemAllFields.FieldValues.TryGetValue("PublishingPageLayout", out var layout))
+            if (pageType == ClassicPageRules.PublishingPage && file.ListItemAllFields.FieldValues.TryGetValue("PublishingPageLayout", out object? layout))
             {
                 // Retain the original URL field, including its friendly description.
                 fields["PublishingPageLayout"] = ClassicPageOnlineSource.Fields(new Dictionary<string, object> { ["PublishingPageLayout"] = layout })["PublishingPageLayout"];
             }
         }
         token.ThrowIfCancellationRequested();
-        var exports = new Dictionary<Guid, ClientResult<string>>();
-        foreach (var (_, part) in definitions.Where(x => x.Definition.ServerObjectIsNull == false))
+        Dictionary<Guid, ClientResult<string>>? exports = new Dictionary<Guid, ClientResult<string>>();
+        foreach ((string? _, WebPartDefinition? part) in definitions.Where(x => x.Definition.ServerObjectIsNull == false))
         {
             if (part.WebPart.ExportMode == WebPartExportMode.All &&
                 !(pageType == ClassicPageRules.WebPartPage && !includeTitleBar && part.ZoneId.Equals("TitleBar", StringComparison.OrdinalIgnoreCase)))
@@ -70,9 +76,9 @@ internal static class PageWebPartSourceReader
         }
         if (exports.Count > 0) await context.ExecuteQueryAsync();
         token.ThrowIfCancellationRequested();
-        var output = definitions.Where(x => x.Definition.ServerObjectIsNull == false).Select(x =>
+        ClassicPageWebPartSource[]? output = definitions.Where(x => x.Definition.ServerObjectIsNull == false).Select(x =>
         {
-            exports.TryGetValue(x.Definition.Id, out var xml);
+            exports.TryGetValue(x.Definition.Id, out ClientResult<string>? xml);
             return new ClassicPageWebPartSource(x.Definition.Id, x.ControlId, x.ControlId == null ? x.Definition.ZoneId : "",
                 x.Definition.WebPart.ZoneIndex, x.Definition.WebPart.Title, x.Definition.WebPart.Hidden, x.Definition.WebPart.IsClosed,
                 x.Definition.WebPart.ExportMode.ToString(), ClassicPageOnlineSource.Fields(x.Definition.WebPart.Properties.FieldValues),

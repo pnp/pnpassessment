@@ -14,16 +14,22 @@ using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Services;
 
+/// <summary>
+/// Verifies shared native enumeration and template policy using recorded SDK responses.
+/// </summary>
 public class SiteEnumerationManagerScopeTests
 {
     private const string TeamSite = "https://contoso.sharepoint.com/sites/team";
     private const string PersonalSite = "https://contoso-my.sharepoint.com/personal/alex_contoso_com";
 
+    /// <summary>
+    /// Verifies that canceled explicit collection does not return a successful empty scope.
+    /// </summary>
     [Fact]
     public async Task Canceled_explicit_collection_does_not_return_a_successful_empty_scope()
     {
-        using var fixture = new OfflineEnumeration("STS#0", TeamSite);
-        using var cancellation = new CancellationTokenSource();
+        using OfflineEnumeration fixture = new OfflineEnumeration("STS#0", TeamSite);
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Manager.EnumerateSiteCollectionsToScanAsync(
             new StartRequest { Mode = Mode.Classic.ToString(), SitesList = TeamSite }, null, _ => { },
@@ -192,17 +198,23 @@ public class SiteEnumerationManagerScopeTests
     }
 
     // Only replaces authentication. The real SDK still initializes contexts and enumerates sites/webs.
+    /// <summary>
+    /// Substitutes recorded authentication while preserving actual SDK context creation and cancellation.
+    /// </summary>
     public class OfflineContextFactory : DispatchProxy
     {
         internal IPnPContextFactory Inner { get; set; }
         private static readonly string Token = new JwtSecurityTokenHandler().WriteToken(
             new JwtSecurityToken(claims: new[] { new Claim("roles", "Sites.Read.All") }));
 
+        /// <summary>
+        /// Forwards supported context-creation overloads with recorded authentication and rejects unexpected operations.
+        /// </summary>
         protected override object Invoke(MethodInfo method, object[] args)
         {
             if (method.Name == nameof(IPnPContextFactory.CreateAsync) && args[0] is Uri uri)
             {
-                var authentication = new ExternalAuthenticationProvider((_, _) => Task.FromResult(Token));
+                ExternalAuthenticationProvider authentication = new ExternalAuthenticationProvider((_, _) => Task.FromResult(Token));
                 if (args.Length == 4 && args[2] is CancellationToken token)
                     return Inner.CreateAsync(uri, authentication, token, (PnPContextOptions)args[3]);
                 if (args.Length == 3)

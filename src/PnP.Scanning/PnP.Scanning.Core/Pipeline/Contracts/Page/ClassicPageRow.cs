@@ -2,6 +2,9 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page
 {
 
+    /// <summary>
+    /// Carries detached page identity, readiness, classification, and acquisition provenance.
+    /// </summary>
     internal class ClassicPageRow : ClassicPageBaseRow
     {
         public string PageUrl { get; set; }

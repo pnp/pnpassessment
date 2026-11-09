@@ -12,16 +12,25 @@ using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Audit;
 
+/// <summary>
+/// Preserves an audit HTTP response or transport failure with its receipt time.
+/// </summary>
 internal sealed record ClassicAuditHttpReceipt(int StatusCode, string Body, DateTime ReceivedAtUtc, string? Error = null);
 
+/// <summary>
+/// Collects journaled audit query and pagination receipts for a fixed time window.
+/// </summary>
 internal sealed class ClassicPageAuditCollector(StartRequest options, AuthenticationManager authentication,
     HttpClient? client = null, Func<CancellationToken, Task<string>>? tokenProvider = null, TimeSpan? pollInterval = null)
 {
+    /// <summary>
+    /// Collects and journals settled coverage for every fixed audit subwindow.
+    /// </summary>
     internal async Task CollectAsync(ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, CancellationToken token)
     {
-        Enum.TryParse<Microsoft365Environment>(options.Environment, out var cloud);
-        var graph = CloudManager.GetMicrosoftGraphAuthority(cloud);
-        var provider = tokenProvider ?? (_ => authentication.GetAccessTokenAsync(new[] { "https://" + graph + "/.default" }));
+        Enum.TryParse<Microsoft365Environment>(options.Environment, out Microsoft365Environment cloud);
+        string graph = CloudManager.GetMicrosoftGraphAuthority(cloud);
+        Func<CancellationToken, Task<string>>? provider = tokenProvider ?? (_ => authentication.GetAccessTokenAsync(new[] { "https://" + graph + "/.default" }));
         string? skip = cloud is not (Microsoft365Environment.Production or Microsoft365Environment.PreProduction) ? "SovereignCloud" : null;
         if (skip == null)
         {
@@ -29,10 +38,10 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception ex) { skip = "TokenError: " + ex.Message; }
         }
-        var windows = ClassicPageAuditClient.SplitWindow(scope.AuditWindowStart, scope.AuditWindowEnd, 2);
-        var workers = new ActionBlock<int>(async chunk =>
+        List<(DateTime Start, DateTime End)>? windows = ClassicPageAuditClient.SplitWindow(scope.AuditWindowStart, scope.AuditWindowEnd, 2);
+        ActionBlock<int>? workers = new ActionBlock<int>(async chunk =>
         {
-            var (start, end) = windows[chunk];
+            (DateTime start, DateTime end) = windows[chunk];
             await journal.ReadOrAcquireAsync("AuditChunk", chunk.ToString(), async () => skip != null
                 ? new ClassicPageAuditChunkSource(chunk, start, end, null, "skipped", skip)
                 : await CollectChunkAsync(chunk, start, end, scope, journal, graph, provider, token), token,
@@ -40,19 +49,22 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
                 x => x.Error);
         }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = Math.Min(7, Math.Max(1, options.Threads)),
             BoundedCapacity = 7, CancellationToken = token });
-        try { for (var index = 0; index < windows.Count; index++) if (!await workers.SendAsync(index, token)) break; }
+        try { for (int index = 0; index < windows.Count; index++) if (!await workers.SendAsync(index, token)) break; }
         finally { workers.Complete(); await workers.Completion; }
     }
 
+    /// <summary>
+    /// Replays or acquires one audit query and its complete authority-checked pagination chain.
+    /// </summary>
     private async Task<ClassicPageAuditChunkSource> CollectChunkAsync(int chunk, DateTime start, DateTime end,
         ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, string graph,
         Func<CancellationToken, Task<string>> provider, CancellationToken token)
     {
-        var endpoint = "https://" + graph + "/v1.0/security/auditLog/queries";
+        string? endpoint = "https://" + graph + "/v1.0/security/auditLog/queries";
         string? queryId = null;
         // Settle a failed subwindow while retaining any query identity already submitted.
         ClassicPageAuditChunkSource Failed(string error) => new(chunk, start, end, queryId, "failed", error);
-        var query = new Dictionary<string, object>
+        Dictionary<string, object>? query = new Dictionary<string, object>
         {
             ["filterStartDateTime"] = start.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
             ["filterEndDateTime"] = end.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
@@ -60,27 +72,27 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
             ["operationFilters"] = new[] { "ClassicPageViewed", "ClassicPageCreated", "ClassicPageEdited" },
         };
         if (scope.ExplicitSites && scope.Sites.Length > 0) query["objectIdFilters"] = scope.Sites.Select(x => x.TrimEnd('/') + "/*").ToArray();
-        var submitted = await journal.ReadOrAcquireAsync("AuditSubmit", chunk.ToString(),
+        ClassicAuditHttpReceipt? submitted = await journal.ReadOrAcquireAsync("AuditSubmit", chunk.ToString(),
             () => RequestAsync(endpoint, JsonSerializer.Serialize(query), provider, token), token);
         if (submitted.Error != null || submitted.StatusCode is < 200 or >= 300)
             return Failed(submitted.StatusCode == 403 ? "NoPermission: AuditLogsQuery-SharePoint.Read.All" : "SubmitError: " + (submitted.Error ?? submitted.Body));
         try
         {
-            using var doc = JsonDocument.Parse(submitted.Body);
+            using JsonDocument? doc = JsonDocument.Parse(submitted.Body);
             queryId = doc.RootElement.GetProperty("id").GetString();
             if (string.IsNullOrEmpty(queryId)) return Failed("SubmitError: response contained no query ID");
         }
         catch (JsonException error) { return Failed("ParseError: " + error.Message); }
-        var poll = 0;
+        int poll = 0;
         while (true)
         {
-            var key = chunk + "|" + poll++;
+            string? key = chunk + "|" + poll++;
             if (!journal.Contains("AuditPoll", key)) await Task.Delay(pollInterval ?? TimeSpan.FromSeconds(60), token);
-            var receipt = await journal.ReadOrAcquireAsync("AuditPoll", key,
+            ClassicAuditHttpReceipt? receipt = await journal.ReadOrAcquireAsync("AuditPoll", key,
                 () => RequestAsync(endpoint + "/" + Uri.EscapeDataString(queryId), null, provider, token), token);
             if (receipt.Error != null || receipt.StatusCode is < 200 or >= 300) return Failed("PollError: " + (receipt.Error ?? receipt.Body));
             string status;
-            try { using var doc = JsonDocument.Parse(receipt.Body); status = doc.RootElement.GetProperty("status").GetString() ?? ""; }
+            try { using JsonDocument? doc = JsonDocument.Parse(receipt.Body); status = doc.RootElement.GetProperty("status").GetString() ?? ""; }
             catch (Exception error) when (error is JsonException or KeyNotFoundException) { return Failed("ParseError: " + error.Message); }
             Serilog.Log.Information("Audit query {QueryId}: {Status}", queryId, status);
             if (status is "failed" or "cancelled") return Failed("QueryFailed: " + status);
@@ -88,54 +100,57 @@ internal sealed class ClassicPageAuditCollector(StartRequest options, Authentica
             if (receipt.ReceivedAtUtc - submitted.ReceivedAtUtc >= TimeSpan.FromMinutes(90)) return Failed("QueryTimeout: " + queryId);
         }
         string? next = endpoint + "/" + Uri.EscapeDataString(queryId) + "/records?$top=5000";
-        var pageIndex = 0;
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        int pageIndex = 0;
+        HashSet<string>? seen = new HashSet<string>(StringComparer.Ordinal);
         while (next != null)
         {
             if (!seen.Add(next)) return Failed("RecordsError: repeated continuation");
-            if (!Uri.TryCreate(next, UriKind.Absolute, out var requestUri) || requestUri.Scheme != "https" ||
+            if (!Uri.TryCreate(next, UriKind.Absolute, out Uri? requestUri) || requestUri.Scheme != "https" ||
                 !requestUri.Host.Equals(graph, StringComparison.OrdinalIgnoreCase) || !requestUri.AbsolutePath.StartsWith("/v1.0/security/auditLog/queries/", StringComparison.Ordinal))
                 return Failed("RecordsError: continuation is outside the selected Graph authority");
-            var ordinal = pageIndex++;
-            var url = next;
-            var response = await journal.ReadOrAcquireAsync("AuditPage", chunk + "|" + ordinal, async () =>
+            int ordinal = pageIndex++;
+            string? url = next;
+            ClassicPageAuditPageSource? response = await journal.ReadOrAcquireAsync("AuditPage", chunk + "|" + ordinal, async () =>
             {
-                var receipt = await RequestAsync(url, null, provider, token);
+                ClassicAuditHttpReceipt? receipt = await RequestAsync(url, null, provider, token);
                 string? continuation = null;
-                try { using var parsed = JsonDocument.Parse(receipt.Body);
-                    continuation = parsed.RootElement.TryGetProperty("@odata.nextLink", out var link) ? link.GetString() : null; }
+                try { using JsonDocument? parsed = JsonDocument.Parse(receipt.Body);
+                    continuation = parsed.RootElement.TryGetProperty("@odata.nextLink", out JsonElement link) ? link.GetString() : null; }
                 catch (JsonException) { /* Persist the original body before settling its parse failure. */ }
                 return new ClassicPageAuditPageSource(chunk, queryId, ordinal, receipt.Body, continuation, receipt.StatusCode, receipt.Error);
             }, token);
             if (response.Error != null || response.StatusCode is < 200 or >= 300) return Failed("RecordsError: " + (response.Error ?? response.Body));
             try
             {
-                using var doc = JsonDocument.Parse(response.Body);
-                if (!doc.RootElement.TryGetProperty("value", out var records) || records.ValueKind != JsonValueKind.Array)
+                using JsonDocument? doc = JsonDocument.Parse(response.Body);
+                if (!doc.RootElement.TryGetProperty("value", out JsonElement records) || records.ValueKind != JsonValueKind.Array)
                     return Failed("ParseError: records response has no value array");
-                next = doc.RootElement.TryGetProperty("@odata.nextLink", out var continuation) ? continuation.GetString() : null;
+                next = doc.RootElement.TryGetProperty("@odata.nextLink", out JsonElement continuation) ? continuation.GetString() : null;
             }
             catch (JsonException error) { return Failed("ParseError: " + error.Message); }
         }
         return new(chunk, start, end, queryId, "succeeded", null);
     }
 
+    /// <summary>
+    /// Captures a bounded HTTP response body or explicit transport failure without hiding cancellation.
+    /// </summary>
     private async Task<ClassicAuditHttpReceipt> RequestAsync(string url, string? body, Func<CancellationToken, Task<string>> provider, CancellationToken token)
     {
         try
         {
-            using var response = await ClassicPageAuditClient.SendWithRetryAsync(client ?? AuthenticationManager.HttpClient, () =>
+            using HttpResponseMessage? response = await ClassicPageAuditClient.SendWithRetryAsync(client ?? AuthenticationManager.HttpClient, () =>
             {
-                var request = new HttpRequestMessage(body == null ? HttpMethod.Get : HttpMethod.Post, url);
+                HttpRequestMessage? request = new HttpRequestMessage(body == null ? HttpMethod.Get : HttpMethod.Post, url);
                 if (body != null) request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
                 return request;
             }, provider, token);
             const int maximumBytes = 16 * 1024 * 1024;
             if (response.Content.Headers.ContentLength > maximumBytes)
                 throw new InvalidDataException("Audit response exceeds the acquisition limit.");
-            await using var stream = await response.Content.ReadAsStreamAsync(token);
-            using var bodyBytes = new MemoryStream();
-            var buffer = new byte[16 * 1024];
+            await using Stream? stream = await response.Content.ReadAsStreamAsync(token);
+            using MemoryStream? bodyBytes = new MemoryStream();
+            byte[]? buffer = new byte[16 * 1024];
             int count;
             while ((count = await stream.ReadAsync(buffer, token)) != 0)
             {

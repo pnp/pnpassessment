@@ -1,6 +1,9 @@
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 
+/// <summary>
+/// Carries detached physical discovery, native identity, coverage, and failure evidence.
+/// </summary>
 internal sealed class ClassicPageDiscoveryRow : ClassicPageBaseRow
 {
     public string RecordKey { get; set; }

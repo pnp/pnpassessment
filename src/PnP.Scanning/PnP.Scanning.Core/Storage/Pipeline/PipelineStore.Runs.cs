@@ -6,6 +6,9 @@ using PnP.Scanning.Core.Pipeline.Orchestration;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Stores assessment-scoped immutable evidence, phase state, and bound analysis results transactionally.
+/// </summary>
 internal sealed partial class PipelineStore
 {
     /// <summary>Creates foundation rows without changing the existing scanner or its lifecycle.</summary>
@@ -25,15 +28,18 @@ internal sealed partial class PipelineStore
         return Task.FromResult(true);
     }, token, create: true);
 
+    /// <summary>
+    /// Validates a sealed source and persists a queued analysis with pinned rule parameters and manifest.
+    /// </summary>
     internal Task<bool> CreateAnalysisAsync(PhaseRunRow phase, CancellationToken token = default) =>
         WriteAsync(phase.AssessmentId, async db =>
         {
-            var snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == phase.SnapshotId, token);
+            SourceSnapshotRow? snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == phase.SnapshotId, token);
             ValidatePhase(phase, snapshot);
             if (phase.Kind != PhaseKind.Analysis || phase.Status != ScanStatus.Queued ||
                 string.IsNullOrWhiteSpace(phase.RuleVersion) || phase.CompletedRecords != 0)
                 throw new ArgumentException("A new analysis requires a queued phase and an explicit rule version.");
-            var manifest = await ValidateSnapshotAsync(db, snapshot, token);
+            SnapshotManifest? manifest = await ValidateSnapshotAsync(db, snapshot, token);
             phase.TotalRecords = manifest.Members.Count;
             phase.CheckpointJson = VersionedJson.From(new { stage = "Queued", manifestDigest = snapshot.ManifestDigest }).Json;
             db.PhaseRuns.Add(phase);
@@ -67,14 +73,17 @@ internal sealed partial class PipelineStore
             return true;
         }, token);
 
+    /// <summary>
+    /// Requires complete source results and immutable projection publication before finishing analysis.
+    /// </summary>
     internal Task<bool> FinishAnalysisAsync(Guid assessmentId, Guid runId, CancellationToken token = default) =>
         WriteAsync(assessmentId, async db =>
         {
-            var phase = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
+            PhaseRunRow? phase = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
             if (phase.Kind != PhaseKind.Analysis || phase.Status != ScanStatus.Running)
                 throw new InvalidOperationException("Only a running analysis can finish.");
-            var pinned = await AnalysisManifestAsync(db, runId, token);
-            var completed = await CompletedResultsAsync(db, runId, token);
+            PinnedManifest? pinned = await AnalysisManifestAsync(db, runId, token);
+            IReadOnlySet<Guid>? completed = await CompletedResultsAsync(db, runId, token);
             if (!completed.SetEquals(pinned.Members.Keys))
                 throw new SnapshotIntegrityException("Analysis has uncommitted source records.");
             _ = await ReadReportsAsync(db, runId, token);
@@ -94,33 +103,39 @@ internal sealed partial class PipelineStore
         return ids;
     }
 
+    /// <summary>
+    /// Validates sealed input and rejects changed pinned analysis rule, parameters, or manifest.
+    /// </summary>
     private static async Task<PinnedManifest> AnalysisManifestAsync(ScanContext db, Guid runId, CancellationToken token)
     {
-        var run = await db.AnalysisRuns.AsNoTracking().SingleAsync(x => x.AnalysisRunId == runId, token);
-        var phase = await db.PhaseRuns.AsNoTracking().SingleAsync(x => x.RunId == runId, token);
+        AnalysisRunRow? run = await db.AnalysisRuns.AsNoTracking().SingleAsync(x => x.AnalysisRunId == runId, token);
+        PhaseRunRow? phase = await db.PhaseRuns.AsNoTracking().SingleAsync(x => x.RunId == runId, token);
         if (run.RuleVersion != phase.RuleVersion || run.ParametersJson != PipelineRunSettings.AnalysisParameters(phase))
             throw new SnapshotIntegrityException("The analysis run's pinned rule or parameters changed.");
-        var snapshot = await db.SourceSnapshots.AsNoTracking().SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
-        var pinned = new PinnedManifest(await ValidateSnapshotAsync(db, snapshot, token));
+        SourceSnapshotRow? snapshot = await db.SourceSnapshots.AsNoTracking().SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
+        PinnedManifest? pinned = new PinnedManifest(await ValidateSnapshotAsync(db, snapshot, token));
         if (pinned.Digest != run.ManifestDigest || run.ModuleKey != snapshot.ModuleKey)
             throw new SnapshotIntegrityException("The analysis run's pinned input differs from its selected snapshot.");
         return pinned;
     }
 
+    /// <summary>
+    /// Appends one validated source result and progress checkpoint while rejecting changed replay.
+    /// </summary>
     private static async Task<bool> CommitResultAsync(ScanContext db, Guid runId, AnalysisResult result,
         PinnedManifest pinned, CancellationToken token)
     {
         if (!Enum.IsDefined(result.Outcome) || string.IsNullOrWhiteSpace(result.Reason))
             throw new ArgumentException("Analysis results require an explicit outcome and reason.");
-        var phase = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
+        PhaseRunRow? phase = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
         if (phase.Kind != PhaseKind.Analysis || phase.Status != ScanStatus.Running)
             throw new InvalidOperationException("The writer requires a running analysis phase.");
-        var run = await db.AnalysisRuns.SingleAsync(x => x.AnalysisRunId == runId, token);
+        AnalysisRunRow? run = await db.AnalysisRuns.SingleAsync(x => x.AnalysisRunId == runId, token);
         if (pinned.Digest != run.ManifestDigest)
             throw new SnapshotIntegrityException("The analysis input digest changed.");
-        var snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
+        SourceSnapshotRow? snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
         await ReadSelectedObservationAsync(db, snapshot, result.ObservationId, pinned, token);
-        var previous = await db.AnalysisResults.SingleOrDefaultAsync(x => x.AnalysisRunId == runId &&
+        AnalysisResultRow? previous = await db.AnalysisResults.SingleOrDefaultAsync(x => x.AnalysisRunId == runId &&
             x.ObservationId == result.ObservationId, token);
         if (previous != null)
         {

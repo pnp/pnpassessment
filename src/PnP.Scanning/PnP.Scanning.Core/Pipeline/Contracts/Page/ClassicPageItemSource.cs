@@ -3,6 +3,9 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 
+/// <summary>
+/// Preserves typed item fields, web-part exports, native identity, and independent read states.
+/// </summary>
 internal sealed record ClassicPageItemSource(string SiteUrl, string WebUrl, string DiscoveryKey,
     Guid? ListId, string? ListTitle, string? ListUrl, Dictionary<string, SourceField> Fields,
     Dictionary<string, SourceField> FileProperties, ClassicPageWebPartSource[] WebParts,

@@ -13,6 +13,9 @@ using System.Text.Json;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Enumerates selected sites and Webs while retaining original scope and policy evidence.
+    /// </summary>
     internal sealed class SiteEnumerationManager
     {
         private const string TemplatePolicyObservationVersion = "web-template-exclusions/v1";
@@ -32,9 +35,9 @@ namespace PnP.Scanning.Core.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
             List<string> list = new();
-            var classicOptions = OptionsBase.FromScannerInput(start) as ClassicOptions;
-            var fullPageDiscovery = classicOptions is { Pages: true };
-            var homePageOnly = classicOptions is { Pages: true, HomePageOnly: true };
+            ClassicOptions classicOptions = OptionsBase.FromScannerInput(start) as ClassicOptions;
+            bool fullPageDiscovery = classicOptions is { Pages: true };
+            bool homePageOnly = classicOptions is { Pages: true, HomePageOnly: true };
             Exception authorityError = null;
 
             Log.Information("Building list of site collections to assess");
@@ -42,7 +45,7 @@ namespace PnP.Scanning.Core.Services
             if (!string.IsNullOrEmpty(start.SitesList))
             {
                 Log.Information("Building list of site collections: using sites list");
-                foreach (var site in LoadSitesFromList(start.SitesList, new char[] { ',' }))
+                foreach (string site in LoadSitesFromList(start.SitesList, new char[] { ',' }))
                 {
                     string siteToAdd = site.ToLowerInvariant().TrimEnd('/');
 
@@ -61,7 +64,7 @@ namespace PnP.Scanning.Core.Services
             else if (!string.IsNullOrEmpty(start.SitesFile))
             {
                 Log.Information("Building list of site collections: using sites file");
-                foreach (var row in LoadSitesFromCsv(start.SitesFile, new char[] { ',' }))
+                foreach (string[] row in LoadSitesFromCsv(start.SitesFile, new char[] { ',' }))
                 {
                     string siteToAdd = row[0].ToLowerInvariant().TrimEnd('/');
                     if (!string.IsNullOrEmpty(siteToAdd))
@@ -84,7 +87,7 @@ namespace PnP.Scanning.Core.Services
 
                 try
                 {
-                    using (var context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
+                    using (PnPContext context = await contextFactory.CreateAsync(new Uri(AuthenticationManager.GetSiteFromTenant(start.Tenant)),
                                                                             new ExternalAuthenticationProvider((resourceUri, scopes) =>
                                                                             {
                                                                                 return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
@@ -107,11 +110,11 @@ namespace PnP.Scanning.Core.Services
                             Log.Information("VanityUrlOptions instance populated");
                         }
 
-                        var siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
+                        List<ISiteCollection> siteCollections = await context.GetSiteCollectionManager().GetSiteCollectionsAsync(
                             // ASPX admission is template-based, not a hard-wired personal-host filter.
                             filter: fullPageDiscovery ? SiteCollectionFilter.Default : SiteCollectionFilter.ExcludePersonalSites,
                             vanityUrlOptions: vanityUrlOptions);
-                        foreach (var siteCollection in siteCollections)
+                        foreach (ISiteCollection siteCollection in siteCollections)
                         {
                             list.Add(siteCollection.Url.ToString());
                         }
@@ -136,7 +139,7 @@ namespace PnP.Scanning.Core.Services
                 list.Count == 0)
             {
                 int sitesToScan = 10;
-                var numberOfSitesProperty = start.Properties.FirstOrDefault(p => p.Property == Constants.StartTestNumberOfSites);
+                PropertyRequest numberOfSitesProperty = start.Properties.FirstOrDefault(p => p.Property == Constants.StartTestNumberOfSites);
 
                 if (numberOfSitesProperty != null)
                 {
@@ -154,8 +157,8 @@ namespace PnP.Scanning.Core.Services
 
             if (fullPageDiscovery && discoveryEvidence != null)
             {
-                var declared = !string.IsNullOrWhiteSpace(start.SitesList) || !string.IsNullOrWhiteSpace(start.SitesFile);
-                var row = new ClassicPageDiscovery
+                bool declared = !string.IsNullOrWhiteSpace(start.SitesList) || !string.IsNullOrWhiteSpace(start.SitesFile);
+                ClassicPageDiscovery row = new ClassicPageDiscovery
                 {
                     RecordKey = "assessment:site-selection", RowType = "Scope", ScopeType = declared ? "SiteSelection" : "Tenant",
                     Url = !string.IsNullOrEmpty(start.Tenant) ? AuthenticationManager.GetSiteFromTenant(start.Tenant) : null,
@@ -186,13 +189,13 @@ namespace PnP.Scanning.Core.Services
             CancellationToken cancellationToken = default, string contextPropertyKey = Constants.PnPContextPropertyScanId)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
-            var templateEvidence = new List<ClassicPageDiscovery>();
+            List<ClassicPageDiscovery> templateEvidence = new List<ClassicPageDiscovery>();
             
             if (isRestart)
             {
                 // When we're enumerating webs for a scan restart we might already have done this 
                 // previously and so only the webs not processed should be handled again
-                var websToRestart = await StorageManager.WebsToRestartScanningAsync(scanId, siteCollectionUrl);
+                List<EnumeratedWeb> websToRestart = await StorageManager.WebsToRestartScanningAsync(scanId, siteCollectionUrl);
                 if (websToRestart != null && websToRestart.Count > 0)
                 {
                     Log.Information("Loaded {Count} webs for restarting assessment {ScanId} with site collection {SiteCollectionUrl}", websToRestart.Count, scanId, siteCollectionUrl);
@@ -201,13 +204,13 @@ namespace PnP.Scanning.Core.Services
             }
 
             // Ensure these props are already loaded when the site is loaded into the PnPContext
-            var contextOptions = new PnPContextOptions()
+            PnPContextOptions contextOptions = new PnPContextOptions()
             {
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[] { w => w.WebTemplateConfiguration },
                 Properties = new Dictionary<string, object>() { { contextPropertyKey, scanId } }
             };
 
-            using (var context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl), 
+            using (PnPContext context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl),
                                                                     new ExternalAuthenticationProvider((resourceUri, scopes) =>
                                                                     {
                                                                         return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
@@ -217,13 +220,13 @@ namespace PnP.Scanning.Core.Services
                 if (options is ClassicOptions { Pages: true } classic)
                 {
                     // Enumerate first: excluding a parent Web must not exclude a differently templated child.
-                    var allWebs = await LoadAllWebsInSiteCollectionAsync(context, skipAppWebs: false);
-                    var policy = SiteTemplateExclusionPolicy.Parse(classic.ExcludeSiteTemplates);
-                    var decisions = templateEvidence;
-                    foreach (var web in allWebs)
+                    List<EnumeratedWeb> allWebs = await LoadAllWebsInSiteCollectionAsync(context, skipAppWebs: false);
+                    SiteTemplateExclusionPolicy policy = SiteTemplateExclusionPolicy.Parse(classic.ExcludeSiteTemplates);
+                    List<ClassicPageDiscovery> decisions = templateEvidence;
+                    foreach (EnumeratedWeb web in allWebs)
                     {
-                        var known = policy.TryEvaluate(web.WebTemplate, out var excluded);
-                        var absolute = context.Uri.AbsoluteUri.TrimEnd('/') + (web.WebUrl == "/" ? "" : "/" + web.WebUrl.TrimStart('/'));
+                        bool known = policy.TryEvaluate(web.WebTemplate, out bool excluded);
+                        string absolute = context.Uri.AbsoluteUri.TrimEnd('/') + (web.WebUrl == "/" ? "" : "/" + web.WebUrl.TrimStart('/'));
                         decisions.Add(new ClassicPageDiscovery
                         {
                             ScanId = scanId, SiteUrl = siteCollectionUrl, WebUrl = web.WebUrl, Url = absolute,

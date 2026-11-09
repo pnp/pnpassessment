@@ -5,6 +5,9 @@ using System.CommandLine.Binding;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Maps parsed existing command options into typed start arguments.
+    /// </summary>
     internal sealed class StartBinder : BinderBase<StartOptions>
     {
         private readonly Option<Mode> mode;

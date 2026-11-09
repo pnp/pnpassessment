@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Binds the existing pause command and reports streamed lifecycle outcomes.
+    /// </summary>
     internal sealed class PauseCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -40,6 +43,9 @@ namespace PnP.Scanning.Process.Commands
             cmd.AddOption(allScansOption);
         }
 
+        /// <summary>
+        /// Builds the existing pause command and propagates streamed lifecycle failures.
+        /// </summary>
         public Command Create()
         {
             // Custom validation of provided command input, use to validate option combinations
@@ -74,11 +80,11 @@ namespace PnP.Scanning.Process.Commands
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Pausing Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
-                var client = await processManager.GetScannerClientAsync();
+                Core.Services.PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
                 // Start the pausing work
-                var call = client.Pause(new Core.Services.PauseRequest { Id = scanId.ToString(), All = all });
-                await foreach (var message in call.ResponseStream.ReadAllAsync())
+                AsyncServerStreamingCall<Core.Services.PauseStatus> call = client.Pause(new Core.Services.PauseRequest { Id = scanId.ToString(), All = all });
+                await foreach (Core.Services.PauseStatus message in call.ResponseStream.ReadAllAsync())
                 {
                     if (message.Type == Constants.MessageError)
                     {

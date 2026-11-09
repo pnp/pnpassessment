@@ -13,74 +13,52 @@ using PnP.Scanning.Core.Scanners;
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
 // This adapter retains the existing database/report contract. It does not define a new CSV shape.
+/// <summary>
+/// Binds deterministic analysis output to the existing Classic storage and report contracts.
+/// </summary>
 internal sealed record ClassicCompatibilityPayload(
     ClassicPage[] Pages, ClassicPageWebPart[] Parts, ClassicPageDiscovery[] Discovery, SPFile[] Files,
     ClassicPageWebSource[] Webs, ClassicPageScopeSource Scope, ClassicComponentSource[] Components,
     ClassicAuditPageStats[] Audit);
 
+/// <summary>
+/// Builds the narrow existing-report projection from fixed source and committed results.
+/// </summary>
 internal static class ClassicCompatibility
 {
+    /// <summary>
+    /// Publishes deterministic compatibility data from fixed source and committed analysis results.
+    /// </summary>
     internal static async Task PublishAsync(Guid assessment, ClassicPageInputIndex index,
         IAnalysisResultReader reader, IAnalysisReportWriter writer, CancellationToken token)
     {
-        var pages = new List<ClassicPage>();
-        var parts = new List<ClassicPageWebPart>();
-        var discoveries = index.Discovery.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>)
+        List<ClassicPage>? pages = new List<ClassicPage>();
+        List<ClassicPageWebPart>? parts = new List<ClassicPageWebPart>();
+        Dictionary<(string, string, string RecordKey), ClassicPageDiscovery>? discoveries = index.Discovery.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>)
             .Concat(index.Scope.Evidence.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>))
             .ToDictionary(row => (row.SiteUrl ?? "", row.WebUrl ?? "", row.RecordKey));
-        var audit = new List<ClassicAuditPageStats>();
-        foreach (var result in await reader.ReadAsync(token))
+        List<ClassicAuditPageStats>? audit = new List<ClassicAuditPageStats>();
+        foreach (AnalysisResult? result in await reader.ReadAsync(token))
         {
-            var value = result.Payload.Value;
-            var kind = value.GetProperty("kind").GetString();
+            JsonElement value = result.Payload.Value;
+            string? kind = value.GetProperty("kind").GetString();
             if (kind == "Page")
             {
-                var output = value.GetProperty("output").Deserialize<ClassicPageProjectionResult>()!;
+                ClassicPageProjectionResult? output = value.GetProperty("output").Deserialize<ClassicPageProjectionResult>()!;
                 if (output.Page != null) pages.Add(ClassicPageSourceJson.Convert<ClassicPage>(output.Page));
                 parts.AddRange(output.Parts.Select(ClassicPageSourceJson.Convert<ClassicPageWebPart>));
                 if (output.Discovery != null)
                 {
-                    var row = ClassicPageSourceJson.Convert<ClassicPageDiscovery>(output.Discovery);
+                    ClassicPageDiscovery? row = ClassicPageSourceJson.Convert<ClassicPageDiscovery>(output.Discovery);
                     discoveries[(row.SiteUrl, row.WebUrl, row.RecordKey)] = row;
                 }
-                foreach (var site in index.Scope.SiteScopes)
-                {
-                    foreach (var evidence in site.Evidence ?? [])
-                    {
-                        var retained = ClassicPageSourceJson.Convert<ClassicPageDiscovery>(evidence);
-                        discoveries[(retained.SiteUrl, retained.WebUrl, retained.RecordKey)] = retained;
-                    }
-                    var row = new ClassicPageDiscovery
-                    {
-                        ScanId = assessment, SiteUrl = site.SiteUrl, WebUrl = "", RecordKey = "assessment:webs:" + DiscoveryHash.Of(site.SiteUrl),
-                        RowType = "Scope", ScopeType = "SiteCollection", Url = site.SiteUrl, ObservationMethod = "EnumerateWebs",
-                        DiscoveryStatus = site.State.Status, ErrorDetail = site.State.Error,
-                        ExpectedChildCount = site.State.Succeeded ? site.WebUrls.Length : null,
-                        ObservedChildCount = site.State.Succeeded ? site.WebUrls.Length : null,
-                        ObservedAtUtc = index.Scope.AuditWindowEnd,
-                    };
-                    discoveries[(row.SiteUrl, row.WebUrl, row.RecordKey)] = row;
-                }
-                foreach (var web in index.Webs.Values.Where(x => !x.State.Succeeded))
-                {
-                    var row = new ClassicPageDiscovery
-                    {
-                        ScanId = assessment, SiteUrl = web.SiteUrl, WebUrl = web.WebUrl,
-                        RecordKey = "assessment:web:" + DiscoveryHash.Of(web.SiteUrl, web.WebUrl), RowType = "Scope", ScopeType = "Web",
-                        Url = web.SiteUrl.TrimEnd('/') + web.WebUrl, DiscoveryStatus = web.State.Status,
-                        ErrorDetail = web.State.Error, ObservationMethod = "WebMetadata", ObservedAtUtc = index.Scope.AuditWindowEnd,
-                    };
-                    discoveries[(row.SiteUrl, row.WebUrl, row.RecordKey)] = row;
-                }
-                var coverage = AssessmentDiscoveryWriter.BuildCoverage(assessment, discoveries.Values.ToArray(), index.Scope.AuditWindowEnd);
-                discoveries[("", "", coverage.RecordKey)] = coverage;
             }
             else if (kind == "Blog")
             {
-                foreach (var page in value.GetProperty("pages").EnumerateArray())
+                foreach (JsonElement page in value.GetProperty("pages").EnumerateArray())
                 {
                     if (page.ValueKind == JsonValueKind.Null) continue;
-                    var row = page.Deserialize<ClassicPage>()!;
+                    ClassicPage? row = page.Deserialize<ClassicPage>()!;
                     // Unknown Blog locators remain in immutable results, not invalid legacy primary keys.
                     if (!string.IsNullOrEmpty(row.PageUrl)) pages.Add(row);
                 }
@@ -88,7 +66,38 @@ internal static class ClassicCompatibility
             else if (kind == "AuditPage")
                 audit.AddRange(value.GetProperty("output").Deserialize<ClassicAuditPageStats[]>()!);
         }
-        var payload = new ClassicCompatibilityPayload(
+        foreach (Core.Pipeline.Contracts.Site.ClassicPageSiteScope? site in index.Scope.SiteScopes)
+        {
+            foreach (Core.Pipeline.Contracts.Page.ClassicPageDiscoveryRow? evidence in site.Evidence ?? [])
+            {
+                ClassicPageDiscovery? retained = ClassicPageSourceJson.Convert<ClassicPageDiscovery>(evidence);
+                discoveries[(retained.SiteUrl, retained.WebUrl, retained.RecordKey)] = retained;
+            }
+            ClassicPageDiscovery? row = new ClassicPageDiscovery
+            {
+                ScanId = assessment, SiteUrl = site.SiteUrl, WebUrl = "", RecordKey = "assessment:webs:" + DiscoveryHash.Of(site.SiteUrl),
+                RowType = "Scope", ScopeType = "SiteCollection", Url = site.SiteUrl, ObservationMethod = "EnumerateWebs",
+                DiscoveryStatus = site.State.Status, ErrorDetail = site.State.Error,
+                ExpectedChildCount = site.State.Succeeded ? site.WebUrls.Length : null,
+                ObservedChildCount = site.State.Succeeded ? site.WebUrls.Length : null,
+                ObservedAtUtc = index.Scope.AuditWindowEnd,
+            };
+            discoveries[(row.SiteUrl, row.WebUrl, row.RecordKey)] = row;
+        }
+        foreach (ClassicPageWebSource? web in index.Webs.Values.Where(x => !x.State.Succeeded))
+        {
+            ClassicPageDiscovery? row = new ClassicPageDiscovery
+            {
+                ScanId = assessment, SiteUrl = web.SiteUrl, WebUrl = web.WebUrl,
+                RecordKey = "assessment:web:" + DiscoveryHash.Of(web.SiteUrl, web.WebUrl), RowType = "Scope", ScopeType = "Web",
+                Url = web.SiteUrl.TrimEnd('/') + web.WebUrl, DiscoveryStatus = web.State.Status,
+                ErrorDetail = web.State.Error, ObservationMethod = "WebMetadata", ObservedAtUtc = index.Scope.AuditWindowEnd,
+            };
+            discoveries[(row.SiteUrl, row.WebUrl, row.RecordKey)] = row;
+        }
+        ClassicPageDiscovery? coverage = AssessmentDiscoveryWriter.BuildCoverage(assessment, discoveries.Values.ToArray(), index.Scope.AuditWindowEnd);
+        discoveries[("", "", coverage.RecordKey)] = coverage;
+        ClassicCompatibilityPayload? payload = new ClassicCompatibilityPayload(
             pages.OrderBy(x => x.SiteUrl).ThenBy(x => x.WebUrl).ThenBy(x => x.PageUrl).ToArray(),
             parts.OrderBy(x => x.SiteUrl).ThenBy(x => x.WebUrl).ThenBy(x => x.PageUrl).ThenBy(x => x.WebPartIndex).ToArray(),
             discoveries.Values.OrderBy(x => x.SiteUrl).ThenBy(x => x.WebUrl).ThenBy(x => x.RecordKey).ToArray(),
@@ -100,13 +109,16 @@ internal static class ClassicCompatibility
         await writer.PublishAsync([new("ClassicCompatibility", "assessment", 0, VersionedJson.From(payload))], token);
     }
 
+    /// <summary>
+    /// Builds existing Web totals while retaining captured non-page component results.
+    /// </summary>
     internal static ClassicWebSummary BuildWeb(Guid assessment, ClassicPageWebSource source,
         ClassicPage[] pages, ClassicPageDiscovery[] discovery, ClassicWebSummary? other)
     {
-        var row = other ?? new ClassicWebSummary();
+        ClassicWebSummary? row = other ?? new ClassicWebSummary();
         row.ScanId = assessment; row.SiteUrl = source.SiteUrl; row.WebUrl = source.WebUrl;
         row.Template = source.Template; row.LastItemUserModifiedDate = source.LastItemUserModifiedDate;
-        var selected = pages.Where(x => x.SiteUrl == source.SiteUrl && x.WebUrl == source.WebUrl).ToArray();
+        ClassicPage[]? selected = pages.Where(x => x.SiteUrl == source.SiteUrl && x.WebUrl == source.WebUrl).ToArray();
         row.ClassicPages = selected.Length;
         row.ClassicWikiPages = selected.Count(x => x.PageType == ClassicPageRules.WikiPage);
         row.ClassicASPXPages = selected.Count(x => x.PageType == ClassicPageRules.ASPXPage);
@@ -115,7 +127,7 @@ internal static class ClassicCompatibility
         row.ClassicPublishingPages = selected.Count(x => x.PageType == ClassicPageRules.PublishingPage);
         row.ModernPages = discovery.Count(x => x.SiteUrl == source.SiteUrl && x.WebUrl == source.WebUrl &&
             x.RowType == "Page" && x.PageType == ClassicPageRules.ModernPage);
-        var type = ClassicScanner.GetSiteType(source.Template);
+        SiteType type = ClassicScanner.GetSiteType(source.Template);
         row.IsClassicPublishingSite = type == SiteType.Publishing;
         row.IsModernSite = type == SiteType.Modern;
         row.IsModernCommunicationSite = type == SiteType.Communication;
@@ -126,11 +138,14 @@ internal static class ClassicCompatibility
         return row;
     }
 
+    /// <summary>
+    /// Aggregates existing Web summaries into the established per-site counts and weighted readiness totals.
+    /// </summary>
     internal static ClassicSiteSummary BuildSite(Guid assessment, IGrouping<string, ClassicWebSummary> group)
     {
-        var root = group.FirstOrDefault(x => x.WebUrl == "/");
-        var sub = group.Where(x => x.WebUrl != "/").ToArray();
-        var weighted = group.Sum(x => x.PagesWithWebParts);
+        ClassicWebSummary? root = group.FirstOrDefault(x => x.WebUrl == "/");
+        ClassicWebSummary[]? sub = group.Where(x => x.WebUrl != "/").ToArray();
+        int weighted = group.Sum(x => x.PagesWithWebParts);
         return new()
         {
             ScanId = assessment, SiteUrl = group.Key, RootWebTemplate = root?.Template,
@@ -154,25 +169,31 @@ internal static class ClassicCompatibility
     }
 }
 
+/// <summary>
+/// Stores assessment-scoped immutable evidence, phase state, and bound analysis results transactionally.
+/// </summary>
 internal sealed partial class PipelineStore
 {
+    /// <summary>
+    /// Atomically validates and materializes immutable compatibility output into existing assessment report tables.
+    /// </summary>
     internal Task<bool> MaterializeClassicAsync(Guid assessment, Guid runId, CancellationToken token) =>
         WriteAsync(assessment, async db =>
         {
-            var manifest = await AnalysisManifestAsync(db, runId, token);
-            var phase = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
+            PinnedManifest? manifest = await AnalysisManifestAsync(db, runId, token);
+            PhaseRunRow? phase = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
             if (phase.Status != ScanStatus.Finished || phase.ModuleKey != "classicpage")
                 throw new InvalidOperationException("Classic reporting requires a completed analysis.");
-            var report = (await ReadReportsAsync(db, runId, token)).Single(x => x.Kind == "ClassicCompatibility");
-            var payload = report.Payload.Value.Deserialize<ClassicCompatibilityPayload>()
+            AnalysisReportRow? report = (await ReadReportsAsync(db, runId, token)).Single(x => x.Kind == "ClassicCompatibility");
+            ClassicCompatibilityPayload? payload = report.Payload.Value.Deserialize<ClassicCompatibilityPayload>()
                 ?? throw new SnapshotIntegrityException("Classic compatibility publication is missing.");
             async Task Replace<T>(IEnumerable<T> rows) where T : class
             {
                 await db.Set<T>().Where(x => EF.Property<Guid>(x, "ScanId") == assessment).ExecuteDeleteAsync(token);
                 db.Set<T>().AddRange(rows);
             }
-            foreach (var component in payload.Components)
-                foreach (var rows in component.Rows)
+            foreach (ClassicComponentSource? component in payload.Components)
+                foreach (KeyValuePair<string, JsonElement[]> rows in component.Rows)
                     if (rows.Value.Any(value => value.GetProperty("ScanId").GetGuid() != assessment ||
                         value.GetProperty("SiteUrl").GetString() != component.SiteUrl ||
                         value.GetProperty("WebUrl").GetString() != component.WebUrl))
@@ -188,7 +209,7 @@ internal sealed partial class PipelineStore
             await Replace(payload.Parts);
             await Replace(payload.Discovery);
             await Replace(payload.Files);
-            var existing = Components<ClassicWebSummary>().ToDictionary(x => (x.SiteUrl, x.WebUrl));
+            Dictionary<(string SiteUrl, string WebUrl), ClassicWebSummary>? existing = Components<ClassicWebSummary>().ToDictionary(x => (x.SiteUrl, x.WebUrl));
             await Replace(payload.Webs.Select(web => ClassicCompatibility.BuildWeb(assessment, web, payload.Pages,
                 payload.Discovery, existing.GetValueOrDefault((web.SiteUrl, web.WebUrl)))));
             await Replace(payload.Scope.SiteScopes.Select(site => new SiteCollection
@@ -209,22 +230,22 @@ internal sealed partial class PipelineStore
             await db.ClassicPageAuditUsages.Where(x => x.ScanId == assessment).ExecuteDeleteAsync(token);
             if (!payload.Scope.Options.SkipUsageInformation)
             {
-                var chunks = new List<PnP.Scanning.Core.Pipeline.Contracts.Audit.ClassicPageAuditChunkSource>();
-                foreach (var member in manifest.Members.Values)
+                List<Core.Pipeline.Contracts.Audit.ClassicPageAuditChunkSource>? chunks = new List<PnP.Scanning.Core.Pipeline.Contracts.Audit.ClassicPageAuditChunkSource>();
+                foreach (ManifestMember? member in manifest.Members.Values)
                 {
-                    var source = await ReadSelectedObservationAsync(db,
+                    SourceRecord? source = await ReadSelectedObservationAsync(db,
                         await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == phase.SnapshotId, token),
                         member.ObservationId, manifest, token);
                     if (ClassicPageSourceJson.Kind(source) == "AuditChunk")
                         chunks.Add(ClassicPageSourceJson.Read<PnP.Scanning.Core.Pipeline.Contracts.Audit.ClassicPageAuditChunkSource>(source.Artifact.GetBytes()));
                 }
-                var succeeded = chunks.Count(x => x.Status == "succeeded");
-                var status = succeeded == chunks.Count && succeeded > 0 ? "succeeded" : succeeded > 0 ? "partial" :
+                int succeeded = chunks.Count(x => x.Status == "succeeded");
+                string? status = succeeded == chunks.Count && succeeded > 0 ? "succeeded" : succeeded > 0 ? "partial" :
                     chunks.All(x => x.Status == "skipped") ? "skipped" : "failed";
-                var merged = payload.Audit.GroupBy(x => x.PageUrl, StringComparer.OrdinalIgnoreCase).ToArray();
-                foreach (var site in payload.Scope.Sites)
+                IGrouping<string, ClassicAuditPageStats>[]? merged = payload.Audit.GroupBy(x => x.PageUrl, StringComparer.OrdinalIgnoreCase).ToArray();
+                foreach (string? site in payload.Scope.Sites)
                 {
-                    var stats = merged.Where(group => payload.Scope.Sites.OrderByDescending(x => x.Length)
+                    IGrouping<string, ClassicAuditPageStats>[]? stats = merged.Where(group => payload.Scope.Sites.OrderByDescending(x => x.Length)
                         .FirstOrDefault(candidate => group.Key.StartsWith(candidate.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase)) == site).ToArray();
                     ClassicPageAuditUsage Row(string url) => new()
                     {
@@ -232,9 +253,9 @@ internal sealed partial class PipelineStore
                         AuditWindowStart = payload.Scope.AuditWindowStart, AuditWindowEnd = payload.Scope.AuditWindowEnd,
                         QueryStatus = status, SkipReason = string.Join("; ", chunks.Where(x => x.Error != null).Select(x => x.Error)),
                     };
-                    foreach (var group in stats)
+                    foreach (IGrouping<string, ClassicAuditPageStats>? group in stats)
                     {
-                        var row = Row(group.Key);
+                        ClassicPageAuditUsage? row = Row(group.Key);
                         row.AuditViewsCount = group.Sum(x => x.Views);
                         row.AuditCreatesCount = group.Sum(x => x.Creates);
                         row.AuditEditsCount = group.Sum(x => x.Edits);
@@ -247,10 +268,10 @@ internal sealed partial class PipelineStore
             await StorageManager.ComputeAndStoreWebPageRollupsAsync(db, assessment);
             await StorageManager.PopulateWebPartUniqueAsync(db, assessment, PageScanComponent.MappingManager);
             await StorageManager.PopulatePublishingSiteSummaryAsync(db, assessment);
-            var summaries = await db.ClassicWebSummaries.Where(x => x.ScanId == assessment).ToListAsync(token);
+            List<ClassicWebSummary>? summaries = await db.ClassicWebSummaries.Where(x => x.ScanId == assessment).ToListAsync(token);
             db.ClassicSiteSummaries.AddRange(summaries.GroupBy(x => x.SiteUrl)
                 .Select(group => ClassicCompatibility.BuildSite(assessment, group)));
-            var scan = await db.Scans.SingleAsync(x => x.ScanId == assessment, token);
+            Scan? scan = await db.Scans.SingleAsync(x => x.ScanId == assessment, token);
             scan.CLIMode = Services.Mode.Classic.ToString();
             scan.PreScanStatus = scan.PostScanStatus = SiteWebStatus.Finished;
             return true;

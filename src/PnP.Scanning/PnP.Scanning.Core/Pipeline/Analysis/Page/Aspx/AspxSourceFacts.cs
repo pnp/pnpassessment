@@ -6,9 +6,15 @@ using System.Text;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Retains source digest, declared handler, parsing disposition, and unresolved diagnostics.
+/// </summary>
 internal sealed record AspxSourceFacts(
     string Sha256, string? Handler, string Resolution, string? Declaration, string? Error);
 
+/// <summary>
+/// Parses bounded ASPX declarations without compiling or executing source content.
+/// </summary>
 internal static class AspxSourceParser
 {
     internal const string DefaultHandler = "System.Web.UI.Page";
@@ -17,10 +23,13 @@ internal static class AspxSourceParser
     private static readonly Encoding Utf16LittleEndian = new UnicodeEncoding(false, true, true);
     private static readonly Encoding Utf16BigEndian = new UnicodeEncoding(true, true, true);
 
+    /// <summary>
+    /// Decodes bounded original bytes and extracts a non-executed Page declaration with explicit unresolved outcomes.
+    /// </summary>
     internal static AspxSourceFacts Parse(byte[] bytes)
     {
         ArgumentNullException.ThrowIfNull(bytes);
-        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        string? hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         if (bytes.Length > MaximumSourceBytes)
         {
             return new(hash, null, "Unresolved", null, "SourceExceedsAnalysisLimit");
@@ -45,23 +54,23 @@ internal static class AspxSourceParser
 
         string? declaration = null;
         Dictionary<string, string>? attributes = null;
-        for (var position = 0; position < text.Length;)
+        for (int position = 0; position < text.Length;)
         {
-            var start = text.IndexOf("<%", position, StringComparison.Ordinal);
+            int start = text.IndexOf("<%", position, StringComparison.Ordinal);
             if (start < 0) break;
             if (text.AsSpan(start).StartsWith("<%--", StringComparison.Ordinal))
             {
-                var endComment = text.IndexOf("--%>", start + 4, StringComparison.Ordinal);
+                int endComment = text.IndexOf("--%>", start + 4, StringComparison.Ordinal);
                 if (endComment < 0) return new(hash, null, "Unresolved", declaration, "UnterminatedServerComment");
                 position = endComment + 4;
                 continue;
             }
-            var end = EndBlock(text, start + 2);
+            int end = EndBlock(text, start + 2);
             if (end < 0) return new(hash, null, "Unresolved", declaration, "UnterminatedServerBlock");
             position = end + 2;
             if (start + 2 >= text.Length || text[start + 2] != '@') continue;
-            var body = text[(start + 3)..end].Trim();
-            var nameEnd = 0;
+            string? body = text[(start + 3)..end].Trim();
+            int nameEnd = 0;
             while (nameEnd < body.Length && !char.IsWhiteSpace(body[nameEnd])) nameEnd++;
             if (!body[..nameEnd].Equals("Page", StringComparison.OrdinalIgnoreCase)) continue;
             if (declaration != null) return new(hash, null, "Unresolved", declaration, "MultiplePageDirectives");
@@ -69,20 +78,23 @@ internal static class AspxSourceParser
             if (!TryAttributes(body.AsSpan(nameEnd), out attributes))
                 return new(hash, null, "Unresolved", declaration, "MalformedPageDirective");
         }
-        if (attributes == null || !attributes.TryGetValue("Inherits", out var inherits))
+        if (attributes == null || !attributes.TryGetValue("Inherits", out string? inherits))
             return new(hash, DefaultHandler, "DefaultAssumed", declaration, null);
-        var handler = inherits.Split(',')[0].Trim();
+        string? handler = inherits.Split(',')[0].Trim();
         if (handler.Length == 0 || !ValidHandler(handler))
             return new(hash, null, "Unresolved", declaration, "InvalidInherits");
         return new(hash, handler, "Declared", declaration, null);
     }
 
+    /// <summary>
+    /// Finds a server-block terminator while respecting quoted attribute content.
+    /// </summary>
     private static int EndBlock(string text, int start)
     {
-        var quote = '\0';
-        for (var i = start; i + 1 < text.Length; i++)
+        char quote = '\0';
+        for (int i = start; i + 1 < text.Length; i++)
         {
-            var c = text[i];
+            char c = text[i];
             if (quote != '\0')
             {
                 if (c == quote) quote = '\0';
@@ -93,23 +105,26 @@ internal static class AspxSourceParser
         return -1;
     }
 
+    /// <summary>
+    /// Parses uniquely named quoted directive attributes and rejects malformed declarations.
+    /// </summary>
     private static bool TryAttributes(ReadOnlySpan<char> text, out Dictionary<string, string> values)
     {
         values = new(StringComparer.OrdinalIgnoreCase);
-        var i = 0;
+        int i = 0;
         while (i < text.Length)
         {
             while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
             if (i == text.Length) return true;
-            var start = i;
+            int start = i;
             while (i < text.Length && (char.IsLetterOrDigit(text[i]) || text[i] is '_' or ':')) i++;
             if (i == start) return false;
-            var name = text[start..i].ToString();
+            string? name = text[start..i].ToString();
             while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
             if (i == text.Length || text[i++] != '=') return false;
             while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
             if (i == text.Length || text[i] is not ('"' or '\'')) return false;
-            var quote = text[i++];
+            char quote = text[i++];
             start = i;
             while (i < text.Length && text[i] != quote) i++;
             if (i == text.Length || !values.TryAdd(name, text[start..i].ToString())) return false;
@@ -118,6 +133,9 @@ internal static class AspxSourceParser
         return true;
     }
 
+    /// <summary>
+    /// Checks that each qualified handler-name segment is a valid identifier.
+    /// </summary>
     private static bool ValidHandler(string value) =>
         value.Split(new[] { '.', '+' }).All(part => part.Length > 0 &&
             (char.IsLetter(part[0]) || part[0] == '_') &&

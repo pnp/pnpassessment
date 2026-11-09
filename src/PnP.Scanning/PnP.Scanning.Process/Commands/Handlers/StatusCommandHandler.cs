@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Displays running assessment status and phase progress through the existing command.
+    /// </summary>
     internal sealed class StatusCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -26,11 +29,14 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Reads and displays current assessment and internal phase progress.
+        /// </summary>
         private async Task HandleStatusAsync()
         {
-            var client = await processManager.GetScannerClientAsync();
+            PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
-            var table = new Table().BorderColor(Color.Grey);
+            Table table = new Table().BorderColor(Color.Grey);
 
             // Add some columns
             table.AddColumn(new TableColumn("Id").Centered());
@@ -58,13 +64,13 @@ namespace PnP.Scanning.Process.Commands
                     {
                         while (!Console.KeyAvailable)
                         {
-                            var statusInformation = await client.StatusAsync(new StatusRequest() { Message = "bla" });
+                            StatusReply statusInformation = await client.StatusAsync(new StatusRequest() { Message = "bla" });
 
                             table.Rows.Clear();
 
                             if (statusInformation.Status.Count > 0)
                             {
-                                foreach (var item in statusInformation.Status)
+                                foreach (ScanStatusReply item in statusInformation.Status)
                                 {
                                     double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
                                     Markup status;

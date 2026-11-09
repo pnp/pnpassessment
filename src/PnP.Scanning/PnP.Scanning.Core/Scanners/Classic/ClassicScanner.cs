@@ -12,6 +12,9 @@ using System.Linq.Expressions;
 
 namespace PnP.Scanning.Core.Scanners
 {
+    /// <summary>
+    /// Runs retained non-page Classic components using the shared assessment metadata contract.
+    /// </summary>
     internal class ClassicScanner : ScannerBase
     {
         public ClassicScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
@@ -30,10 +33,10 @@ namespace PnP.Scanning.Core.Scanners
                 throw new InvalidOperationException("Classic Pages must use the collection and analysis coordinator.");
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
-            var options = AssessmentContextOptions(Options);
+            PnPContextOptions options = AssessmentContextOptions(Options);
 
-            using (var context = await CreateWebContextAsync())
-            using (var csomContext = GetClientContext(context))
+            using (PnPContext context = await CreateWebContextAsync())
+            using (ClientContext csomContext = GetClientContext(context))
             {
                 await RetryLoadSharedMetadataAsync(context, options,
                     ScanManager.GetCancellationTokenSource(ScanId).Token).ConfigureAwait(false);
@@ -49,6 +52,9 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
         }
 
+        /// <summary>
+        /// Builds the shared rich metadata requests required by selected existing Classic components.
+        /// </summary>
         internal static PnPContextOptions AssessmentContextOptions(ClassicOptions selected)
         {
             // Define extra Web/Site data that we want to load when the context is inialized
@@ -101,6 +107,9 @@ namespace PnP.Scanning.Core.Scanners
             return options;
         }
 
+        /// <summary>
+        /// Runs selected retained non-page Classic components using the supplied shared contexts and cancellation.
+        /// </summary>
         internal static async Task ExecuteOtherComponentsAsync(ClassicScanner scanner, PnPContext context,
             ClientContext csomContext, CancellationToken token)
         {

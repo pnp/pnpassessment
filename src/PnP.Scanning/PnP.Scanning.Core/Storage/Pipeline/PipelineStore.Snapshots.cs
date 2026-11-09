@@ -5,22 +5,28 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
+/// <summary>
+/// Stores assessment-scoped immutable evidence, phase state, and bound analysis results transactionally.
+/// </summary>
 internal sealed partial class PipelineStore
 {
+    /// <summary>
+    /// Commits original source evidence and the collector checkpoint together, accepting only identical replay.
+    /// </summary>
     private Task<bool> CommitObservationAsync(Guid assessmentId, Guid snapshotId, Guid runId,
         CollectionRecord record, CancellationToken token) => WriteAsync(assessmentId, async db =>
     {
-        var snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == snapshotId, token);
-        var run = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
+        SourceSnapshotRow? snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == snapshotId, token);
+        PhaseRunRow? run = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
         if (snapshot.IsSealed || run.SnapshotId != snapshotId || run.Kind != PhaseKind.Collection || run.Status != ScanStatus.Running)
             throw new InvalidOperationException("The writer requires its bound, running collection and an unsealed snapshot.");
-        var item = record.Observation;
+        CollectedObservation? item = record.Observation;
         if (item != null)
         {
             if (item.ObservationId == Guid.Empty || string.IsNullOrWhiteSpace(item.SourceIdentity) || !Enum.IsDefined(item.AcquisitionStatus))
                 throw new ArgumentException("A source observation requires an ID, identity and acquisition status.");
-            var bytes = item.RawBytes?.ToArray();
-            var row = new SourceObservationRow
+            byte[]? bytes = item.RawBytes?.ToArray();
+            SourceObservationRow? row = new SourceObservationRow
             {
                 ObservationId = item.ObservationId, SnapshotId = snapshotId, SourceIdentity = item.SourceIdentity,
                 SourceRevision = item.SourceRevision, AcquisitionStatus = item.AcquisitionStatus,
@@ -28,7 +34,7 @@ internal sealed partial class PipelineStore
                 RawBytes = bytes, Length = bytes?.LongLength, Sha256 = bytes == null ? null : SnapshotManifest.Digest(bytes),
             };
             SnapshotManifest.ValidateContent(row);
-            var previous = await db.SourceObservations.SingleOrDefaultAsync(x => x.ObservationId == item.ObservationId, token);
+            SourceObservationRow? previous = await db.SourceObservations.SingleOrDefaultAsync(x => x.ObservationId == item.ObservationId, token);
             if (previous != null)
             {
                 SnapshotManifest.ValidateContent(previous);
@@ -59,19 +65,22 @@ internal sealed partial class PipelineStore
         return true;
     }, token);
 
+    /// <summary>
+    /// Validates source membership and content before atomically sealing collection and advancing its parent.
+    /// </summary>
     private Task<SnapshotInfo> SealAsync(Guid assessmentId, Guid snapshotId, Guid runId, CancellationToken token) =>
         WriteAsync(assessmentId, async db =>
         {
-            var snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == snapshotId, token);
-            var run = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
+            SourceSnapshotRow? snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == snapshotId, token);
+            PhaseRunRow? run = await db.PhaseRuns.SingleAsync(x => x.RunId == runId, token);
             if (run.Kind != PhaseKind.Collection || run.SnapshotId != snapshotId)
                 throw new InvalidOperationException("Only the bound collection can seal this snapshot.");
             if (snapshot.IsSealed) return (await ValidateSnapshotAsync(db, snapshot, token)).Info();
             if (run.Status != ScanStatus.Running) throw new InvalidOperationException("Only a running collection can seal its snapshot.");
-            var observations = await ReadAndValidateObservationsAsync(db, snapshotId, token);
+            List<SourceObservationRow>? observations = await ReadAndValidateObservationsAsync(db, snapshotId, token);
             if (run.CompletedRecords != observations.Count || (run.TotalRecords > 0 && run.TotalRecords != observations.Count))
                 throw new SnapshotIntegrityException("Collection progress does not match committed snapshot membership.");
-            var manifest = SnapshotManifest.Build(snapshot, observations, contentVerified: true);
+            SnapshotManifest? manifest = SnapshotManifest.Build(snapshot, observations, contentVerified: true);
             snapshot.ManifestJson = manifest.Serialize();
             snapshot.MemberIdsJson = manifest.MemberIds();
             snapshot.ManifestDigest = SnapshotManifest.Digest(snapshot.ManifestJson);
@@ -83,7 +92,7 @@ internal sealed partial class PipelineStore
             run.CheckpointJson = VersionedJson.From(new { stage = "Sealed", snapshotId, manifestDigest = snapshot.ManifestDigest }).Json;
             if (run.ParentRunId is Guid parentId)
             {
-                var parent = await db.PhaseRuns.SingleAsync(x => x.RunId == parentId, token);
+                PhaseRunRow? parent = await db.PhaseRuns.SingleAsync(x => x.RunId == parentId, token);
                 parent.CurrentPhase = PhaseKind.Analysis;
                 parent.CompletedRecords = 0;
                 parent.TotalRecords = observations.Count;

@@ -1,5 +1,8 @@
 ﻿namespace PnP.Scanning.Core.Storage
 {
+    /// <summary>
+    /// Carries persisted assessment status and site counters with pipeline ownership metadata.
+    /// </summary>
     internal sealed class ScanResultFromDatabase
     {
         internal ScanResultFromDatabase(Guid scanId, ScanStatus status, int sitesToScan)

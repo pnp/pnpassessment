@@ -4,6 +4,9 @@ using PnP.Scanning.Core.Storage;
 
 namespace PnP.Scanning.Core.Scanners;
 
+/// <summary>
+/// Resolves and enriches publishing layout status within the selected site collection.
+/// </summary>
 internal sealed class PublishingLayoutStatusReader
 {
     private const int FailureLookupBatchSize = 256;
@@ -153,24 +156,27 @@ internal sealed class PublishingLayoutStatusReader
         throw new InvalidDataException("Publishing page layout must have a server-relative or absolute URL within the scanned site collection.");
     }
 
+    /// <summary>
+    /// Resolves a declared layout only within the selected site collection.
+    /// </summary>
     internal static bool TryResolveServerRelativeUrl(Uri siteUrl, string url, out string resolved)
     {
         resolved = null;
         if (string.IsNullOrWhiteSpace(url)) return false;
         Uri absolute = null;
-        var validUrl = !url.StartsWith("//", StringComparison.Ordinal) && !url.Contains('\\') &&
+        bool validUrl = !url.StartsWith("//", StringComparison.Ordinal) && !url.Contains('\\') &&
             (url.StartsWith('/') ? Uri.TryCreate(siteUrl, url, out absolute) : Uri.TryCreate(url, UriKind.Absolute, out absolute));
         if (validUrl && absolute.Scheme == siteUrl.Scheme &&
             absolute.Authority.Equals(siteUrl.Authority, StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrEmpty(absolute.Query) && string.IsNullOrEmpty(absolute.Fragment))
         {
-            var path = Uri.UnescapeDataString(absolute.AbsolutePath);
+            string path = Uri.UnescapeDataString(absolute.AbsolutePath);
             // The containment checks below inspect a single decode, so a multiply-encoded
             // reference such as %252e%252e would satisfy them and still escape the site
             // collection once SharePoint decodes the value again. Require decoding to be
             // idempotent so that what is validated here is what the file APIs receive.
             if (!string.Equals(Uri.UnescapeDataString(path), path, StringComparison.Ordinal)) return false;
-            var sitePath = Uri.UnescapeDataString(siteUrl.AbsolutePath).TrimEnd('/');
+            string sitePath = Uri.UnescapeDataString(siteUrl.AbsolutePath).TrimEnd('/');
             if (path.StartsWith(sitePath + "/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains('\\') && !path.Split('/').Any(segment => segment is "." or ".."))
             {

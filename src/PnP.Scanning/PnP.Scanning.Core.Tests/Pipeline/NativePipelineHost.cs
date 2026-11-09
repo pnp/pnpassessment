@@ -25,10 +25,16 @@ using PnP.Scanning.Process.Services;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
 
+/// <summary>
+/// Hosts the actual CLI and loopback RPC service with recorded modules and forbidden-online counters.
+/// </summary>
 internal sealed class NativePipelineHost : IAsyncDisposable
 {
     private readonly IHost host;
     private readonly GrpcChannel channel;
+    /// <summary>
+    /// Initializes Native Pipeline Host with the supplied dependencies and fixed scope.
+    /// </summary>
     private NativePipelineHost(IHost host, string address, ForbiddenOnlineEnvironment environment,
         PipelineCoordinator? coordinator, LegacyOnlyScanner? legacy, ResolutionCounter counter)
     {
@@ -38,8 +44,8 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         Coordinator = coordinator;
         Legacy = legacy;
         Counter = counter;
-        var config = new ConfigurationOptions { Port = new Uri(address).Port };
-        var manager = new ScannerManager(config);
+        ConfigurationOptions? config = new ConfigurationOptions { Port = new Uri(address).Port };
+        ScannerManager? manager = new ScannerManager(config);
         Parser = new CommandLineBuilder(new RootCommandHandler(manager, environment, config, _ => Task.CompletedTask).Create()).UseDefaults().Build();
     }
 
@@ -49,13 +55,16 @@ internal sealed class NativePipelineHost : IAsyncDisposable
     internal Parser Parser { get; }
     internal ResolutionCounter Counter { get; }
 
+    /// <summary>
+    /// Starts the real loopback RPC service with recorded modules and dependency-rejection counters.
+    /// </summary>
     internal static async Task<NativePipelineHost> StartAsync(PipelineStore store, ModuleRegistry registry,
         ForbiddenOnlineEnvironment environment, bool legacyOnly = false)
     {
-        var coordinator = legacyOnly ? null : new PipelineCoordinator(store, registry, environment);
-        var legacy = legacyOnly ? new LegacyOnlyScanner() : null;
-        var counter = new ResolutionCounter();
-        var host = Host.CreateDefaultBuilder().ConfigureLogging(x => x.ClearProviders())
+        PipelineCoordinator? coordinator = legacyOnly ? null : new PipelineCoordinator(store, registry, environment);
+        LegacyOnlyScanner? legacy = legacyOnly ? new LegacyOnlyScanner() : null;
+        ResolutionCounter? counter = new ResolutionCounter();
+        IHost? host = Host.CreateDefaultBuilder().ConfigureLogging(x => x.ClearProviders())
             .ConfigureWebHostDefaults(web =>
             {
                 if (legacyOnly) web.UseStartup<Startup<LegacyOnlyScanner>>();
@@ -82,24 +91,27 @@ internal sealed class NativePipelineHost : IAsyncDisposable
                 });
             }).Build();
         await host.StartAsync();
-        var address = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        string? address = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         return new NativePipelineHost(host, address, environment, coordinator, legacy, counter);
     }
 
+    /// <summary>
+    /// Executes the actual CLI parser and captures its exit code, output, and errors.
+    /// </summary>
     internal async Task<(int ExitCode, PhaseReply? Ticket, string Output, string Error)> InvokeAsync(params string[] arguments)
     {
         // Initialize Spectre against the stable test-runner writer before temporarily
         // redirecting Console. Its singleton must not retain a disposed capture writer.
         _ = Spectre.Console.AnsiConsole.Console;
-        var previousOut = Console.Out;
-        var previousError = Console.Error;
-        using var output = new StringWriter();
-        using var error = new StringWriter();
+        TextWriter? previousOut = Console.Out;
+        TextWriter? previousError = Console.Error;
+        using StringWriter? output = new StringWriter();
+        using StringWriter? error = new StringWriter();
         try
         {
             Console.SetOut(output);
             Console.SetError(error);
-            var exitCode = await Parser.InvokeAsync(arguments, new CaptureConsole(output, error));
+            int exitCode = await Parser.InvokeAsync(arguments, new CaptureConsole(output, error));
             PhaseReply? ticket = null;
             return (exitCode, ticket, output.ToString(), error.ToString());
         }
@@ -110,6 +122,9 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Captures CLI output and error streams without invoking external processes.
+    /// </summary>
     private sealed class CaptureConsole(TextWriter output, TextWriter error) : System.CommandLine.IConsole
     {
         public System.CommandLine.IO.IStandardStreamWriter Out { get; } = new CaptureWriter(output);
@@ -117,12 +132,21 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         public bool IsOutputRedirected => true;
         public bool IsErrorRedirected => true;
         public bool IsInputRedirected => true;
+        /// <summary>
+        /// Adapts recorded output writers to the command-line console interface.
+        /// </summary>
         private sealed class CaptureWriter(TextWriter writer) : System.CommandLine.IO.IStandardStreamWriter
         {
+            /// <summary>
+            /// Appends CLI text to the fixture's recorded output stream.
+            /// </summary>
             public void Write(string? value) => writer.Write(value);
         }
     }
 
+    /// <summary>
+    /// Stops and disposes the owned loopback host and client channel.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         channel.Dispose();
@@ -130,9 +154,15 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         host.Dispose();
     }
 
+    /// <summary>
+    /// Counts and rejects unexpected construction of online or legacy services.
+    /// </summary>
     internal sealed class ResolutionCounter
     {
         internal int Calls;
+        /// <summary>
+        /// Counts and rejects forbidden online or legacy dependency resolution.
+        /// </summary>
         internal T Reject<T>()
         {
             Interlocked.Increment(ref Calls);
@@ -141,17 +171,29 @@ internal sealed class NativePipelineHost : IAsyncDisposable
     }
 }
 
+/// <summary>
+/// Provides an existing-RPC fixture without internal pipeline-specific entry points.
+/// </summary>
 internal sealed class LegacyOnlyScanner : PnPScanner.PnPScannerBase
 {
     internal int StartCalls;
     internal int StopCalls;
+    /// <summary>
+    /// Reports the recorded fixture's process availability.
+    /// </summary>
     public override Task<PingReply> Ping(Empty request, ServerCallContext context) =>
         Task.FromResult(new PingReply { UpAndRunning = true, ProcessId = Environment.ProcessId });
+    /// <summary>
+    /// Records the existing Start RPC call.
+    /// </summary>
     public override Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
     {
         Interlocked.Increment(ref StartCalls);
         return responseStream.WriteAsync(new StartStatus { Status = "legacy start was called" });
     }
+    /// <summary>
+    /// Records the existing Stop RPC call without changing a real host.
+    /// </summary>
     public override Task<Empty> Stop(StopRequest request, ServerCallContext context)
     {
         Interlocked.Increment(ref StopCalls);

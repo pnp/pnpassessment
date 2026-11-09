@@ -4,10 +4,16 @@ using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Describes page taxonomy, retirement impact, and the evidence supporting that verdict.
+/// </summary>
 internal sealed record AspxPageClassification(
     string PageType, string ProductFamily, string Experience,
     string ImpactStatus, string? ImpactedBy, string Reason);
 
+/// <summary>
+/// Classifies exact handlers using independent list-role and catalog evidence.
+/// </summary>
 internal static class AspxPageClassifier
 {
     internal const string RuleVersion = "aspx-page-policy/v4";
@@ -27,11 +33,14 @@ internal static class AspxPageClassifier
         "Microsoft.SharePoint.WebControls.WikiLayoutsPage",
     };
 
+    /// <summary>
+    /// Derives page taxonomy and impact only from exact handlers and observed role evidence.
+    /// </summary>
     internal static AspxPageClassification Classify(
         string? handler, int? listTemplate, bool? listView, bool? listForm, bool? catalog,
         string? webRelativePath = null)
     {
-        var type = handler switch
+        string? type = handler switch
         {
             "Microsoft.SharePoint.WebPartPages.WikiEditPage" => ClassicPageRules.WikiPage,
             WebPartPageHandler when listTemplate == 301 => ClassicPageRules.BlogPage,
@@ -46,8 +55,8 @@ internal static class AspxPageClassifier
             return new(type, "List", "Inapplicable", "Excluded", null, "RegisteredListViewOrForm");
         if (catalog == true)
         {
-            var modern = handler != null && ModernHandlers.Contains(handler);
-            var exactClassic = type is ClassicPageRules.WikiPage or ClassicPageRules.WebPartPage or
+            bool modern = handler != null && ModernHandlers.Contains(handler);
+            bool exactClassic = type is ClassicPageRules.WikiPage or ClassicPageRules.WebPartPage or
                 ClassicPageRules.PublishingPage or ClassicPageRules.ASPXPage or ClassicPageRules.BlogPage;
             return new(type, CatalogFamily(webRelativePath), modern ? "Modern" : "Classic", "Excluded", null,
                 modern ? "CatalogAsset;ExactModernHandler" : exactClassic ? "CatalogAsset;ExactClassicHandler" :
@@ -66,10 +75,13 @@ internal static class AspxPageClassifier
         return new(type, "User", "Classic", "Included", MessageCenterUrl, "ClassicUserPage;MC1464926");
     }
 
+    /// <summary>
+    /// Maps an observed Web-relative catalog root to its specific family or catalog_other.
+    /// </summary>
     private static string CatalogFamily(string? webRelativePath)
     {
         if (webRelativePath == null) return "catalog_other";
-        foreach (var root in CatalogRoots)
+        foreach (string? root in CatalogRoots)
             if (webRelativePath.StartsWith("_catalogs/" + root + "/", StringComparison.OrdinalIgnoreCase))
                 return "catalog_" + root;
         if (webRelativePath.StartsWith("Style Library/", StringComparison.OrdinalIgnoreCase))

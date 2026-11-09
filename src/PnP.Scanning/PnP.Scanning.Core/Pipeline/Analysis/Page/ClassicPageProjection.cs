@@ -15,24 +15,33 @@ using PnP.Scanning.Core.Scanners.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Carries an assessed page, web parts, discovery disposition, and explicit failures.
+/// </summary>
 internal sealed record ClassicPageProjectionResult(ClassicPage? Page, ClassicPageWebPart[] Parts,
     ClassicPageDiscovery? Discovery, bool Modern, string? Error = null);
 
+/// <summary>
+/// Applies page readiness rules to detached evidence without modifying collected source.
+/// </summary>
 internal static class ClassicPageProjection
 {
+    /// <summary>
+    /// Assesses captured page fields and web parts while retaining nullable selection and failure provenance.
+    /// </summary>
     internal static ClassicPageProjectionResult Analyze(Guid assessmentId, ClassicPageWebSource web,
         ClassicPageDiscovery discovered, ClassicPageItemSource source, ClassicPageSourceOptions options, WebPartMappingManager mapping)
     {
         // The analysis mutates only a detached projection, never the source facts.
-        var row = JsonSerializer.Deserialize<ClassicPageDiscovery>(JsonSerializer.Serialize(discovered))!;
+        ClassicPageDiscovery? row = JsonSerializer.Deserialize<ClassicPageDiscovery>(JsonSerializer.Serialize(discovered))!;
         row.HomePage = SnapshotHomePage.ResolveHomePageState(row.Url, web.WelcomePage, web.WelcomePageState.Succeeded, row.HomePage);
         if (options.HomePageOnly && row.HomePage != true)
         { row.AssessmentStatus = "NotSelected"; return new(null, [], row, false); }
         if (source.FileLevelOnly)
         {
-            var association = FileLevelPageProjection.ClassifyListAssociation(row,
+            FileLevelPageProjection.ListAssociationState association = FileLevelPageProjection.ClassifyListAssociation(row,
                 source.OwningListMatched == true, source.ListRootFolderUrls);
-            var filePage = FileLevelPageProjection.Project(row, association);
+            ClassicPage? filePage = FileLevelPageProjection.Project(row, association);
             if (filePage == null) return new(null, [], row, false);
             ClassicPageWebPart[] fileParts = [];
             if (source.WebPartsState.Succeeded)
@@ -58,21 +67,21 @@ internal static class ClassicPageProjection
             AddError(row, "PageMetadata", source.MetadataState);
             return new(null, [], row, false, source.MetadataState.Error ?? source.MetadataState.Status);
         }
-        var values = source.Fields.ToDictionary(x => x.Key, x => x.Value.ToValue());
-        var url = ClassicPageRules.ResolvePhysicalPageUrl(values, row.Url);
-        var contentType = source.Fields.GetValueOrDefault("ContentTypeId")?.Text ?? row.ContentTypeId;
-        var type = ClassicPageRules.IsPublishingContentType(contentType)
+        Dictionary<string, object?>? values = source.Fields.ToDictionary(x => x.Key, x => x.Value.ToValue());
+        string? url = ClassicPageRules.ResolvePhysicalPageUrl(values, row.Url);
+        string? contentType = source.Fields.GetValueOrDefault("ContentTypeId")?.Text ?? row.ContentTypeId;
+        string? type = ClassicPageRules.IsPublishingContentType(contentType)
             ? ClassicPageRules.PublishingPage : ClassicPageRules.GetPageType(values);
         row.PageType = type;
         row.AssessmentStatus = type == ClassicPageRules.ModernPage ? "NotApplicable" : "Complete";
         if (type == ClassicPageRules.ModernPage) return new(null, [], row, true);
-        var name = source.Fields.GetValueOrDefault("Title")?.Text;
-        var page = new ClassicPage
+        string? name = source.Fields.GetValueOrDefault("Title")?.Text;
+        ClassicPage? page = new ClassicPage
         {
             ScanId = assessmentId, SiteUrl = web.SiteUrl, WebUrl = web.WebUrl, PageUrl = url,
             PageName = !string.IsNullOrEmpty(name) ? name : Path.GetFileNameWithoutExtension(url),
             ListId = source.ListId ?? Guid.Empty, ListTitle = source.ListTitle, ListUrl = source.ListUrl,
-            ModifiedAt = source.Fields.TryGetValue("Modified", out var modified) && modified.ToValue() is DateTime date ? date : default,
+            ModifiedAt = source.Fields.TryGetValue("Modified", out SourceField? modified) && modified.ToValue() is DateTime date ? date : default,
             ModifiedBy = ModifiedBy(source.Fields, options.SkipUserInformation), PageType = type, HomePage = row.HomePage,
             SiteCollectionId = row.SiteCollectionId, WebId = row.WebId, FileUniqueId = row.FileUniqueId, ListItemId = row.ListItemId,
             DiscoveryStatus = row.DiscoveryStatus, AssessmentStatus = row.AssessmentStatus,
@@ -116,10 +125,13 @@ internal static class ClassicPageProjection
         return new(page, parts, row, false, error);
     }
 
+    /// <summary>
+    /// Evaluates the existing home-page fallback from saved features, layout, and part evidence.
+    /// </summary>
     private static bool HomeFallback(ClassicPageWebSource web, ClassicPage page, ClassicPageItemSource source, ClassicPageWebPart[] parts)
     {
-        var split = web.Template.Split('#');
-        var configuration = split.Length == 2 && int.TryParse(split[1], out var parsed) ? parsed : -1;
+        string[]? split = web.Template.Split('#');
+        int configuration = split.Length == 2 && int.TryParse(split[1], out int parsed) ? parsed : -1;
         return HomePageDetector.IsUncustomizedHomePageFallback(true, split[0], configuration,
             web.SiteFeatures.Contains(new Guid("F6924D36-2FA8-4F0B-B16D-06B7250180FA")),
             web.WebFeatures.Contains(new Guid("94C94CA6-B32F-4DA9-A9E3-1F3D343D7ECB")),
@@ -130,13 +142,19 @@ internal static class ClassicPageProjection
             source.Fields.GetValueOrDefault("WikiField")?.Text,
             parts.Select(x => new WebPartEntity { Type = x.WebPartType }).ToArray(), source.ContentTypeDisplayFormTemplateName);
     }
+    /// <summary>
+    /// Reads the captured editor identity unless user information was excluded.
+    /// </summary>
     internal static string? ModifiedBy(Dictionary<string, SourceField> fields, bool skipUserInformation = false)
     {
         if (skipUserInformation) return null;
-        if (!fields.TryGetValue("Editor", out var field) || field.Type != "User" || field.Value.ValueKind != JsonValueKind.Object) return null;
-        var email = field.Value.TryGetProperty("Email", out var e) ? e.GetString() : null;
-        return !string.IsNullOrEmpty(email) ? email : field.Value.TryGetProperty("LookupValue", out var lookup) ? lookup.GetString() : null;
+        if (!fields.TryGetValue("Editor", out SourceField? field) || field.Type != "User" || field.Value.ValueKind != JsonValueKind.Object) return null;
+        string? email = field.Value.TryGetProperty("Email", out JsonElement e) ? e.GetString() : null;
+        return !string.IsNullOrEmpty(email) ? email : field.Value.TryGetProperty("LookupValue", out JsonElement lookup) ? lookup.GetString() : null;
     }
+    /// <summary>
+    /// Appends distinct assessment stage and acquisition diagnostics to a detached discovery row.
+    /// </summary>
     internal static void AddError(ClassicPageDiscovery row, string stage, SourceReadState state)
     {
         row.ErrorStage = string.Join(';', new[] { row.ErrorStage, stage }.Where(x => !string.IsNullOrEmpty(x)).Distinct());

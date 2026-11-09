@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Binds existing list filters and renders assessment status without changing scan selection.
+    /// </summary>
     internal sealed class ListCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -77,12 +80,15 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Calls the existing list RPC and renders requested lifecycle and phase progress.
+        /// </summary>
         private async Task HandleStartAsync(bool running, bool paused, bool finished, bool terminated)
         {
             // Setup client to talk to scanner
-            var client = await processManager.GetScannerClientAsync();
+            Core.Services.PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
-            var listResult = await client.ListAsync(new Core.Services.ListRequest
+            Core.Services.ListReply listResult = await client.ListAsync(new Core.Services.ListRequest
             {
                 Running = running,
                 Paused = paused,
@@ -93,7 +99,7 @@ namespace PnP.Scanning.Process.Commands
             if (listResult.Status.Count > 0)
             {
                 // Create a table
-                var table = new Table().BorderColor(Color.Grey);
+                Table table = new Table().BorderColor(Color.Grey);
 
                 // Add some columns
                 table.AddColumn("Id ");
@@ -106,7 +112,7 @@ namespace PnP.Scanning.Process.Commands
                 table.AddColumn("Snapshot / run / analysis");
                 table.AddColumn("Errors");
 
-                foreach (var item in listResult.Status)
+                foreach (Core.Services.ListScanResponse item in listResult.Status)
                 {
                     double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
                     Markup status;

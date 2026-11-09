@@ -33,7 +33,7 @@ internal sealed class AssessmentDiscoveryWriter
     internal async Task WritePhysicalFilesAsync(Guid scanId, IEnumerable<RawDiscoveryRecord> records,
         CancellationToken cancellationToken)
     {
-        foreach (var batch in records.Select(record => SPFileFactProjection.FromPhysicalRecord(scanId, record))
+        foreach (SPFile[] batch in records.Select(record => SPFileFactProjection.FromPhysicalRecord(scanId, record))
             .Where(file => file != null).Chunk(128))
         {
             if (fileSink != null) await fileSink(batch, cancellationToken).ConfigureAwait(false);
@@ -48,10 +48,10 @@ internal sealed class AssessmentDiscoveryWriter
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            using var db = createContext();
-            foreach (var row in rows)
+            using ScanContext db = createContext();
+            foreach (ClassicPageDiscovery row in rows)
             {
-                var previous = await db.ClassicPageDiscoveries.FindAsync(
+                ClassicPageDiscovery previous = await db.ClassicPageDiscoveries.FindAsync(
                     new object[] { row.ScanId, row.RecordKey }, cancellationToken).ConfigureAwait(false);
                 if (previous == null) db.ClassicPageDiscoveries.Add(row);
                 else
@@ -161,19 +161,22 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    /// <summary>
+    /// Computes and persists assessment coverage from retained discovery evidence.
+    /// </summary>
     internal async Task<DiscoveryVerdict> FinalizeScanAsync(Guid scanId,
         CancellationToken cancellationToken = default)
     {
         await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            using var db = createContext();
-            var allRows = await db.ClassicPageDiscoveries.AsNoTracking()
+            using ScanContext db = createContext();
+            List<ClassicPageDiscovery> allRows = await db.ClassicPageDiscoveries.AsNoTracking()
                 .Where(row => row.ScanId == scanId)
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
-            var current = BuildCoverage(scanId, allRows, DateTime.UtcNow);
-            var verdict = Enum.Parse<DiscoveryVerdict>(current.DiscoveryStatus);
-            var summary = await db.ClassicPageDiscoveries.FindAsync(
+            ClassicPageDiscovery current = BuildCoverage(scanId, allRows, DateTime.UtcNow);
+            DiscoveryVerdict verdict = Enum.Parse<DiscoveryVerdict>(current.DiscoveryStatus);
+            ClassicPageDiscovery summary = await db.ClassicPageDiscoveries.FindAsync(
                 new object[] { scanId, "summary:coverage" }, cancellationToken).ConfigureAwait(false);
             if (summary == null) db.ClassicPageDiscoveries.Add(current);
             else db.Entry(summary).CurrentValues.SetValues(current);
@@ -183,18 +186,21 @@ internal sealed class AssessmentDiscoveryWriter
         finally { WriteGate.Release(); }
     }
 
+    /// <summary>
+    /// Builds a deterministic coverage verdict from scope, pagination, reference, and gap evidence.
+    /// </summary>
     internal static ClassicPageDiscovery BuildCoverage(Guid scanId,
         IReadOnlyList<ClassicPageDiscovery> allRows, DateTime observedAtUtc)
     {
-        var coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
-        var scopes = coverageRows.Where(row => row.RowType == "Scope").ToArray();
-        var selection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:site-selection");
-        var pageSelection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:page-selection");
-        var statuses = coverageRows.Select(row => row.DiscoveryStatus)
+        ClassicPageDiscovery[] coverageRows = allRows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
+        ClassicPageDiscovery[] scopes = coverageRows.Where(row => row.RowType == "Scope").ToArray();
+        ClassicPageDiscovery selection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:site-selection");
+        ClassicPageDiscovery pageSelection = scopes.FirstOrDefault(row => row.RecordKey == "assessment:page-selection");
+        string[] statuses = coverageRows.Select(row => row.DiscoveryStatus)
             .Concat(allRows.Where(row => row.RowType == "Reference" ||
                 (row.RowType == "Pagination" && row.DiscoveryStatus is ("Denied" or "Failed" or "Unknown")))
                 .Select(row => row.DiscoveryStatus)).ToArray();
-        var gapCodes = allRows.Where(row => row.RowType != "Assessment").SelectMany(row => (row.ErrorCodes ?? string.Empty)
+        string[] gapCodes = allRows.Where(row => row.RowType != "Assessment").SelectMany(row => (row.ErrorCodes ?? string.Empty)
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(code => code.Contains(':') ? code[(code.LastIndexOf(':') + 1)..] : code)
             .ToArray();
@@ -220,9 +226,9 @@ internal sealed class AssessmentDiscoveryWriter
             verdict = DiscoveryVerdict.CompleteTenantVerified;
         }
 
-        var pageCount = allRows.Count(row => row.RowType == "Page");
-        var gapCount = coverageRows.Count(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
-        var current = new ClassicPageDiscovery
+        int pageCount = allRows.Count(row => row.RowType == "Page");
+        int gapCount = coverageRows.Count(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
+        ClassicPageDiscovery current = new ClassicPageDiscovery
         {
             ScanId = scanId,
             RecordKey = "summary:coverage",
@@ -259,7 +265,7 @@ internal sealed class AssessmentDiscoveryWriter
         // richer metadata previously read through its list-item surface.
         if (row.RowType == "Page")
         {
-            var changed = new List<string>();
+            List<string> changed = new List<string>();
             if (!string.Equals(previous.Url, row.Url, StringComparison.OrdinalIgnoreCase)) changed.Add("Url");
             if (previous.ListId.HasValue && row.ListId.HasValue && previous.ListId != row.ListId) changed.Add("ListId");
             if (previous.ListItemId.HasValue && row.ListItemId.HasValue && previous.ListItemId != row.ListItemId) changed.Add("ListItemId");

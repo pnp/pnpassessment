@@ -4,6 +4,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Composes the established CLI commands without exposing internal phase selectors.
+    /// </summary>
     internal sealed class RootCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -11,6 +14,9 @@ namespace PnP.Scanning.Process.Commands
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly ConfigurationOptions configurationOptions;
 
+        /// <summary>
+        /// Initializes Root Command Handler with the supplied dependencies and fixed scope.
+        /// </summary>
         public RootCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance,
             Func<StartOptions, Task> authenticate = null)
         {
@@ -20,9 +26,12 @@ namespace PnP.Scanning.Process.Commands
             configurationOptions = configurationOptionsInstance;
         }
 
+        /// <summary>
+        /// Registers the established CLI commands without exposing internal collection or analysis entry points.
+        /// </summary>
         public Command Create()
         {
-            var rootCommand = new RootCommand();
+            RootCommand rootCommand = new RootCommand();
 
             rootCommand.AddCommand(new CacheCommandHandler(processManager).Create());
             rootCommand.AddCommand(new ConfigCommandHandler(processManager).Create());

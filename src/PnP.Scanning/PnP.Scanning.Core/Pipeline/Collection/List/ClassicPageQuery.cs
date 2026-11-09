@@ -3,8 +3,14 @@ using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Pipeline.Analysis.Page;
 namespace PnP.Scanning.Core.Pipeline.Collection.List;
 
+/// <summary>
+/// Builds bounded CAML queries for native items, ASPX metadata, and pointpub content.
+/// </summary>
 internal static class ClassicPageQuery
 {
+    /// <summary>
+    /// Builds a paged CAML query for exact items or explicitly selected content evidence.
+    /// </summary>
     internal static string Create(List<string> extraFields, bool filterOnASPXPages = true,
         int? itemId = null, bool skipUserInformation = false, bool filterOnDelveBlogs = false)
     {
@@ -13,7 +19,7 @@ internal static class ClassicPageQuery
 
         if (extraFields.Count > 0)
         {
-            foreach(var field in extraFields)
+            foreach(string field in extraFields)
             {
                 extraViewFields = $"{extraViewFields}<FieldRef Name='{field}' />";
             }

@@ -683,19 +683,25 @@ namespace PnP.Scanning.Core.Storage
             }
         }
 
+        /// <summary>
+        /// Reads the persisted local assessment summary through the shared disk reader.
+        /// </summary>
         internal async Task<ScanResultFromDatabase> GetScanResultAsync(Guid scanId)
             => await ReadScanResultFromDiskAsync(scanId);
 
+        /// <summary>
+        /// Reads status, site counters, and pipeline ownership without constructing the online scan engine.
+        /// </summary>
         internal static async Task<ScanResultFromDatabase> ReadScanResultFromDiskAsync(Guid scanId)
         {
             try
             {
-                using (var dbContext = new ScanContext(scanId))
+                using (ScanContext dbContext = new ScanContext(scanId))
                 {
                     // Trigger the database to upgrade to the latest
                     await dbContext.Database.MigrateAsync();
 
-                    var scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
+                    Scan scan = await dbContext.Scans.FirstOrDefaultAsync(p => p.ScanId == scanId);
 
                     if (scan != null)
                     {
@@ -705,7 +711,7 @@ namespace PnP.Scanning.Core.Storage
                         int finished = 0;
                         int failed = 0;
 
-                        foreach (var site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId).ToListAsync())
+                        foreach (SiteCollection site in await dbContext.SiteCollections.Where(p => p.ScanId == scanId).ToListAsync())
                         {
 
                             switch (site.Status)
@@ -729,7 +735,7 @@ namespace PnP.Scanning.Core.Storage
                             }
                         }
 
-                        var result = new ScanResultFromDatabase(scan.ScanId, scan.Status, total)
+                        ScanResultFromDatabase result = new ScanResultFromDatabase(scan.ScanId, scan.Status, total)
                         {
                             Mode = scan.CLIMode,
                             UsesPipeline = await dbContext.PhaseRuns.AnyAsync(x => x.AssessmentId == scanId),

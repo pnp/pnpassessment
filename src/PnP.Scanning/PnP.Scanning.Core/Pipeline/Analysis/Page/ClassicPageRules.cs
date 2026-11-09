@@ -3,6 +3,9 @@ using PnP.Scanning.Core.Scanners;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 
+/// <summary>
+/// Reuses existing pure page classification and physical-URL validation rules.
+/// </summary>
 internal static class ClassicPageRules
 {
     internal const string FileRefField = "FileRef";
@@ -26,11 +29,20 @@ internal static class ClassicPageRules
     internal const string DelveBlogPage = PageScanComponent.DelveBlogPage;
     internal const string DelveBlogFileType = "pointpub";
 
+    /// <summary>
+    /// Tests the captured content-type identity with the existing publishing-page policy.
+    /// </summary>
     internal static bool IsPublishingContentType(string contentTypeId) =>
         SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(contentTypeId);
 
+    /// <summary>
+    /// Applies existing pure page-type rules to captured item field values.
+    /// </summary>
     internal static string GetPageType(IDictionary<string, object> fields) => PageScanComponent.GetPageType(fields);
 
+    /// <summary>
+    /// Validates the discovered physical locator against returned item metadata without inventing a URL.
+    /// </summary>
     internal static string ResolvePhysicalPageUrl(IDictionary<string, object> fields, string discoveredUrl) =>
         PageScanComponent.ResolvePhysicalPageUrl(fields, discoveredUrl);
 }

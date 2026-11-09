@@ -5,23 +5,29 @@ using System.Text.RegularExpressions;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>
+    /// Lists historical assessment databases separately from pipeline-owned lifecycle rows.
+    /// </summary>
     internal static class ScanEnumerationManager
     {
+        /// <summary>
+        /// Reads historical assessment summaries and excludes pipeline-owned phases from legacy lifecycle handling.
+        /// </summary>
         internal static async Task<ListReply> EnumerateScansFromDiskAsync(StorageManager storageManager, bool running, bool paused, bool finished, bool terminated)
         {
             ListReply scans = new();
 
             // List folders that possibly contain a scan result
             Regex regex = new("[({]?[a-fA-F0-9]{8}[-]?([a-fA-F0-9]{4}[-]?){3}[a-fA-F0-9]{12}[})]?", RegexOptions.IgnoreCase);
-            var scanFolders = Directory.EnumerateDirectories(StorageManager.GetScannerFolder()).Where(f => regex.IsMatch(f));
+            IEnumerable<string> scanFolders = Directory.EnumerateDirectories(StorageManager.GetScannerFolder()).Where(f => regex.IsMatch(f));
 
             List<ListScanResponse> tempResults = new();
 
-            foreach (var scan in scanFolders)
+            foreach (string scan in scanFolders)
             {
                 string scanIdString = scan.Substring(scan.LastIndexOf(Path.DirectorySeparatorChar) + 1);
                 Guid scanId = Guid.Parse(scanIdString);
-                var scanResult = new ListScanResponse
+                ListScanResponse scanResult = new ListScanResponse
                 {
                     Id = scanIdString,
                 };
@@ -29,7 +35,7 @@ namespace PnP.Scanning.Core.Services
                 if (File.Exists(Path.Combine(scan, StorageManager.DbName)))
                 {
                     // Get status from the scan database
-                    var scanResultFromDatabase = await StorageManager.ReadScanResultFromDiskAsync(scanId);
+                    ScanResultFromDatabase scanResultFromDatabase = await StorageManager.ReadScanResultFromDiskAsync(scanId);
                     if (scanResultFromDatabase != null)
                     {
                         // Pipeline phases have their own rows, counters and recovery. Do not pass them
@@ -75,27 +81,27 @@ namespace PnP.Scanning.Core.Services
 
             if (tempResults.Any())
             {
-                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Finished.ToString()).OrderBy(p => p.ScanStarted))
+                foreach (ListScanResponse scanResult in tempResults.Where(p => p.Status == ScanStatus.Finished.ToString()).OrderBy(p => p.ScanStarted))
                 {
                     scans.Status.Add(scanResult);
                 }
-                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Terminated.ToString()).OrderBy(p => p.ScanStarted))
+                foreach (ListScanResponse scanResult in tempResults.Where(p => p.Status == ScanStatus.Terminated.ToString()).OrderBy(p => p.ScanStarted))
                 {
                     scans.Status.Add(scanResult);
                 }
-                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Paused.ToString()).OrderBy(p => p.ScanStarted))
+                foreach (ListScanResponse scanResult in tempResults.Where(p => p.Status == ScanStatus.Paused.ToString()).OrderBy(p => p.ScanStarted))
                 {
                     scans.Status.Add(scanResult);
                 }
-                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Pausing.ToString()).OrderBy(p => p.ScanStarted))
+                foreach (ListScanResponse scanResult in tempResults.Where(p => p.Status == ScanStatus.Pausing.ToString()).OrderBy(p => p.ScanStarted))
                 {
                     scans.Status.Add(scanResult);
                 }
-                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Running.ToString()).OrderBy(p => p.ScanStarted))
+                foreach (ListScanResponse scanResult in tempResults.Where(p => p.Status == ScanStatus.Running.ToString()).OrderBy(p => p.ScanStarted))
                 {
                     scans.Status.Add(scanResult);
                 }
-                foreach (var scanResult in tempResults.Where(p => p.Status == ScanStatus.Queued.ToString()).OrderBy(p=>p.ScanStarted))
+                foreach (ListScanResponse scanResult in tempResults.Where(p => p.Status == ScanStatus.Queued.ToString()).OrderBy(p=>p.ScanStarted))
                 {
                     scans.Status.Add(scanResult);
                 }

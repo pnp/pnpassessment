@@ -9,8 +9,14 @@ using PnP.Scanning.Core.Pipeline.Contracts.Page;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Page;
 
+/// <summary>
+/// Captures bounded source bytes and independent authoritative view, form, and catalog evidence.
+/// </summary>
 internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri site, Uri web)
 {
+    /// <summary>
+    /// Retains native list identity, template, catalog flag, and observed root path.
+    /// </summary>
     private sealed record ListContext(Guid Id, int Template, bool Catalog, string Root);
     private readonly Dictionary<Guid, ListContext> lists = [];
     private readonly HashSet<string> views = new(StringComparer.OrdinalIgnoreCase);
@@ -20,6 +26,9 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
     private bool rolesComplete;
     private bool rolesAttempted;
 
+    /// <summary>
+    /// Captures native list context and independent registered view, form, and catalog evidence.
+    /// </summary>
     internal async Task LoadRolesAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -33,7 +42,7 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
             token.ThrowIfCancellationRequested();
             metadataComplete = true;
             rolesComplete = true;
-            foreach (var list in csom.Web.Lists)
+            foreach (Microsoft.SharePoint.Client.List? list in csom.Web.Lists)
             {
                 lists.Add(list.Id, new(list.Id, list.BaseTemplate, list.IsCatalog, list.RootFolder.ServerRelativeUrl));
                 Add(forms, list.DefaultDisplayFormUrl);
@@ -41,12 +50,12 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
                 Add(forms, list.DefaultNewFormUrl);
                 try
                 {
-                    var knownUserInfo = list.BaseTemplate == 112 &&
+                    bool knownUserInfo = list.BaseTemplate == 112 &&
                         list.RootFolder.ServerRelativeUrl.TrimEnd('/').EndsWith("/_catalogs/users", StringComparison.OrdinalIgnoreCase);
-                    var usedDefaultForms = await ReadWithFormIdentityFallbackAsync(knownUserInfo, list.Id,
+                    bool usedDefaultForms = await ReadWithFormIdentityFallbackAsync(knownUserInfo, list.Id,
                         includeFormObjects => ReadListRegistrationsAsync(list, includeFormObjects, token), token)
                         .ConfigureAwait(false);
-                    foreach (var view in list.Views) Add(views, view.ServerRelativeUrl);
+                    foreach (View? view in list.Views) Add(views, view.ServerRelativeUrl);
                     if (usedDefaultForms)
                     {
                         Add(forms, list.DefaultDisplayFormUrl);
@@ -63,9 +72,9 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
                     }
                     else
                     {
-                        foreach (var form in list.Forms) Add(forms, form.ServerRelativeUrl);
+                        foreach (Form? form in list.Forms) Add(forms, form.ServerRelativeUrl);
                     }
-                    foreach (var type in list.ContentTypes)
+                    foreach (ContentType? type in list.ContentTypes)
                     {
                         Add(forms, type.DisplayFormUrl);
                         Add(forms, type.EditFormUrl);
@@ -87,6 +96,9 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         token.ThrowIfCancellationRequested();
     }
 
+    /// <summary>
+    /// Reads registered list views and content-type forms with optional form-object identities.
+    /// </summary>
     private async Task ReadListRegistrationsAsync(Microsoft.SharePoint.Client.List list, bool includeFormObjects,
         CancellationToken token)
     {
@@ -102,6 +114,9 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         token.ThrowIfCancellationRequested();
     }
 
+    /// <summary>
+    /// Retries only the recognized null-Guid form-identity failure using default form declarations.
+    /// </summary>
     internal static async Task<bool> ReadWithFormIdentityFallbackAsync(bool knownUserInfo, Guid listId,
         Func<bool, Task> read, CancellationToken token)
     {
@@ -130,10 +145,16 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         }
     }
 
+    /// <summary>
+    /// Determines whether known system-list defaults establish complete form-registration evidence.
+    /// </summary>
     internal static bool HasCompleteDefaultForms(bool knownUserInfo, string? display, string? edit, string? create) =>
         knownUserInfo && !string.IsNullOrWhiteSpace(display) &&
         !string.IsNullOrWhiteSpace(edit) && !string.IsNullOrWhiteSpace(create);
 
+    /// <summary>
+    /// Recognizes the specific null-Guid argument failure without treating generic safety errors as equivalent.
+    /// </summary>
     internal static bool IsNullGuidParameter(Exception error)
     {
         for (Exception? current = error; current != null; current = current.InnerException)
@@ -146,30 +167,42 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         return false;
     }
 
+    /// <summary>
+    /// Matches the exact server argument type and Guid parameter diagnostic.
+    /// </summary>
     internal static bool IsNullGuidServerError(string? errorTypeName, string? message) =>
         errorTypeName == typeof(ArgumentNullException).FullName && message != null &&
         Regex.IsMatch(message, @"(?:^|\r?\n)\s*Parameter name:\s*g\s*(?:\r?\n|$)|\(Parameter ['""]g['""]\)",
             RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// Adds an authority-checked registration locator or marks role coverage incomplete.
+    /// </summary>
     private void Add(HashSet<string> targets, string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
-        if (TryNormalizeRegistration(site, web, value, out var normalized))
+        if (TryNormalizeRegistration(site, web, value, out string? normalized))
             targets.Add(normalized);
         else
             rolesComplete = false;
     }
 
+    /// <summary>
+    /// Normalizes a declared role locator while rejecting foreign authorities.
+    /// </summary>
     internal static bool TryNormalizeRegistration(Uri site, Uri web, string value, out string normalized)
     {
         normalized = "";
-        if (!value.StartsWith('/') && Uri.TryCreate(value, UriKind.Absolute, out var absolute) &&
+        if (!value.StartsWith('/') && Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute) &&
             !SharePointAspxUrlPolicy.HasSameHttpsAuthority(site, absolute))
             return false;
-        var path = DisplayFormUrlPolicy.ToServerRelative(value, web.AbsolutePath, site.AbsolutePath);
+        string? path = DisplayFormUrlPolicy.ToServerRelative(value, web.AbsolutePath, site.AbsolutePath);
         return path != null && new SharePointAspxUrlPolicy(site, web).TryNormalizeResourceReference(path, out normalized);
     }
 
+    /// <summary>
+    /// Captures bounded original source bytes and independent native role evidence for one physical file.
+    /// </summary>
     internal async Task<string> ReadAsync(SPFileSource file, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -178,17 +211,17 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         if (owner == null && file.ServerRelativeUrl != null)
             owner = lists.Values.Where(l => SharePointAspxUrlPolicy.IsPathWithinRoot(file.ServerRelativeUrl, l.Root))
                 .OrderByDescending(l => l.Root.Length).FirstOrDefault();
-        var normalized = urls.TryNormalizeDecodedPhysicalPath(file.ServerRelativeUrl, out var path) ? path : null;
+        string? normalized = urls.TryNormalizeDecodedPhysicalPath(file.ServerRelativeUrl, out string? path) ? path : null;
         bool? view = normalized != null && views.Contains(normalized) ? true : rolesComplete ? false : null;
         bool? form = normalized != null && forms.Contains(normalized) ? true : rolesComplete ? false : null;
         bool? catalog = owner?.Catalog ?? (metadataComplete && file.ListId == null ? false : null);
-        var roleState = !rolesAttempted ? "NotAttempted" : rolesComplete && catalog != null ? "Complete" : "Partial";
+        string? roleState = !rolesAttempted ? "NotAttempted" : rolesComplete && catalog != null ? "Complete" : "Partial";
         try
         {
-            var source = await pnp.Web.GetFileByIdAsync(file.FileUniqueId, f => f.UniqueId, f => f.Length).ConfigureAwait(false);
+            PnP.Core.Model.SharePoint.IFile? source = await pnp.Web.GetFileByIdAsync(file.FileUniqueId, f => f.UniqueId, f => f.Length).ConfigureAwait(false);
             if (source.UniqueId != file.FileUniqueId)
                 throw new InvalidDataException("ASPX source response has a different file identity.");
-            var observed = await AspxSourceReader.ReadAsync(source, token).ConfigureAwait(false);
+            AspxSourceObservation? observed = await AspxSourceReader.ReadAsync(source, token).ConfigureAwait(false);
             return JsonSerializer.Serialize(new AspxPageEvidence(
                 observed.State, null, null, "PendingAnalysis",
                 null, observed.Error, owner?.Template,

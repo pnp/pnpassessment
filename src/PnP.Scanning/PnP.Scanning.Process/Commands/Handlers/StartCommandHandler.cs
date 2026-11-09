@@ -13,6 +13,9 @@ using System.CommandLine.Help;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Binds existing assessment options, verifies authentication, and invokes native Start.
+    /// </summary>
     internal class StartCommandHandler
     {
         private static class ClassicAcquisitionOptionText
@@ -96,7 +99,7 @@ namespace PnP.Scanning.Process.Commands
                 parseArgument: (result) =>
                 {
                     // https://github.com/dotnet/command-line-api/issues/1287
-                    var siteFile = result.FindResultFor(sitesFileOption);
+                    System.CommandLine.Parsing.OptionResult siteFile = result.FindResultFor(sitesFileOption);
                     if (siteFile != null)
                     {
                         result.ErrorMessage = $"the --{Constants.StartSitesList} option is mutually exclusive with the --{Constants.StartSitesFile} option";
@@ -115,7 +118,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartSitesFile}",
                 parseArgument: (result) =>
                 {
-                    var siteList = result.FindResultFor(sitesListOption);
+                    System.CommandLine.Parsing.OptionResult siteList = result.FindResultFor(sitesListOption);
                     if (siteList != null)
                     {
                         result.ErrorMessage = $"the --{Constants.StartSitesFile} option is mutually exclusive with the --{Constants.StartSitesList} option";
@@ -174,7 +177,7 @@ namespace PnP.Scanning.Process.Commands
                 parseArgument: (result) =>
                 {
                     // https://github.com/dotnet/command-line-api/issues/1287
-                    var authenticationMode = result.FindResultFor(authenticationModeOption);
+                    System.CommandLine.Parsing.OptionResult authenticationMode = result.FindResultFor(authenticationModeOption);
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
                         result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
@@ -204,7 +207,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartCertFile}",
                 parseArgument: (result) =>
                 {
-                    var authenticationMode = result.FindResultFor(authenticationModeOption);
+                    System.CommandLine.Parsing.OptionResult authenticationMode = result.FindResultFor(authenticationModeOption);
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
                         result.ErrorMessage = $"--{Constants.StartCertPath} can only be used with --{Constants.StartAuthMode} application";
@@ -227,7 +230,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartCertPassword}",
                 parseArgument: (result) =>
                 {
-                    var authenticationMode = result.FindResultFor(authenticationModeOption);
+                    System.CommandLine.Parsing.OptionResult authenticationMode = result.FindResultFor(authenticationModeOption);
                     if (authenticationMode != null && authenticationMode.GetValueOrDefault<AuthenticationMode>() != AuthenticationMode.Application)
                     {
                         result.ErrorMessage = $"--{Constants.StartCertPassword} can only be used with --{Constants.StartAuthMode} application";
@@ -336,7 +339,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartTestNumberOfSites}",
                 parseArgument: (result) =>
                 {
-                    var mode = result.FindResultFor(modeOption);
+                    System.CommandLine.Parsing.OptionResult mode = result.FindResultFor(modeOption);
                     if (mode != null && mode.GetValueOrDefault<Mode>() != Mode.Test)
                     {
                         result.ErrorMessage = $"--{Constants.StartTestNumberOfSites} can only be used with --{Constants.StartMode} test";
@@ -454,7 +457,7 @@ namespace PnP.Scanning.Process.Commands
             // argument order.
             cmd.AddValidator(result =>
             {
-                var classicOnlyOptions = new Option[]
+                Option[] classicOnlyOptions = new Option[]
                 {
                     classicExportWebPartPropertiesOption,
                     classicSkipUsageInformationOption,
@@ -463,19 +466,19 @@ namespace PnP.Scanning.Process.Commands
                     classicAuditLogWindowDaysOption,
                     excludeSiteTemplatesOption,
                 };
-                var modeResult = result.FindResultFor(modeOption);
+                System.CommandLine.Parsing.OptionResult modeResult = result.FindResultFor(modeOption);
                 if (modeResult?.Tokens.FirstOrDefault()?.Value is string modeText && !Enum.TryParse<Mode>(modeText, true, out _))
                     return;
-                var mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
+                Mode mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
                 if (mode == Mode.Classic)
                 {
-                    var selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
-                    var aspxScopeOptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false };
+                    List<ClassicComponent> selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
+                    bool aspxScopeOptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false };
                     if (aspxScopeOptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
                         result.ErrorMessage = ClassicAcquisitionOptionText.PagesComponentRequired;
                     return;
                 }
-                foreach (var opt in classicOnlyOptions)
+                foreach (Option opt in classicOnlyOptions)
                 {
                     // Only complain about options the user actually supplied on the command line.
                     if (result.FindResultFor(opt) is { IsImplicit: false })
@@ -487,7 +490,7 @@ namespace PnP.Scanning.Process.Commands
             });
 
             // Binder approach as that one can handle an unlimited number of command line arguments
-            var startBinder = new StartBinder(modeOption, tenantOption, sitesListOption, sitesFileOption,
+            StartBinder startBinder = new StartBinder(modeOption, tenantOption, sitesListOption, sitesFileOption,
                                               authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
                                               , syntexFullOption
@@ -526,7 +529,7 @@ namespace PnP.Scanning.Process.Commands
             // Auto populate the tenant id when not provided
             if (string.IsNullOrEmpty(arguments.TenantId) && !string.IsNullOrEmpty(arguments.Tenant))
             {
-                var tenantId = await AuthenticationManager.GetAzureADTenantIdAsync(arguments.Tenant);
+                Guid tenantId = await AuthenticationManager.GetAzureADTenantIdAsync(arguments.Tenant);
                 if (tenantId != Guid.Empty)
                 {
                     arguments.TenantId = tenantId.ToString();
@@ -541,8 +544,8 @@ namespace PnP.Scanning.Process.Commands
                 AnsiConsole.MarkupLine("");
 
                 // Show cmd help
-                var helpBld = new HelpBuilder(LocalizationResources.Instance, Console.WindowWidth);
-                var hc = new HelpContext(helpBld, cmd, Console.Out);
+                HelpBuilder helpBld = new HelpBuilder(LocalizationResources.Instance, Console.WindowWidth);
+                HelpContext hc = new HelpContext(helpBld, cmd, Console.Out);
                 helpBld.Write(hc);
 
                 return 1;
@@ -552,7 +555,7 @@ namespace PnP.Scanning.Process.Commands
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
-                var client = await processManager.GetScannerClientAsync();
+                PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
                 // Handle authentication
                 Microsoft365Environment environment = Microsoft365Environment.Production;
@@ -595,7 +598,7 @@ namespace PnP.Scanning.Process.Commands
                 await Task.Delay(TimeSpan.FromMilliseconds(500));
 
                 // Kick off a scan
-                var start = new StartRequest
+                StartRequest start = new StartRequest
                 {
                     Mode = arguments.Mode.ToString(),
                     Tenant = arguments.Tenant != null ? arguments.Tenant.ToString() : "",
@@ -664,7 +667,7 @@ namespace PnP.Scanning.Process.Commands
                     // Classic assessment; they are covered by the dedicated --mode AddInsACS assessment. Drop
                     // them so a Classic assessment never silently produces empty data for them, warning when a
                     // user explicitly requested them via --classicinclude.
-                    foreach (var component in new[] { ClassicComponent.AzureACS, ClassicComponent.SharePointAddIns })
+                    foreach (ClassicComponent component in new[] { ClassicComponent.AzureACS, ClassicComponent.SharePointAddIns })
                     {
                         if (classicComponents.Remove(component) && arguments.ClassicInclude.Count > 0)
                         {
@@ -702,8 +705,8 @@ namespace PnP.Scanning.Process.Commands
                 }
 #endif
                 bool encounteredError = false;
-                var call = client.Start(start);
-                await foreach (var message in call.ResponseStream.ReadAllAsync())
+                AsyncServerStreamingCall<StartStatus> call = client.Start(start);
+                await foreach (StartStatus message in call.ResponseStream.ReadAllAsync())
                 {
                     if (message.Type == Constants.MessageError)
                     {

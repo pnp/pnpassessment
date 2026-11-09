@@ -5,22 +5,28 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
+/// <summary>
+/// Evaluates the pinned snapshot with bounded concurrency and append-only result writes.
+/// </summary>
 internal sealed class AnalysisExecutor
 {
+    /// <summary>
+    /// Evaluates uncommitted members of the pinned snapshot with bounded parallelism and validates completion.
+    /// </summary>
     public async Task ExecuteAsync(IAnalysisModule module, ISnapshotReader reader,
         IAnalysisResultWriter writer, VersionedJson parameters, int threads, CancellationToken cancellationToken)
     {
-        var snapshot = await reader.OpenAsync(cancellationToken);
+        SnapshotInfo? snapshot = await reader.OpenAsync(cancellationToken);
         if (module is IAnalysisSnapshotPreparation preparation)
             await preparation.PrepareAsync(reader, cancellationToken);
-        var completed = await writer.GetCompletedObservationIdsAsync(cancellationToken);
+        IReadOnlySet<Guid>? completed = await writer.GetCompletedObservationIdsAsync(cancellationToken);
         if (completed.Any(id => !snapshot.ObservationIds.Contains(id)))
             throw new SnapshotIntegrityException("Committed results reference a record outside the selected snapshot.");
 
-        var workers = new ActionBlock<Guid>(async id =>
+        ActionBlock<Guid>? workers = new ActionBlock<Guid>(async id =>
         {
-            var source = await reader.ReadAsync(id, cancellationToken);
-            var result = await module.AnalyzeAsync(source, parameters, cancellationToken);
+            SourceRecord? source = await reader.ReadAsync(id, cancellationToken);
+            AnalysisResult? result = await module.AnalyzeAsync(source, parameters, cancellationToken);
             if (result.ObservationId != id)
                 throw new InvalidOperationException("Analyzer returned a result for a different source observation.");
             await writer.WriteAsync(result, cancellationToken);
@@ -33,7 +39,7 @@ internal sealed class AnalysisExecutor
 
         try
         {
-            foreach (var id in snapshot.ObservationIds.Where(id => !completed.Contains(id)))
+            foreach (Guid id in snapshot.ObservationIds.Where(id => !completed.Contains(id)))
                 if (!await workers.SendAsync(id, cancellationToken)) break;
         }
         finally
