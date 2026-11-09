@@ -23,7 +23,7 @@ namespace PnP.Scanning.Core.Scanners
     /// component intentionally does not persist anything (that is done by the storage layer) and does not
     /// compute the mapping percentage (that is a separate task) — it just produces the rows.
     /// </summary>
-    internal static class PageWebPartExtractor
+    internal static partial class PageWebPartExtractor
     {
         // Web part type constants returned by the property-signature based type detection. Ported from
         // the legacy WebParts constants (only the subset GetTypeFromProperties can return is needed).

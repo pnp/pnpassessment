@@ -1,0 +1,37 @@
+using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
+
+internal sealed class ClassicPageDiscoveryRow : ClassicPageBaseRow
+{
+    public string RecordKey { get; set; }
+    public string RowType { get; set; }
+    public string ScopeType { get; set; }
+    public string ParentScopeKey { get; set; }
+    public string Url { get; set; }
+    public Guid? SiteCollectionId { get; set; }
+    public Guid? WebId { get; set; }
+    public Guid? ListId { get; set; }
+    public Guid? FolderUniqueId { get; set; }
+    public Guid? FileUniqueId { get; set; }
+    public int? ListItemId { get; set; }
+    public string FileName { get; set; }
+
+    public string PageType { get; set; }
+
+    public string ContentTypeId { get; set; }
+    public string SetupPath { get; set; }
+    public string CustomizedPageStatus { get; set; }
+
+    public bool? HomePage { get; set; }
+    public bool? LibraryHidden { get; set; }
+    public string ObservationMethod { get; set; }
+    public string DiscoveryStatus { get; set; }
+    public string AssessmentStatus { get; set; }
+    public int? ExpectedChildCount { get; set; }
+    public int? ObservedChildCount { get; set; }
+    public string ErrorStage { get; set; }
+    public string ErrorCodes { get; set; }
+    public string ErrorDetail { get; set; }
+    public string EvidenceJson { get; set; }
+    public DateTime ObservedAtUtc { get; set; }
+}

@@ -28,8 +28,9 @@ namespace PnP.Scanning.Core.Services
 
         /// <summary>Builds the declared or tenant-authoritative site selection and retains enumeration failures and home-page scope evidence without claiming an empty tenant.</summary>
         internal async Task<List<string>> EnumerateSiteCollectionsToScanAsync(StartRequest start, AuthenticationManager authenticationManager, Action<string> feedback,
-            ICollection<ClassicPageDiscovery> discoveryEvidence = null)
+            ICollection<ClassicPageDiscovery> discoveryEvidence = null, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             List<string> list = new();
             var classicOptions = OptionsBase.FromScannerInput(start) as ClassicOptions;
             var fullPageDiscovery = classicOptions is { Pages: true };
@@ -88,7 +89,7 @@ namespace PnP.Scanning.Core.Services
                                                                             {
                                                                                 return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                                                                             }
-                        )))
+                        ), cancellationToken))
                     {
                         // Page discovery must not widen the existing non-personal scan scope.
                         VanityUrlOptions vanityUrlOptions = null;
@@ -149,6 +150,7 @@ namespace PnP.Scanning.Core.Services
             }
 #endif
             Log.Information("Assessment scope defined: {SitesToScan} site collections will be assessed", list.Count);
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (fullPageDiscovery && discoveryEvidence != null)
             {
@@ -180,7 +182,8 @@ namespace PnP.Scanning.Core.Services
         }
 
         /// <summary>Replays pending checkpoints or enumerates all webs before applying each observed template policy, retaining excluded-parent child independence.</summary>
-        internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart)
+        internal async Task<WebEnumerationResult> EnumerateWebsToScanAsync(Guid scanId, string siteCollectionUrl, OptionsBase options, AuthenticationManager authenticationManager, bool isRestart,
+            CancellationToken cancellationToken = default, string contextPropertyKey = Constants.PnPContextPropertyScanId)
         {
             List<EnumeratedWeb> webUrlsToScan = new();
             var templateEvidence = new List<ClassicPageDiscovery>();
@@ -201,7 +204,7 @@ namespace PnP.Scanning.Core.Services
             var contextOptions = new PnPContextOptions()
             {
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[] { w => w.WebTemplateConfiguration },
-                Properties = new Dictionary<string, object>() { { Constants.PnPContextPropertyScanId, scanId } }
+                Properties = new Dictionary<string, object>() { { contextPropertyKey, scanId } }
             };
 
             using (var context = await contextFactory.CreateAsync(new Uri(siteCollectionUrl), 
@@ -209,7 +212,7 @@ namespace PnP.Scanning.Core.Services
                                                                     {
                                                                         return authenticationManager.GetAccessTokenAsync(scopes).GetAwaiter().GetResult();
                                                                     }),
-                                                                    contextOptions))
+                                                                    cancellationToken, contextOptions))
             {
                 if (options is ClassicOptions { Pages: true } classic)
                 {

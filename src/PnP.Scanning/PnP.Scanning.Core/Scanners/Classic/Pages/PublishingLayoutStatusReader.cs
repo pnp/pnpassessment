@@ -153,7 +153,7 @@ internal sealed class PublishingLayoutStatusReader
         throw new InvalidDataException("Publishing page layout must have a server-relative or absolute URL within the scanned site collection.");
     }
 
-    private static bool TryResolveServerRelativeUrl(Uri siteUrl, string url, out string resolved)
+    internal static bool TryResolveServerRelativeUrl(Uri siteUrl, string url, out string resolved)
     {
         resolved = null;
         if (string.IsNullOrWhiteSpace(url)) return false;

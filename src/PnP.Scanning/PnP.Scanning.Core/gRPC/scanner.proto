@@ -11,6 +11,9 @@ package PnP.Scanning.Core.Services;
 service PnPScanner {
 	rpc Status (StatusRequest) returns (StatusReply);
 	rpc Start (StartRequest) returns (stream StartStatus);
+	rpc Collect (CollectRequest) returns (PhaseReply);
+	rpc Analyze (AnalyzeRequest) returns (PhaseReply);
+	rpc StartPipeline (StartPipelineRequest) returns (PhaseReply);
 	rpc Stop (StopRequest) returns (google.protobuf.Empty);
 	rpc Ping (google.protobuf.Empty) returns (PingReply);
 	rpc List (ListRequest) returns (ListReply);
@@ -39,6 +42,15 @@ message ScanStatusReply {
 	int32 RequestsThrottled = 8;
 	int32 RequestsRetriedDueToNetworkError = 9;
 	google.protobuf.Timestamp RetryingRequestAt = 10;
+	string ExecutionPath = 11;
+	string Phase = 12;
+	string SnapshotId = 13;
+	string RunId = 14;
+	string AnalysisRunId = 15;
+	int32 RecordsCompleted = 16;
+	int32 RecordsTotal = 17;
+	int32 ErrorCount = 18;
+	string ErrorSummary = 19;
 }
 
 // Start
@@ -74,12 +86,14 @@ message StartStatus {
 // Stop
 message StopRequest {
 	string Site = 1;
+	string Id = 2;
 }
 
 // Ping
 message PingReply {
 	bool UpAndRunning = 1;
 	int32 ProcessId = 2;
+	bool SupportsPipeline = 3;
 }
 
 // List
@@ -102,6 +116,15 @@ message ListScanResponse {
 	int32 SiteCollectionsScanned = 5;
 	google.protobuf.Timestamp ScanStarted = 6;
 	google.protobuf.Timestamp ScanEnded = 7;
+	string ExecutionPath = 8;
+	string Phase = 9;
+	string SnapshotId = 10;
+	string RunId = 11;
+	string AnalysisRunId = 12;
+	int32 RecordsCompleted = 13;
+	int32 RecordsTotal = 14;
+	int32 ErrorCount = 15;
+	string ErrorSummary = 16;
 }
 
 // Pause
@@ -121,6 +144,37 @@ message RestartRequest {
 	int32 Threads = 2;
 	string AdminCenterUrl = 3;
 	string MySiteHostUrl = 4;	
+	string RunId = 5;
+}
+
+// Separate method names prevent an old service from silently treating a pipeline request as legacy Start.
+message CollectRequest {
+	string Module = 1;
+	StartRequest CollectionOptions = 2;
+	string ParametersJson = 3;
+}
+
+message AnalyzeRequest {
+	string Id = 1;
+	string SnapshotId = 2;
+	string RuleVersion = 3;
+	string ParametersJson = 4;
+	int32 Threads = 5;
+}
+
+message StartPipelineRequest {
+	CollectRequest Collection = 1;
+	string RuleVersion = 2;
+	string AnalysisParametersJson = 3;
+}
+
+message PhaseReply {
+	string AssessmentId = 1;
+	string SnapshotId = 2;
+	string RunId = 3;
+	string AnalysisRunId = 4;
+	string Status = 5;
+	string RuleVersion = 6;
 }
 
 message RestartStatus {

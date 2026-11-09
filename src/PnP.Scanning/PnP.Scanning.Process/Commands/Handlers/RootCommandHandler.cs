@@ -28,6 +28,8 @@ namespace PnP.Scanning.Process.Commands
             rootCommand.AddCommand(new ReportCommandHandler(processManager).Create());
             rootCommand.AddCommand(new RestartCommandHandler(processManager, configurationOptions).Create());
             rootCommand.AddCommand(new StartCommandHandler(processManager, dataProtectionProvider, configurationOptions).Create());
+            rootCommand.AddCommand(new StartCommandHandler(processManager, dataProtectionProvider, configurationOptions, "collect").Create());
+            rootCommand.AddCommand(PipelineCommandHandler.Analyze(processManager));
             rootCommand.AddCommand(new StatusCommandHandler(processManager).Create());
             rootCommand.AddCommand(new StopCommandHandler(processManager).Create());
 

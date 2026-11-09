@@ -22,6 +22,10 @@ namespace PnP.Scanning.Core.Authentication
         internal static HttpClient HttpClient { get => httpClient; }
 
         internal IDataProtectionProvider DataProtectionProvider { get; private set; }
+        /// <summary>
+        /// Assigns the device-login notification callback used when a collector initializes interactive authentication.
+        /// </summary>
+        internal void SetCollectionDeviceCodeCallback(Func<DeviceCodeResult, Task> callback) => deviceCodeCallback = callback;
 
         internal static AuthenticationManager Create(StartRequest request, IDataProtectionProvider provider)
         {

@@ -35,6 +35,28 @@ internal sealed class SPFileWriter
         this.createContext = createContext ?? throw new ArgumentNullException(nameof(createContext));
     }
 
+    internal static SPFile Consolidate(SPFile previous, SPFile incoming)
+    {
+        Validate(incoming);
+        var merged = JsonSerializer.Deserialize<SPFile>(JsonSerializer.Serialize(previous ?? incoming));
+        if (previous != null)
+        {
+            if (previous.ScanId != incoming.ScanId || previous.SiteCollectionId != incoming.SiteCollectionId ||
+                previous.FileUniqueId != incoming.FileUniqueId)
+                throw new InvalidDataException("Cannot consolidate different native file identities.");
+            Merge(merged, incoming);
+        }
+        else
+        {
+            merged.ProvenanceJson = UnionProvenance(EmptyProvenance, incoming.ProvenanceJson);
+            var states = ReadFieldStates(merged.ItemMetadataFieldStatesJson);
+            NormalizeInitialItemFacts(merged, states);
+            merged.ItemMetadataFieldStatesJson = JsonSerializer.Serialize(states);
+            if (merged.FirstObservedAtUtc == default) merged.FirstObservedAtUtc = merged.ObservedAtUtc;
+        }
+        return merged;
+    }
+
     /// <summary>Validates one bounded single-scan raw-file batch, unions repeat evidence, and commits all observations or none.</summary>
     internal async Task WriteAsync(IEnumerable<SPFile> observations, CancellationToken cancellationToken = default)
     {
@@ -150,6 +172,7 @@ internal sealed class SPFileWriter
         previous.ContentTypeId = MergeItemText(previous, nameof(previous.ContentTypeId), ContentTypeIdField, previous.ContentTypeId, incoming.ContentTypeId, itemStates);
         previous.CustomizedPageStatus = MergeText(previous, nameof(previous.CustomizedPageStatus), previous.CustomizedPageStatus, incoming.CustomizedPageStatus);
         previous.SetupPath = MergeText(previous, nameof(previous.SetupPath), previous.SetupPath, incoming.SetupPath);
+        previous.AspxEvidenceJson = MergeText(previous, nameof(previous.AspxEvidenceJson), previous.AspxEvidenceJson, incoming.AspxEvidenceJson);
         previous.ClientSideApplicationId = MergeItemText(previous, nameof(previous.ClientSideApplicationId), ClientSideApplicationIdField, previous.ClientSideApplicationId, incoming.ClientSideApplicationId, itemStates);
         previous.HtmlFileType = MergeItemText(previous, nameof(previous.HtmlFileType), HtmlFileTypeField, previous.HtmlFileType, incoming.HtmlFileType, itemStates);
         previous.FileType = MergeItemText(previous, nameof(previous.FileType), FileTypeField, previous.FileType, incoming.FileType, itemStates);

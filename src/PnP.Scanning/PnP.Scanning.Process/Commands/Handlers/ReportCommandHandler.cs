@@ -79,17 +79,20 @@ namespace PnP.Scanning.Process.Commands
             //{                               
             //});
 
-            cmd.SetHandler(async (Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open) =>
-                            {
-                                await HandleStartAsync(scanId, mode, delimiter, path, open);
-                            },
-                            scanIdOption, modeOption, delimiterOption, exportPathOption, openGeneratedReportOption);
+            cmd.SetHandler(async context =>
+            {
+                var result = context.ParseResult;
+                context.ExitCode = await HandleStartAsync(result.GetValueForOption(scanIdOption),
+                    result.GetValueForOption(modeOption), result.GetValueForOption(delimiterOption),
+                    result.GetValueForOption(exportPathOption), result.GetValueForOption(openGeneratedReportOption));
+            });
 
             return cmd;
         }
 
-        private async Task HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open)
+        private async Task<int> HandleStartAsync(Guid scanId, ReportMode mode, Delimiter delimiter, string path, bool open)
         {
+            int exitCode = 0;
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Creating reports...", async ctx =>
             {
                 // Setup client to talk to scanner
@@ -116,6 +119,7 @@ namespace PnP.Scanning.Process.Commands
                 {
                     if (message.Type == Constants.MessageError)
                     {
+                        exitCode = 1;
                         AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
                     }
                     else if (message.Type == Constants.MessageWarning)
@@ -138,7 +142,7 @@ namespace PnP.Scanning.Process.Commands
 
                 AnsiConsole.WriteLine();
 
-                if (!string.IsNullOrEmpty(finalReportPath) && open)
+                if (exitCode == 0 && !string.IsNullOrEmpty(finalReportPath) && open)
                 {
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
@@ -167,6 +171,7 @@ namespace PnP.Scanning.Process.Commands
                 }
 
             });
+            return exitCode;
         }
     }
 }

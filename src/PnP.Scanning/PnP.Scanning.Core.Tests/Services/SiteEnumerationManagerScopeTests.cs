@@ -19,6 +19,18 @@ public class SiteEnumerationManagerScopeTests
     private const string TeamSite = "https://contoso.sharepoint.com/sites/team";
     private const string PersonalSite = "https://contoso-my.sharepoint.com/personal/alex_contoso_com";
 
+    [Fact]
+    public async Task Canceled_explicit_collection_does_not_return_a_successful_empty_scope()
+    {
+        using var fixture = new OfflineEnumeration("STS#0", TeamSite);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Manager.EnumerateSiteCollectionsToScanAsync(
+            new StartRequest { Mode = Mode.Classic.ToString(), SitesList = TeamSite }, null, _ => { },
+            cancellationToken: cancellation.Token));
+        fixture.Transport.Requests.Should().BeEmpty();
+    }
+
     /// <summary>
     /// Defers ASPX tenant-site admission until templates can be evaluated while retaining the legacy non-page personal-host filter.
     /// </summary>
@@ -188,9 +200,14 @@ public class SiteEnumerationManagerScopeTests
 
         protected override object Invoke(MethodInfo method, object[] args)
         {
-            if (method.Name == nameof(IPnPContextFactory.CreateAsync) && args.Length == 3 && args[0] is Uri uri)
-                return Inner.CreateAsync(uri, new ExternalAuthenticationProvider((_, _) => Task.FromResult(Token)),
-                    (PnPContextOptions)args[2]);
+            if (method.Name == nameof(IPnPContextFactory.CreateAsync) && args[0] is Uri uri)
+            {
+                var authentication = new ExternalAuthenticationProvider((_, _) => Task.FromResult(Token));
+                if (args.Length == 4 && args[2] is CancellationToken token)
+                    return Inner.CreateAsync(uri, authentication, token, (PnPContextOptions)args[3]);
+                if (args.Length == 3)
+                    return Inner.CreateAsync(uri, authentication, (PnPContextOptions)args[2]);
+            }
             throw new InvalidOperationException("Unexpected context factory operation: " + method.Name);
         }
     }

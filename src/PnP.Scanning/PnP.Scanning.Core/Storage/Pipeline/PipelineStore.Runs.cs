@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+using PnP.Scanning.Core.Pipeline.Orchestration;
 
 namespace PnP.Scanning.Core.Storage.Pipeline;
 
@@ -39,7 +40,7 @@ internal sealed partial class PipelineStore
             db.AnalysisRuns.Add(new()
             {
                 AnalysisRunId = phase.RunId, SnapshotId = phase.SnapshotId, ModuleKey = phase.ModuleKey,
-                RuleVersion = phase.RuleVersion, ParametersJson = phase.ParametersJson,
+                RuleVersion = phase.RuleVersion, ParametersJson = PipelineRunSettings.AnalysisParameters(phase),
                 ManifestDigest = SnapshotManifest.Digest(manifest.Serialize()), CreatedAtUtc = phase.CreatedAtUtc,
             });
             return true;
@@ -79,6 +80,7 @@ internal sealed partial class PipelineStore
             _ = await ReadReportsAsync(db, runId, token);
             phase.Status = ScanStatus.Finished;
             phase.EndedAtUtc = DateTime.UtcNow;
+            await UpdateParentAsync(db, phase, token);
             return true;
         }, token);
 
@@ -95,6 +97,9 @@ internal sealed partial class PipelineStore
     private static async Task<PinnedManifest> AnalysisManifestAsync(ScanContext db, Guid runId, CancellationToken token)
     {
         var run = await db.AnalysisRuns.AsNoTracking().SingleAsync(x => x.AnalysisRunId == runId, token);
+        var phase = await db.PhaseRuns.AsNoTracking().SingleAsync(x => x.RunId == runId, token);
+        if (run.RuleVersion != phase.RuleVersion || run.ParametersJson != PipelineRunSettings.AnalysisParameters(phase))
+            throw new SnapshotIntegrityException("The analysis run's pinned rule or parameters changed.");
         var snapshot = await db.SourceSnapshots.AsNoTracking().SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
         var pinned = new PinnedManifest(await ValidateSnapshotAsync(db, snapshot, token));
         if (pinned.Digest != run.ManifestDigest || run.ModuleKey != snapshot.ModuleKey)
@@ -136,6 +141,7 @@ internal sealed partial class PipelineStore
             phase.LastError = $"{result.Outcome}: {result.Reason}";
         }
         phase.CheckpointJson = VersionedJson.From(new { stage = "Analysis", result.ObservationId, committedResults = phase.CompletedRecords }).Json;
+        await UpdateParentAsync(db, phase, token);
         return true;
     }
 }

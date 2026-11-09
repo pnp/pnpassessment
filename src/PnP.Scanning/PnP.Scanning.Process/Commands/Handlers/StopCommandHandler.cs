@@ -17,10 +17,36 @@ namespace PnP.Scanning.Process.Commands
         public Command Create()
         {
             var cmd = new Command("stop", "Stops the Microsoft 365 Assessment engine, terminating all running assessments");
+            var id = new Option<Guid?>("--id", "Terminate one assessment while keeping the engine running");
+            cmd.AddOption(id);
 
             // Configure options for stop
 
-            cmd.SetHandler(async () => await HandleStopAsync());
+            cmd.SetHandler(async context =>
+            {
+                var assessmentId = context.ParseResult.GetValueForOption(id);
+                if (assessmentId == null) await HandleStopAsync();
+                else
+                {
+                    try
+                    {
+                        var client = await processManager.GetScannerClientAsync();
+                        if (!(await client.PingAsync(new Google.Protobuf.WellKnownTypes.Empty())).SupportsPipeline)
+                        {
+                            Console.Error.WriteLine("The running assessment service does not support stop --id. Restart it using this version of the tool.");
+                            context.ExitCode = 1;
+                            return;
+                        }
+                        await client.StopAsync(new StopRequest { Id = assessmentId.ToString() });
+                        Console.WriteLine($"Assessment {assessmentId} terminated at its committed checkpoint.");
+                    }
+                    catch (Grpc.Core.RpcException ex)
+                    {
+                        Console.Error.WriteLine(ex.Status.Detail);
+                        context.ExitCode = 1;
+                    }
+                }
+            });
 
             return cmd;
         }

@@ -14,6 +14,17 @@ internal interface IAnalysisModule
     Task<AnalysisResult> AnalyzeAsync(SourceRecord source, VersionedJson parameters, CancellationToken cancellationToken);
 }
 
+internal interface IAnalysisSnapshotPreparation
+{
+    Task PrepareAsync(ISnapshotReader snapshot, CancellationToken cancellationToken);
+}
+
+internal interface IAnalysisFinalizer
+{
+    Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results,
+        IAnalysisReportWriter reports, VersionedJson parameters, CancellationToken cancellationToken);
+}
+
 internal interface IAnalysisResultWriter
 {
     Task<IReadOnlySet<Guid>> GetCompletedObservationIdsAsync(CancellationToken cancellationToken);

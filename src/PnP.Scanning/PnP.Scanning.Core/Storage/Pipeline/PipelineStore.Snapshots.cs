@@ -55,6 +55,7 @@ internal sealed partial class PipelineStore
             run.TotalRecords = expected;
         }
         run.CheckpointJson = record.Checkpoint.Json;
+        await UpdateParentAsync(db, run, token);
         return true;
     }, token);
 
@@ -80,6 +81,14 @@ internal sealed partial class PipelineStore
             run.Status = ScanStatus.Finished;
             run.EndedAtUtc = snapshot.SealedAtUtc;
             run.CheckpointJson = VersionedJson.From(new { stage = "Sealed", snapshotId, manifestDigest = snapshot.ManifestDigest }).Json;
+            if (run.ParentRunId is Guid parentId)
+            {
+                var parent = await db.PhaseRuns.SingleAsync(x => x.RunId == parentId, token);
+                parent.CurrentPhase = PhaseKind.Analysis;
+                parent.CompletedRecords = 0;
+                parent.TotalRecords = observations.Count;
+                parent.CheckpointJson = run.CheckpointJson;
+            }
             return manifest.Info();
         }, token);
 
