@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Pipeline.Orchestration;
+using PnP.Scanning.Core.Pipeline.Collection.Module;
 using Serilog;
 using System.Runtime.InteropServices;
 
@@ -56,38 +57,6 @@ namespace PnP.Scanning.Core.Services
             reply.Status.AddRange(legacy.Status);
             if (legacyScanManager.IsValueCreated) await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.List);
             return reply;
-        }
-
-        /// <summary>
-        /// Queues a standalone collection through the pipeline coordinator and returns its fixed assessment and snapshot identities.
-        /// </summary>
-        public override Task<PhaseReply> Collect(CollectRequest request, ServerCallContext context) =>
-            PipelineCallAsync(() => pipeline.CollectAsync(request, context.CancellationToken));
-
-        /// <summary>
-        /// Queues a new offline analysis of the explicitly selected sealed snapshot.
-        /// </summary>
-        public override Task<PhaseReply> Analyze(AnalyzeRequest request, ServerCallContext context) =>
-            PipelineCallAsync(() => pipeline.AnalyzeAsync(request, context.CancellationToken));
-
-        /// <summary>
-        /// Queues collection followed by analysis through the dedicated pipeline RPC.
-        /// </summary>
-        public override Task<PhaseReply> StartPipeline(StartPipelineRequest request, ServerCallContext context) =>
-            PipelineCallAsync(() => pipeline.StartPipelineAsync(request, context.CancellationToken));
-
-        /// <summary>
-        /// Translates pipeline validation, unsupported input and integrity errors into explicit gRPC status codes.
-        /// </summary>
-        private static async Task<PhaseReply> PipelineCallAsync(Func<Task<PhaseReply>> action)
-        {
-            try { return await action(); }
-            catch (ArgumentException ex) { throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message)); }
-            catch (System.Text.Json.JsonException ex) { throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message)); }
-            catch (KeyNotFoundException ex) { throw new RpcException(new Status(StatusCode.NotFound, ex.Message)); }
-            catch (NotSupportedException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
-            catch (InvalidOperationException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
-            catch (Pipeline.Contracts.Module.SnapshotIntegrityException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
         }
 
         /// <summary>
@@ -226,8 +195,7 @@ namespace PnP.Scanning.Core.Services
             {
                 try
                 {
-                    Guid? runId = string.IsNullOrWhiteSpace(request.RunId) ? null : Guid.Parse(request.RunId);
-                    var ticket = await pipeline.RestartAsync(scanId, request.Threads, runId, context.CancellationToken);
+                    var ticket = await pipeline.RestartAsync(scanId, request.Threads, token: context.CancellationToken);
                     await responseStream.WriteAsync(new RestartStatus { Status = $"Pipeline run {ticket.RunId} resumed with snapshot {ticket.SnapshotId} and rule {ticket.RuleVersion}" });
                 }
                 catch (Exception ex)
@@ -237,12 +205,24 @@ namespace PnP.Scanning.Core.Services
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(request.RunId))
+            try
             {
-                await responseStream.WriteAsync(new RestartStatus
+                var adopted = await pipeline.RestartLegacyClassicAsync(scanId, request.Threads,
+                    password => dataProtectionProvider.CreateProtector(Constants.DataProtectorMsalCachePurpose).Unprotect(password),
+                    context.CancellationToken);
+                if (adopted != null)
                 {
-                    Status = "Legacy assessments do not have pipeline run IDs.", Type = Constants.MessageError,
-                });
+                    await responseStream.WriteAsync(new RestartStatus
+                    {
+                        Status = $"Assessment restarted. Source snapshot = {adopted.SnapshotId}",
+                    });
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Classic assessment {ScanId} could not restart", scanId);
+                await responseStream.WriteAsync(new RestartStatus { Status = ex.Message, Type = Constants.MessageError });
                 return;
             }
 
@@ -294,22 +274,6 @@ namespace PnP.Scanning.Core.Services
         /// </summary>
         public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
         {
-            if (!string.IsNullOrWhiteSpace(request.Id))
-            {
-                if (!Guid.TryParse(request.Id, out var id)) throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid assessment ID."));
-                if (await pipeline.OwnsAssessmentAsync(id, context.CancellationToken))
-                {
-                    try { await pipeline.TerminateAsync(id, context.CancellationToken); }
-                    catch (InvalidOperationException ex) { throw new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)); }
-                }
-                else
-                {
-                    if (!scanManager.ScanExists(id)) throw new RpcException(new Status(StatusCode.NotFound, "Assessment is not running."));
-                    scanManager.CancelScan(id, false);
-                    await scanManager.SetPausingStatusAsync(id, false, Storage.ScanStatus.Terminated);
-                }
-                return new Empty();
-            }
             // Run the stop in a separate thread so that the GRPc client still gets a response
             _ = Task.Run(async () =>
             {
@@ -324,7 +288,7 @@ namespace PnP.Scanning.Core.Services
         public async override Task<PingReply> Ping(Empty request, ServerCallContext context)
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId, SupportsPipeline = true };
+            return new PingReply() { UpAndRunning = true, ProcessId = Environment.ProcessId };
         }
 
         public override async Task Start(StartRequest request, IServerStreamWriter<StartStatus> responseStream, ServerCallContext context)
@@ -334,11 +298,22 @@ namespace PnP.Scanning.Core.Services
                 Log.Information("Starting Microsoft 365 Assessment");
                 await responseStream.WriteAsync(new StartStatus
                 {
-                    Status = "Starting the Microsoft 365 Assessment (legacy)"
+                    Status = "Starting the Microsoft 365 Assessment"
                 });
 
-                if (request.Mode.Equals(Mode.ClassicPage.ToString(), StringComparison.OrdinalIgnoreCase))
-                    throw new NotSupportedException("ClassicPage requires the dedicated collection/analysis pipeline RPCs.");
+                if (ClassicPageModule.Handles(request))
+                {
+                    var ticket = await pipeline.StartPipelineAsync(new StartPipelineRequest
+                    {
+                        Collection = new CollectRequest { Module = ClassicPageModule.Key, CollectionOptions = request },
+                    }, context.CancellationToken);
+                    await responseStream.WriteAsync(new StartStatus
+                    {
+                        Status = $"Sites to assess are queued up. Assessment id = {ticket.AssessmentId}. " +
+                            $"Source snapshot = {ticket.SnapshotId}. Analysis run = {ticket.AnalysisRunId}",
+                    });
+                    return;
+                }
 
                 // 1. Handle auth
                 var authenticationManager = AuthenticationManager.Create(request, dataProtectionProvider);
@@ -423,9 +398,7 @@ namespace PnP.Scanning.Core.Services
                 Log.Information("Report data export started for assessment {ScanId}", scanId);
 
                 if (await pipeline.OwnsAssessmentAsync(scanId, context.CancellationToken))
-                {
-                    throw new NotSupportedException("Reporting for classicpage pipeline assessments is not available in this version. Existing Classic assessments retain their report command.");
-                }
+                    await pipeline.EnsureReportReadyAsync(scanId, context.CancellationToken);
 
                 var dataExportPath = await reportManager.ExportReportDataAsync(scanId, request.Path, request.Delimiter);
 
@@ -465,7 +438,7 @@ namespace PnP.Scanning.Core.Services
                     }
                 }
 
-                await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Report);
+                if (legacyScanManager.IsValueCreated) await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Report);
             }
             catch (Exception ex)
             {

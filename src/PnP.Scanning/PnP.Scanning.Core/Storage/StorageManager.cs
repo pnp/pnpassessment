@@ -732,6 +732,7 @@ namespace PnP.Scanning.Core.Storage
                         var result = new ScanResultFromDatabase(scan.ScanId, scan.Status, total)
                         {
                             Mode = scan.CLIMode,
+                            UsesPipeline = await dbContext.PhaseRuns.AnyAsync(x => x.AssessmentId == scanId),
                             SiteCollectionsQueued = queued,
                             SiteCollectionsRunning = running,
                             SiteCollectionsFinished = finished,

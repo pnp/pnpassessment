@@ -11,14 +11,18 @@ using PnP.Scanning.Core.Scanners.WebPartMapping;
 
 namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 
-internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnapshotPreparation
+internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnapshotPreparation, IAnalysisFinalizer
 {
     private ClassicPageInputIndex index = null!;
     private Guid assessmentId;
     private readonly WebPartMappingManager mapping = new();
     public string ModuleKey => ClassicPageModuleKey;
     private const string ClassicPageModuleKey = "classicpage";
-    public string RuleVersion => "classicpage-v1";
+    public string RuleVersion => "classicpage-v2";
+
+    public Task FinalizeAsync(ISnapshotReader snapshot, IAnalysisResultReader results,
+        IAnalysisReportWriter reports, VersionedJson parameters, CancellationToken token) =>
+        Storage.Pipeline.ClassicCompatibility.PublishAsync(assessmentId, index, results, reports, token);
 
     public async Task PrepareAsync(ISnapshotReader snapshot, CancellationToken cancellationToken)
     {

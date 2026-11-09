@@ -66,14 +66,15 @@ public sealed class ContractAndSnapshotTests
             Assert.False(name.StartsWith("System.Net.", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Authentication", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Pipeline.Collection", StringComparison.Ordinal), name);
-            Assert.False(name.StartsWith("PnP.Scanning.Core.Storage", StringComparison.Ordinal), name);
+            var compatibilityProjection = name == "PnP.Scanning.Core.Storage.Pipeline.ClassicCompatibility";
+            Assert.False(name.StartsWith("PnP.Scanning.Core.Storage", StringComparison.Ordinal) && !compatibilityProjection, name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Services", StringComparison.Ordinal), name);
             var pureMapping = name == "PnP.Scanning.Core.Scanners.WebPartMapping.WebPartMappingManager";
             Assert.False(name.StartsWith("PnP.Scanning.Core.Scanners", StringComparison.Ordinal) && !pureMapping, name);
             Assert.False(name.StartsWith("Microsoft.AspNetCore.DataProtection", StringComparison.Ordinal), name);
             if (name.StartsWith("PnP.Scanning.Core.", StringComparison.Ordinal))
                 Assert.True(name.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) ||
-                    name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) || pureMapping ||
+                    name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) || pureMapping || compatibilityProjection ||
                     PurePageType(type) || type.DeclaringType != null && PurePageType(type.DeclaringType), name);
         }
         Assert.DoesNotContain(typeof(ISnapshotReader).GetMethods(), x => x.Name.Contains("Write", StringComparison.Ordinal));

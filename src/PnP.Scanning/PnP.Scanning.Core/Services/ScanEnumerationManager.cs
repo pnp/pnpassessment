@@ -34,7 +34,7 @@ namespace PnP.Scanning.Core.Services
                     {
                         // Pipeline phases have their own rows, counters and recovery. Do not pass them
                         // to legacy termination, restart or web cleanup paths.
-                        if (scanResultFromDatabase.Mode?.StartsWith("Pipeline:", StringComparison.Ordinal) == true) continue;
+                        if (scanResultFromDatabase.UsesPipeline) continue;
                         scanResult.ExecutionPath = "legacy";
                         scanResult.Status = scanResultFromDatabase.Status.ToString();
                         scanResult.Mode = scanResultFromDatabase.Mode;

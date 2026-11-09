@@ -32,10 +32,12 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
     internal bool IncludePhysicalFacts;
     internal Guid? ExtraFileAssessment;
     private Guid assessment;
+    private bool otherComponents;
     internal ClassicPageSourceOptions Options = new(false, true, false, false, 14);
     internal Task<IClassicPageOnlineSource> OpenAsync(CollectionContext context, CancellationToken token)
     {
         assessment = context.AssessmentId;
+        otherComponents = ClassicPageModule.HasOtherComponents(context.Options);
         Options = ClassicPageModule.Options(context.Options);
         Count("open");
         return Task.FromResult<IClassicPageOnlineSource>(this);
@@ -48,7 +50,7 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
     };
     internal static StartRequest MakeOptions(bool usage = false, bool homeOnly = false)
     {
-        var request = new StartRequest { Mode = Mode.ClassicPage.ToString(), Threads = 2, Environment = "Production", AuthMode = "Device",
+        var request = new StartRequest { Mode = Mode.Classic.ToString(), Threads = 2, Environment = "Production", AuthMode = "Device",
             ApplicationId = App, TenantId = SiteId.ToString(), Tenant = "contoso.sharepoint.com", SitesList = Site };
         global::PnP.Scanning.Core.Scanners.ClassicStartRequestBuilder.AddClassicProperties(request, new[] { ClassicComponent.Pages }, false, !usage, false, homeOnly, 14);
         return request;
@@ -59,7 +61,7 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
         var end = new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc);
         var evidence = new ClassicPageDiscoveryRow { ScanId = assessment, RecordKey = "assessment:site-selection", RowType = "Scope", ScopeType = "SiteSelection",
             Url = Site, ObservationMethod = "DeclaredSites", DiscoveryStatus = "Complete", ExpectedChildCount = 1, ObservedChildCount = 1, ObservedAtUtc = end };
-        return Task.FromResult(new ClassicPageScopeSource([Site], [], true, options, end.AddDays(-14), end, [evidence]));
+        return Task.FromResult(new ClassicPageScopeSource([Site], [], true, options, end.AddDays(-14), end, [evidence], otherComponents));
     }
     public Task<ClassicPageSiteScope> ReadWebsAsync(string siteUrl, CancellationToken token)
     {
@@ -194,6 +196,24 @@ internal sealed class ClassicPageFixture : IClassicPageOnlineSource
         await journal.ReadOrAcquireAsync("AuditPage", "0|0", () => Task.FromResult(new ClassicPageAuditPageSource(0, "recorded-query", 0,
             "{\"value\":[{\"operation\":\"ClassicPageViewed\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"one\"},{\"operation\":\"ClassicPageEdited\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"ONE\"}]}", null)), token);
         await journal.ReadOrAcquireAsync("AuditChunk", "0", () => Task.FromResult(new ClassicPageAuditChunkSource(0, scope.AuditWindowStart, scope.AuditWindowEnd, "recorded-query", "succeeded", null)), token);
+    }
+
+    public Task<ClassicComponentSource> ReadClassicComponentsAsync(ClassicPageWebSource web, CancellationToken token)
+    {
+        Count("components");
+        return Task.FromResult(new ClassicComponentSource(Site, "/", SourceReadState.Complete,
+            new Dictionary<string, System.Text.Json.JsonElement[]>
+            {
+                ["ClassicList"] = [System.Text.Json.JsonSerializer.SerializeToElement(new PnP.Scanning.Core.Storage.ClassicList
+                {
+                    ScanId = assessment, SiteUrl = Site, WebUrl = "/", ListId = ListId,
+                    ListUrl = "/sites/a/Lists/Tasks", ListTitle = "Tasks", RemediationCode = "CL4",
+                })],
+                ["ClassicWebSummary"] = [System.Text.Json.JsonSerializer.SerializeToElement(new PnP.Scanning.Core.Storage.ClassicWebSummary
+                {
+                    ScanId = assessment, SiteUrl = Site, WebUrl = "/", ClassicLists = 1, AggregatedRemediationCodes = "CL4",
+                })],
+            }));
     }
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

@@ -12,6 +12,7 @@
         internal Guid ScanId { get; set; }
 
         internal string Mode { get; set; }
+        internal bool UsesPipeline { get; set; }
 
         internal ScanStatus Status { get; set; }
 

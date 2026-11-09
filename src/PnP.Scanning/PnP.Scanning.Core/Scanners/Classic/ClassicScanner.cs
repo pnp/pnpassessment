@@ -9,7 +9,6 @@ using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Discovery;
 using System.Linq.Expressions;
-using System.Runtime.ExceptionServices;
 
 namespace PnP.Scanning.Core.Scanners
 {
@@ -27,8 +26,31 @@ namespace PnP.Scanning.Core.Scanners
         /// <summary>Runs selected Classic components against one shared web context.</summary>
         internal async override Task ExecuteAsync()
         {
+            if (Options.Pages)
+                throw new InvalidOperationException("Classic Pages must use the collection and analysis coordinator.");
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
+            var options = AssessmentContextOptions(Options);
+
+            using (var context = await CreateWebContextAsync())
+            using (var csomContext = GetClientContext(context))
+            {
+                await RetryLoadSharedMetadataAsync(context, options,
+                    ScanManager.GetCancellationTokenSource(ScanId).Token).ConfigureAwait(false);
+
+                await ExecuteOtherComponentsAsync(this, context, csomContext,
+                    ScanManager.GetCancellationTokenSource(ScanId).Token).ConfigureAwait(false);
+
+                // Store site summary
+                await StorageManager.StoreSiteSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context).ConfigureAwait(false);
+
+            }
+
+            Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+        }
+
+        internal static PnPContextOptions AssessmentContextOptions(ClassicOptions selected)
+        {
             // Define extra Web/Site data that we want to load when the context is inialized
             // This will not require extra server roundtrips
             PnPContextOptions options = new()
@@ -61,14 +83,14 @@ namespace PnP.Scanning.Core.Scanners
                 }
             };
 
-            if (Options.Pages)
+            if (selected.Pages)
             {
                 // Also load site/web feature collections
                 options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
                 options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
             }
 
-            if (Options.Extensibility)
+            if (selected.Extensibility)
             {
                 options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.UserCustomActions });
                 options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.UserCustomActions,
@@ -76,120 +98,87 @@ namespace PnP.Scanning.Core.Scanners
                                                                                                                                                w => w.CustomMasterUrl,
                                                                                                                                                w => w.MasterUrl });
             }
+            return options;
+        }
 
-            using (var context = await CreateWebContextAsync())
-            using (var csomContext = GetClientContext(context))
+        internal static async Task ExecuteOtherComponentsAsync(ClassicScanner scanner, PnPContext context,
+            ClientContext csomContext, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (scanner.Options.Workflow)
             {
-                SharePointListMetadataSnapshot sharedLists = null;
-                Exception metadataFailure = null;
-                if (!(Options.Pages && Options.HomePageOnly))
+                scanner.Logger.Information("Starting classic Workflow assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // Call the workflow scan component
+                await WorkflowScanComponent.ExecuteAsync(new WorkflowOptions { Mode = Mode.Workflow.ToString(), Analyze = true },
+                                                         scanner, context, csomContext).ConfigureAwait(false);
+
+                // Store workflow summary data
+                HashSet<string> remediationCodes = new()
                 {
-                    // Load shared assessment metadata before the selected components consume it.
-                    // HOME defers this load until after its targeted page discovery.
-                    var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
-                    try
-                    {
-                        sharedLists = await RetryLoadSharedMetadataAsync(context, options, token).ConfigureAwait(false);
-                    }
-                    catch (Exception error) when (Options.Pages && !token.IsCancellationRequested)
-                    {
-                        // Defer page failure finalization until raw discovery has been retained.
-                        metadataFailure = error;
-                    }
-                }
+                    RemediationCodes.WF1.ToString()
+                };
+                await scanner.StorageManager.StoreWorkflowSummaryAsync(scanner.ScanId, scanner.SiteUrl, scanner.WebUrl, scanner.WebTemplate, context, remediationCodes).ConfigureAwait(false);
 
-                if (Options.Pages && (Options.HomePageOnly || metadataFailure != null))
-                {
-                    // HOME must discover its target before the all-lists metadata request.
-                    // A failed full-inventory load also needs raw discovery before finalization.
-                    await ExecutePagesAsync(context, csomContext, options, sharedLists, metadataFailure)
-                        .ConfigureAwait(false);
-                }
-
-                if (Options.Workflow)
-                {
-                    Logger.Information("Starting classic Workflow assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the workflow scan component
-                    await WorkflowScanComponent.ExecuteAsync(new WorkflowOptions { Mode = Mode.Workflow.ToString(), Analyze = true }, 
-                                                             this, context, csomContext).ConfigureAwait(false);
-
-                    // Store workflow summary data
-                    HashSet<string> remediationCodes = new()
-                    {
-                        RemediationCodes.WF1.ToString()
-                    };
-                    await StorageManager.StoreWorkflowSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context, remediationCodes).ConfigureAwait(false);
-
-                    Logger.Information("Classic Workflow assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.InfoPath)
-                {
-                    Logger.Information("Starting classic InfoPath assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the InfoPath scan component
-                    await InfoPathScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-                    
-                    Logger.Information("Classic InfoPath assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.Pages && !Options.HomePageOnly && metadataFailure == null)
-                {
-                    await ExecutePagesAsync(context, csomContext, options, sharedLists, null).ConfigureAwait(false);
-                }
-
-                if (Options.Lists)
-                {
-                    Logger.Information("Starting classic Lists assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the List scan component
-                    await ListScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-
-                    Logger.Information("Classic Lists assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.Extensibility)
-                {
-                    Logger.Information("Starting Extensibility assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the UserCustomAction scan component
-                    Logger.Information("Starting Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-                    await UserCustomActionScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-                    Logger.Information("Classic Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                    
-                    // Call the Extensibility scan component
-                    Logger.Information("Starting Extensibility:Core assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-                    await ExtensibilityScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-                    Logger.Information("Classic Extensibility:Core assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-
-                    Logger.Information("Classic Extensibility assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.AzureACS)
-                {
-                    //Logger.Information("Starting Azure ACS assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // TODO
-
-                    //Logger.Information("Classic Azure ACS assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-                
-                if (Options.SharePointAddIns)
-                {
-                    //Logger.Information("Starting SharePoint AddIns assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // TODO
-
-                    //Logger.Information("Classic SharePoint AddIns assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                // Store site summary
-                await StorageManager.StoreSiteSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context).ConfigureAwait(false);
-
+                scanner.Logger.Information("Classic Workflow assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
             }
 
-            Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+            if (scanner.Options.InfoPath)
+            {
+                scanner.Logger.Information("Starting classic InfoPath assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // Call the InfoPath scan component
+                await InfoPathScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+
+                scanner.Logger.Information("Classic InfoPath assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            if (scanner.Options.Lists)
+            {
+                scanner.Logger.Information("Starting classic Lists assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // Call the List scan component
+                await ListScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+
+                scanner.Logger.Information("Classic Lists assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            if (scanner.Options.Extensibility)
+            {
+                scanner.Logger.Information("Starting Extensibility assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // Call the UserCustomAction scan component
+                scanner.Logger.Information("Starting Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+                await UserCustomActionScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+                scanner.Logger.Information("Classic Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+
+                // Call the Extensibility scan component
+                scanner.Logger.Information("Starting Extensibility:Core assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+                await ExtensibilityScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+                scanner.Logger.Information("Classic Extensibility:Core assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+
+                scanner.Logger.Information("Classic Extensibility assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            if (scanner.Options.AzureACS)
+            {
+                //scanner.Logger.Information("Starting Azure ACS assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // TODO
+
+                //scanner.Logger.Information("Classic Azure ACS assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            if (scanner.Options.SharePointAddIns)
+            {
+                //scanner.Logger.Information("Starting SharePoint AddIns assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // TODO
+
+                //scanner.Logger.Information("Classic SharePoint AddIns assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            token.ThrowIfCancellationRequested();
         }
 
         /// <summary>Creates one identity context; the separate shared-metadata step controls when list metadata loads.</summary>
@@ -206,29 +195,6 @@ namespace PnP.Scanning.Core.Scanners
             });
         }
 
-        /// <summary>Runs page discovery with the shared snapshot or targeted fallback, then finalizes retained initialization failures before assessment.</summary>
-        private async Task ExecutePagesAsync(PnPContext context, ClientContext csomContext,
-            PnPContextOptions assessmentOptions, SharePointListMetadataSnapshot sharedLists,
-            Exception metadataFailure)
-        {
-            Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-            var discoveredPages = await DiscoverPagesAsync(Options.HomePageOnly, sharedLists,
-                () => LoadSharedMetadataAfterHomeDiscoveryAsync(context, assessmentOptions),
-                snapshot => ClassicPageDiscoveryComponent.ExecuteAsync(this, context, snapshot)).ConfigureAwait(false);
-
-            if (metadataFailure != null)
-            {
-                ScanManager.GetCancellationTokenSource(ScanId).Token.ThrowIfCancellationRequested();
-                await new AssessmentDiscoveryWriter(ScanId).FailUnassessedPagesAsync(
-                    ScanId, SiteUrl, WebUrl, metadataFailure, "AssessmentInitialization").ConfigureAwait(false);
-                ExceptionDispatchInfo.Capture(metadataFailure).Throw();
-            }
-
-            await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
-            Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-        }
-
         /// <summary>Loads the Web metadata once through the existing bounded response-body retry policy.</summary>
         private Task<SharePointListMetadataSnapshot> RetryLoadSharedMetadataAsync(PnPContext context,
             PnPContextOptions assessmentOptions, CancellationToken token)
@@ -236,16 +202,6 @@ namespace PnP.Scanning.Core.Scanners
             return ClassicAssessmentInitialization.RetryAsync(
                 () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
                 token, LogMetadataRetry);
-        }
-
-        /// <summary>Loads rich shared assessment metadata only after targeted homepage discovery has completed.</summary>
-        private Task<SharePointListMetadataSnapshot> LoadSharedMetadataAfterHomeDiscoveryAsync(PnPContext context,
-            PnPContextOptions assessmentOptions)
-        {
-            var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
-            return ClassicAssessmentInitialization.ExecuteAsync(
-                () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
-                new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl, token, LogMetadataRetry);
         }
 
         /// <summary>Logs the eligible initialization retry without changing retry classification, attempt limits or exception ownership.</summary>

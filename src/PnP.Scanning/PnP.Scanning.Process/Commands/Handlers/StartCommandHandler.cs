@@ -2,7 +2,6 @@ using Grpc.Core;
 using Microsoft.AspNetCore.DataProtection;
 using PnP.Core.Services;
 using PnP.Scanning.Core;
-using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Discovery.Aspx;
 using PnP.Scanning.Core.Scanners;
@@ -25,12 +24,8 @@ namespace PnP.Scanning.Process.Commands
         private readonly ScannerManager processManager;
         private readonly IDataProtectionProvider dataProtectionProvider;
         private readonly ConfigurationOptions configurationOptions;
-        private readonly bool collectOnly;
-        private Option<string> moduleOption;
-        private Option<string> ruleVersionOption;
-        private Option<string> parametersJsonOption;
-        private Option<string> analysisParametersJsonOption;
 
+        private readonly Func<StartOptions, Task> authenticate;
         private Command cmd;
         private Option<Mode> modeOption;
         private Option<string> tenantOption;
@@ -60,28 +55,16 @@ namespace PnP.Scanning.Process.Commands
         private Option<int> testNumberOfSitesOption;
 #endif
 
-        /// <summary>
-        /// Creates start or collect options and binds the scanner manager, protected configuration and defaults.
-        /// </summary>
-        public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance, string commandName = "start")
+        /// <summary>Builds start options and their validators, including explicit Classic template-exclusion inputs without starting workers or authentication.</summary>
+        public StartCommandHandler(ScannerManager processManagerInstance, IDataProtectionProvider dataProtectionProviderInstance, ConfigurationOptions configurationOptionsInstance,
+            Func<StartOptions, Task> authenticate = null)
         {
+            this.authenticate = authenticate;
             processManager = processManagerInstance;
             dataProtectionProvider = dataProtectionProviderInstance;
             configurationOptions = configurationOptionsInstance;
 
-            collectOnly = commandName == "collect";
-            cmd = new Command(commandName, collectOnly ? "Collects and seals source evidence using a registered module" : "Starts a pipeline or legacy Microsoft 365 Assessment");
-            moduleOption = new Option<string>("--module", "Registered collection/analysis module key");
-            parametersJsonOption = new Option<string>("--parameters", () => VersionedJson.Empty.Json, "Versioned collection parameters as JSON");
-            cmd.AddOption(moduleOption);
-            cmd.AddOption(parametersJsonOption);
-            if (!collectOnly)
-            {
-                ruleVersionOption = new Option<string>("--rule-version", "Analysis rule version; defaults to the registered current version");
-                analysisParametersJsonOption = new Option<string>("--analysis-parameters", () => VersionedJson.Empty.Json, "Versioned analysis parameters as JSON");
-                cmd.AddOption(ruleVersionOption);
-                cmd.AddOption(analysisParametersJsonOption);
-            }
+            cmd = new Command("start", "Starts a new Microsoft 365 Assessment");
 
             // Configure the options for the start command
 
@@ -104,7 +87,7 @@ namespace PnP.Scanning.Process.Commands
                 name: $"--{Constants.StartTenant}",
                 description: "Name of the tenant that will be assessed (e.g. contoso.sharepoint.com)")
             {
-                IsRequired = false
+                IsRequired = true
             };
             cmd.AddOption(tenantOption);
 
@@ -172,7 +155,7 @@ namespace PnP.Scanning.Process.Commands
                 //getDefaultValue: () => Guid.Parse("31359c7f-bd7e-475c-86db-fdb8c937548e"),
                 description: "Entra application id to use for authenticating the Microsoft 365 Assessment")
             {
-                IsRequired = false
+                IsRequired = true
             };
             cmd.AddOption(applicationIdOption);
 
@@ -464,24 +447,6 @@ namespace PnP.Scanning.Process.Commands
         /// <returns></returns>
         public Command Create()
         {
-            cmd.AddValidator(result =>
-            {
-                var module = result.GetValueForOption(moduleOption);
-                if (result.FindResultFor(moduleOption) is { IsImplicit: false } && string.IsNullOrWhiteSpace(module))
-                {
-                    result.ErrorMessage = "--module requires a non-empty module key";
-                    return;
-                }
-                if (collectOnly || result.GetValueForOption(modeOption) == Mode.ClassicPage || !string.IsNullOrWhiteSpace(module)) return;
-                if (string.IsNullOrWhiteSpace(result.GetValueForOption(tenantOption)))
-                    result.ErrorMessage = $"Option '--{Constants.StartTenant}' is required for legacy start";
-                else if (result.GetValueForOption(applicationIdOption) == Guid.Empty)
-                    result.ErrorMessage = $"Option '--{Constants.StartApplicationId}' is required for legacy start";
-                else if (result.FindResultFor(ruleVersionOption) is { IsImplicit: false } ||
-                    result.FindResultFor(analysisParametersJsonOption) is { IsImplicit: false } ||
-                    result.FindResultFor(parametersJsonOption) is { IsImplicit: false })
-                    result.ErrorMessage = "Pipeline parameters require --module";
-            });
             // Cross-option validation runs here (after ALL options are parsed) rather than inside an
             // individual option's parseArgument, where the referenced option may not be parsed yet
             // (System.CommandLine dotnet/command-line-api#1287). This makes the --mode value reliable,
@@ -489,15 +454,6 @@ namespace PnP.Scanning.Process.Commands
             // argument order.
             cmd.AddValidator(result =>
             {
-                if (result.GetValueForOption(modeOption) == Mode.ClassicPage)
-                {
-                    var module = result.GetValueForOption(moduleOption);
-                    if (!string.IsNullOrWhiteSpace(module) && !module.Equals("classicpage", StringComparison.OrdinalIgnoreCase))
-                    { result.ErrorMessage = "--mode classicpage requires the classicpage module."; return; }
-                    var include = result.GetValueForOption(classicIncludeOption);
-                    if (include?.Any(x => x != ClassicComponent.Pages) == true)
-                    { result.ErrorMessage = "--mode classicpage only supports the Pages component."; return; }
-                }
                 var classicOnlyOptions = new Option[]
                 {
                     classicExportWebPartPropertiesOption,
@@ -508,12 +464,14 @@ namespace PnP.Scanning.Process.Commands
                     excludeSiteTemplatesOption,
                 };
                 var modeResult = result.FindResultFor(modeOption);
+                if (modeResult?.Tokens.FirstOrDefault()?.Value is string modeText && !Enum.TryParse<Mode>(modeText, true, out _))
+                    return;
                 var mode = modeResult?.GetValueOrDefault<Mode>() ?? Mode.Classic;
-                if (mode is Mode.Classic or Mode.ClassicPage)
+                if (mode == Mode.Classic)
                 {
                     var selected = result.FindResultFor(classicIncludeOption)?.GetValueOrDefault<List<ClassicComponent>>();
-                    if (result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false } &&
-                        selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
+                    var aspxScopeOptionSupplied = result.FindResultFor(excludeSiteTemplatesOption) is { IsImplicit: false };
+                    if (aspxScopeOptionSupplied && selected is { Count: > 0 } && !selected.Contains(ClassicComponent.Pages))
                         result.ErrorMessage = ClassicAcquisitionOptionText.PagesComponentRequired;
                     return;
                 }
@@ -530,8 +488,7 @@ namespace PnP.Scanning.Process.Commands
 
             // Binder approach as that one can handle an unlimited number of command line arguments
             var startBinder = new StartBinder(modeOption, tenantOption, sitesListOption, sitesFileOption,
-                                              authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption,
-                                              moduleOption, ruleVersionOption, parametersJsonOption, analysisParametersJsonOption
+                                              authenticationModeOption, applicationIdOption, tenantIdOption, certPathOption, certPfxFileInfoOption, certPfxFilePasswordOption, threadsOption
                                               // PER SCAN COMPONENT: implement scan component specific options
                                               , syntexFullOption
                                               , workflowAnalyzeOption
@@ -548,54 +505,14 @@ namespace PnP.Scanning.Process.Commands
                                               );
             cmd.SetHandler(async context =>
             {
-                var arguments = startBinder.Bind(context.BindingContext);
-                if (collectOnly || arguments.Mode == Mode.ClassicPage || !string.IsNullOrWhiteSpace(arguments.Module))
-                {
-                    context.ExitCode = await PipelineCommandHandler.RunCollectionAsync(processManager,
-                        CreatePipelineRequest(arguments), collectOnly, arguments.RuleVersion, arguments.AnalysisParametersJson);
-                    return;
-                }
-                AnsiConsole.MarkupLine("[gray]Execution path: legacy[/]");
-                await HandleStartAsync(arguments);
+                context.ExitCode = await HandleStartAsync(startBinder.Bind(context.BindingContext));
             });
 
             return cmd;
         }
 
-        /// <summary>
-        /// Converts typed command options and configured cloud scope into a collect request without initializing authentication.
-        /// <para>Evolved from <c>Commands/Handlers/StartCommandHandler.cs (HandleStartAsync)</c> to reuse command option binding while deferring authentication to the collection phase.</para>
-        /// </summary>
-        private CollectRequest CreatePipelineRequest(StartOptions arguments)
-        {
-            var options = new StartRequest
-            {
-                Mode = arguments.Mode.ToString(), Tenant = arguments.Tenant ?? "",
-                Environment = string.IsNullOrWhiteSpace(configurationOptions?.Environment) ? Microsoft365Environment.Production.ToString() : configurationOptions.Environment,
-                SitesList = arguments.SitesList == null ? "" : string.Join(",", arguments.SitesList),
-                SitesFile = arguments.SitesFile?.FullName ?? "", AuthMode = arguments.AuthMode.ToString(),
-                ApplicationId = arguments.ApplicationId.ToString(), TenantId = arguments.TenantId ?? "",
-                CertPath = arguments.CertPath ?? "", CertFile = arguments.CertFile?.FullName ?? "",
-                CertPassword = arguments.CertPassword ?? "", Threads = arguments.Threads,
-                AdminCenterUrl = configurationOptions?.AdminCenterUrl ?? "", MySiteHostUrl = configurationOptions?.MySiteHostUrl ?? "",
-            };
-            if (arguments.Mode is Mode.Classic or Mode.ClassicPage)
-            {
-                var components = arguments.ClassicInclude is { Count: > 0 } ? arguments.ClassicInclude : arguments.Mode == Mode.ClassicPage
-                    ? new List<ClassicComponent> { ClassicComponent.Pages } :
-                    Enum.GetValues<ClassicComponent>().Where(x => !AssessmentAvailability.IsRetired(x) &&
-                        x != ClassicComponent.AzureACS && x != ClassicComponent.SharePointAddIns).ToList();
-                ClassicStartRequestBuilder.AddClassicProperties(options, components,
-                    arguments.ExportWebPartProperties, arguments.SkipUsageInformation, arguments.SkipUserInformation,
-                    arguments.HomePageOnly, arguments.AuditLogWindowDays,
-                    arguments.ExcludeSiteTemplates == null ? null : string.Join(",", arguments.ExcludeSiteTemplates));
-            }
-            return new CollectRequest { Module = arguments.Module ?? (arguments.Mode == Mode.ClassicPage ? "classicpage" : arguments.Mode.ToString()),
-                CollectionOptions = options, ParametersJson = arguments.ParametersJson ?? VersionedJson.Empty.Json };
-        }
-
         /// <summary>Validates the supported Classic options, then sends the existing supported-component start request.</summary>
-        private async Task HandleStartAsync(StartOptions arguments)
+        private async Task<int> HandleStartAsync(StartOptions arguments)
         {
             // Reject retired assessment modes before doing any work. The Workflow 2013 engine code is
             // retained (so pre-existing Workflow scan databases can still be reported on) but the
@@ -603,7 +520,7 @@ namespace PnP.Scanning.Process.Commands
             if (AssessmentAvailability.IsRetired(arguments.Mode))
             {
                 AnsiConsole.MarkupLine($"[red]{AssessmentAvailability.WorkflowRetiredMessage}[/]");
-                return;
+                return 1;
             }
 
             // Auto populate the tenant id when not provided
@@ -628,9 +545,10 @@ namespace PnP.Scanning.Process.Commands
                 var hc = new HelpContext(helpBld, cmd, Console.Out);
                 helpBld.Write(hc);
 
-                return;
+                return 1;
             }
 
+            int exitCode = 0;
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Starting Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
@@ -652,20 +570,25 @@ namespace PnP.Scanning.Process.Commands
                     }
 
                     // Initialize authentication, this will result in a local auth cache when succesfull
-                    await new AuthenticationManager(dataProtectionProvider)
-                                .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), environment,
-                                                           arguments.ApplicationId, arguments.TenantId,
-                                                           arguments.CertPath, arguments.CertFile, arguments.CertPassword,
-                                                           (deviceCodeResult) =>
-                                                           {
-                                                               AnsiConsole.MarkupLine(deviceCodeResult.Message);
+                    if (authenticate != null) await authenticate(arguments);
+                    else
+                    {
+                        await new AuthenticationManager(dataProtectionProvider)
+                                    .VerifyAuthenticationAsync(arguments.Tenant, arguments.AuthMode.ToString(), environment,
+                                                               arguments.ApplicationId, arguments.TenantId,
+                                                               arguments.CertPath, arguments.CertFile, arguments.CertPassword,
+                                                               (deviceCodeResult) =>
+                                                               {
+                                                                   AnsiConsole.MarkupLine(deviceCodeResult.Message);
 
-                                                               return Task.FromResult(0);
-                                                           });
+                                                                   return Task.FromResult(0);
+                                                               });
+                    }
                 }
                 catch (Exception ex)
                 {
                     AnsiConsole.WriteException(ex);
+                    exitCode = 1;
                     return;
                 }
 
@@ -784,6 +707,7 @@ namespace PnP.Scanning.Process.Commands
                 {
                     if (message.Type == Constants.MessageError)
                     {
+                        exitCode = 1;
                         AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
                         encounteredError = true;
                     }
@@ -809,6 +733,7 @@ namespace PnP.Scanning.Process.Commands
                 }
 
             });
+            return exitCode;
         }
     }
 }

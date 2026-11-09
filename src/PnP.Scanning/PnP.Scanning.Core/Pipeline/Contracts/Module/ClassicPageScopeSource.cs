@@ -6,4 +6,4 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Module;
 
 internal sealed record ClassicPageScopeSource(string[] Sites, ClassicPageSiteScope[] SiteScopes,
     bool ExplicitSites, ClassicPageSourceOptions Options, DateTime AuditWindowStart, DateTime AuditWindowEnd,
-    ClassicPageDiscoveryRow[] Evidence);
+    ClassicPageDiscoveryRow[] Evidence, bool ClassicComponentsRequested = false);

@@ -22,6 +22,7 @@ internal sealed class ClassicPageInputIndex
     internal bool HasContentItemContract { get; private set; }
     internal bool ContentItemsComplete { get; private set; }
     internal Dictionary<int, ClassicPageAuditChunkSource> AuditChunks { get; } = [];
+    internal Dictionary<string, ClassicComponentSource> Components { get; } = [];
 
     // Keep identities and shared metadata, not all page XML / audit bodies, in the index.
     internal static async Task<ClassicPageInputIndex> CreateAsync(IAsyncEnumerable<SourceRecord> records, CancellationToken token,
@@ -38,6 +39,11 @@ internal sealed class ClassicPageInputIndex
         {
             switch (ClassicPageSourceJson.Kind(source))
             {
+                case "ClassicComponents":
+                    var components = ClassicPageSourceJson.Read<ClassicComponentSource>(source.Artifact.GetBytes());
+                    if (!index.Components.TryAdd(ClassicPageSourceJson.WebKey(components.SiteUrl, components.WebUrl), components))
+                        throw new SnapshotIntegrityException("Duplicate Classic component scope.");
+                    break;
                 case "Scope":
                     if (index.Scope != null) throw new SnapshotIntegrityException("Classic Pages requires one fixed assessment scope.");
                     index.Scope = ClassicPageSourceJson.Read<ClassicPageScopeSource>(source.Artifact.GetBytes());
@@ -86,7 +92,7 @@ internal sealed class ClassicPageInputIndex
                     if (!index.BlogLists.TryAdd(ClassicPageSourceJson.WebKey(blogScope.SiteUrl, blogScope.WebUrl), blogScope))
                         throw new SnapshotIntegrityException("Duplicate Blog/Delve list-scope input.");
                     if (blogScope.Lists.Any(x => x.ListId == Guid.Empty || string.IsNullOrWhiteSpace(x.ListUrl) ||
-                        x.PageType is not ("BlogPage" or "DelveBlogPage")) ||
+                        x.PageType is not ("BlogPage" or "DelveBlogPage" or "ASPXPage")) ||
                         blogScope.Lists.Select(x => x.ListId).Distinct().Count() != blogScope.Lists.Length)
                         throw new SnapshotIntegrityException("Blog/Delve list scope has invalid or duplicate native identities.");
                     break;
@@ -163,13 +169,14 @@ internal sealed class ClassicPageInputIndex
         {
             var owner = ClassicPageSourceJson.WebKey(batch.SiteUrl, batch.WebUrl);
             if (!index.Webs.TryGetValue(owner, out var web) || batch.ListId == Guid.Empty ||
-                batch.PageType is not ("BlogPage" or "DelveBlogPage") || (!batch.State.Succeeded && batch.NextPage != null))
+                batch.PageType is not ("BlogPage" or "DelveBlogPage" or "ASPXPage") || (!batch.State.Succeeded && batch.NextPage != null))
                 throw new SnapshotIntegrityException("Blog/Delve batch has a foreign owner or unsettled paging state.");
             if (index.BlogLists.TryGetValue(owner, out var scope))
             {
                 var list = scope.Lists.SingleOrDefault(x => x.ListId == batch.ListId);
                 if (list == null || list.ListUrl != batch.ListUrl || list.PageType != batch.PageType ||
-                    list.DisplayFormUrl != batch.DisplayFormUrl)
+                    list.DisplayFormUrl != batch.DisplayFormUrl ||
+                    !(list.ContentTypeForms ?? []).SequenceEqual(batch.ContentTypeForms ?? []))
                     throw new SnapshotIntegrityException("Blog/Delve batch differs from its fixed list scope.");
             }
             foreach (var fields in batch.Items)
@@ -197,6 +204,21 @@ internal sealed class ClassicPageInputIndex
             (index.Files.Values.Any(file => file.ScanId != expectedAssessment) ||
              index.Discovery.Concat(index.Scope.Evidence).Any(row => row.ScanId != expectedAssessment)))
             throw new SnapshotIntegrityException("Classic Page evidence belongs to a different assessment.");
+        if (index.Components.Keys.Any(key => !index.Webs.ContainsKey(key)))
+            throw new SnapshotIntegrityException("Classic component evidence has a foreign Web.");
+        if ((index.Components.Count > 0 || index.Scope.ClassicComponentsRequested) && !expected.SetEquals(index.Components.Keys))
+            throw new SnapshotIntegrityException("Classic component evidence does not cover the fixed Web scope.");
+        foreach (var component in index.Components.Values)
+        {
+            if (component.Rows.Keys.Any(kind => kind is not ("ClassicList" or "ClassicInfoPath" or "Workflow" or
+                "ClassicExtensibility" or "ClassicUserCustomAction" or "ClassicWebSummary")))
+                throw new SnapshotIntegrityException("Classic component evidence has an unsupported row contract.");
+            foreach (var row in component.Rows.Values.SelectMany(rows => rows))
+                if (!row.TryGetProperty("ScanId", out var scan) || scan.GetGuid() != assessmentId ||
+                    !row.TryGetProperty("SiteUrl", out var site) || site.GetString() != component.SiteUrl ||
+                    !row.TryGetProperty("WebUrl", out var web) || web.GetString() != component.WebUrl)
+                    throw new SnapshotIntegrityException("Classic component evidence has foreign ownership.");
+        }
         return index;
     }
 }

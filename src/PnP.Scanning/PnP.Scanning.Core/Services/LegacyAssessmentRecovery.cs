@@ -14,7 +14,8 @@ internal sealed class LegacyAssessmentRecovery(PipelineStore store) : IHostedSer
             await store.EnsureDatabaseAsync(assessmentId, cancellationToken);
             using var db = store.CreateContext(assessmentId);
             var scan = await db.Scans.SingleOrDefaultAsync(x => x.ScanId == assessmentId, cancellationToken);
-            if (scan == null || scan.CLIMode?.StartsWith("Pipeline:", StringComparison.Ordinal) == true || scan.Status != ScanStatus.Running) continue;
+            if (scan == null || await db.PhaseRuns.AnyAsync(x => x.AssessmentId == assessmentId, cancellationToken) ||
+                scan.Status != ScanStatus.Running) continue;
             db.History.Add(new History
             {
                 ScanId = assessmentId, Event = Constants.EventAssessmentStatusChange, EventDate = DateTime.Now,

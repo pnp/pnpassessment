@@ -54,8 +54,8 @@ internal sealed partial class PipelineStore
     }
 
     internal Task<bool> CreateCollectionAsync(Scan assessment, SourceSnapshotRow snapshot,
-        PhaseRunRow root, PhaseRunRow? collectionChild, CancellationToken token) =>
-        WriteAsync(snapshot.AssessmentId, db =>
+        PhaseRunRow root, PhaseRunRow? collectionChild, CancellationToken token, bool adoptLegacy = false) =>
+        WriteAsync(snapshot.AssessmentId, async db =>
         {
             if (collectionChild == null)
             {
@@ -80,11 +80,34 @@ internal sealed partial class PipelineStore
                 throw new ArgumentException("New collection requires an unsealed input and queued phases.");
             _ = SnapshotManifest.Build(snapshot, []);
             _ = PipelineRunSettings.Read(root);
-            db.Scans.Add(assessment);
+            if (adoptLegacy)
+            {
+                var previous = await db.Scans.SingleAsync(x => x.ScanId == assessment.ScanId, token);
+                if (previous.Status is not (ScanStatus.Paused or ScanStatus.Terminated) ||
+                    await db.PhaseRuns.AnyAsync(x => x.AssessmentId == assessment.ScanId, token))
+                    throw new InvalidOperationException("Historical Classic assessment cannot be adopted in its current state.");
+                previous.Status = ScanStatus.Queued;
+                previous.EndDate = default;
+                await db.Properties.Where(x => x.ScanId == assessment.ScanId).ExecuteDeleteAsync(token);
+                db.History.Add(new History
+                {
+                    ScanId = assessment.ScanId, EventDate = DateTime.UtcNow, Event = Constants.EventAssessmentStatusChange,
+                    Message = "Restart is acquiring a versioned source snapshot using the current Classic implementation.",
+                });
+            }
+            else db.Scans.Add(assessment);
+            var scope = new VersionedJson(snapshot.ScopeJson).Value;
+            if (scope.ValueKind == System.Text.Json.JsonValueKind.Object && scope.TryGetProperty("properties", out var properties))
+                foreach (var property in properties.EnumerateArray())
+                    db.Properties.Add(new Property
+                    {
+                        ScanId = assessment.ScanId, Name = property.GetProperty("Property").GetString(),
+                        Type = property.GetProperty("Type").GetString(), Value = property.GetProperty("Value").GetString(),
+                    });
             db.SourceSnapshots.Add(snapshot);
             db.PhaseRuns.Add(root);
             if (collectionChild != null) db.PhaseRuns.Add(collectionChild);
-            return Task.FromResult(true);
+            return true;
         }, token, create: true);
 
     internal Task<bool> SetRunningAsync(Guid assessmentId, Guid rootId, Guid phaseId, CancellationToken token) =>

@@ -20,7 +20,7 @@ internal static class ClassicBlogPageProjection
             CultureInfo.InvariantCulture, out var itemId) || itemId <= 0 ||
             input.ListId == Guid.Empty || web.SiteId == Guid.Empty || web.WebId == Guid.Empty)
             throw new InvalidDataException("A Blog/Delve content row requires its observed site, Web, list and item identity.");
-        if (input.PageType is not (ClassicPageRules.BlogPage or ClassicPageRules.DelveBlogPage))
+        if (input.PageType is not (ClassicPageRules.BlogPage or ClassicPageRules.DelveBlogPage or ClassicPageRules.ASPXPage))
             throw new InvalidDataException("The selected content batch has an unsupported Blog type.");
         var delve = input.PageType == ClassicPageRules.DelveBlogPage;
         string? url;
@@ -36,7 +36,12 @@ internal static class ClassicBlogPageProjection
         }
         else
         {
-            var form = input.DisplayFormUrl;
+            var contentType = fields.GetValueOrDefault("ContentTypeId")?.Text ?? "";
+            var form = input.ContentTypeForms?.OrderByDescending(type => type.ContentTypeId.Length)
+                .FirstOrDefault(type => contentType.StartsWith(type.ContentTypeId, StringComparison.OrdinalIgnoreCase))?.FormUrl
+                ?? input.DisplayFormUrl;
+            if (input.PageType == ClassicPageRules.ASPXPage && !LegacyDisplayFormAssessment.IsContentPageForm(form))
+                return null;
             if (form != null && (!form.StartsWith('/') || form.StartsWith("//", StringComparison.Ordinal)))
                 throw new InvalidDataException("A captured Blog form declaration must be normalized before offline analysis.");
             url = form == null ? null : form + (form.Contains('?') ? "&" : "?") + "ID=" + itemId.ToString(CultureInfo.InvariantCulture);
@@ -49,7 +54,8 @@ internal static class ClassicBlogPageProjection
             DiscoveryStatus = "Discovered", AssessmentStatus = url == null ? "Unknown" : "Complete",
             ModifiedAt = fields.TryGetValue("Modified", out var modified) && modified.ToValue() is DateTime date ? date : default,
             ModifiedBy = options.SkipUserInformation ? null : ClassicPageProjection.ModifiedBy(fields),
-            PageType = input.PageType, HomePage = false, RemediationCode = delve ? null : "CP4",
+            PageType = input.PageType, HomePage = false, RemediationCode = delve ? null :
+                input.PageType == ClassicPageRules.BlogPage ? "CP4" : "CP5",
         };
     }
 }

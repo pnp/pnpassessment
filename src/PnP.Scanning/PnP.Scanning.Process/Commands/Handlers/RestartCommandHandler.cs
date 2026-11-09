@@ -15,7 +15,6 @@ namespace PnP.Scanning.Process.Commands
 
         private Option<Guid> scanIdOption;
         private Option<int> threadsOption;
-        private Option<Guid?> runIdOption;
 
         internal RestartCommandHandler(ScannerManager processManagerInstance, ConfigurationOptions configurationOptionsInstance)
         {
@@ -39,44 +38,32 @@ namespace PnP.Scanning.Process.Commands
                 IsRequired = false
             };
             cmd.AddOption(threadsOption);
-            runIdOption = new Option<Guid?>("--run-id", "Optional pipeline root run ID; defaults to the latest run for the assessment");
-            cmd.AddOption(runIdOption);
         }
 
         public Command Create()
         {
-            cmd.SetHandler(async context =>
-            {
-                context.ExitCode = await HandleRestartAsync(context.ParseResult.GetValueForOption(scanIdOption),
-                    context.ParseResult.GetValueForOption(threadsOption), context.ParseResult.GetValueForOption(runIdOption));
-            });
+            cmd.SetHandler(async (Guid scanId, int threads) =>
+                            {
+                                await HandleRestartAsync(scanId, threads);
+                            },
+                            scanIdOption, threadsOption);
 
             return cmd;
         }
 
-        /// <summary>
-        /// Requests resume of the selected assessment or pipeline run and displays the streamed response.
-        /// </summary>
-        private async Task<int> HandleRestartAsync(Guid scanId, int threads, Guid? runId)
+        private async Task HandleRestartAsync(Guid scanId, int threads)
         {
-            int exitCode = 0;
+
             await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Restarting Microsoft 365 Assessment...", async ctx =>
             {
                 // Setup client to talk to scanner
                 var client = await processManager.GetScannerClientAsync();
-                if (runId != null && !(await client.PingAsync(new Google.Protobuf.WellKnownTypes.Empty())).SupportsPipeline)
-                {
-                    Console.Error.WriteLine("The running assessment service does not support pipeline run IDs. Restart it using this version of the tool.");
-                    exitCode = 1;
-                    return;
-                }
 
                 // Restart the scan
                 var call = client.Restart(new Core.Services.RestartRequest
                 {
                     Id = scanId.ToString(),
                     Threads = threads,
-                    RunId = runId?.ToString() ?? "",
                     AdminCenterUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.AdminCenterUrl)) ? configurationOptions.AdminCenterUrl : "",
                     MySiteHostUrl = (configurationOptions != null && !string.IsNullOrEmpty(configurationOptions.MySiteHostUrl)) ? configurationOptions.MySiteHostUrl : "",
                 });
@@ -85,7 +72,6 @@ namespace PnP.Scanning.Process.Commands
                 {
                     if (message.Type == Constants.MessageError)
                     {
-                        exitCode = 1;
                         AnsiConsole.MarkupLine($"[red]{message.Status}[/]");
                     }
                     else if (message.Type == Constants.MessageWarning)
@@ -101,7 +87,6 @@ namespace PnP.Scanning.Process.Commands
                     await Task.Delay(TimeSpan.FromMilliseconds(500));
                 }
             });
-            return exitCode;
         }
     }
 }

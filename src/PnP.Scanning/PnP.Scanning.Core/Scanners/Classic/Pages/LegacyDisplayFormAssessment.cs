@@ -134,7 +134,7 @@ internal static class LegacyDisplayFormAssessment
     /// ordinary list data, not a separately assessed content page. Custom forms keeping the stock
     /// filename remain excluded, matching the existing assessment's documented limitation.
     /// </summary>
-    private static bool IsContentPageForm(string form)
+    internal static bool IsContentPageForm(string form)
     {
         if (form == null)
         {

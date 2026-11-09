@@ -88,8 +88,8 @@ public sealed class ClassicPageRuntimeTests
         using var db = data.Store.CreateContext(id);
         Assert.All(await db.AnalysisRuns.AsNoTracking().ToListAsync(), run =>
         {
-            Assert.Null(run.ReportDigest);
-            Assert.Null(run.ReportPublishedAtUtc);
+            Assert.NotNull(run.ReportDigest);
+            Assert.NotNull(run.ReportPublishedAtUtc);
         });
         var discovery = await db.SourceObservations.SingleAsync(x => x.SourceIdentity.StartsWith("Discovery:"));
         Assert.Equal(8, ClassicPageSourceJson.Read<ClassicPageDiscoverySource>(discovery.RawBytes).Files!.Length);

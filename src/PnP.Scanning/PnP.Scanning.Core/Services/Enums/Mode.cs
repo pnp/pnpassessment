@@ -10,7 +10,6 @@
         InfoPath,
         Classic,
         AddInsACS,
-        Alerts,
-        ClassicPage
+        Alerts
     }
 }

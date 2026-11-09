@@ -18,10 +18,6 @@ namespace PnP.Scanning.Process.Commands
         private readonly Option<FileInfo> certFile;
         private readonly Option<string> certPassword;
         private readonly Option<int> threads;
-        private readonly Option<string> module;
-        private readonly Option<string> ruleVersion;
-        private readonly Option<string> parametersJson;
-        private readonly Option<string> analysisParametersJson;
 
         // PER SCAN COMPONENT: implement scan component specific options
         private readonly Option<bool> syntexDeepScan;
@@ -39,8 +35,7 @@ namespace PnP.Scanning.Process.Commands
 
         /// <summary>Retains command option instances so parsed start values, including explicit ASPX scope inputs, bind without reinterpreting defaults.</summary>
         public StartBinder(Option<Mode> modeInput, Option<string> tenantInput, Option<List<string>> sitesListInput, Option<FileInfo> sitesFileInput,
-                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput,
-                           Option<string> moduleInput, Option<string> ruleVersionInput, Option<string> parametersJsonInput, Option<string> analysisParametersJsonInput
+                           Option<AuthenticationMode> authModeInput, Option<Guid> applicationIdInput, Option<string> tenantIdInput, Option<string> certPathInput, Option<FileInfo> certFileInput, Option<string> certPasswordInput, Option<int> threadsInput
                            // PER SCAN COMPONENT: implement scan component specific options
                            , Option<bool> syntexDeepScanInput
                            , Option<bool> workflowAnalyzeInput
@@ -67,10 +62,6 @@ namespace PnP.Scanning.Process.Commands
             certFile = certFileInput;
             certPassword = certPasswordInput;
             threads = threadsInput;
-            module = moduleInput;
-            ruleVersion = ruleVersionInput;
-            parametersJson = parametersJsonInput;
-            analysisParametersJson = analysisParametersJsonInput;
 
             // PER SCAN COMPONENT: implement scan component specific options
             syntexDeepScan = syntexDeepScanInput;
@@ -87,14 +78,9 @@ namespace PnP.Scanning.Process.Commands
 #endif
         }
 
-        /// <summary>
-        /// Exposes typed binding for the command handler using the supplied parse context.
-        /// </summary>
-        internal StartOptions Bind(BindingContext bindingContext) => GetBoundValue(bindingContext);
+        /// <summary>Copies the parser results into start options, preserving the option-defined defaults and explicit scope selection.</summary>
+        internal StartOptions Bind(BindingContext context) => GetBoundValue(context);
 
-        /// <summary>
-        /// Reads the parsed options into StartOptions, including fixed pipeline module, rule and JSON parameters.
-        /// </summary>
         protected override StartOptions GetBoundValue(BindingContext bindingContext) =>
             new()
             {
@@ -109,10 +95,6 @@ namespace PnP.Scanning.Process.Commands
                 CertFile = bindingContext.ParseResult.GetValueForOption(certFile),
                 CertPassword = bindingContext.ParseResult.GetValueForOption(certPassword),
                 Threads = bindingContext.ParseResult.GetValueForOption(threads),
-                Module = bindingContext.ParseResult.GetValueForOption(module),
-                RuleVersion = ruleVersion == null ? null : bindingContext.ParseResult.GetValueForOption(ruleVersion),
-                ParametersJson = bindingContext.ParseResult.GetValueForOption(parametersJson),
-                AnalysisParametersJson = analysisParametersJson == null ? null : bindingContext.ParseResult.GetValueForOption(analysisParametersJson),
                 // PER SCAN COMPONENT: implement scan component specific options
                 SyntexDeepScan = bindingContext.ParseResult.GetValueForOption(syntexDeepScan),
                 WorkflowAnalyze = bindingContext.ParseResult.GetValueForOption(workflowAnalyze),

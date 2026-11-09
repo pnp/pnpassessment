@@ -40,7 +40,7 @@ internal sealed class NativePipelineHost : IAsyncDisposable
         Counter = counter;
         var config = new ConfigurationOptions { Port = new Uri(address).Port };
         var manager = new ScannerManager(config);
-        Parser = new CommandLineBuilder(new RootCommandHandler(manager, environment, config).Create()).UseDefaults().Build();
+        Parser = new CommandLineBuilder(new RootCommandHandler(manager, environment, config, _ => Task.CompletedTask).Create()).UseDefaults().Build();
     }
 
     internal PnPScanner.PnPScannerClient Client { get; }
@@ -73,6 +73,7 @@ internal sealed class NativePipelineHost : IAsyncDisposable
                         services.AddSingleton(coordinator!);
                         services.AddSingleton<IHostedService>(coordinator!);
                         services.AddSingleton<Scanner>();
+                        services.AddSingleton<ReportManager>();
                         services.AddSingleton<global::PnP.Core.Services.IPnPContextFactory>(_ => counter.Reject<global::PnP.Core.Services.IPnPContextFactory>());
                         services.AddSingleton<AuthenticationManager>(_ => counter.Reject<AuthenticationManager>());
                         services.AddSingleton<ScanManager>(_ => counter.Reject<ScanManager>());
@@ -99,9 +100,7 @@ internal sealed class NativePipelineHost : IAsyncDisposable
             Console.SetOut(output);
             Console.SetError(error);
             var exitCode = await Parser.InvokeAsync(arguments, new CaptureConsole(output, error));
-            var line = output.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .LastOrDefault(x => x.TrimStart().StartsWith("{", StringComparison.Ordinal));
-            var ticket = line == null ? null : JsonParser.Default.Parse<PhaseReply>(line);
+            PhaseReply? ticket = null;
             return (exitCode, ticket, output.ToString(), error.ToString());
         }
         finally

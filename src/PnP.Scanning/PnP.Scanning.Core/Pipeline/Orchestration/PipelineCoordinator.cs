@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Analysis.Module;
 using PnP.Scanning.Core.Pipeline.Collection.Module;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
@@ -56,7 +57,7 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
             request.RuleVersion, ParseParameters(request.AnalysisParametersJson), token);
 
     private async Task<PhaseReply> QueueCollectionAsync(CollectRequest request, string? ruleVersion,
-        VersionedJson? analysisParameters, CancellationToken token)
+        VersionedJson? analysisParameters, CancellationToken token, Guid? existingAssessment = null)
     {
         // Metadata validation occurs before database creation, factories, credentials or online services.
         var collector = registry.GetCollector(request.Module);
@@ -72,8 +73,8 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         await scheduling.WaitAsync(token);
         try
         {
-            CheckCapacity();
-            var assessmentId = Guid.NewGuid();
+            CheckCapacity(existingAssessment);
+            var assessmentId = existingAssessment ?? Guid.NewGuid();
             var snapshotId = Guid.NewGuid();
             var rootId = Guid.NewGuid();
             var analysisId = analyzer == null ? (Guid?)null : Guid.NewGuid();
@@ -103,19 +104,50 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
             });
             await store.CreateCollectionAsync(new Storage.Scan
             {
-                ScanId = assessmentId, CLIMode = $"Pipeline:{collector.ModuleKey}",
+                ScanId = assessmentId, CLIMode = collector.ModuleKey == ClassicPageModule.Key ? Mode.Classic.ToString() : $"Pipeline:{collector.ModuleKey}",
                 StartDate = DateTime.UtcNow, Status = ScanStatus.Queued, CLIThreads = options.Threads,
                 Version = VersionManager.GetCurrentVersion(), CLITenant = options.Tenant,
+                CLITenantId = options.TenantId, CLIEnvironment = options.Environment,
+                CLIAuthMode = options.AuthMode, CLIApplicationId = options.ApplicationId,
+                CLISiteList = options.SitesList, CLISiteFile = options.SitesFile,
+                CLICertPath = options.CertPath, CLICertFile = options.CertFile,
                 PreScanStatus = SiteWebStatus.Queued, PostScanStatus = SiteWebStatus.Queued,
             }, new SourceSnapshotRow
             {
                 AssessmentId = assessmentId, SnapshotId = snapshotId, ModuleKey = collector.ModuleKey,
                 InputVersion = collector.InputVersion, ScopeJson = scope.Json, CreatedAtUtc = DateTime.UtcNow,
-            }, root, child, token);
+            }, root, child, token, adoptLegacy: existingAssessment.HasValue);
             await LaunchAsync(root);
             return Ticket(root);
         }
         finally { scheduling.Release(); }
+    }
+
+    internal async Task<PhaseReply?> RestartLegacyClassicAsync(Guid assessment, int threads,
+        Func<string, string> unprotectPassword, CancellationToken token)
+    {
+        if (!File.Exists(store.DatabasePath(assessment))) return null;
+        await store.EnsureDatabaseAsync(assessment, token);
+        using var db = store.CreateContext(assessment, readOnly: true);
+        var saved = await db.Scans.AsNoTracking().SingleOrDefaultAsync(x => x.ScanId == assessment, token);
+        if (saved?.CLIMode != Mode.Classic.ToString()) return null;
+        var options = new StartRequest
+        {
+            Mode = saved.CLIMode, Tenant = saved.CLITenant ?? "", TenantId = saved.CLITenantId ?? "",
+            Environment = saved.CLIEnvironment ?? "", AuthMode = saved.CLIAuthMode ?? "",
+            ApplicationId = saved.CLIApplicationId ?? "", CertPath = saved.CLICertPath ?? "",
+            CertFile = saved.CLICertFile ?? "", Threads = threads > 0 ? threads : saved.CLIThreads,
+            SitesList = saved.CLISiteList ?? "", SitesFile = saved.CLISiteFile ?? "",
+        };
+        foreach (var property in await db.Properties.AsNoTracking().Where(x => x.ScanId == assessment).ToListAsync(token))
+            options.Properties.Add(new PropertyRequest { Property = property.Name, Type = property.Type, Value = property.Value });
+        if (!ClassicPageModule.Handles(options)) return null;
+        if (saved.Status is not (ScanStatus.Paused or ScanStatus.Terminated))
+            throw new InvalidOperationException("Only a paused or terminated Classic assessment can restart.");
+        if (!string.IsNullOrEmpty(saved.CLICertFilePassword)) options.CertPassword = unprotectPassword(saved.CLICertFilePassword);
+        // Historical assessments have no sealed raw source. Reacquire into a new snapshot, never pretend legacy rows are raw evidence.
+        return await QueueCollectionAsync(new CollectRequest { Module = ClassicPageModule.Key, CollectionOptions = options },
+            ClassicPageModule.RuleVersion, VersionedJson.Empty, token, assessment);
     }
 
     internal async Task<PhaseReply> AnalyzeAsync(AnalyzeRequest request, CancellationToken token = default)
@@ -308,6 +340,8 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
                     else await store.FinishResultsAsync(root.AssessmentId, phase.RunId, token);
                 }
                 else await store.OpenSnapshotAsync(root.AssessmentId, root.SnapshotId, token);
+                if (root.ModuleKey == ClassicPageModule.Key)
+                    await store.MaterializeClassicAsync(root.AssessmentId, phase.RunId, token);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -353,6 +387,16 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
         return (await store.GetRunsAsync(assessmentId, token)).Count > 0;
     }
 
+    internal async Task EnsureReportReadyAsync(Guid assessmentId, CancellationToken token)
+    {
+        var root = await store.LatestRootAsync(assessmentId, token);
+        if (root == null || root.ModuleKey != ClassicPageModule.Key || root.Status != ScanStatus.Finished)
+            throw new InvalidOperationException("The selected assessment has not completed Classic collection and analysis.");
+        var runId = PipelineRunSettings.Read(root).AnalysisRunId ??
+            throw new InvalidOperationException("The selected assessment has no completed analysis run.");
+        await store.MaterializeClassicAsync(assessmentId, runId, token);
+    }
+
     internal async Task<ListReply> ListAsync(ListRequest request, CancellationToken token = default)
     {
         var all = !request.Running && !request.Paused && !request.Finished && !request.Terminated;
@@ -364,7 +408,8 @@ internal sealed class PipelineCoordinator(PipelineStore store, ModuleRegistry re
                 request.Finished && run.Status == ScanStatus.Finished || request.Terminated && run.Status == ScanStatus.Terminated)) continue;
             reply.Status.Add(new ListScanResponse
             {
-                Id = run.AssessmentId.ToString(), Mode = run.ModuleKey, Status = run.Status.ToString(), ExecutionPath = "pipeline",
+                Id = run.AssessmentId.ToString(), Mode = run.ModuleKey == ClassicPageModule.Key ? Mode.Classic.ToString() : run.ModuleKey,
+                Status = run.Status.ToString(), ExecutionPath = "pipeline",
                 Phase = run.CurrentPhase.ToString(), SnapshotId = run.SnapshotId.ToString(), RunId = run.RunId.ToString(),
                 AnalysisRunId = PipelineRunSettings.Read(run).AnalysisRunId?.ToString() ?? "", RecordsCompleted = run.CompletedRecords,
                 RecordsTotal = run.TotalRecords, ErrorCount = run.ErrorCount, ErrorSummary = run.LastError ?? "",

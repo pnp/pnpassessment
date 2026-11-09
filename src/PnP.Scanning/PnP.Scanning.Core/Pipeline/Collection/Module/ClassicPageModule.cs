@@ -18,11 +18,11 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Module;
 internal static class ClassicPageModule
 {
     internal const string Key = "classicpage";
-    internal const string InputVersion = "classicpage-source-v1";
-    internal const string RuleVersion = "classicpage-v1";
+    internal const string InputVersion = "classicpage-source-v2";
+    internal const string RuleVersion = "classicpage-v2";
     internal static ModuleRegistry Registry(Func<CollectionContext, CancellationToken, Task<IClassicPageOnlineSource>>? online = null) => new(
         new[] { new CollectionRegistration(Key, InputVersion, () => new ClassicPageCollectionModule(online), ValidateParameters, ValidateOptions) },
-        new[] { new AnalysisRegistration(Key, RuleVersion, new[] { InputVersion }, () => new ClassicPageAnalysisModule(),
+        new[] { new AnalysisRegistration(Key, RuleVersion, new[] { InputVersion, "classicpage-source-v1" }, () => new ClassicPageAnalysisModule(),
             ClassicPageRuleMetadata.Validate, ClassicPageRuleMetadata.Pin) },
         new Dictionary<string, string> { [Key] = RuleVersion });
     internal static void ValidateParameters(VersionedJson parameters)
@@ -32,17 +32,15 @@ internal static class ClassicPageModule
     }
     internal static void ValidateOptions(StartRequest request)
     {
-        if (!request.Mode.Equals(Mode.ClassicPage.ToString(), StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("The classicpage module requires --mode classicpage.");
+        if (!request.Mode.Equals(Mode.Classic.ToString(), StringComparison.OrdinalIgnoreCase) ||
+            OptionsBase.FromScannerInput(request) is not ClassicOptions { Pages: true })
+            throw new ArgumentException("The page pipeline requires Classic mode with the Pages component.");
         if (!Guid.TryParse(request.ApplicationId, out var application) || application == Guid.Empty)
             throw new ArgumentException("A nonempty application ID is required for Classic Page collection.");
         if (string.IsNullOrWhiteSpace(request.Tenant)) throw new ArgumentException("A tenant is required for Classic Page collection.");
         if (!Enum.TryParse<Authentication.AuthenticationMode>(request.AuthMode, true, out _) ||
             !Enum.TryParse<global::PnP.Core.Services.Microsoft365Environment>(request.Environment, true, out _))
             throw new ArgumentException("A supported authentication mode and cloud environment are required.");
-        foreach (var component in Enum.GetValues<ClassicComponent>().Where(x => x != ClassicComponent.Pages))
-            if (request.Properties.Any(x => x.Property == component.ToString() && bool.TryParse(x.Value, out var enabled) && enabled))
-                throw new ArgumentException($"Classic Pages cannot select component {component}.");
         var options = Options(request);
         if (request.Properties.GroupBy(x => x.Property, StringComparer.Ordinal).Any(x => x.Count() > 1))
             throw new ArgumentException("Collection property names must be unique.");
@@ -57,6 +55,14 @@ internal static class ClassicPageModule
             Flag(Constants.StartClassicSkipUserInformation), Flag(Constants.StartClassicHomePageOnly), window == null ? 14 : int.Parse(window),
             request.Properties.FirstOrDefault(x => x.Property == Constants.StartExcludeSiteTemplates)?.Value);
     }
+
+    internal static bool Handles(StartRequest request) =>
+        request.Mode.Equals(Mode.Classic.ToString(), StringComparison.OrdinalIgnoreCase) &&
+        OptionsBase.FromScannerInput(request) is ClassicOptions { Pages: true };
+
+    internal static bool HasOtherComponents(StartRequest request) =>
+        OptionsBase.FromScannerInput(request) is ClassicOptions options &&
+        (options.Lists || options.InfoPath || options.Workflow || options.Extensibility);
 }
 
 internal sealed class ClassicPageCollectionModule(Func<CollectionContext, CancellationToken, Task<IClassicPageOnlineSource>>? online = null)
@@ -106,6 +112,10 @@ internal sealed class ClassicPageCollectionModule(Func<CollectionContext, Cancel
                 catch (Exception ex) { return new ClassicPageWebSource(work.Site, work.Web, work.Template, identity.SiteId, identity.WebId, default, [], [], null,
                     SourceReadState.NotAttempted, null, SourceReadState.NotAttempted, null, 0, null, SourceReadState.NotAttempted, ClassicPageOnlineSource.Failure(ex)); }
             }, cancellationToken, x => ClassicPageAcquisitionJournal.Status(x.State), x => x.State.Error);
+            if (ClassicPageModule.HasOtherComponents(context.Options))
+                await journal.ReadOrAcquireAsync("ClassicComponents", key,
+                    () => source.ReadClassicComponentsAsync(web, cancellationToken), cancellationToken,
+                    x => ClassicPageAcquisitionJournal.Status(x.State), x => x.State.Error);
             foreach (var page in discovery.Rows.Where(x => x.RowType == "Page"))
             {
                 await journal.ReadOrAcquireAsync("Page", key + "|" + page.RecordKey, async () =>
@@ -151,7 +161,7 @@ internal sealed class ClassicPageCollectionModule(Func<CollectionContext, Cancel
                         {
                             return new ClassicPageBlogBatchSource(web.SiteUrl, web.WebUrl, list.ListId, list.ListTitle,
                                 list.ListUrl, [], null, ClassicPageOnlineSource.Failure(error), list.DisplayFormUrl,
-                                list.PageType, pageOrdinal, requestPaging);
+                                list.PageType, pageOrdinal, requestPaging, list.ContentTypeForms);
                         }
                     }, cancellationToken, x => ClassicPageAcquisitionJournal.Status(x.State), x => x.State.Error);
                     paging = batch.NextPage;
@@ -173,7 +183,7 @@ internal sealed class ClassicPageCollectionModule(Func<CollectionContext, Cancel
         {
             foreach (var header in headers)
             {
-                if (ClassicPageSourceJson.Kind(header) is not ("Scope" or "Web" or "Discovery" or "Page" or "BlogLists" or "Blog" or "AuditPage" or "AuditChunk")) continue;
+                if (ClassicPageSourceJson.Kind(header) is not ("Scope" or "Web" or "Discovery" or "Page" or "BlogLists" or "Blog" or "AuditPage" or "AuditChunk" or "ClassicComponents")) continue;
                 var record = await journal.ReadAsync(header.ObservationId, cancellationToken);
                 yield return new(record.ObservationId, Guid.Empty, record.SourceIdentity, record.SourceRevision, record.AcquisitionStatus,
                     record.Metadata, new SourceArtifact(record.RawBytes?.LongLength, null, record.RawBytes), record.AcquisitionError);

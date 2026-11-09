@@ -44,10 +44,7 @@ namespace PnP.Scanning.Process
             if (isCliProcess)
             {
 
-                bool pipelineCommand = args.Length > 0 &&
-                    (args[0].Equals("analyze", StringComparison.OrdinalIgnoreCase) ||
-                     args[0].Equals("collect", StringComparison.OrdinalIgnoreCase) || args.Contains("--module"));
-                if (!pipelineCommand) await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
+                await AnsiConsole.Status().Spinner(Spinner.Known.BouncingBar).StartAsync("Version check...", async ctx =>
                 {
                     var versions = await VersionManager.LatestVersionAsync();
 

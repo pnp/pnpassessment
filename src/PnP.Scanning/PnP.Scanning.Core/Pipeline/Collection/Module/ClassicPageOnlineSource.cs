@@ -40,6 +40,7 @@ internal interface IClassicPageOnlineSource : IAsyncDisposable
     Task<ClassicBlogListScopeSource> ReadBlogListsAsync(ClassicPageWebSource web, CancellationToken token);
     Task<ClassicPageBlogBatchSource> ReadBlogBatchAsync(ClassicPageWebSource web, ClassicBlogListSource list,
         string? paging, bool skipUsers, CancellationToken token);
+    Task<ClassicComponentSource> ReadClassicComponentsAsync(ClassicPageWebSource web, CancellationToken token);
     Task CollectAuditAsync(ClassicPageScopeSource scope, ClassicPageAcquisitionJournal journal, CancellationToken token);
 }
 
@@ -101,7 +102,8 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
         foreach (var row in evidence) row.ScanId = context.AssessmentId;
         var end = DateTime.UtcNow;
         return new(sites.ToArray(), [], !string.IsNullOrWhiteSpace(request.SitesList) || !string.IsNullOrWhiteSpace(request.SitesFile),
-            options, end.AddDays(-options.AuditLogWindowDays), end, evidence.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>).ToArray());
+            options, end.AddDays(-options.AuditLogWindowDays), end, evidence.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>).ToArray(),
+            ClassicPageModule.HasOtherComponents(context.Options));
     }
 
     public async Task<ClassicPageSiteScope> ReadWebsAsync(string siteUrl, CancellationToken token)
@@ -112,7 +114,8 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
                 new ClassicOptions { Pages = true, ExcludeSiteTemplates = ClassicPageModule.Options(context.Options).ExcludeSiteTemplates },
                 services.Authentication, isRestart: false, cancellationToken: token, contextPropertyKey: "PipelineAssessmentId");
             token.ThrowIfCancellationRequested();
-            return new(siteUrl, result.Webs.Select(x => x.WebUrl).ToArray(), result.Webs.Select(x => x.WebTemplate).ToArray(), SourceReadState.Complete);
+            return new(siteUrl, result.Webs.Select(x => x.WebUrl).ToArray(), result.Webs.Select(x => x.WebTemplate).ToArray(), SourceReadState.Complete,
+                result.ScopeEvidence.Select(ClassicPageSourceJson.Convert<ClassicPageDiscovery>).ToArray());
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception error) { return new(siteUrl, [], [], Failure(error)); }
@@ -376,6 +379,20 @@ internal sealed class ClassicPageOnlineSource(CollectionContext context, Collect
     {
         using var pnp = await OpenAsync(web.SiteUrl, web.WebUrl, token);
         return await ClassicBlogContentReader.ReadBatchAsync(pnp, web, list, paging, skipUsers, token);
+    }
+
+    public async Task<ClassicComponentSource> ReadClassicComponentsAsync(ClassicPageWebSource web, CancellationToken token)
+    {
+        var options = (ClassicOptions)OptionsBase.FromScannerInput(context.Options);
+        options.Pages = false;
+        using var pnp = await OpenAsync(web.SiteUrl, web.WebUrl, token);
+        using var csom = Csom(pnp, token);
+        await ClassicAssessmentMetadata.LoadAsync(pnp, ClassicScanner.AssessmentContextOptions(options), token);
+        var scanner = new ClassicScanner(null, services.SiteEnumeration.StorageManager, services.ContextFactory,
+            context.AssessmentId, web.SiteUrl, web.WebUrl, web.Template, options);
+        await Storage.Pipeline.ClassicComponentStorage.ResetAsync(context.AssessmentId, web, token);
+        await ClassicScanner.ExecuteOtherComponentsAsync(scanner, pnp, csom.Context, token);
+        return await Storage.Pipeline.ClassicComponentStorage.CaptureAsync(context.AssessmentId, web, token);
     }
 
     internal static async Task<ClassicPageBlogBatchSource> LoadBatchAsync(SdkList list, string query, string? paging, CancellationToken token,
