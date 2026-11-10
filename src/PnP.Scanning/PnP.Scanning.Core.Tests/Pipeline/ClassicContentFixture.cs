@@ -114,7 +114,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         {
             ScanId = assessment,
             RecordKey = "assessment:site-selection",
-            RowType = "Scope",
+            RowType = DiscoveryRowType.Scope,
             ScopeType = "SiteSelection",
             Url = Site,
             ObservationMethod = "DeclaredSites",
@@ -193,7 +193,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                 SiteUrl = Site,
                 WebUrl = "/",
                 RecordKey = "page:" + number,
-                RowType = "Page",
+                RowType = DiscoveryRowType.Page,
                 ScopeType = "File",
                 Url = number == 1 ? "/sites/a/SitePages/Home.aspx" : $"/sites/a/SitePages/{number}.aspx",
                 SiteCollectionId = SiteCollectionId,
@@ -228,7 +228,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                         SiteUrl = Site,
                         WebUrl = "/",
                         RecordKey = "scope:web",
-                        RowType = "Scope",
+                        RowType = DiscoveryRowType.Scope,
                         ScopeType = "Web",
                         DiscoveryStatus = "Denied",
                         ErrorCodes = "http_403",
@@ -259,7 +259,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
             SiteUrl = Site,
             WebUrl = "/",
             RecordKey = "scope:web",
-            RowType = "Scope",
+            RowType = DiscoveryRowType.Scope,
             ScopeType = "Web",
             DiscoveryStatus = "Complete",
             Url = Site,
@@ -393,7 +393,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                 "Guid",
                 Guid.Parse("B6917CB1-93A0-4B97-A84D-7CF49975D4EC"));
         Core.Storage.SPFile facts = Core.Discovery.SPFileFactProjection.FromItemMetadata(
-            CollectionJson.Convert<Core.Storage.ClassicPageDiscovery>(candidate),
+            Core.Storage.Pipeline.DiscoveryEvidenceMapper.ToLegacy(candidate),
             fields.ToDictionary(field => field.Key, field => field.Value.ToValue()));
         return new(
             Site,

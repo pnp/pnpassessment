@@ -47,8 +47,8 @@ internal static class ClassicCompatibility
         List<ClassicPageRow> pageCandidates = [];
         List<ClassicPageWebPart>? parts = new List<ClassicPageWebPart>();
         Dictionary<(string, string, string RecordKey), ClassicPageDiscovery>? discoveries = index.Evidence
-            .Select(CollectionJson.Convert<ClassicPageDiscovery>)
-            .Concat(index.Scope.Evidence.Select(CollectionJson.Convert<ClassicPageDiscovery>))
+            .Select(DiscoveryEvidenceMapper.ToLegacy)
+            .Concat(index.Scope.Evidence.Select(DiscoveryEvidenceMapper.ToLegacy))
             .ToDictionary(row => (row.SiteUrl ?? "", row.WebUrl ?? "", row.RecordKey));
         List<ClassicAuditPageStats>? audit = new List<ClassicAuditPageStats>();
         foreach (AnalysisResult? result in await reader.ReadAsync(token))
@@ -62,7 +62,7 @@ internal static class ClassicCompatibility
                 parts.AddRange(output.Parts.Select(CollectionJson.Convert<ClassicPageWebPart>));
                 if (output.Discovery != null)
                 {
-                    ClassicPageDiscovery? row = CollectionJson.Convert<ClassicPageDiscovery>(output.Discovery);
+                    ClassicPageDiscovery? row = DiscoveryEvidenceMapper.ToLegacy(output.Discovery);
                     discoveries[(row.SiteUrl, row.WebUrl, row.RecordKey)] = row;
                 }
             }
@@ -83,7 +83,7 @@ internal static class ClassicCompatibility
         {
             foreach (Core.Pipeline.Contracts.Page.DiscoveryEvidence? evidence in site.Evidence ?? [])
             {
-                ClassicPageDiscovery? retained = CollectionJson.Convert<ClassicPageDiscovery>(evidence);
+                ClassicPageDiscovery? retained = DiscoveryEvidenceMapper.ToLegacy(evidence);
                 discoveries[(retained.SiteUrl, retained.WebUrl, retained.RecordKey)] = retained;
             }
 

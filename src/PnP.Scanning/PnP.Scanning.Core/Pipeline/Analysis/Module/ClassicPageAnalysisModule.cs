@@ -116,7 +116,9 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
             PhysicalFileAnalysis[]? files = (input.Files ?? []).Select(file => PhysicalFileAnalysisRules.Analyze(
                     index.Files[(file.SiteCollectionId, file.FileUniqueId)]))
                 .ToArray();
-            DiscoveryEvidence[]? coverage = input.Evidence.Where(row => row.RowType is "Scope" or "Gap").ToArray();
+            DiscoveryEvidence[]? coverage = input.Evidence
+                .Where(row => row.RowType is DiscoveryRowType.Scope or DiscoveryRowType.Gap)
+                .ToArray();
             bool incomplete =
                 coverage.Any(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
             return Task.FromResult(

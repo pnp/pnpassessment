@@ -224,7 +224,7 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
             options,
             end.AddDays(-options.AuditLogWindowDays),
             end,
-            evidence.Select(CollectionJson.Convert<DiscoveryEvidence>).ToArray(),
+            evidence.Select(Storage.Pipeline.DiscoveryEvidenceMapper.FromLegacy).ToArray(),
             ClassicPageModule.HasOtherComponents(context.Options));
     }
 
@@ -252,7 +252,7 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
                 siteUrl,
                 result.Webs.Select(web => new WebScope(siteUrl, web.WebUrl, web.WebTemplate)).ToArray(),
                 SourceReadState.Complete,
-                result.ScopeEvidence.Select(CollectionJson.Convert<DiscoveryEvidence>).ToArray());
+                result.ScopeEvidence.Select(Storage.Pipeline.DiscoveryEvidenceMapper.FromLegacy).ToArray());
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -536,7 +536,7 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
             web.SiteUrl,
             web.WebUrl,
             rows.Values.OrderBy(x => x.RecordKey, StringComparer.Ordinal)
-                .Select(CollectionJson.Convert<DiscoveryEvidence>)
+                .Select(Storage.Pipeline.DiscoveryEvidenceMapper.FromLegacy)
                 .ToArray(),
             files.Values.OrderBy(x => x.SiteCollectionId)
                 .ThenBy(x => x.FileUniqueId)
@@ -701,7 +701,7 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
             ClassicPageRules.ResolvePhysicalPageUrl(fields.ToDictionary(x => x.Key, x => x.Value.ToValue()), page.Url);
         }
 
-        Storage.ClassicPageDiscovery? physical = CollectionJson.Convert<Storage.ClassicPageDiscovery>(page);
+        Storage.ClassicPageDiscovery? physical = Storage.Pipeline.DiscoveryEvidenceMapper.ToLegacy(page);
         SPFile? fileFacts = state.Succeeded
             ? SPFileFactProjection.FromItemMetadata(physical, fields.ToDictionary(x => x.Key, x => x.Value.ToValue()))
             : SPFileFactProjection.FromItemFailure(physical, new InvalidDataException(state.Error ?? state.Status));
@@ -733,7 +733,7 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
     {
         SPFile? facts = state.Status is "Failed" or "Denied" or "NotReturned"
             ? SPFileFactProjection.FromItemFailure(
-                CollectionJson.Convert<Storage.ClassicPageDiscovery>(page),
+                Storage.Pipeline.DiscoveryEvidenceMapper.ToLegacy(page),
                 new InvalidDataException(state.Error ?? state.Status))
             : null;
         return new(

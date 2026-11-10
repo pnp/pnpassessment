@@ -1,4 +1,5 @@
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
+using System.Text.Json.Serialization;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 
@@ -8,7 +9,13 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 internal sealed class DiscoveryEvidence : ClassicPageBaseRow
 {
     public string RecordKey { get; set; }
-    public string RowType { get; set; }
+
+    /// <summary>
+    /// Identifies the required evidence role using its established text representation, independently of scope and read status.
+    /// </summary>
+    [JsonRequired]
+    public DiscoveryRowType RowType { get; set; }
+
     public string ScopeType { get; set; }
     public string ParentScopeKey { get; set; }
     public string Url { get; set; }

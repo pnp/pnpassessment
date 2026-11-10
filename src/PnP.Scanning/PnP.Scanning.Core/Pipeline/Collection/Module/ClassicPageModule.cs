@@ -236,8 +236,8 @@ internal sealed class ClassicContentCollectionModule(
                         cancellationToken,
                         value => AcquisitionJournal.Status(value.State),
                         value => value.State.Error);
-                foreach (DiscoveryEvidence candidate in
-                         inventory.Evidence.Where(evidence => evidence.RowType == "Page"))
+                foreach (DiscoveryEvidence candidate in inventory.Evidence.Where(evidence =>
+                             evidence.RowType == DiscoveryRowType.Page))
                     await journal.ReadOrAcquireAsync(
                         "FileEnrichment",
                         webKey + "|" + candidate.RecordKey,

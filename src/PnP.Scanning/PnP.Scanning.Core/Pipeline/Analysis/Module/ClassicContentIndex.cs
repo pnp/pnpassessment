@@ -70,7 +70,7 @@ internal sealed class ClassicContentIndex
                             throw new SnapshotIntegrityException(
                                 "Discovery evidence belongs to a different Web inventory.");
                         index.Evidence.Add(evidence);
-                        if (evidence.RowType == "Page" && !index.FileCandidates.TryAdd(
+                        if (evidence.RowType == DiscoveryRowType.Page && !index.FileCandidates.TryAdd(
                                 owner + "|" + evidence.RecordKey,
                                 evidence))
                             throw new SnapshotIntegrityException("Repeated file-enrichment candidate identity.");
