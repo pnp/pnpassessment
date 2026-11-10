@@ -44,10 +44,10 @@ CustomizedPageStatus | SharePoint customization status of the page file: `Uncust
 LayoutUrl | URL of the publishing page's referenced layout file, as stored in `PublishingPageLayout`. Empty for non-publishing pages or when the reference is unavailable.
 LayoutCustomizedPageStatus | SharePoint customization status of the referenced publishing layout file: `Uncustomized`, `Customized`, or `None`. Populated during post-scanning from referenced discovery rows; missing statuses (including `--homepageonly`) use a cached fallback with SDK retries. Conflicting observations retain the latest known status and record `changed_during_scan` in `discovery.csv`. Empty for non-publishing pages or when unavailable. Layout failures are recorded as `PageLayoutMetadata` without changing the page's `AssessmentStatus`.
 HomePage | True when this page is the web's home (welcome) page, False when it is not, or empty when the web's welcome page could not be resolved
-UncustomizedHomePage | True when this home page is still the default, uncustomized home page (only meaningful when `HomePage` is true)
+UncustomizedHomePage | Nullable authoritative primary API result, or the canonical true/false result when both sealed Web/file fallback receipts establish a completed fallback. Failed/unacquired fallback is empty, not false.
 ModifiedBy | Display name of the user who last modified the page (empty when `--skipuserinformation` was specified)
-WebPartCount | Measured part count when readiness assessment completed for a Wiki/WebPart/Publishing file; empty for unacquired or inapplicable measurements, including Posts.
-MappingPercentage | Measured readiness percentage when available; empty is unknown/inapplicable, not a successful 0 or 100. Read with AssessmentStatus and AssessmentPageType.
+WebPartCount | Actual part count when sealed acquisition and analysis provenance establish a successful read; a genuine empty read is 0. Unacquired/inapplicable values, including Posts, are empty.
+MappingPercentage | Measured readiness percentage only when actually calculated. File-only pages with a successful empty part read retain WebPartCount=0 but have an empty percentage and MappingReadState=WithheldFileOnlyEmpty. Real computed 0% and 100% remain numeric.
 UnmappedWebParts | Comma-separated list of the (short) web part type names on the page that do not have a known modern mapping
 RemediationCode | The remediation code for this page type (`CP1`-`CP5`)
 ScanId | Id of the assessment
@@ -61,3 +61,8 @@ IsCatalog / IsListView / IsListForm / RoleReadState | Captured role evidence, no
 Official / OfficialReadState | Unknown/NotAcquired when no independent authoritative official-file observation exists. No inference from path or role.
 AuditViewsCount / AuditCreatesCount / AuditEditsCount / AuditUniqueUsers | Exact content-locator usage including the Posts item query. Unknown/skipped/failed counts stay empty; partial counts are labelled partial.
 UsageQueryStatus / AuditWindowStart / AuditWindowEnd | Fixed audit-window coverage. A successful fully covered query with no matching events can report zero; an unavailable query cannot.
+UsageAttributionState | ExactContentLocator when events carry the actual content locator; Posts with no item-specific record stay ItemLocatorNotObserved with empty counts even if query coverage succeeded. Renderer activity is never assigned to Posts.
+WebPartsReadState / MappingReadState | Sealed part acquisition and explicit computed/withheld/unavailable readiness state, independently of the broad page AssessmentStatus.
+CanModernizeReadState / WebHomeFallbackReadState / HomeFallbackReadState | Primary API, Web fallback and file fallback acquisition states used to establish nullable home-page readiness.
+
+Audit statistics are reduced with `classic-pages-v5` rules while the acquisition shape remains `classic-objects-v4`. This fixes query-addressed Posts events without changing sealed source bytes. Previously published v4 statistics are not silently reinterpreted or rewritten; a new explicit analysis run is required to produce corrected results.

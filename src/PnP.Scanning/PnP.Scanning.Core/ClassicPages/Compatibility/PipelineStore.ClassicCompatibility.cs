@@ -123,8 +123,10 @@ internal sealed partial class PipelineStore
                             : chunks.All(x => x.Status == "skipped")
                                 ? "skipped"
                                 : "failed";
-                    IGrouping<string, ClassicAuditPageStats>[]? merged =
-                        payload.Audit.GroupBy(x => x.PageUrl, StringComparer.OrdinalIgnoreCase).ToArray();
+                    IGrouping<string, ClassicAuditPageStats>[]? merged = payload.Audit.GroupBy(
+                            x => AuditCompatibilityLocator(x.PageUrl, payload.Scope.SiteCollectionUrls),
+                            ClassicPageAuditAnalysis.LocatorComparer)
+                        .ToArray();
                     foreach (string? site in payload.Scope.SiteCollectionUrls)
                     {
                         IGrouping<string, ClassicAuditPageStats>[]? stats = merged.Where(group =>
@@ -140,7 +142,7 @@ internal sealed partial class PipelineStore
                                 ScanId = assessment,
                                 SiteUrl = site,
                                 WebUrl = "/",
-                                PageUrl = new Uri(url).AbsolutePath,
+                                PageUrl = new Uri(url).PathAndQuery,
                                 AuditWindowStart = payload.Scope.AuditWindowStart,
                                 AuditWindowEnd = payload.Scope.AuditWindowEnd,
                                 QueryStatus = status,
@@ -177,4 +179,27 @@ internal sealed partial class PipelineStore
                 return true;
             },
             token);
+
+    /// <summary>
+    /// Attributes server-relative audit addresses only to the uniquely declared HTTPS authority.
+    /// Raw publication keys remain unchanged; query-addressed items are never folded into their renderer path.
+    /// </summary>
+    internal static string AuditCompatibilityLocator(string locator, string[] sites)
+    {
+        if (!locator.StartsWith('/')) return locator;
+        if (locator.StartsWith("//", StringComparison.Ordinal))
+            throw new SnapshotIntegrityException("A scheme-relative audit locator has no verified owner.");
+        string[] authorities = sites.Select(site =>
+            {
+                Uri uri = new(site);
+                if (uri.Scheme != "https" || !uri.IsDefaultPort || !string.IsNullOrEmpty(uri.UserInfo))
+                    throw new SnapshotIntegrityException("Audit attribution requires a declared HTTPS authority.");
+                return uri.GetLeftPart(UriPartial.Authority);
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (authorities.Length != 1)
+            throw new SnapshotIntegrityException("A server-relative audit locator has no unique declared authority.");
+        return authorities[0] + locator;
+    }
 }

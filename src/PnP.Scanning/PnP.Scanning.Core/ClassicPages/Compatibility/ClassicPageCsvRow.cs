@@ -12,6 +12,7 @@ internal sealed class ClassicPageCsvRow
     [Ignore] private readonly ClassicPageRow page;
     [Ignore] internal AspxCsvRow? File { get; }
     [Ignore] internal PageIdentity Identity { get; }
+    [Ignore] private readonly ClassicPageMeasurements? measurements;
 
     /// <summary>
     /// Preserves canonical identity/readiness and names an admitted ASPX by its exact handler rather than metadata heuristics.
@@ -21,7 +22,8 @@ internal sealed class ClassicPageCsvRow
         AspxCsvRow? file,
         string pageType,
         Guid analysisRunId,
-        Guid snapshotId)
+        Guid snapshotId,
+        ClassicPageMeasurements? measurements = null)
     {
         this.page = page;
         Identity = page.Identity?.Validated() ??
@@ -30,6 +32,7 @@ internal sealed class ClassicPageCsvRow
         PageType = pageType;
         AnalysisRunId = analysisRunId;
         SnapshotId = snapshotId;
+        this.measurements = measurements;
     }
 
     public Guid ScanId => page.ScanId;
@@ -60,9 +63,14 @@ internal sealed class ClassicPageCsvRow
     public string? LayoutCustomizedPageStatus => page.LayoutCustomizedPageStatus;
     public bool? HomePage => page.HomePage;
     public bool? UncustomizedHomePage { get; internal set; }
-    public int? WebPartCount => HasPartAssessment ? page.WebPartCount : null;
-    public double? MappingPercentage => HasPartAssessment ? page.MappingPercentage : null;
-    public string? UnmappedWebParts => HasPartAssessment ? page.UnmappedWebParts : null;
+    public int? WebPartCount => measurements?.PartCountKnown == true ? page.WebPartCount : null;
+    public double? MappingPercentage => measurements?.MappingKnown == true ? page.MappingPercentage : null;
+    public string? UnmappedWebParts => measurements?.MappingKnown == true ? page.UnmappedWebParts : null;
+    public string WebPartsReadState => measurements?.WebPartsReadState ?? "NotAcquired";
+    public string MappingReadState => measurements?.MappingReadState ?? "Unavailable";
+    public string HomeFallbackReadState => measurements?.HomeFallbackReadState ?? "NotAcquired";
+    public string CanModernizeReadState { get; internal set; } = "NotAcquired";
+    public string WebHomeFallbackReadState { get; internal set; } = "NotAcquired";
     public string? RemediationCode => page.RemediationCode;
     public string Experience => page.Experience;
     public string ProductFamily => page.ProductFamily;
@@ -90,11 +98,7 @@ internal sealed class ClassicPageCsvRow
     public DateTime? AuditWindowStart { get; internal set; }
     public DateTime? AuditWindowEnd { get; internal set; }
     public string UsageQueryStatus { get; internal set; } = "notcollected";
+    public string UsageAttributionState { get; internal set; } = "NotAcquired";
     public Guid AnalysisRunId { get; }
     public Guid SnapshotId { get; }
-
-    [Ignore]
-    private bool HasPartAssessment =>
-        Identity.ObjectKind == PageObjectKind.File && page.AssessmentStatus == "Complete" &&
-        (page.AssessmentPageType ?? page.PageType) is "WikiPage" or "WebPartPage" or "PublishingPage";
 }

@@ -42,7 +42,7 @@ public sealed class DiscoveryRowTypeTests
             typeof(string),
             typeof(ClassicPageDiscovery).GetProperty(nameof(ClassicPageDiscovery.RowType))!.PropertyType);
         Assert.Equal("classic-objects-v4", ClassicContentContract.InputVersion);
-        Assert.Equal("classic-pages-v4", ClassicContentContract.RuleVersion);
+        Assert.Equal("classic-pages-v5", ClassicContentContract.RuleVersion);
     }
 
     /// <summary>

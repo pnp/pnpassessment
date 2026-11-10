@@ -234,6 +234,7 @@ internal static class ClassicReportCsvProjection
                     page.AuditWindowStart,
                     page.AuditWindowEnd,
                     QueryStatus = page.UsageQueryStatus,
+                    page.UsageAttributionState,
                     SkipReason =
                         page.UsageQueryStatus == "succeeded" ? null : "See native audit coverage and UsageQueryStatus.",
                 }),
@@ -336,7 +337,14 @@ internal static class ClassicReportCsvProjection
             if (!pages.TryGetValue(identity, out ClassicPageRow? page))
                 throw new SnapshotIntegrityException(
                     "An admitted ASPX file has no canonical Page; incomplete publication cannot substitute for export.");
-            selected.Add(new(page, file, type, source.AnalysisRunId, source.SnapshotId));
+            selected.Add(
+                new(
+                    page,
+                    file,
+                    type,
+                    source.AnalysisRunId,
+                    source.SnapshotId,
+                    source.Measurements.GetValueOrDefault(identity)));
         }
 
         foreach (ClassicPageRow page in
@@ -353,7 +361,7 @@ internal static class ClassicReportCsvProjection
             if (string.IsNullOrWhiteSpace(row.PageUrl))
                 throw new SnapshotIntegrityException("Selected native Page has no acquired report locator.");
             (string Site, string Web, string Url) key = (row.SiteUrl.ToUpperInvariant(), row.WebUrl.ToUpperInvariant(),
-                row.PageUrl.ToUpperInvariant());
+                ClassicPageAuditAnalysis.LocatorKey(row.PageUrl));
             PageIdentity identity = row.Identity;
             if (locators.TryGetValue(key, out PageIdentity? previous) && previous != identity)
                 throw new SnapshotIntegrityException(
@@ -366,8 +374,13 @@ internal static class ClassicReportCsvProjection
             ApplyUsage(row, source);
             Contracts.Web.WebFacts? web = source.Publication.Webs.SingleOrDefault(web =>
                 web.SiteCollectionId == row.SiteCollectionId && web.WebId == row.WebId);
+            row.CanModernizeReadState = web?.CanModernizeState.Status ?? "NotAcquired";
+            row.WebHomeFallbackReadState = web?.HomeFallbackState.Status ?? "NotAcquired";
             if (row.HomePage == true && web?.CanModernizeState.Succeeded == true)
                 row.UncustomizedHomePage = web.CanModernizeHomepage;
+            else if (row.HomePage == true &&
+                     source.Measurements.GetValueOrDefault(row.Identity)?.HomeFallbackKnown == true)
+                row.UncustomizedHomePage = pages[row.Identity].UncustomizedHomePage;
         }
 
         return selected.OrderBy(row => row.ContentKey, StringComparer.Ordinal).ToArray();
@@ -425,9 +438,17 @@ internal static class ClassicReportCsvProjection
             ? null
             : new Uri(row.SiteUrl).GetLeftPart(UriPartial.Authority) + row.PageUrl;
         if (row.PageUrl?.StartsWith("https://", StringComparison.OrdinalIgnoreCase) == true) locator = row.PageUrl;
-        ClassicAuditPageStats[] stats = source.Publication.Audit
-            .Where(stat => string.Equals(stat.PageUrl, locator, StringComparison.OrdinalIgnoreCase))
+        ClassicAuditPageStats[] stats = source.Publication.Audit.Where(stat =>
+                ClassicPageAuditAnalysis.LocatorEquals(stat.PageUrl, locator) || row.PageUrl?.StartsWith('/') == true &&
+                ClassicPageAuditAnalysis.LocatorEquals(stat.PageUrl, row.PageUrl))
             .ToArray();
+        if (row.ObjectKind == nameof(PageObjectKind.ListItem) && stats.Length == 0)
+        {
+            row.UsageAttributionState = "ItemLocatorNotObserved";
+            return;
+        }
+
+        row.UsageAttributionState = stats.Length == 0 ? "CoveredFileNoEvents" : "ExactContentLocator";
         row.AuditViewsCount = stats.Sum(stat => stat.Views);
         row.AuditCreatesCount = stats.Sum(stat => stat.Creates);
         row.AuditEditsCount = stats.Sum(stat => stat.Edits);

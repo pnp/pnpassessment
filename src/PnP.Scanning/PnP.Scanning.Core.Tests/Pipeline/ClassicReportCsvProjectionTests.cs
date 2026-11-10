@@ -137,7 +137,9 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.Null(post.WebPartCount);
         Assert.Equal(3, post.AuditViewsCount);
         Assert.Equal(1, post.AuditUniqueUsers);
-        Assert.Equal(0, Assert.Single(rows, row => row.ListId != ListId).AuditViewsCount);
+        ClassicPageCsvRow unobserved = Assert.Single(rows, row => row.ListId != ListId);
+        Assert.Null(unobserved.AuditViewsCount);
+        Assert.Equal("ItemLocatorNotObserved", unobserved.UsageAttributionState);
         Assert.NotEqual(rows[0].ContentKey, rows[1].ContentKey);
     }
 

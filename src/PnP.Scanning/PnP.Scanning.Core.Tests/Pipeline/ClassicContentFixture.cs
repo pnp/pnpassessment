@@ -45,6 +45,11 @@ internal sealed class ClassicContentFixture : IClassicContentReader
     internal Func<WebFileInventory, WebFileInventory>? TransformInventory;
     internal Func<ListItemBatch, ListItemBatch>? TransformBatch;
     internal Func<WebListItemQueries, WebListItemQueries>? TransformQueries;
+    internal string? AuditBody;
+    internal string AuditStatus = "succeeded";
+    internal bool PartialAudit;
+    internal Func<WebFacts, WebFacts>? TransformWebFacts;
+    internal Func<FilePageEvidence, FilePageEvidence>? TransformEnrichment;
     private Guid assessment;
     private bool otherComponents;
     internal ClassicCollectionOptions Options = new(false, true, false, false, 14);
@@ -182,7 +187,8 @@ internal sealed class ClassicContentFixture : IClassicContentReader
     {
         Count("metadata");
         if (FailEnrichment) throw new InvalidOperationException("Feature-dependent metadata denied");
-        return Task.FromResult(Web(scope.WebTemplate));
+        WebFacts facts = Web(scope.WebTemplate);
+        return Task.FromResult(TransformWebFacts?.Invoke(facts) ?? facts);
     }
 
     /// <summary>
@@ -356,10 +362,15 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         }
 
         if (candidate.ListItemId == null)
-            return FilePageSourceReader.UnavailableFileEnrichment(web, candidate, SourceReadState.NotAttempted) with
-            {
-                FileLevelOnly = true, ListRootFolderUrls = []
-            };
+        {
+            FilePageEvidence fileOnly =
+                FilePageSourceReader.UnavailableFileEnrichment(web, candidate, SourceReadState.NotAttempted) with
+                {
+                    FileLevelOnly = true, ListRootFolderUrls = []
+                };
+            return TransformEnrichment?.Invoke(fileOnly) ?? fileOnly;
+        }
+
         if (candidate.ListItemId == 7)
             return FilePageSourceReader.UnavailableFileEnrichment(
                 web,
@@ -398,7 +409,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         PhysicalFileFacts facts = PhysicalFileProjection.FromItemMetadata(
             candidate,
             fields.ToDictionary(field => field.Key, field => field.Value.ToValue()));
-        return new(
+        FilePageEvidence result = new(
             Site,
             "/",
             candidate.RecordKey,
@@ -416,6 +427,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
             PublishingLayout: candidate.ListItemId == 3
                 ? new("/_catalogs/masterpage/ArticleLeft.aspx", "Customized", "Customized", SourceReadState.Complete)
                 : null);
+        return TransformEnrichment?.Invoke(result) ?? result;
     }
 
     /// <summary>
@@ -508,17 +520,19 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         CancellationToken token)
     {
         Count("audit");
-        await journal.ReadOrAcquireAsync(
-            "AuditPage",
-            "0|0",
-            () => Task.FromResult(
-                new ClassicPageAuditPageSource(
-                    0,
-                    "recorded-query",
-                    0,
-                    "{\"value\":[{\"operation\":\"ClassicPageViewed\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"one\"},{\"operation\":\"ClassicPageEdited\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"ONE\"}]}",
-                    null)),
-            token);
+        if (AuditStatus == "succeeded")
+            await journal.ReadOrAcquireAsync(
+                "AuditPage",
+                "0|0",
+                () => Task.FromResult(
+                    new ClassicPageAuditPageSource(
+                        0,
+                        "recorded-query",
+                        0,
+                        AuditBody ??
+                        "{\"value\":[{\"operation\":\"ClassicPageViewed\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"one\"},{\"operation\":\"ClassicPageEdited\",\"objectId\":\"https://contoso.sharepoint.com/sites/a/SitePages/Home.aspx\",\"userId\":\"ONE\"}]}",
+                        null)),
+                token);
         await journal.ReadOrAcquireAsync(
             "AuditChunk",
             "0",
@@ -526,11 +540,34 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                 new ClassicPageAuditChunkSource(
                     0,
                     scope.AuditWindowStart,
-                    scope.AuditWindowEnd,
+                    PartialAudit
+                        ? scope.AuditWindowStart.AddTicks((scope.AuditWindowEnd - scope.AuditWindowStart).Ticks / 2)
+                        : scope.AuditWindowEnd,
                     "recorded-query",
-                    "succeeded",
-                    null)),
-            token);
+                    AuditStatus,
+                    AuditStatus == "succeeded" ? null : "Recorded incomplete audit acquisition")),
+            token,
+            chunk => chunk.Status == "succeeded"
+                ? Core.Pipeline.Contracts.Module.AcquisitionStatus.Complete
+                : chunk.Status == "skipped"
+                    ? Core.Pipeline.Contracts.Module.AcquisitionStatus.NotAttempted
+                    : Core.Pipeline.Contracts.Module.AcquisitionStatus.Failed,
+            chunk => chunk.Error);
+        if (PartialAudit)
+            await journal.ReadOrAcquireAsync(
+                "AuditChunk",
+                "1",
+                () => Task.FromResult(
+                    new ClassicPageAuditChunkSource(
+                        1,
+                        scope.AuditWindowStart.AddTicks((scope.AuditWindowEnd - scope.AuditWindowStart).Ticks / 2),
+                        scope.AuditWindowEnd,
+                        "recorded-denied",
+                        "failed",
+                        "Recorded audit 403")),
+                token,
+                _ => Core.Pipeline.Contracts.Module.AcquisitionStatus.Failed,
+                chunk => chunk.Error);
     }
 
     /// <summary>

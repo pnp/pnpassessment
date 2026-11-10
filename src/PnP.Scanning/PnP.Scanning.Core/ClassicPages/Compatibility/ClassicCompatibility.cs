@@ -84,7 +84,7 @@ internal static class ClassicCompatibility
                 throw new SnapshotIntegrityException(
                     $"The existing report contract cannot represent content {identity.Key} without an acquired locator; native evidence is retained.");
             (string Site, string Web, string Url) key = (page.SiteUrl.ToUpperInvariant(),
-                page.WebUrl.ToUpperInvariant(), page.PageUrl.ToUpperInvariant());
+                page.WebUrl.ToUpperInvariant(), ClassicPageAuditAnalysis.LocatorKey(page.PageUrl));
             if (legacyKeys.TryGetValue(key, out PageIdentity? previous) && previous != identity)
                 throw new SnapshotIntegrityException(
                     $"Distinct native content {previous.Key} and {identity.Key} share one legacy URL key. The existing report contract cannot represent both; no object was discarded.");

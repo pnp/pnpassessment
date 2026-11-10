@@ -64,12 +64,12 @@ internal sealed class AspxCsvRow
     public string? NoExecuteReadState => File.NoExecuteReadState;
     public string? AspxEvidenceJson => File.AspxEvidenceJson;
     public bool? NoExecute { get; }
-    public string? PageHandler => Source?.Handler ?? Evidence?.PageHandler;
+    public string? PageHandler => Source == null ? Evidence?.PageHandler : Source.Handler;
     public string? SourceSha256 => Source?.Sha256 ?? Evidence?.SourceSha256;
     public string? SourceReadState => Evidence?.SourceReadState;
     public string? HandlerResolution => Source?.Resolution ?? Evidence?.HandlerResolution;
-    public string? PageDeclaration => Source?.Declaration ?? Evidence?.PageDeclaration;
-    public string? SourceError => Evidence?.SourceError;
+    public string? PageDeclaration => Source == null ? Evidence?.PageDeclaration : Source.Declaration;
+    public string? SourceError => Source?.Error ?? Evidence?.SourceError;
     public int? ListTemplate => Evidence?.ListTemplate;
     public bool? IsCatalog => Evidence?.IsCatalog;
     public bool? IsListView => Evidence?.IsListView;

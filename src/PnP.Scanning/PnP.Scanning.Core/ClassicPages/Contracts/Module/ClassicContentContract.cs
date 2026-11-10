@@ -8,5 +8,5 @@ internal static class ClassicContentContract
 {
     internal const string ModuleKey = "classicpage";
     internal const string InputVersion = "classic-objects-v4";
-    internal const string RuleVersion = "classic-pages-v4";
+    internal const string RuleVersion = "classic-pages-v5";
 }

@@ -26,6 +26,8 @@ Official / OfficialReadState | No separate authoritative official-file observati
 
 `AspxEvidenceJson` retains the recorded source evidence, including original bytes when acquired. Treat exported source and error details as assessment data; synthetic examples in this repository contain no real tenant data.
 
+Captured bytes take precedence over older flattened handler/declaration values. If those bytes are malformed or cannot be resolved, the handler stays unknown and `HandlerResolution`/`SourceError` expose the parser result; an older allowed handler is not revived. The original acquisition can still be `Available` because reading bytes succeeded even though parsing failed. The raw row is retained in all of these cases.
+
 Nullable text uses the existing `BackslashNullV1` encoding: after normal CSV unquoting, `\N` is null, an empty field is a known empty string, and a leading backslash in a real value is escaped with one extra backslash. Nullable Boolean, integer and GUID fields use empty values.
 
 `aspxsummary.json` counts the rows actually written and their true/false/unknown NoExecute distribution. It does not substitute the selected Pages count or assert tenant completeness.

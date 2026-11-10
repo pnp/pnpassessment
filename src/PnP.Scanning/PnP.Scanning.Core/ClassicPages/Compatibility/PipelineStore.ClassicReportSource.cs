@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.ClassicPages.Compatibility;
 using PnP.Scanning.Core.ClassicPages.Contracts.Audit;
 using PnP.Scanning.Core.ClassicPages.Contracts.Module;
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
+using PnP.Scanning.Core.ClassicPages.Contracts.Web;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 
@@ -17,7 +19,11 @@ internal sealed record ClassicReportSource(
     Guid AnalysisRunId,
     Guid SnapshotId,
     ClassicCompatibilityPayload Publication,
-    ClassicPageAuditChunkSource[] AuditChunks);
+    ClassicPageAuditChunkSource[] AuditChunks)
+{
+    public IReadOnlyDictionary<PageIdentity, ClassicPageMeasurements> Measurements { get; init; } =
+        new Dictionary<PageIdentity, ClassicPageMeasurements>();
+}
 
 /// <summary>
 /// Exposes verified Classic report inputs without changing the generic storage schema or acquiring live data.
@@ -62,10 +68,12 @@ internal sealed partial class PipelineStore
         ClassicCompatibilityPayload payload = publication.Payload.Value.Deserialize<ClassicCompatibilityPayload>() ??
                                               throw new SnapshotIntegrityException("Classic publication is missing.");
         List<ClassicPageAuditChunkSource> chunks = [];
+        Dictionary<PageIdentity, ClassicPageMeasurements> measurements = [];
         SourceSnapshotRow snapshot = await context.SourceSnapshots.AsNoTracking()
             .SingleAsync(row => row.SnapshotId == phase.SnapshotId, token);
         foreach (ManifestMember member in manifest.Members.Values.Where(member =>
-                     member.SourceIdentity.StartsWith("AuditChunk:", StringComparison.Ordinal)))
+                     member.SourceIdentity.StartsWith("AuditChunk:", StringComparison.Ordinal) ||
+                     member.SourceIdentity.StartsWith("FileEnrichment:", StringComparison.Ordinal)))
         {
             SourceRecord record = await ReadSelectedObservationAsync(
                 context,
@@ -73,9 +81,31 @@ internal sealed partial class PipelineStore
                 member.ObservationId,
                 manifest,
                 token);
-            chunks.Add(CollectionJson.Read<ClassicPageAuditChunkSource>(record.Artifact.GetBytes()));
+            if (CollectionJson.Kind(record) == "AuditChunk")
+            {
+                chunks.Add(CollectionJson.Read<ClassicPageAuditChunkSource>(record.Artifact.GetBytes()));
+                continue;
+            }
+
+            if (CollectionJson.Kind(record) != "FileEnrichment")
+                throw new SnapshotIntegrityException("Report measurement receipt has a different acquisition kind.");
+            FilePageEvidence input = CollectionJson.Read<FilePageEvidence>(record.Artifact.GetBytes());
+            ClassicPageDiscovery? disposition = payload.Discovery.SingleOrDefault(row => row.RowType == "Page" &&
+                row.RecordKey == input.DiscoveryKey && row.SiteUrl == input.SiteUrl && row.WebUrl == input.WebUrl);
+            if (disposition?.SiteCollectionId is not Guid siteId || disposition.FileUniqueId is not Guid fileId)
+                continue;
+            PageIdentity identity = PageIdentity.File(siteId, fileId);
+            ClassicPageRow? page = payload.Pages.SingleOrDefault(page => page.Identity == identity);
+            if (page == null) continue;
+            WebFacts web = payload.Webs.Single(web => web.SiteCollectionId == siteId && web.WebId == page.WebId);
+            int parts = payload.Parts.Count(part =>
+                part.SiteUrl == page.SiteUrl && part.WebUrl == page.WebUrl && part.PageUrl == page.PageUrl);
+            measurements.Add(identity, ClassicPageMeasurements.FromCaptured(input, page, disposition, web, parts));
         }
 
-        return new(assessmentId, phase.RunId, phase.SnapshotId, payload, chunks.ToArray());
+        return new(assessmentId, phase.RunId, phase.SnapshotId, payload, chunks.ToArray())
+        {
+            Measurements = measurements
+        };
     }
 }
