@@ -132,7 +132,7 @@ internal static class ClassicAspxReportProjection
                 : AcquisitionStates.NotAcquiredLegacy;
         ExportFileEvidence? evidence = await FileEvidenceAsync(path, cancellationToken).ConfigureAwait(false);
 
-        /// <summary>Writes the pre-evaluated summary with the original path, serialization and encoding evaluation order.</summary>
+        // Keep summary evaluation before path resolution, serialization and encoding construction.
         Task WriteSummaryAsync<TSummary>(TSummary summary) =>
             File.WriteAllTextAsync(
                 Path.Combine(exportPath, SummaryJson),
