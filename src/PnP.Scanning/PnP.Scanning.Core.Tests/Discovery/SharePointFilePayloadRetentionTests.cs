@@ -324,6 +324,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
         payloads.CollectAndCountLiveBytes().Should().Be(0);
         GC.KeepAlive(provider);
 
+        /// <summary>Reads one bounded file batch, then cancels or disposes the stream to verify payload cleanup.</summary>
         async Task ReadThenStopAsync()
         {
             await using IAsyncEnumerator<RawDiscoveryBatch> reader = provider.CreateRawSource(root)

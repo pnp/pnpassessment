@@ -68,6 +68,7 @@ public sealed class ContractAndSnapshotTests
     [Fact]
     public void Analysis_entrypoints_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
+        /// <summary>Identifies shared pure discovery value types allowed across the offline analysis boundary.</summary>
         bool PurePageType(Type type) =>
             type.Namespace == "PnP.Scanning.Core.Discovery" && new[]
             {

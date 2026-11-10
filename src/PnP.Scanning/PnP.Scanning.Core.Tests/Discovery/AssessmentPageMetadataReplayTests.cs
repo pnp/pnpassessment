@@ -405,6 +405,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         public int StreamRequests { get; private set; }
         public string[] LastViewFields { get; private set; } = Array.Empty<string>();
 
+        /// <summary>Seeds synthetic native file and list-item metadata behind a strict offline SDK boundary.</summary>
         public MetadataFixture(
             Guid scan,
             string path,
