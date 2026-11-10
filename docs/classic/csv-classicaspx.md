@@ -2,6 +2,8 @@
 
 ## Summary
 
+For the new **unfiltered physical ASPX inventory**, use [aspx.csv](csv-aspx.md). This older filename is retained as a legacy business projection for existing consumers; it is not the source of the new raw ASPX tab or the native Pages predicate.
+
 This csv file is the Classic ASPX business projection of the raw physical files stored for an assessment. It is not a dump of the SPFile SQL table. The table keeps observed file facts independently of file type; this export selects physical ASPX files and excludes files identified as modern pages by the existing Classic assessment heuristics.
 
 One row represents one real SiteCollectionId and FileUniqueId pair, not a list-item address. Stock forms/views and unclassified ASPX files remain visible. Missing or failed metadata is not evidence that a file is modern or absent. Legacy item-only Blog/CP4 assessment remains in [classicpages.csv](csv-classicpages.md); it does not multiply physical-file rows.

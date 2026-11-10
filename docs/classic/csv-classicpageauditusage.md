@@ -2,6 +2,8 @@
 
 ## Summary
 
+For native pipeline reports, this file has one row per **selected** [classicpages.csv](csv-classicpages.md) object when usage was requested. It retains the full Posts locator including `?ID=...`, never the shared renderer's usage. Failed, unsupported and uncollected queries have **empty counts**, not successful zeroes; partial counts remain labelled `partial`. Intentionally specifying `--skipusageinformation` keeps the existing no-usage-file behavior; `classicpages.csv` still carries `UsageQueryStatus=skipped` and nullable counts. Legacy assessments retain the historical behavior described below.
+
 This csv file contains one row per classic page for which audit log activity was collected, plus (when a
 site's audit data could not be fully collected) a site-level summary row that surfaces the coverage gap.
 It reports how often each classic page was **viewed, created and edited** during the queried audit window,

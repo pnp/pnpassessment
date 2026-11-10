@@ -25,10 +25,10 @@ public sealed class NativePipelineCollection;
 public sealed class NativePipelineTests
 {
     /// <summary>
-    /// Verifies that existing report rpc exports real replacement results without online access or new csv contracts.
+    /// Verifies that the existing report RPC exports raw ASPX and native Posts without online access or renderer admission.
     /// </summary>
     [Fact]
-    public async Task Existing_report_rpc_exports_real_replacement_results_without_online_access_or_new_csv_contracts()
+    public async Task Existing_report_rpc_exports_raw_ASPX_and_filtered_native_Pages_without_online_access()
     {
         using StoreCase? output = new StoreCase("classic-native-report");
         PipelineStore? store = new PipelineStore(AppContext.BaseDirectory);
@@ -73,12 +73,25 @@ public sealed class NativePipelineTests
                 Assert.Contains(messages, x => !string.IsNullOrEmpty(x.ReportPath));
             }
 
-            Assert.Contains(
+            Assert.DoesNotContain(
                 "Home.aspx",
                 await File.ReadAllTextAsync(Path.Combine(output.DirectoryPath, "classicpages.csv")));
+            Assert.Contains("Home.aspx", await File.ReadAllTextAsync(Path.Combine(output.DirectoryPath, "aspx.csv")));
             Assert.Contains(
                 "BlogPage",
                 await File.ReadAllTextAsync(Path.Combine(output.DirectoryPath, "classicpages.csv")));
+            using (System.Text.Json.JsonDocument summary = System.Text.Json.JsonDocument.Parse(
+                       await File.ReadAllTextAsync(Path.Combine(output.DirectoryPath, "classicpagessummary.json"))))
+            {
+                Assert.Equal(2, summary.RootElement.GetProperty("ExportedPageCount").GetInt64());
+                Assert.Equal(0, summary.RootElement.GetProperty("AspxPageCount").GetInt64());
+                Assert.Equal(2, summary.RootElement.GetProperty("PostsPageCount").GetInt64());
+                Assert.Equal(0, summary.RootElement.GetProperty("NoExecuteUnknownCount").GetInt64());
+            }
+
+            using (StreamReader summaryText = new(Path.Combine(output.DirectoryPath, "classicwebsummaries.csv")))
+            using (CsvHelper.CsvReader summaryCsv = new(summaryText, System.Globalization.CultureInfo.InvariantCulture))
+                Assert.Equal(2, summaryCsv.GetRecords<ClassicWebSummary>().Sum(web => web.ClassicPages));
             Assert.Contains("Classic", await File.ReadAllTextAsync(Path.Combine(output.DirectoryPath, "scans.csv")));
             using ScanContext? db = store.CreateContext(assessment, readOnly: true);
             Assert.True(

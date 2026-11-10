@@ -677,13 +677,13 @@ public sealed class ClassicAspxReportExportTests
         }
     }
 
-    /// <summary>Exercises the real Classic report seam while retaining discovery and legacy CSVs alongside only the canonical ASPX business outputs.</summary>
+    /// <summary>Exercises the real report seam with raw ASPX inventory, explicit summaries and unchanged historical compatibility outputs.</summary>
     [Fact]
     public async Task NativeClassicDispatchPreservesDiscoveryAndLegacyCsvs()
     {
-        using var fixture = new ScanContextFixture();
-        var scan = Guid.NewGuid();
-        using var context = fixture.CreateContext();
+        using ScanContextFixture? fixture = new ScanContextFixture();
+        Guid scan = Guid.NewGuid();
+        using ScanContext? context = fixture.CreateContext();
         context.Add(FileFact(scan));
         Mark(context, scan, "HomePageOnly");
         context.ClassicPages.Add(
@@ -696,13 +696,13 @@ public sealed class ClassicAspxReportExportTests
                 CustomizedPageStatus = "Uncustomized"
             });
         await context.SaveChangesAsync();
-        var directory = DirectoryForTest();
+        string? directory = DirectoryForTest();
         try
         {
             await ReportManager.ExportClassicReportDataAsync(context, scan, directory, Configuration());
             File.Exists(Path.Combine(directory, "discovery.csv")).Should().BeTrue();
-            using var reader = new StreamReader(Path.Combine(directory, "classicpages.csv"));
-            using var csv = new CsvReader(reader, Configuration());
+            using StreamReader? reader = new StreamReader(Path.Combine(directory, "classicpages.csv"));
+            using CsvReader? csv = new CsvReader(reader, Configuration());
             csv.GetRecords<ClassicPage>().Single().PageUrl.Should().Be("/Home.aspx");
             ReadRows(directory).Should().ContainSingle();
             Directory.GetFiles(directory)
@@ -710,8 +710,10 @@ public sealed class ClassicAspxReportExportTests
                 .Should()
                 .Contain(CsvName)
                 .And.Contain(SummaryName)
+                .And.Contain("aspx.csv")
+                .And.Contain("aspxsummary.json")
+                .And.Contain("classicpagessummary.json")
                 .And.NotContain("aspxinventory.csv")
-                .And.NotContain("aspxsummary.json")
                 .And.NotContain("spfiles.csv")
                 .And.NotContain("classicaspxinventories.csv")
                 .And.NotContain("aspxitembindings.csv");
