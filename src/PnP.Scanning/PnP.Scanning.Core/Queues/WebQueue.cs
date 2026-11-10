@@ -1,9 +1,11 @@
-﻿using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages.Collection.Discovery;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Threading.Tasks.Dataflow;
-using PnP.Scanning.Core.Discovery;
+
 
 namespace PnP.Scanning.Core.Queues
 {
@@ -12,7 +14,13 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<WebQueueItem> websToScan;
 
-        public WebQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken, string adminCenterUrl, string mySiteHostUrl) : base(storageManager, cancellationToken, adminCenterUrl, mySiteHostUrl)
+        public WebQueue(
+            ScanManager scanManager,
+            StorageManager storageManager,
+            Guid scanId,
+            CancellationToken cancellationToken,
+            string adminCenterUrl,
+            string mySiteHostUrl) : base(storageManager, cancellationToken, adminCenterUrl, mySiteHostUrl)
         {
             ScanId = scanId;
             ScanManager = scanManager;
@@ -22,6 +30,7 @@ namespace PnP.Scanning.Core.Queues
 
         private Guid ScanId { get; set; }
 
+        /// <summary>Queues one selected scope for the retained assessment workers.</summary>
         internal async Task EnqueueAsync(WebQueueItem web)
         {
             if (websToScan == null)
@@ -35,8 +44,9 @@ namespace PnP.Scanning.Core.Queues
                 };
 
                 // Configure the site collection scanning queue
-                websToScan = new ActionBlock<WebQueueItem>(async (web) => await ProcessWebAsync(web)
-                                                                , executionDataflowBlockOptions);
+                websToScan = new ActionBlock<WebQueueItem>(
+                    async (web) => await ProcessWebAsync(web),
+                    executionDataflowBlockOptions);
             }
 
             // Send the request into the queue
@@ -52,6 +62,7 @@ namespace PnP.Scanning.Core.Queues
             }
         }
 
+        /// <summary>Runs one retained legacy Web assessment and records scope failures.</summary>
         private async Task ProcessWebAsync(WebQueueItem web)
         {
             if (!ScanManager.IsPausing(ScanId) && !CancellationToken.IsCancellationRequested)
@@ -62,12 +73,25 @@ namespace PnP.Scanning.Core.Queues
                 await StorageManager.StartWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
 
                 // Get an instance for the actual scanner to use
-                var scanner = ScannerBase.NewScanner(ScanManager, StorageManager, web.PnPContextFactory, ScanId, web.SiteCollectionUrl, web.WebUrl, web.WebTemplate, web.OptionsBase, AdminCenterUrl, MySiteHostUrl);
+                ScannerBase scanner = ScannerBase.NewScanner(
+                    ScanManager,
+                    StorageManager,
+                    web.PnPContextFactory,
+                    ScanId,
+                    web.SiteCollectionUrl,
+                    web.WebUrl,
+                    web.WebTemplate,
+                    web.OptionsBase,
+                    AdminCenterUrl,
+                    MySiteHostUrl);
 
                 if (scanner == null)
                 {
-                    Log.Error("Unknown options class specified for assessment {ScanId}, no assessment instance created", ScanId);
-                    throw new Exception($"Unknown options class specified for assessment {ScanId}, no assessment instance created");
+                    Log.Error(
+                        "Unknown options class specified for assessment {ScanId}, no assessment instance created",
+                        ScanId);
+                    throw new Exception(
+                        $"Unknown options class specified for assessment {ScanId}, no assessment instance created");
                 }
 
                 try
@@ -82,10 +106,17 @@ namespace PnP.Scanning.Core.Queues
                     await StorageManager.EndWebScanAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
                     if (web.OptionsBase is ClassicOptions { Pages: true })
                     {
-                        var coverage = await new AssessmentDiscoveryWriter(ScanId)
-                            .ReadWebCoverageAsync(ScanId, web.SiteCollectionUrl, web.WebUrl);
-                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, web.SiteCollectionUrl, web.WebUrl,
-                            "Web", coverage, stage: "WebScan");
+                        string coverage = await new AssessmentDiscoveryWriter(ScanId).ReadWebCoverageAsync(
+                            ScanId,
+                            web.SiteCollectionUrl,
+                            web.WebUrl);
+                        await LegacyScopeEvidence.RecordScopeAsync(
+                            ScanId,
+                            web.SiteCollectionUrl,
+                            web.WebUrl,
+                            "Web",
+                            coverage,
+                            stage: "WebScan");
                     }
                 }
                 catch (Exception ex)
@@ -96,13 +127,31 @@ namespace PnP.Scanning.Core.Queues
                         // failure. Finalize only undisposed rows; cancellation remains resumable.
                         if (!CancellationToken.IsCancellationRequested)
                             await new AssessmentDiscoveryWriter(ScanId).FailUnassessedPagesAsync(
-                                ScanId, web.SiteCollectionUrl, web.WebUrl, ex, "WebScan");
-                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, web.SiteCollectionUrl, web.WebUrl,
-                            "Web", CancellationToken.IsCancellationRequested ? "Cancelled" :
-                                AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(ex)), ex, stage: "WebScan");
+                                ScanId,
+                                web.SiteCollectionUrl,
+                                web.WebUrl,
+                                ex,
+                                "WebScan");
+                        await LegacyScopeEvidence.RecordScopeAsync(
+                            ScanId,
+                            web.SiteCollectionUrl,
+                            web.WebUrl,
+                            "Web",
+                            CancellationToken.IsCancellationRequested
+                                ? "Cancelled"
+                                : AssessmentWebDiscovery.Status(AssessmentWebDiscovery.Classify(ex)),
+                            ex,
+                            stage: "WebScan");
                     }
+
                     // The web scan failed, log accordingly
-                    Log.Error(ex, "Assessment of {SiteUrl}{WebUrl} failed with assessment component {ScanComponent} error '{Error}'", web.SiteCollectionUrl, web.WebUrl, scanner.GetType(), ex.Message);
+                    Log.Error(
+                        ex,
+                        "Assessment of {SiteUrl}{WebUrl} failed with assessment component {ScanComponent} error '{Error}'",
+                        web.SiteCollectionUrl,
+                        web.WebUrl,
+                        scanner.GetType(),
+                        ex.Message);
                     await StorageManager.EndWebScanWithErrorAsync(ScanId, web.SiteCollectionUrl, web.WebUrl, ex);
                 }
             }
@@ -110,14 +159,21 @@ namespace PnP.Scanning.Core.Queues
             {
                 if (CancellationToken.IsCancellationRequested)
                 {
-                    Log.Information("Assessment {ScanId} was cancelled, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                    Log.Information(
+                        "Assessment {ScanId} was cancelled, so skipping processing of web {SiteCollection}{WebUrl}.",
+                        ScanId,
+                        web.SiteCollectionUrl,
+                        web.WebUrl);
                 }
                 else
                 {
-                    Log.Information("Assessment {ScanId} has pausing bit set, so skipping processing of web {SiteCollection}{WebUrl}.", ScanId, web.SiteCollectionUrl, web.WebUrl);
+                    Log.Information(
+                        "Assessment {ScanId} has pausing bit set, so skipping processing of web {SiteCollection}{WebUrl}.",
+                        ScanId,
+                        web.SiteCollectionUrl,
+                        web.WebUrl);
                 }
             }
         }
-        
     }
 }

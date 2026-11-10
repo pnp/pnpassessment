@@ -1,8 +1,8 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
 using PnP.Core.Services;
-using PnP.Core.Services.Core;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Queues;
 using PnP.Scanning.Core.Scanners;
@@ -129,7 +129,8 @@ namespace PnP.Scanning.Core.Services
             if (discoveryEvidence != null)
             {
                 foreach (ClassicPageDiscovery row in discoveryEvidence) row.ScanId = scanId;
-                await new PnP.Scanning.Core.Discovery.AssessmentDiscoveryWriter(scanId).WriteAsync(discoveryEvidence);
+                await new PnP.Scanning.Core.ClassicPages.Compatibility.AssessmentDiscoveryWriter(scanId).WriteAsync(
+                    discoveryEvidence);
             }
 
             if (siteCollectionList.Count == 0)
@@ -204,7 +205,7 @@ namespace PnP.Scanning.Core.Services
                     Log.Error(ex, "Preassessment for assessment {ScanId} failed. Error: {Error}", scanId, ex.Message);
                     await StorageManager.SetPreScanStatusAsync(scanId, SiteWebStatus.Failed);
                     if (options is ClassicOptions { Pages: true })
-                        await ClassicPageDiscoveryComponent.RecordScopeAsync(
+                        await LegacyScopeEvidence.RecordScopeAsync(
                             scanId,
                             siteCollectionList[0],
                             "/",

@@ -1,8 +1,8 @@
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Collection.Module;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
@@ -32,8 +32,10 @@ public sealed class NativePipelineTests
     {
         using StoreCase? output = new StoreCase("classic-native-report");
         PipelineStore? store = new PipelineStore(AppContext.BaseDirectory);
-        ClassicContentFixture? source =
-            new ClassicContentFixture { IncludePhysicalFacts = true, IncludeBlog = true, IncludeDelve = true };
+        ClassicContentFixture? source = new ClassicContentFixture
+        {
+            IncludePhysicalFacts = true, IncludeBlog = true, IncludeRetiredFile = true
+        };
         Guid assessment = Guid.Empty;
         try
         {
@@ -158,8 +160,10 @@ public sealed class NativePipelineTests
     public async Task Existing_start_command_routes_pages_and_mixed_components_through_the_new_pipeline(bool mixed)
     {
         using StoreCase? data = new StoreCase("classic-existing-cli");
-        ClassicContentFixture? source =
-            new ClassicContentFixture { IncludePhysicalFacts = true, IncludeBlog = true, IncludeDelve = true };
+        ClassicContentFixture? source = new ClassicContentFixture
+        {
+            IncludePhysicalFacts = true, IncludeBlog = true, IncludeRetiredFile = true
+        };
         await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
@@ -198,7 +202,8 @@ public sealed class NativePipelineTests
         using ScanContext? db = data.Store.CreateContext(assessment);
         Assert.Equal("Classic", (await db.Scans.SingleAsync()).CLIMode);
         Assert.True(await db.ClassicPages.AnyAsync(x => x.PageType == "BlogPage"));
-        Assert.True(await db.ClassicPages.AnyAsync(x => x.PageType == "DelveBlogPage"));
+        Assert.False(await db.ClassicPages.AnyAsync(x => x.PageType == "DelveBlogPage"));
+        Assert.True(await db.SPFiles.AnyAsync(x => x.FileName.EndsWith(".pointpub")));
         Assert.Equal(mixed ? 1 : 0, await db.ClassicLists.CountAsync());
         Assert.Single(await db.SourceSnapshots.ToListAsync());
         Assert.Single(await db.AnalysisRuns.ToListAsync());

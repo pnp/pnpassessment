@@ -1,7 +1,8 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages.Collection.Discovery;
 using FluentAssertions;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Storage;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using PnP.Scanning.Core.Tests.Fixtures;
 using System.Net;
 using System.Text.Json;
@@ -55,25 +56,48 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         Uri.UnescapeDataString(request.Query).Should().Contain("/sites/a/Docs/A#B");
     }
 
+    /// <summary>Verifies later sparse observation does not erase known file ownership.</summary>
     [Fact]
     public async Task Later_sparse_observation_does_not_erase_known_file_ownership()
     {
         var scanId = Guid.NewGuid();
         var siteUrl = "https://contoso.sharepoint.com/sites/a";
         var webUrl = "/";
-        var richScope = new DiscoveryScopeRegistration("rich", null, DiscoveryScopeKind.Folder,
-            DiscoverySourceKind.RawListLibraryFiles, "/docs", "test");
-        var sparseScope = new DiscoveryScopeRegistration("sparse", null, DiscoveryScopeKind.Folder,
-            DiscoverySourceKind.ListViewBackingFiles, "/view", "test");
+        DiscoveryScopeRegistration richScope = new DiscoveryScopeRegistration(
+            "rich",
+            null,
+            DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.RawListLibraryFiles,
+            "/docs",
+            "test");
+        DiscoveryScopeRegistration sparseScope = new DiscoveryScopeRegistration(
+            "sparse",
+            null,
+            DiscoveryScopeKind.Folder,
+            DiscoverySourceKind.ListViewBackingFiles,
+            "/view",
+            "test");
         var siteId = Guid.NewGuid();
         var webId = Guid.NewGuid();
         var listId = Guid.NewGuid();
         var folderId = Guid.NewGuid();
         var fileId = Guid.NewGuid();
-        var rich = new RawDiscoveryRecord(fileId.ToString("D"), fileId.ToString("D"), listId.ToString("D"),
-            "page.aspx", "/sites/a/docs/page.aspx", true, "test", SiteCollectionId: siteId,
-            WebId: webId, ListId: listId, FolderUniqueId: folderId, ListItemId: 7,
-            ContentTypeId: "0x0101", PageType: "WikiPage", LibraryHidden: false);
+        RawDiscoveryRecord rich = new RawDiscoveryRecord(
+            fileId.ToString("D"),
+            fileId.ToString("D"),
+            listId.ToString("D"),
+            "page.aspx",
+            "/sites/a/docs/page.aspx",
+            true,
+            "test",
+            SiteCollectionId: siteId,
+            WebId: webId,
+            ListId: listId,
+            FolderUniqueId: folderId,
+            ListItemId: 7,
+            ContentTypeId: "0x0101",
+            PageType: "WikiPage",
+            LibraryHidden: false);
         var sparse = rich with
         {
             ListId = null,
@@ -97,19 +121,26 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         row.LibraryHidden.Should().BeFalse();
     }
 
+    /// <summary>Verifies assessment home page state falls back without erasing a known value.</summary>
     [Fact]
     public void Assessment_home_page_state_falls_back_without_erasing_a_known_value()
     {
-        PageScanComponent.ResolveHomePageState("/sites/a/SitePages/Home.aspx", "SitePages/Home.aspx",
-            welcomePageKnown: true, discoveredHomePage: false).Should().BeTrue();
-        PageScanComponent.ResolveHomePageState("/sites/a/default.aspx", null,
-            welcomePageKnown: false, discoveredHomePage: null).Should().BeNull();
-
-        var page = new ClassicPage { HomePage = true };
-        PageScanComponent.ApplyDiscoveryState(page, new ClassicPageDiscovery { HomePage = null });
-        page.HomePage.Should().BeTrue();
+        SnapshotHomePage.ResolveHomePageState(
+                "/sites/a/SitePages/Home.aspx",
+                "SitePages/Home.aspx",
+                readSucceeded: true,
+                observed: false)
+            .Should()
+            .BeTrue();
+        SnapshotHomePage.ResolveHomePageState("/sites/a/default.aspx", null, readSucceeded: false, observed: null)
+            .Should()
+            .BeNull();
+        SnapshotHomePage.ResolveHomePageState("/sites/a/default.aspx", null, readSucceeded: false, observed: true)
+            .Should()
+            .BeTrue();
     }
 
+    /// <summary>Verifies home page only resolves one physical file without enumerating lists or folders.</summary>
     [Fact]
     public async Task Home_page_only_resolves_one_physical_file_without_enumerating_lists_or_folders()
     {
@@ -121,13 +152,19 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         var siteUrl = new Uri("https://contoso.sharepoint.com/sites/a");
         using var factory = new HomePageOnlyFactory(siteUrl, listId, fileId);
         using var provider = new SharePointLiveAspxDiscoveryProvider(
-            new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64),
+            new SharePointLiveAspxDiscoveryOptions(
+                "test",
+                "declared",
+                "revision",
+                new string('a', 64),
                 Intent: AspxDiscoveryIntent.HomePageOnly),
-            factory, new AspxWebAcquisitionContext(siteId, siteUrl, webId, siteUrl, "/sites/a", "STS#3"));
+            factory,
+            new AspxWebAcquisitionContext(siteId, siteUrl, webId, siteUrl, "/sites/a", "STS#3"));
 
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
-        await new AssessmentWebDiscovery(scanId, siteUrl.AbsoluteUri, "/", writer)
-            .RunAsync(provider, CancellationToken.None);
+        await new AssessmentWebDiscovery(scanId, siteUrl.AbsoluteUri, "/", writer).RunAsync(
+            provider,
+            CancellationToken.None);
 
         var page = (await writer.ReadPagesAsync(scanId, siteUrl.AbsoluteUri, "/")).Should().ContainSingle().Subject;
         page.Url.Should().Be("/sites/a/SitePages/Home.aspx");
@@ -143,6 +180,7 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         factory.Client.FolderReads.Should().Be(0);
     }
 
+    /// <summary>Verifies home page only resolution failure is reported without falling back to full inventory.</summary>
     [Fact]
     public async Task Home_page_only_resolution_failure_is_reported_without_falling_back_to_full_inventory()
     {
@@ -150,14 +188,19 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         var siteUrl = new Uri("https://contoso.sharepoint.com/sites/a");
         using var factory = new HomePageOnlyFactory(siteUrl, Guid.NewGuid(), Guid.NewGuid(), failResolution: true);
         using var provider = new SharePointLiveAspxDiscoveryProvider(
-            new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64),
+            new SharePointLiveAspxDiscoveryOptions(
+                "test",
+                "declared",
+                "revision",
+                new string('a', 64),
                 Intent: AspxDiscoveryIntent.HomePageOnly),
-            factory, new AspxWebAcquisitionContext(Guid.NewGuid(), siteUrl, Guid.NewGuid(), siteUrl,
-                "/sites/a", "STS#3"));
+            factory,
+            new AspxWebAcquisitionContext(Guid.NewGuid(), siteUrl, Guid.NewGuid(), siteUrl, "/sites/a", "STS#3"));
 
         var writer = new AssessmentDiscoveryWriter(database.CreateContext);
-        await new AssessmentWebDiscovery(scanId, siteUrl.AbsoluteUri, "/", writer)
-            .RunAsync(provider, CancellationToken.None);
+        await new AssessmentWebDiscovery(scanId, siteUrl.AbsoluteUri, "/", writer).RunAsync(
+            provider,
+            CancellationToken.None);
 
         (await writer.ReadPagesAsync(scanId, siteUrl.AbsoluteUri, "/")).Should().BeEmpty();
         using var read = database.CreateContext();
@@ -169,10 +212,13 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         factory.Client.FolderReads.Should().Be(0);
     }
 
-    private static SharePointLiveAspxDiscoveryProvider Provider(RootTraversalFactory factory, Uri siteUrl,
-        Guid siteId, Guid webId) => new(
-        new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64)),
-        factory, new AspxWebAcquisitionContext(siteId, siteUrl, webId, siteUrl, "/sites/a", "STS#3"));
+    /// <summary>Verifies provider.</summary>
+    private static SharePointLiveAspxDiscoveryProvider
+        Provider(RootTraversalFactory factory, Uri siteUrl, Guid siteId, Guid webId) =>
+        new(
+            new SharePointLiveAspxDiscoveryOptions("test", "declared", "revision", new string('a', 64)),
+            factory,
+            new AspxWebAcquisitionContext(siteId, siteUrl, webId, siteUrl, "/sites/a", "STS#3"));
 
     private static async Task<DiscoveryScopeRegistration> WebRootFolderAsync(
         SharePointLiveAspxDiscoveryProvider provider)
@@ -193,8 +239,11 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
     {
         internal RootTraversalFactory(Uri webUrl) => Client = new RootTraversalClient(webUrl);
         internal RootTraversalClient Client { get; }
-        public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
-            CancellationToken cancellationToken = default) => Task.FromResult<ISharePointAspxRestClient>(Client);
+
+        /// <summary>Verifies get async.</summary>
+        public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ISharePointAspxRestClient>(Client);
+
         public void Dispose() => Client.Dispose();
     }
 
@@ -202,9 +251,13 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
     {
         internal HomePageOnlyFactory(Uri webUrl, Guid listId, Guid fileId, bool failResolution = false) =>
             Client = new HomePageOnlyClient(webUrl, listId, fileId, failResolution);
+
         internal HomePageOnlyClient Client { get; }
-        public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl,
-            CancellationToken cancellationToken = default) => Task.FromResult<ISharePointAspxRestClient>(Client);
+
+        /// <summary>Verifies get async.</summary>
+        public Task<ISharePointAspxRestClient> GetAsync(Uri webUrl, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ISharePointAspxRestClient>(Client);
+
         public void Dispose() => Client.Dispose();
     }
 
@@ -228,41 +281,68 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         internal int FolderReads { get; private set; }
         public Uri WebUrl { get; }
 
-        public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
-            CancellationToken cancellationToken = default)
+        /// <summary>Verifies get page async.</summary>
+        public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default)
         {
             RestCollectionReads++;
             throw new InvalidOperationException("Home-page-only discovery must not enumerate REST collections.");
         }
 
-        public Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
+        /// <summary>Verifies resolve file async.</summary>
+        public Task<SharePointResolvedFile> ResolveFileAsync(
+            string serverRelativeUrl,
             CancellationToken cancellationToken = default)
         {
             FileResolutions++;
-            return Task.FromResult(failResolution
-                ? new SharePointResolvedFile(DiscoveryTerminalOutcome.Failed, null, null, serverRelativeUrl,
-                    null, "fake:resolve", "locator_resolution_failed")
-                : new SharePointResolvedFile(DiscoveryTerminalOutcome.Complete, fileId.ToString("D"),
-                    "HOME.aspx", "/sites/a/SitePages/HOME.aspx", "Customized", "fake:resolve",
-                    ListId: listId, ListItemId: 42));
+            return Task.FromResult(
+                failResolution
+                    ? new SharePointResolvedFile(
+                        DiscoveryTerminalOutcome.Failed,
+                        null,
+                        null,
+                        serverRelativeUrl,
+                        null,
+                        "fake:resolve",
+                        "locator_resolution_failed")
+                    : new SharePointResolvedFile(
+                        DiscoveryTerminalOutcome.Complete,
+                        fileId.ToString("D"),
+                        "HOME.aspx",
+                        "/sites/a/SitePages/HOME.aspx",
+                        "Customized",
+                        "fake:resolve",
+                        ListId: listId,
+                        ListItemId: 42));
         }
 
-        public Task<SharePointModeledValue> ReadWelcomePageAsync(
-            CancellationToken cancellationToken = default)
+        /// <summary>Verifies read welcome page async.</summary>
+        public Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken cancellationToken = default)
         {
             WelcomePageReads++;
-            return Task.FromResult(new SharePointModeledValue(DiscoveryTerminalOutcome.Complete,
-                "SitePages/Home.aspx", "fake", "welcome", null, "fake:welcome", DateTimeOffset.UtcNow));
+            return Task.FromResult(
+                new SharePointModeledValue(
+                    DiscoveryTerminalOutcome.Complete,
+                    "SitePages/Home.aspx",
+                    "fake",
+                    "welcome",
+                    null,
+                    "fake:welcome",
+                    DateTimeOffset.UtcNow));
         }
 
-        public Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
+        /// <summary>Verifies read folder async.</summary>
+        public Task<SharePointModeledFolderResult> ReadFolderAsync(
+            string serverRelativeUrl,
             CancellationToken cancellationToken = default)
         {
             FolderReads++;
             throw new InvalidOperationException("Home-page-only discovery must not enumerate folders.");
         }
 
-        public void Dispose() { }
+        /// <summary>Verifies dispose.</summary>
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class RootTraversalClient : ISharePointAspxRestClient
@@ -272,64 +352,115 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
         public Uri WebUrl { get; }
 
         /// <summary>Supplies the same root file and hash-named child through REST rather than modeled child expansion.</summary>
-        public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
-            CancellationToken cancellationToken = default)
+        public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
             var items = (IReadOnlyList<JsonElement>)Array.Empty<JsonElement>();
             if (requestUri.AbsolutePath.EndsWith("/RootFolder/Files", StringComparison.OrdinalIgnoreCase) &&
                 !Uri.UnescapeDataString(requestUri.Query).Contains("$skip=1", StringComparison.Ordinal))
             {
-                items = new[] { JsonSerializer.SerializeToElement(new
+                items = new[]
                 {
-                    UniqueId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
-                    Name = "default.aspx", ServerRelativeUrl = "/sites/a/default.aspx", CustomizedPageStatus = "Uncustomized"
-                }) };
+                    JsonSerializer.SerializeToElement(
+                        new
+                        {
+                            UniqueId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
+                            Name = "default.aspx",
+                            ServerRelativeUrl = "/sites/a/default.aspx",
+                            CustomizedPageStatus = "Uncustomized"
+                        })
+                };
             }
+
             if (requestUri.AbsolutePath.EndsWith("/RootFolder/Folders", StringComparison.OrdinalIgnoreCase))
             {
-                items = new[] { JsonSerializer.SerializeToElement(new
+                items = new[]
                 {
-                    UniqueId = Guid.Parse("66666666-6666-6666-6666-666666666666"),
-                    Name = "A#B", ServerRelativeUrl = "/sites/a/Docs/A#B"
-                }) };
+                    JsonSerializer.SerializeToElement(
+                        new
+                        {
+                            UniqueId = Guid.Parse("66666666-6666-6666-6666-666666666666"),
+                            Name = "A#B",
+                            ServerRelativeUrl = "/sites/a/Docs/A#B"
+                        })
+                };
             }
-            return Task.FromResult(new SharePointRestPage(requestUri, HttpStatusCode.OK, items, null,
-                new string('b', 64), "odata-nometadata", DiscoveryTerminalOutcome.Complete));
+
+            return Task.FromResult(
+                new SharePointRestPage(
+                    requestUri,
+                    HttpStatusCode.OK,
+                    items,
+                    null,
+                    new string('b', 64),
+                    "odata-nometadata",
+                    DiscoveryTerminalOutcome.Complete));
         }
 
-        public Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        /// <summary>Verifies resolve file async.</summary>
+        public Task<SharePointResolvedFile> ResolveFileAsync(
+            string serverRelativeUrl,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
-        public Task<SharePointModeledValue> ReadWelcomePageAsync(
-            CancellationToken cancellationToken = default) => Task.FromResult(new SharePointModeledValue(
-            DiscoveryTerminalOutcome.Empty, null, "fake", "welcome", null, "fake:welcome",
-            DateTimeOffset.UtcNow));
+        /// <summary>Verifies read welcome page async.</summary>
+        public Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(
+                new SharePointModeledValue(
+                    DiscoveryTerminalOutcome.Empty,
+                    null,
+                    "fake",
+                    "welcome",
+                    null,
+                    "fake:welcome",
+                    DateTimeOffset.UtcNow));
 
-        public Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
+        /// <summary>Verifies read folder async.</summary>
+        public Task<SharePointModeledFolderResult> ReadFolderAsync(
+            string serverRelativeUrl,
             CancellationToken cancellationToken = default)
         {
             if (serverRelativeUrl == "/sites/a")
-                return Task.FromResult(new SharePointModeledFolderResult(
-                    DiscoveryTerminalOutcome.Complete, Guid.NewGuid().ToString("D"), serverRelativeUrl,
-                    new[]
-                    {
-                        new SharePointModeledFolder(Guid.NewGuid().ToString("D"), "A#B",
-                            "/sites/a/Docs/A#B"),
-                    },
-                    new[]
-                    {
-                        new SharePointModeledFile(Guid.NewGuid().ToString("D"), "default.aspx",
-                            "/sites/a/default.aspx", "Uncustomized"),
-                    },
-                    "fake", "folder", null, "fake:folder", DateTimeOffset.UtcNow));
+                return Task.FromResult(
+                    new SharePointModeledFolderResult(
+                        DiscoveryTerminalOutcome.Complete,
+                        Guid.NewGuid().ToString("D"),
+                        serverRelativeUrl,
+                        new[]
+                        {
+                            new SharePointModeledFolder(Guid.NewGuid().ToString("D"), "A#B", "/sites/a/Docs/A#B"),
+                        },
+                        new[]
+                        {
+                            new SharePointModeledFile(
+                                Guid.NewGuid().ToString("D"),
+                                "default.aspx",
+                                "/sites/a/default.aspx",
+                                "Uncustomized"),
+                        },
+                        "fake",
+                        "folder",
+                        null,
+                        "fake:folder",
+                        DateTimeOffset.UtcNow));
 
-            return Task.FromResult(new SharePointModeledFolderResult(
-                DiscoveryTerminalOutcome.Failed, null, serverRelativeUrl,
-                Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
-                "fake", "folder", "failed", "fake:folder", DateTimeOffset.UtcNow));
+            return Task.FromResult(
+                new SharePointModeledFolderResult(
+                    DiscoveryTerminalOutcome.Failed,
+                    null,
+                    serverRelativeUrl,
+                    Array.Empty<SharePointModeledFolder>(),
+                    Array.Empty<SharePointModeledFile>(),
+                    "fake",
+                    "folder",
+                    "failed",
+                    "fake:folder",
+                    DateTimeOffset.UtcNow));
         }
 
-        public void Dispose() { }
+        /// <summary>Verifies dispose.</summary>
+        public void Dispose()
+        {
+        }
     }
 }

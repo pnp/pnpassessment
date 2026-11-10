@@ -1,11 +1,13 @@
+using PnP.Scanning.Core.ClassicPages.Contracts.Module;
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Collection.Module;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
@@ -22,7 +24,7 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class DiscoveryRowTypeTests
 {
     /// <summary>
-    /// Enumerates only roles emitted by physical discovery, coverage reduction, and the retained display-form assessment boundary.
+    /// Enumerates physical discovery, coverage reduction and historical assessment roles without changing the legacy database column.
     /// </summary>
     [Fact]
     public void Defined_kinds_match_the_existing_producer_vocabulary_without_an_unset_or_unknown_default()
@@ -39,8 +41,8 @@ public sealed class DiscoveryRowTypeTests
         Assert.Equal(
             typeof(string),
             typeof(ClassicPageDiscovery).GetProperty(nameof(ClassicPageDiscovery.RowType))!.PropertyType);
-        Assert.Equal("classic-objects-v3", ClassicContentContract.InputVersion);
-        Assert.Equal("classic-pages-v3", ClassicContentContract.RuleVersion);
+        Assert.Equal("classic-objects-v4", ClassicContentContract.InputVersion);
+        Assert.Equal("classic-pages-v4", ClassicContentContract.RuleVersion);
     }
 
     /// <summary>

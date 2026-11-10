@@ -1,15 +1,19 @@
+using PnP.Scanning.Core.ClassicPages.Collection.Module;
+using PnP.Scanning.Core.ClassicPages.Collection.Page;
+using PnP.Scanning.Core.ClassicPages.Collection.File;
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
+using PnP.Scanning.Core.ClassicPages.Contracts.Shared;
+using PnP.Scanning.Core.ClassicPages.Contracts.Web;
+using PnP.Scanning.Core.ClassicPages.Contracts.Module;
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using System.Collections.Concurrent;
 using System.Text.Json;
-using PnP.Scanning.Core.Pipeline.Collection.File;
 using PnP.Scanning.Core.Pipeline.Collection.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.Audit;
-using PnP.Scanning.Core.Pipeline.Contracts.List;
-using PnP.Scanning.Core.Pipeline.Contracts.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.ClassicPages.Contracts.Audit;
+using PnP.Scanning.Core.ClassicPages.Contracts.List;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
-using PnP.Scanning.Core.Pipeline.Contracts.Site;
-using PnP.Scanning.Core.Pipeline.Contracts.Web;
+using PnP.Scanning.Core.ClassicPages.Contracts.Site;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Tests.Pipeline;
@@ -25,8 +29,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
     internal static readonly Guid WebId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     internal static readonly Guid ListId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     internal static readonly Guid PostsListId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    internal static readonly Guid PointPublishingListId = Guid.Parse("55555555-5555-5555-5555-555555555555");
-    internal static readonly Guid PointPublishingFileId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    internal static readonly Guid RetiredFileId = Guid.Parse("99999999-9999-9999-9999-999999999999");
     internal readonly ConcurrentDictionary<string, int> Calls = new();
     internal string? BlockAt;
     internal TaskCompletionSource Reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -34,7 +37,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
     internal bool FailEnrichment;
     internal bool DeniedDiscovery;
     internal bool IncludeBlog;
-    internal bool IncludeDelve;
+    internal bool IncludeRetiredFile;
     internal bool PostsOnNonBlogWeb;
     internal bool IncludeSecondBlog;
     internal bool IncludePhysicalFacts = true;
@@ -310,7 +313,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                 FirstObservedAtUtc = scope.ObservedAtUtc,
                 ObservedAtUtc = scope.ObservedAtUtc,
             });
-        if (IncludeDelve)
+        if (IncludeRetiredFile)
             files.Add(
                 new PhysicalFileFacts
                 {
@@ -319,7 +322,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                     WebId = WebId,
                     ListId = ListId,
                     ListItemId = 200,
-                    FileUniqueId = PointPublishingFileId,
+                    FileUniqueId = RetiredFileId,
                     SiteUrl = Site,
                     WebUrl = "/",
                     ServerRelativeUrl = "/sites/a/SitePages/post.pointpub",
@@ -353,12 +356,12 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         }
 
         if (candidate.ListItemId == null)
-            return ClassicContentReader.UnavailableFileEnrichment(web, candidate, SourceReadState.NotAttempted) with
+            return FilePageSourceReader.UnavailableFileEnrichment(web, candidate, SourceReadState.NotAttempted) with
             {
                 FileLevelOnly = true, ListRootFolderUrls = []
             };
         if (candidate.ListItemId == 7)
-            return ClassicContentReader.UnavailableFileEnrichment(
+            return FilePageSourceReader.UnavailableFileEnrichment(
                 web,
                 candidate,
                 new("Denied", "Recorded page metadata 403"));
@@ -392,8 +395,8 @@ internal sealed class ClassicContentFixture : IClassicContentReader
             fields["ClientSideApplicationId"] = SourceField.Of(
                 "Guid",
                 Guid.Parse("B6917CB1-93A0-4B97-A84D-7CF49975D4EC"));
-        Core.Storage.SPFile facts = Core.Discovery.SPFileFactProjection.FromItemMetadata(
-            Core.Storage.Pipeline.DiscoveryEvidenceMapper.ToLegacy(candidate),
+        PhysicalFileFacts facts = PhysicalFileProjection.FromItemMetadata(
+            candidate,
             fields.ToDictionary(field => field.Key, field => field.Value.ToValue()));
         return new(
             Site,
@@ -409,7 +412,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
             candidate.ListItemId is 1 or 2 or 3 ? SourceReadState.Complete : SourceReadState.NotAttempted,
             null,
             SourceReadState.NotAttempted,
-            CollectionJson.Convert<PhysicalFileFacts>(facts),
+            facts,
             PublishingLayout: candidate.ListItemId == 3
                 ? new("/_catalogs/masterpage/ArticleLeft.aspx", "Customized", "Customized", SourceReadState.Complete)
                 : null);
@@ -457,15 +460,12 @@ internal sealed class ClassicContentFixture : IClassicContentReader
                     ListItemQueryKind.Posts,
                     301,
                     "/sites/a/Lists/Posts2/Post.aspx"));
-        if (IncludeDelve)
-            queries.Add(
-                new(ListId, "Site Pages", "/sites/a/SitePages", ListItemQueryKind.PointPublishingFiles, 119, null));
         WebListItemQueries scope = new(Site, "/", queries.ToArray(), SourceReadState.Complete);
         return Task.FromResult(TransformQueries?.Invoke(scope) ?? scope);
     }
 
     /// <summary>
-    /// Returns real synthetic item identities and native File links, preserving the original paging receipt.
+    /// Returns independent Posts item identities and their original paging receipts without any File association reads.
     /// </summary>
     public Task<ListItemBatch> ReadListItemBatchAsync(
         WebFacts web,
@@ -475,44 +475,14 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         CancellationToken token)
     {
         Count("blog:" + (paging ?? "first"));
-        bool fileBacked = query.QueryKind == ListItemQueryKind.PointPublishingFiles;
-        int itemId = fileBacked
-            ? 200
-            : paging == null
-                ? 100
-                : 101;
+        int itemId = paging == null ? 100 : 101;
         Dictionary<string, SourceField> fields = new()
         {
             ["ID"] = SourceField.Of("Int32", itemId),
-            ["Title"] = SourceField.Of("String", fileBacked ? "Point-publishing content" : "Recorded blog post"),
+            ["Title"] = SourceField.Of("String", "Recorded blog post"),
             ["Modified"] = SourceField.Of("DateTime", web.LastItemUserModifiedDate),
         };
-        if (fileBacked)
-        {
-            fields["FileRef"] = SourceField.Of("String", "/sites/a/SitePages/post.pointpub");
-            fields["File_x0020_Type"] = SourceField.Of("String", "pointpub");
-        }
-
         ListItemFacts item = new(itemId, fields);
-        if (fileBacked)
-            item = item with
-            {
-                FileAssociation = NativeFileAssociationReader.FromNative(
-                    assessment,
-                    web,
-                    query.ListId,
-                    item,
-                    new NativeItemFile(
-                        SiteCollectionId,
-                        WebId,
-                        query.ListId,
-                        itemId,
-                        PointPublishingFileId,
-                        "post.pointpub",
-                        "/sites/a/SitePages/post.pointpub",
-                        123,
-                        "Customized"))
-            };
         ListItemBatch batch = new(
             Site,
             "/",
@@ -520,7 +490,7 @@ internal sealed class ClassicContentFixture : IClassicContentReader
             query.ListTitle,
             query.ListUrl,
             [item],
-            fileBacked || paging != null ? null : "second",
+            paging == null ? "second" : null,
             SourceReadState.Complete,
             query.QueryKind,
             query.ListTemplate,

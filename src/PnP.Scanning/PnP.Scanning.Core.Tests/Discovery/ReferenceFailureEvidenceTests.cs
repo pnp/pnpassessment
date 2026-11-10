@@ -1,7 +1,8 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages.Collection.Discovery;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using System.Net;
 using System.Text.Json;
@@ -17,12 +18,15 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
     private readonly ScanContextFixture database;
     public ReferenceFailureEvidenceTests(ScanContextFixture database) => this.database = database;
 
+    /// <summary>Verifies real http failure keeps request stage original type message and http diagnostics.</summary>
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, DiscoveryTerminalOutcome.Denied, "locator_denied")]
     [InlineData(HttpStatusCode.InternalServerError, DiscoveryTerminalOutcome.Failed, "locator_resolution_failed")]
     [InlineData(HttpStatusCode.BadRequest, DiscoveryTerminalOutcome.Failed, "locator_resolution_failed")]
     public async Task Real_http_failure_keeps_request_stage_original_type_message_and_http_diagnostics(
-        HttpStatusCode status, DiscoveryTerminalOutcome expected, string code)
+        HttpStatusCode status,
+        DiscoveryTerminalOutcome expected,
+        string code)
     {
         using var sdk = await OfflineFileSdk.CreateAsync();
         SetFailure(sdk, status);
@@ -32,7 +36,8 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         result.Outcome.Should().Be(expected);
         result.ErrorCode.Should().Be(code);
         result.ErrorStage.Should().Be("FileRequest");
-        result.ErrorDetail.Should().Contain("SharePointRestServiceException")
+        result.ErrorDetail.Should()
+            .Contain("SharePointRestServiceException")
             .And.Contain(((int)status).ToString(System.Globalization.CultureInfo.InvariantCulture))
             .And.Contain("Offline physical-file request failed")
             .And.Contain("Offline.FileFailure")
@@ -62,12 +67,14 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies actual sdk not found result has request stage and does not invent a physical identity.</summary>
     [Fact]
     public async Task Actual_sdk_not_found_result_has_request_stage_and_does_not_invent_a_physical_identity()
     {
         using var sdk = await OfflineFileSdk.CreateAsync();
         sdk.Transport.FileStatus = HttpStatusCode.NotFound;
-        sdk.Transport.FileJson = ErrorPayload("The offline file does not exist.",
+        sdk.Transport.FileJson = ErrorPayload(
+            "The offline file does not exist.",
             "-2130575338, System.IO.FileNotFoundException");
 
         var result = await sdk.Client.ResolveFileAsync(OfflineFileSdk.FilePath);
@@ -81,20 +88,28 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies actual provider persists safe diagnostics in reference columns and evidence json.</summary>
     [Theory]
     [InlineData("denied", "FileRequest", "SharePointRestServiceException")]
     [InlineData("server", "FileRequest", "SharePointRestServiceException")]
     [InlineData("projection", "FileMetadataProjection", "ClientException")]
     public async Task Actual_provider_persists_safe_diagnostics_in_reference_columns_and_evidence_json(
-        string failure, string stage, string errorType)
+        string failure,
+        string stage,
+        string errorType)
     {
         using var sdk = await OfflineFileSdk.CreateAsync();
-        if (failure == "projection") sdk.Transport.FileJson = ReferenceFileResolutionTests.FilePayload("item", omitName: true);
-        else SetFailure(sdk, failure == "denied" ? HttpStatusCode.Forbidden : HttpStatusCode.InternalServerError);
+        if (failure == "projection")
+            sdk.Transport.FileJson = ReferenceFileResolutionTests.FilePayload("item", omitName: true);
+        else
+            SetFailure(sdk, failure == "denied" ? HttpStatusCode.Forbidden : HttpStatusCode.InternalServerError);
         var scan = Guid.NewGuid();
         using var provider = Provider(sdk);
 
-        await new AssessmentWebDiscovery(scan, OfflineFileSdk.WebUrl, "/",
+        await new AssessmentWebDiscovery(
+            scan,
+            OfflineFileSdk.WebUrl,
+            "/",
             new AssessmentDiscoveryWriter(database.CreateContext)).RunAsync(provider, CancellationToken.None);
 
         var candidate = provider.ReferenceCollector.ReadReferenceEvidence().Should().ContainSingle().Which;
@@ -102,7 +117,8 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         candidate.ErrorStage.Should().Be(stage);
         candidate.ErrorDetail.Should().Contain(errorType);
         using var db = database.CreateContext();
-        var reference = await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
+        Core.Storage.ClassicPageDiscovery reference =
+            await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
         reference.DiscoveryStatus.Should().Be("Failed");
         reference.ErrorStage.Should().Be(stage);
         reference.ErrorDetail.Should().Be(candidate.ErrorDetail);
@@ -110,12 +126,13 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         using var evidence = JsonDocument.Parse(reference.EvidenceJson);
         evidence.RootElement.GetProperty("errorStage").GetString().Should().Be(stage);
         evidence.RootElement.GetProperty("errorDetail").GetString().Should().Be(candidate.ErrorDetail);
-        (await db.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan && row.RowType == "Page"))
-            .Should().Be(0, "an actual failed resolution remains evidence, not an invented physical page");
+        (await db.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan && row.RowType == "Page")).Should()
+            .Be(0, "an actual failed resolution remains evidence, not an invented physical page");
         sdk.Transport.FileRequests.Should().ContainSingle();
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies successful file without item metadata reaches page and linked reference persistence.</summary>
     [Fact]
     public async Task Successful_file_without_item_metadata_reaches_page_and_linked_reference_persistence()
     {
@@ -124,11 +141,15 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         var scan = Guid.NewGuid();
         using var provider = Provider(sdk);
 
-        await new AssessmentWebDiscovery(scan, OfflineFileSdk.WebUrl, "/",
+        await new AssessmentWebDiscovery(
+            scan,
+            OfflineFileSdk.WebUrl,
+            "/",
             new AssessmentDiscoveryWriter(database.CreateContext)).RunAsync(provider, CancellationToken.None);
 
         using var db = database.CreateContext();
-        var reference = await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
+        Core.Storage.ClassicPageDiscovery reference =
+            await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
         reference.DiscoveryStatus.Should().Be("Discovered");
         reference.FileUniqueId.Should().Be(OfflineFileSdk.FileId);
         reference.ErrorStage.Should().BeNull();
@@ -140,10 +161,12 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         page.ListId.Should().BeNull();
         page.ListItemId.Should().BeNull();
         page.HomePage.Should().BeTrue();
-        sdk.Transport.FileRequests.Should().ContainSingle("targeted HOME discovery reuses the resolved physical record");
+        sdk.Transport.FileRequests.Should()
+            .ContainSingle("targeted HOME discovery reuses the resolved physical record");
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies real http exception secrets are redacted before reference database persistence.</summary>
     [Fact]
     public async Task Real_http_exception_secrets_are_redacted_before_reference_database_persistence()
     {
@@ -153,34 +176,55 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         const string secret = "fixture-clientsecret-do-not-persist";
         using var sdk = await OfflineFileSdk.CreateAsync();
         sdk.Transport.FileStatus = HttpStatusCode.InternalServerError;
-        sdk.Transport.FileJson = ErrorPayload("Offline safe failure; Authorization: Bearer " + bearer +
-            "; access_token=" + jwt + "; password=" + password + "; client_secret=" + secret);
+        sdk.Transport.FileJson = ErrorPayload(
+            "Offline safe failure; Authorization: Bearer " + bearer + "; access_token=" + jwt + "; password=" +
+            password + "; client_secret=" + secret);
         var scan = Guid.NewGuid();
         using var provider = Provider(sdk);
 
-        await new AssessmentWebDiscovery(scan, OfflineFileSdk.WebUrl, "/",
+        await new AssessmentWebDiscovery(
+            scan,
+            OfflineFileSdk.WebUrl,
+            "/",
             new AssessmentDiscoveryWriter(database.CreateContext)).RunAsync(provider, CancellationToken.None);
 
         using var db = database.CreateContext();
-        var reference = await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
-        reference.ErrorDetail.Should().Contain("SharePointRestServiceException").And.Contain("Offline safe failure")
-            .And.Contain("500").And.Contain("redacted");
+        Core.Storage.ClassicPageDiscovery reference =
+            await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
+        reference.ErrorDetail.Should()
+            .Contain("SharePointRestServiceException")
+            .And.Contain("Offline safe failure")
+            .And.Contain("500")
+            .And.Contain("redacted");
         foreach (var sensitive in new[] { bearer, jwt, password, secret })
         {
             reference.ErrorDetail.Should().NotContain(sensitive);
             reference.EvidenceJson.Should().NotContain(sensitive);
         }
+
         reference.ErrorDetail.Length.Should().BeLessThanOrEqualTo(1024);
         reference.ErrorDetail.Should().NotContain(" at PnP.");
         sdk.Transport.FileRequests.Should().ContainSingle();
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
-    private static SharePointLiveAspxDiscoveryProvider Provider(OfflineFileSdk sdk) => new(
-        new("offline-app", "scheduled-web", "test-build", "test-authority", Intent: AspxDiscoveryIntent.HomePageOnly),
-        new SingleClientFactory(sdk.Client),
-        new AspxWebAcquisitionContext(OfflineFileSdk.SiteId, new Uri(OfflineFileSdk.WebUrl),
-            OfflineFileSdk.WebId, new Uri(OfflineFileSdk.WebUrl), "/sites/reference", "STS#0"));
+    /// <summary>Verifies provider.</summary>
+    private static SharePointLiveAspxDiscoveryProvider Provider(OfflineFileSdk sdk) =>
+        new(
+            new(
+                "offline-app",
+                "scheduled-web",
+                "test-build",
+                "test-authority",
+                Intent: AspxDiscoveryIntent.HomePageOnly),
+            new SingleClientFactory(sdk.Client),
+            new AspxWebAcquisitionContext(
+                OfflineFileSdk.SiteId,
+                new Uri(OfflineFileSdk.WebUrl),
+                OfflineFileSdk.WebId,
+                new Uri(OfflineFileSdk.WebUrl),
+                "/sites/reference",
+                "STS#0"));
 
     private static void SetFailure(OfflineFileSdk sdk, HttpStatusCode status)
     {
@@ -188,11 +232,13 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         sdk.Transport.FileJson = ErrorPayload("Offline physical-file request failed.");
     }
 
+    /// <summary>Verifies error payload.</summary>
     private static string ErrorPayload(string message, string code = "-2147467259, Offline.FileFailure") =>
-        JsonSerializer.Serialize(new Dictionary<string, object>
-        {
-            ["odata.error"] = new { code, message = new { lang = "en-US", value = message } }
-        });
+        JsonSerializer.Serialize(
+            new Dictionary<string, object>
+            {
+                ["odata.error"] = new { code, message = new { lang = "en-US", value = message } }
+            });
 
     private sealed class SingleClientFactory(ISharePointAspxRestClient client) : ISharePointAspxRestClientFactory
     {
@@ -202,6 +248,7 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
             webUrl.Should().Be(new Uri(OfflineFileSdk.WebUrl), "the fixture must never alias another Web");
             return Task.FromResult(client);
         }
+
         public void Dispose() => client.Dispose();
     }
 }

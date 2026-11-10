@@ -1,3 +1,5 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using EFCore.BulkExtensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -1213,6 +1215,8 @@ namespace PnP.Scanning.Core.Storage
             Log.Information("PopulateWebPartUniqueAsync succeeded");
         }
 
+        /// <summary>Aggregates stored publishing page, layout and remediation facts for the existing site report.</summary>
+
         // Build the per-site-collection publishing-portal rollup (mirrors the legacy Modernization Scanner's
         // ModernizationPublishingSiteScanResults.csv — one row per publishing portal). A "publishing web" is a
         // web flagged as a classic publishing site (publishing template) or one that carries at least one
@@ -1248,7 +1252,7 @@ namespace PnP.Scanning.Core.Storage
                 .ToListAsync();
 
             var publishingPages = await dbContext.ClassicPages
-                .Where(p => p.ScanId == scanId && p.PageType == PageScanComponent.PublishingPage)
+                .Where(p => p.ScanId == scanId && p.PageType == ClassicPageRules.PublishingPage)
                 .Select(p => new { p.SiteUrl, p.Layout, p.ModifiedAt })
                 .ToListAsync();
 
@@ -1318,6 +1322,7 @@ namespace PnP.Scanning.Core.Storage
             Log.Information("PopulatePublishingSiteSummaryAsync succeeded");
         }
 
+        /// <summary>Queries the legacy audit source and persists per-page usage together with query coverage.</summary>
         internal async Task CollectAndStoreAuditLogUsageAsync(
             ScanContext dbContext,
             Guid scanId,
@@ -1402,15 +1407,16 @@ namespace PnP.Scanning.Core.Storage
             IReadOnlyList<string> siteUrlsForFilter = hasExplicitSiteList ? siteUrls : null;
 
             Action<string> auditProgress = msg => Log.Information("[AuditLog] {ScanId} {AuditMsg}", scanId, msg);
-            var (allStats, skipReason) = await Scanners.AuditLogUsageAnalyzer.QueryAllSitesAuditUsageAsync(
-                Authentication.AuthenticationManager.HttpClient,
-                graphBaseUrl,
-                tokenProvider,
-                siteUrlsForFilter,
-                windowStart,
-                windowEnd,
-                cancellationToken,
-                auditProgress);
+            (IReadOnlyDictionary<string, AuditLogUsageAnalyzer.AuditPageStats> allStats, string skipReason) =
+                await AuditLogUsageAnalyzer.QueryAllSitesAuditUsageAsync(
+                    Authentication.AuthenticationManager.HttpClient,
+                    graphBaseUrl,
+                    tokenProvider,
+                    siteUrlsForFilter,
+                    windowStart,
+                    windowEnd,
+                    cancellationToken,
+                    auditProgress);
 
             // allStats != null + skipReason == null → full success
             // allStats != null + skipReason != null → partial success (some chunks failed, data incomplete)
@@ -1441,11 +1447,11 @@ namespace PnP.Scanning.Core.Storage
             // Pre-compute the "<site>/" prefixes once instead of re-allocating (s + "/") per page × site.
             var sitePrefixes = sortedSiteUrls.Select(s => s + "/").ToList();
 
-            Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>> statsBySite = null;
+            Dictionary<string, Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>> statsBySite = null;
             if (allStats != null)
             {
                 statsBySite =
-                    new Dictionary<string, Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>>(
+                    new Dictionary<string, Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>>(
                         StringComparer.OrdinalIgnoreCase);
                 foreach (var kvp in allStats)
                 {
@@ -1463,7 +1469,7 @@ namespace PnP.Scanning.Core.Storage
 
                     if (!statsBySite.TryGetValue(owningSite, out var siteDict))
                         statsBySite[owningSite] = siteDict =
-                            new Dictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats>(
+                            new Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>(
                                 StringComparer.OrdinalIgnoreCase);
                     siteDict[kvp.Key] = kvp.Value;
                 }
@@ -1472,7 +1478,7 @@ namespace PnP.Scanning.Core.Storage
             var allRecords = new List<ClassicPageAuditUsage>();
             foreach (var siteUrl in siteUrls)
             {
-                IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> siteStats = null;
+                IReadOnlyDictionary<string, AuditLogUsageAnalyzer.AuditPageStats> siteStats = null;
                 if (statsBySite != null && statsBySite.TryGetValue(siteUrl, out var assigned) && assigned.Count > 0)
                     siteStats = assigned;
                 BuildAuditLogRecords(
@@ -1489,11 +1495,12 @@ namespace PnP.Scanning.Core.Storage
             await dbContext.BulkInsertAsync(allRecords);
         }
 
+        /// <summary>Projects retained audit counts and query coverage into existing report rows.</summary>
         private static void BuildAuditLogRecords(
             List<ClassicPageAuditUsage> target,
             Guid scanId,
             string siteUrl,
-            IReadOnlyDictionary<string, Scanners.AuditLogUsageAnalyzer.AuditPageStats> stats,
+            IReadOnlyDictionary<string, AuditLogUsageAnalyzer.AuditPageStats> stats,
             DateTime windowStart,
             DateTime windowEnd,
             string queryStatus,
@@ -1558,7 +1565,7 @@ namespace PnP.Scanning.Core.Storage
                         QueryStatus = queryStatus,
                         SkipReason = queryStatus == "partial" ? skipReason : null,
                     };
-                    Scanners.AuditLogUsageAnalyzer.ApplyAuditUsage(record, stats);
+                    AuditLogUsageAnalyzer.ApplyAuditUsage(record, stats);
                     record.PageUrl = Rel(kvp.Key);
                     target.Add(record);
                 }

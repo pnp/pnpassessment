@@ -1,9 +1,9 @@
-﻿using System.Globalization;
+﻿using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using FluentAssertions;
 using PnP.Scanning.Core.Services;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -27,6 +27,7 @@ namespace PnP.Scanning.Core.Tests.Storage
             this.fixture = fixture;
         }
 
+        /// <summary>Verifies csv page web parts header and rows.</summary>
         [Fact]
         public async Task Csv_PageWebParts_HeaderAndRows()
         {
@@ -36,10 +37,22 @@ namespace PnP.Scanning.Core.Tests.Storage
 
             var webParts = new List<ClassicPageWebPart>
             {
-                NewWebPart(scanId, siteUrl, pageUrl, index: 0, type: "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart",
-                           shortType: "ContentEditorWebPart", isMappable: true),
-                NewWebPart(scanId, siteUrl, pageUrl, index: 1, type: "Contoso.Custom.WebPart",
-                           shortType: "WebPart", isMappable: false),
+                NewWebPart(
+                    scanId,
+                    siteUrl,
+                    pageUrl,
+                    index: 0,
+                    type: "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart",
+                    shortType: "ContentEditorWebPart",
+                    isMappable: true),
+                NewWebPart(
+                    scanId,
+                    siteUrl,
+                    pageUrl,
+                    index: 1,
+                    type: "Contoso.Custom.WebPart",
+                    shortType: "WebPart",
+                    isMappable: false),
             };
 
             using (var context = fixture.CreateContext())
@@ -56,24 +69,20 @@ namespace PnP.Scanning.Core.Tests.Storage
                 var file = Path.Join(exportDir, "classicpagewebparts.csv");
                 File.Exists(file).Should().BeTrue();
 
-                ReadHeader(file).Should().Contain(new[]
-                {
-                    nameof(ClassicPageWebPart.ScanId),
-                    nameof(ClassicPageWebPart.SiteUrl),
-                    nameof(ClassicPageWebPart.WebUrl),
-                    nameof(ClassicPageWebPart.PageUrl),
-                    nameof(ClassicPageWebPart.WebPartIndex),
-                    nameof(ClassicPageWebPart.WebPartType),
-                    nameof(ClassicPageWebPart.WebPartTypeShort),
-                    nameof(ClassicPageWebPart.WebPartTitle),
-                    nameof(ClassicPageWebPart.ZoneId),
-                    nameof(ClassicPageWebPart.Row),
-                    nameof(ClassicPageWebPart.Column),
-                    nameof(ClassicPageWebPart.Order),
-                    nameof(ClassicPageWebPart.Hidden),
-                    nameof(ClassicPageWebPart.IsClosed),
-                    nameof(ClassicPageWebPart.IsMappable),
-                });
+                ReadHeader(file)
+                    .Should()
+                    .Contain(
+                        new[]
+                        {
+                            nameof(ClassicPageWebPart.ScanId), nameof(ClassicPageWebPart.SiteUrl),
+                            nameof(ClassicPageWebPart.WebUrl), nameof(ClassicPageWebPart.PageUrl),
+                            nameof(ClassicPageWebPart.WebPartIndex), nameof(ClassicPageWebPart.WebPartType),
+                            nameof(ClassicPageWebPart.WebPartTypeShort), nameof(ClassicPageWebPart.WebPartTitle),
+                            nameof(ClassicPageWebPart.ZoneId), nameof(ClassicPageWebPart.Row),
+                            nameof(ClassicPageWebPart.Column), nameof(ClassicPageWebPart.Order),
+                            nameof(ClassicPageWebPart.Hidden), nameof(ClassicPageWebPart.IsClosed),
+                            nameof(ClassicPageWebPart.IsMappable),
+                        });
 
                 var rows = ReadRecords<ClassicPageWebPart>(file)
                     .Where(wp => wp.ScanId == scanId)
@@ -98,6 +107,7 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
+        /// <summary>Verifies csv web part unique header and rows.</summary>
         [Fact]
         public async Task Csv_WebPartUnique_HeaderAndRows()
         {
@@ -105,8 +115,20 @@ namespace PnP.Scanning.Core.Tests.Storage
 
             var uniques = new List<ClassicWebPartUnique>
             {
-                new() { ScanId = scanId, WebPartType = "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart", InMappingFile = true, PageCount = 3 },
-                new() { ScanId = scanId, WebPartType = "Contoso.Custom.WebPart", InMappingFile = false, PageCount = 1 },
+                new()
+                {
+                    ScanId = scanId,
+                    WebPartType = "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart",
+                    InMappingFile = true,
+                    PageCount = 3
+                },
+                new()
+                {
+                    ScanId = scanId,
+                    WebPartType = "Contoso.Custom.WebPart",
+                    InMappingFile = false,
+                    PageCount = 1
+                },
             };
 
             using (var context = fixture.CreateContext())
@@ -123,21 +145,23 @@ namespace PnP.Scanning.Core.Tests.Storage
                 var file = Path.Join(exportDir, "classicwebpartunique.csv");
                 File.Exists(file).Should().BeTrue();
 
-                ReadHeader(file).Should().Contain(new[]
-                {
-                    nameof(ClassicWebPartUnique.ScanId),
-                    nameof(ClassicWebPartUnique.WebPartType),
-                    nameof(ClassicWebPartUnique.InMappingFile),
-                    nameof(ClassicWebPartUnique.PageCount),
-                });
+                ReadHeader(file)
+                    .Should()
+                    .Contain(
+                        new[]
+                        {
+                            nameof(ClassicWebPartUnique.ScanId), nameof(ClassicWebPartUnique.WebPartType),
+                            nameof(ClassicWebPartUnique.InMappingFile), nameof(ClassicWebPartUnique.PageCount),
+                        });
 
-                var rows = ReadRecords<ClassicWebPartUnique>(file)
+                List<ClassicWebPartUnique> rows = ReadRecords<ClassicWebPartUnique>(file)
                     .Where(u => u.ScanId == scanId)
                     .ToList();
 
                 rows.Should().HaveCount(2);
 
-                var contentEditor = rows.Single(u => u.WebPartType == "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart");
+                ClassicWebPartUnique contentEditor = rows.Single(u =>
+                    u.WebPartType == "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart");
                 contentEditor.InMappingFile.Should().BeTrue();
                 contentEditor.PageCount.Should().Be(3);
 
@@ -151,6 +175,7 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
+        /// <summary>Verifies csv classic pages has enriched columns.</summary>
         [Fact]
         public async Task Csv_ClassicPages_HasEnrichedColumns()
         {
@@ -191,16 +216,16 @@ namespace PnP.Scanning.Core.Tests.Storage
                 File.Exists(file).Should().BeTrue();
 
                 // The enrichment columns the page scan adds must all surface in the page CSV.
-                ReadHeader(file).Should().Contain(new[]
-                {
-                    nameof(ClassicPage.Layout),
-                    nameof(ClassicPage.HomePage),
-                    nameof(ClassicPage.UncustomizedHomePage),
-                    nameof(ClassicPage.ModifiedBy),
-                    nameof(ClassicPage.WebPartCount),
-                    nameof(ClassicPage.MappingPercentage),
-                    nameof(ClassicPage.UnmappedWebParts),
-                });
+                ReadHeader(file)
+                    .Should()
+                    .Contain(
+                        new[]
+                        {
+                            nameof(ClassicPage.Layout), nameof(ClassicPage.HomePage),
+                            nameof(ClassicPage.UncustomizedHomePage), nameof(ClassicPage.ModifiedBy),
+                            nameof(ClassicPage.WebPartCount), nameof(ClassicPage.MappingPercentage),
+                            nameof(ClassicPage.UnmappedWebParts),
+                        });
 
                 var row = ReadRecords<ClassicPage>(file).Single(p => p.ScanId == scanId && p.PageUrl == pageUrl);
 
@@ -218,6 +243,7 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
+        /// <summary>Verifies csv page and layout customization statuses round trip independently.</summary>
         [Fact]
         public async Task Csv_Page_and_layout_customization_statuses_round_trip_independently()
         {
@@ -226,48 +252,69 @@ namespace PnP.Scanning.Core.Tests.Storage
             {
                 new ClassicPage
                 {
-                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
-                    PageUrl = "/sites/a/Pages/publishing.aspx", PageType = "PublishingPage",
+                    ScanId = scan,
+                    SiteUrl = "https://contoso.sharepoint.com/sites/a",
+                    WebUrl = "/",
+                    PageUrl = "/sites/a/Pages/publishing.aspx",
+                    PageType = "PublishingPage",
                     CustomizedPageStatus = "Customized",
                     LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
                 },
                 new ClassicPage
                 {
-                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
-                    PageUrl = "/sites/a/SitePages/wiki.aspx", PageType = "WikiPage",
+                    ScanId = scan,
+                    SiteUrl = "https://contoso.sharepoint.com/sites/a",
+                    WebUrl = "/",
+                    PageUrl = "/sites/a/SitePages/wiki.aspx",
+                    PageType = "WikiPage",
                     CustomizedPageStatus = "Uncustomized",
                 },
                 new ClassicPage
                 {
-                    ScanId = scan, SiteUrl = "https://contoso.sharepoint.com/sites/a", WebUrl = "/",
-                    PageUrl = "/sites/a/Pages/unknown.aspx", PageType = "PublishingPage",
+                    ScanId = scan,
+                    SiteUrl = "https://contoso.sharepoint.com/sites/a",
+                    WebUrl = "/",
+                    PageUrl = "/sites/a/Pages/unknown.aspx",
+                    PageType = "PublishingPage",
                 },
             };
             using (var context = fixture.CreateContext())
             {
                 context.ClassicPages.AddRange(pages);
-                context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
-                {
-                    ScanId = scan, SiteUrl = pages[0].SiteUrl, WebUrl = "/", RecordKey = "layout",
-                    RowType = "Page", Url = pages[0].LayoutUrl, CustomizedPageStatus = "Uncustomized",
-                    DiscoveryStatus = "Discovered",
-                });
+                context.ClassicPageDiscoveries.Add(
+                    new ClassicPageDiscovery
+                    {
+                        ScanId = scan,
+                        SiteUrl = pages[0].SiteUrl,
+                        WebUrl = "/",
+                        RecordKey = "layout",
+                        RowType = "Page",
+                        Url = pages[0].LayoutUrl,
+                        CustomizedPageStatus = "Uncustomized",
+                        DiscoveryStatus = "Discovered",
+                    });
                 await context.SaveChangesAsync();
-                await PublishingLayoutStatusReader.EnrichSiteAsync(context, scan, pages[0].SiteUrl,
+                await PublishingLayoutStatusReader.EnrichSiteAsync(
+                    context,
+                    scan,
+                    pages[0].SiteUrl,
                     _ => throw new InvalidOperationException("Layout should come from discovery"),
                     (error, _) => throw new InvalidOperationException("Unexpected layout failure", error));
             }
+
             var directory = NewTempDir();
             try
             {
                 await ExportAsync(scan, directory);
                 var file = Path.Join(directory, "classicpages.csv");
-                ReadHeader(file).Should().Contain(new[]
-                {
-                    nameof(ClassicPage.CustomizedPageStatus),
-                    nameof(ClassicPage.LayoutUrl),
-                    nameof(ClassicPage.LayoutCustomizedPageStatus),
-                });
+                ReadHeader(file)
+                    .Should()
+                    .Contain(
+                        new[]
+                        {
+                            nameof(ClassicPage.CustomizedPageStatus), nameof(ClassicPage.LayoutUrl),
+                            nameof(ClassicPage.LayoutCustomizedPageStatus),
+                        });
                 var rows = ReadRecords<ClassicPage>(file).ToArray();
                 var publishing = rows.Single(page => page.PageUrl.EndsWith("/publishing.aspx"));
                 publishing.CustomizedPageStatus.Should().Be("Customized");
@@ -281,9 +328,13 @@ namespace PnP.Scanning.Core.Tests.Storage
                 unknown.CustomizedPageStatus.Should().BeNullOrEmpty();
                 unknown.LayoutCustomizedPageStatus.Should().BeNullOrEmpty();
             }
-            finally { DeleteTempDir(directory); }
+            finally
+            {
+                DeleteTempDir(directory);
+            }
         }
 
+        /// <summary>Verifies csv layout failure preserves complete page and exports discovery error.</summary>
         [Fact]
         public async Task Csv_Layout_failure_preserves_complete_page_and_exports_discovery_error()
         {
@@ -292,26 +343,42 @@ namespace PnP.Scanning.Core.Tests.Storage
             const string pageUrl = "/sites/a/Pages/home.aspx";
             using (var context = fixture.CreateContext())
             {
-                context.ClassicPages.Add(new ClassicPage
-                {
-                    ScanId = scan, SiteUrl = site, WebUrl = "/", PageUrl = pageUrl,
-                    PageType = "PublishingPage", AssessmentStatus = "Complete",
-                    LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
-                    WebPartCount = 3, MappingPercentage = 100,
-                });
-                context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
-                {
-                    ScanId = scan, SiteUrl = site, WebUrl = "/", RecordKey = "page",
-                    RowType = "Page", Url = pageUrl, DiscoveryStatus = "Discovered",
-                    AssessmentStatus = "Complete",
-                });
+                context.ClassicPages.Add(
+                    new ClassicPage
+                    {
+                        ScanId = scan,
+                        SiteUrl = site,
+                        WebUrl = "/",
+                        PageUrl = pageUrl,
+                        PageType = "PublishingPage",
+                        AssessmentStatus = "Complete",
+                        LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
+                        WebPartCount = 3,
+                        MappingPercentage = 100,
+                    });
+                context.ClassicPageDiscoveries.Add(
+                    new ClassicPageDiscovery
+                    {
+                        ScanId = scan,
+                        SiteUrl = site,
+                        WebUrl = "/",
+                        RecordKey = "page",
+                        RowType = "Page",
+                        Url = pageUrl,
+                        DiscoveryStatus = "Discovered",
+                        AssessmentStatus = "Complete",
+                    });
                 await context.SaveChangesAsync();
                 var failures = new List<Exception>();
-                await PublishingLayoutStatusReader.EnrichSiteAsync(context, scan, site,
+                await PublishingLayoutStatusReader.EnrichSiteAsync(
+                    context,
+                    scan,
+                    site,
                     _ => throw new UnauthorizedAccessException("Layout denied"),
                     (error, _) => failures.Add(error));
                 failures.Should().ContainSingle();
             }
+
             var directory = NewTempDir();
             try
             {
@@ -327,34 +394,52 @@ namespace PnP.Scanning.Core.Tests.Storage
                 discovery.ErrorCodes.Should().Be("UnauthorizedAccessException");
                 discovery.ErrorDetail.Should().Contain("Layout denied");
             }
-            finally { DeleteTempDir(directory); }
+            finally
+            {
+                DeleteTempDir(directory);
+            }
         }
 
+        /// <summary>Verifies csv classic page audit usage header and rows.</summary>
         [Fact]
         public async Task Csv_ClassicPageAuditUsage_HeaderAndRows()
         {
             var scanId = Guid.NewGuid();
             var siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
             var windowStart = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
-            var windowEnd   = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc);
+            DateTime windowEnd = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc);
 
             var rows = new List<ClassicPageAuditUsage>
             {
                 new()
                 {
-                    ScanId = scanId, SiteUrl = siteUrl, WebUrl = "/",
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = "/",
                     PageUrl = $"{siteUrl}/SitePages/Home.aspx",
-                    AuditViewsCount = 7, AuditCreatesCount = 1, AuditEditsCount = 2, AuditUniqueUsers = 3,
-                    AuditWindowStart = windowStart, AuditWindowEnd = windowEnd,
-                    QueryStatus = "succeeded", SkipReason = null,
+                    AuditViewsCount = 7,
+                    AuditCreatesCount = 1,
+                    AuditEditsCount = 2,
+                    AuditUniqueUsers = 3,
+                    AuditWindowStart = windowStart,
+                    AuditWindowEnd = windowEnd,
+                    QueryStatus = "succeeded",
+                    SkipReason = null,
                 },
                 new()
                 {
-                    ScanId = scanId, SiteUrl = siteUrl, WebUrl = "/",
+                    ScanId = scanId,
+                    SiteUrl = siteUrl,
+                    WebUrl = "/",
                     PageUrl = $"{siteUrl}/SitePages/Page1.aspx",
-                    AuditViewsCount = 0, AuditCreatesCount = 0, AuditEditsCount = 0, AuditUniqueUsers = 0,
-                    AuditWindowStart = windowStart, AuditWindowEnd = windowEnd,
-                    QueryStatus = "skipped", SkipReason = "AuditLogDisabled",
+                    AuditViewsCount = 0,
+                    AuditCreatesCount = 0,
+                    AuditEditsCount = 0,
+                    AuditUniqueUsers = 0,
+                    AuditWindowStart = windowStart,
+                    AuditWindowEnd = windowEnd,
+                    QueryStatus = "skipped",
+                    SkipReason = "AuditLogDisabled",
                 },
             };
 
@@ -373,20 +458,19 @@ namespace PnP.Scanning.Core.Tests.Storage
                 File.Exists(file).Should().BeTrue();
 
                 var header = ReadHeader(file);
-                header.Should().Contain(new[]
-                {
-                    nameof(ClassicPageAuditUsage.ScanId),
-                    nameof(ClassicPageAuditUsage.SiteUrl),
-                    nameof(ClassicPageAuditUsage.PageUrl),
-                    nameof(ClassicPageAuditUsage.AuditViewsCount),
-                    nameof(ClassicPageAuditUsage.AuditCreatesCount),
-                    nameof(ClassicPageAuditUsage.AuditEditsCount),
-                    nameof(ClassicPageAuditUsage.AuditUniqueUsers),
-                    nameof(ClassicPageAuditUsage.AuditWindowStart),
-                    nameof(ClassicPageAuditUsage.AuditWindowEnd),
-                    nameof(ClassicPageAuditUsage.QueryStatus),
-                    nameof(ClassicPageAuditUsage.SkipReason),
-                });
+                header.Should()
+                    .Contain(
+                        new[]
+                        {
+                            nameof(ClassicPageAuditUsage.ScanId), nameof(ClassicPageAuditUsage.SiteUrl),
+                            nameof(ClassicPageAuditUsage.PageUrl), nameof(ClassicPageAuditUsage.AuditViewsCount),
+                            nameof(ClassicPageAuditUsage.AuditCreatesCount),
+                            nameof(ClassicPageAuditUsage.AuditEditsCount),
+                            nameof(ClassicPageAuditUsage.AuditUniqueUsers),
+                            nameof(ClassicPageAuditUsage.AuditWindowStart),
+                            nameof(ClassicPageAuditUsage.AuditWindowEnd), nameof(ClassicPageAuditUsage.QueryStatus),
+                            nameof(ClassicPageAuditUsage.SkipReason),
+                        });
                 header.Should().NotContain(nameof(ClassicPageAuditUsage.WebUrl));
 
                 var exported = ReadRecordsIgnoreMissingFields<ClassicPageAuditUsage>(file)
@@ -458,14 +542,14 @@ namespace PnP.Scanning.Core.Tests.Storage
             return csv.GetRecords<T>().ToList();
         }
 
+        /// <summary>Verifies read records ignore missing fields.</summary>
+
         // For CSVs that intentionally omit some model properties (e.g. classicpageauditusage.csv drops WebUrl).
         private static List<T> ReadRecordsIgnoreMissingFields<T>(string file)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                Delimiter = ",",
-                HeaderValidated = null,
-                MissingFieldFound = null,
+                Delimiter = ",", HeaderValidated = null, MissingFieldFound = null,
             };
             using var reader = new StreamReader(file);
             using var csv = new CsvReader(reader, config);
@@ -494,8 +578,15 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
-        private static ClassicPageWebPart NewWebPart(Guid scanId, string siteUrl, string pageUrl, int index,
-                                                     string type, string shortType, bool isMappable)
+        /// <summary>Verifies new web part.</summary>
+        private static ClassicPageWebPart NewWebPart(
+            Guid scanId,
+            string siteUrl,
+            string pageUrl,
+            int index,
+            string type,
+            string shortType,
+            bool isMappable)
         {
             return new ClassicPageWebPart
             {

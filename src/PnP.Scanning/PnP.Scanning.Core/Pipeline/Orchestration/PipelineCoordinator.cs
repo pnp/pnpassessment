@@ -1,3 +1,4 @@
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using System.Collections.Concurrent;
 using Google.Protobuf;

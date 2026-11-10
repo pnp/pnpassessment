@@ -1,7 +1,8 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -17,10 +18,13 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
 
     public PublishingLayoutStatusReaderTests(ScanContextFixture fixture) => this.fixture = fixture;
 
+    /// <summary>Verifies post scan uses root discovery committed after subwebs without requests.</summary>
     [Theory]
     [InlineData("Uncustomized", false)]
     [InlineData("None", true)]
-    public async Task Post_scan_uses_root_discovery_committed_after_subwebs_without_requests(string status, bool absoluteDiscoveryUrl)
+    public async Task Post_scan_uses_root_discovery_committed_after_subwebs_without_requests(
+        string status,
+        bool absoluteDiscoveryUrl)
     {
         var scan = Guid.NewGuid();
         var first = StoredPage(scan, "/first", "https://contoso.sharepoint.com" + LayoutUrl);
@@ -34,9 +38,13 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
             db.ClassicPages.AddRange(first, second, wiki);
             await db.SaveChangesAsync();
         }
+
         using (var db = fixture.CreateContext())
         {
-            var layout = Discovered(scan, absoluteDiscoveryUrl ? "https://contoso.sharepoint.com" + LayoutUrl : LayoutUrl, status);
+            ClassicPageDiscovery layout = Discovered(
+                scan,
+                absoluteDiscoveryUrl ? "https://contoso.sharepoint.com" + LayoutUrl : LayoutUrl,
+                status);
             layout.AssessmentStatus = "NotApplicable";
             db.ClassicPageDiscoveries.Add(layout);
             await db.SaveChangesAsync();
@@ -44,15 +52,20 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
 
         using (var db = fixture.CreateContext())
         {
-            await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+            await PublishingLayoutStatusReader.EnrichSiteAsync(
+                db,
+                scan,
+                SiteUrl,
                 _ => throw new InvalidOperationException("Discovery should avoid all requests"),
                 (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
         }
+
         using (var db = fixture.CreateContext())
         {
             var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
             pages.Where(page => page.PageType == "PublishingPage")
-                .Should().OnlyContain(page => page.LayoutCustomizedPageStatus == status && page.AssessmentStatus == "Complete");
+                .Should()
+                .OnlyContain(page => page.LayoutCustomizedPageStatus == status && page.AssessmentStatus == "Complete");
             var saved = pages.Single(page => page.WebUrl == "/first");
             saved.CustomizedPageStatus.Should().Be("Customized");
             saved.WebPartCount.Should().Be(3);
@@ -61,6 +74,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         }
     }
 
+    /// <summary>Verifies missing discovery or status falls back once across webs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -68,17 +82,23 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     {
         var scan = Guid.NewGuid();
         using var db = fixture.CreateContext();
-        db.ClassicPages.AddRange(StoredPage(scan, "/first", LayoutUrl),
+        db.ClassicPages.AddRange(
+            StoredPage(scan, "/first", LayoutUrl),
             StoredPage(scan, "/second", "https://contoso.sharepoint.com" + LayoutUrl));
         if (hasDiscovery) db.ClassicPageDiscoveries.Add(Discovered(scan, LayoutUrl, null));
         await db.SaveChangesAsync();
         var requests = new List<string>();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl, url =>
-        {
-            requests.Add(url);
-            return Task.FromResult("1");
-        }, (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            url =>
+            {
+                requests.Add(url);
+                return Task.FromResult("1");
+            },
+            (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
 
         requests.Should().Equal(LayoutUrl);
         db.ChangeTracker.Clear();
@@ -86,10 +106,13 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         pages.Should().OnlyContain(page => page.LayoutCustomizedPageStatus == "Uncustomized");
     }
 
+    /// <summary>Verifies discovery and fallback results are scoped to scan and site collection.</summary>
     [Theory]
     [InlineData("Customized", 1)]
     [InlineData(null, 2)]
-    public async Task Discovery_and_fallback_results_are_scoped_to_scan_and_site_collection(string discoveredStatus, int expectedRequests)
+    public async Task Discovery_and_fallback_results_are_scoped_to_scan_and_site_collection(
+        string discoveredStatus,
+        int expectedRequests)
     {
         var scan = Guid.NewGuid();
         var otherScan = Guid.NewGuid();
@@ -106,15 +129,24 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         db.ClassicPageDiscoveries.AddRange(otherSiteLayout, Discovered(otherScan, LayoutUrl, "None"));
         await db.SaveChangesAsync();
         var requests = 0;
+
         Task<string> Read(string _)
         {
             requests++;
             return Task.FromResult("Uncustomized");
         }
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl, Read,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            Read,
             (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, otherSite, Read,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            otherSite,
+            Read,
             (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
 
         requests.Should().Be(expectedRequests);
@@ -123,6 +155,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         untouched.LayoutCustomizedPageStatus.Should().BeNull();
     }
 
+    /// <summary>Verifies discovery query only materializes referenced layouts and failed pages.</summary>
     [Fact]
     public async Task Discovery_query_only_materializes_referenced_layouts_and_failed_pages()
     {
@@ -136,40 +169,56 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         pageRow.WebUrl = page.WebUrl;
         var invalidRow = Discovered(scan, invalid.PageUrl.ToUpperInvariant(), "Customized");
         invalidRow.WebUrl = invalid.WebUrl;
-        db.ClassicPageDiscoveries.AddRange(layout, pageRow, invalidRow,
+        db.ClassicPageDiscoveries.AddRange(
+            layout,
+            pageRow,
+            invalidRow,
             Discovered(scan, invalid.LayoutUrl, "Customized"));
-        db.ClassicPageDiscoveries.AddRange(Enumerable.Range(0, 2000).Select(index =>
-            Discovered(scan, $"/sites/a/unrelated/{index}.aspx", "Uncustomized")));
+        db.ClassicPageDiscoveries.AddRange(
+            Enumerable.Range(0, 2000)
+                .Select(index => Discovered(scan, $"/sites/a/unrelated/{index}.aspx", "Uncustomized")));
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var errors = new List<Exception>();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
             _ => throw new InvalidOperationException("No fallback should be needed"),
             (error, _) => errors.Add(error));
 
         errors.Should().ContainSingle().Which.Should().BeOfType<InvalidDataException>();
         // The prefetch covers layouts only. A page's own discovery row is read solely to carry a
         // failure, so the successfully enriched page never materializes one.
-        db.ChangeTracker.Entries<ClassicPageDiscovery>().Select(entry => entry.Entity.RecordKey)
-            .Should().BeEquivalentTo(new[] { layout.RecordKey, invalidRow.RecordKey });
-        db.ChangeTracker.Entries<ClassicPageDiscovery>().Select(entry => entry.Entity.RecordKey)
-            .Should().NotContain(pageRow.RecordKey);
+        db.ChangeTracker.Entries<ClassicPageDiscovery>()
+            .Select(entry => entry.Entity.RecordKey)
+            .Should()
+            .BeEquivalentTo(new[] { layout.RecordKey, invalidRow.RecordKey });
+        db.ChangeTracker.Entries<ClassicPageDiscovery>()
+            .Select(entry => entry.Entity.RecordKey)
+            .Should()
+            .NotContain(pageRow.RecordKey);
         (await db.ClassicPages.SingleAsync(value => value.ScanId == scan && value.PageUrl == page.PageUrl))
-            .LayoutCustomizedPageStatus.Should().Be("Uncustomized");
-        (await db.ClassicPageDiscoveries.FindAsync(scan, invalidRow.RecordKey))
-            .ErrorStage.Should().Be("PageLayoutMetadata");
+            .LayoutCustomizedPageStatus.Should()
+            .Be("Uncustomized");
+        (await db.ClassicPageDiscoveries.FindAsync(scan, invalidRow.RecordKey)).ErrorStage.Should()
+            .Be("PageLayoutMetadata");
     }
 
+    /// <summary>Verifies conflicting discovery retains latest status and records changed during scan.</summary>
     [Theory]
     [InlineData("Uncustomized", "Customized")]
     [InlineData("Customized", "Uncustomized")]
     [InlineData("Customized", "None")]
-    public async Task Conflicting_discovery_retains_latest_status_and_records_changed_during_scan(string previous, string current)
+    public async Task Conflicting_discovery_retains_latest_status_and_records_changed_during_scan(
+        string previous,
+        string current)
     {
         var scan = Guid.NewGuid();
         using var db = fixture.CreateContext();
-        db.ClassicPages.AddRange(StoredPage(scan, "/first", LayoutUrl),
+        db.ClassicPages.AddRange(
+            StoredPage(scan, "/first", LayoutUrl),
             StoredPage(scan, "/second", "https://contoso.sharepoint.com" + LayoutUrl));
         var older = Discovered(scan, LayoutUrl, previous);
         older.ObservedAtUtc = new DateTime(2026, 10, 16, 1, 0, 0, DateTimeKind.Utc);
@@ -180,14 +229,18 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
             _ => throw new InvalidOperationException("Conflicting observations should not trigger a request"),
             (error, _) => throw new InvalidOperationException("Discovery changes are not layout failures", error));
 
         db.ChangeTracker.Clear();
         var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
-        pages.Should().HaveCount(2).And.OnlyContain(page =>
-            page.LayoutCustomizedPageStatus == current && page.AssessmentStatus == "Complete");
+        pages.Should()
+            .HaveCount(2)
+            .And.OnlyContain(page => page.LayoutCustomizedPageStatus == current && page.AssessmentStatus == "Complete");
         var saved = await db.ClassicPageDiscoveries.FindAsync(scan, latest.RecordKey);
         saved.CustomizedPageStatus.Should().Be(current);
         saved.DiscoveryStatus.Should().Be("Discovered");
@@ -196,6 +249,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         saved.ErrorDetail.Should().Contain("latest observed value " + current);
     }
 
+    /// <summary>Verifies post scan failure preserves assessment status and inventory.</summary>
     [Theory]
     [InlineData("Complete")]
     [InlineData("Failed")]
@@ -220,33 +274,46 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
                 row.ErrorCodes = "ExistingFailure";
                 row.ErrorDetail = "Original page assessment failed";
             }
+
             db.ClassicPageDiscoveries.Add(row);
         }
+
         await db.SaveChangesAsync();
         var requests = 0;
         var failures = new List<string>();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl, _ =>
-        {
-            requests++;
-            throw new UnauthorizedAccessException("Layout denied");
-        }, (_, page) => failures.Add(page.PageUrl));
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ =>
+            {
+                requests++;
+                throw new UnauthorizedAccessException("Layout denied");
+            },
+            (_, page) => failures.Add(page.PageUrl));
 
         requests.Should().Be(1);
         failures.Should().HaveCount(2);
         db.ChangeTracker.Clear();
         var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
-        pages.Should().OnlyContain(page => page.AssessmentStatus == assessmentStatus &&
-            page.LayoutCustomizedPageStatus == null && page.WebPartCount == 3 &&
-            page.MappingPercentage == 100 && page.RemediationCode == "CP3");
+        pages.Should()
+            .OnlyContain(page => page.AssessmentStatus == assessmentStatus && page.LayoutCustomizedPageStatus == null &&
+                                 page.WebPartCount == 3 && page.MappingPercentage == 100 &&
+                                 page.RemediationCode == "CP3");
         var rows = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
-        rows.Should().OnlyContain(row => row.AssessmentStatus == assessmentStatus &&
-            row.ErrorStage.Contains("PageLayoutMetadata") && row.ErrorDetail.Contains("Layout denied"));
+        rows.Should()
+            .OnlyContain(row =>
+                row.AssessmentStatus == assessmentStatus && row.ErrorStage.Contains("PageLayoutMetadata") &&
+                row.ErrorDetail.Contains("Layout denied"));
         if (assessmentStatus == "Failed")
-            rows.Should().OnlyContain(row => row.ErrorStage.Contains("WebPartAssessment") &&
-                row.ErrorCodes.Contains("ExistingFailure") && row.ErrorDetail.Contains("Original page assessment failed"));
+            rows.Should()
+                .OnlyContain(row =>
+                    row.ErrorStage.Contains("WebPartAssessment") && row.ErrorCodes.Contains("ExistingFailure") &&
+                    row.ErrorDetail.Contains("Original page assessment failed"));
     }
 
+    /// <summary>Verifies post scan cancellation propagates without recording a layout failure.</summary>
     [Fact]
     public async Task Post_scan_cancellation_propagates_without_recording_a_layout_failure()
     {
@@ -255,7 +322,10 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         db.ClassicPages.Add(StoredPage(scan, "/first", LayoutUrl));
         await db.SaveChangesAsync();
 
-        var enrich = () => PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+        Func<Task> enrich = () => PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
             _ => throw new OperationCanceledException(),
             (_, _) => throw new InvalidOperationException("Cancellation is not a layout failure"));
         await enrich.Should().ThrowAsync<OperationCanceledException>();
@@ -263,24 +333,42 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         (await db.ClassicPages.SingleAsync(page => page.ScanId == scan)).AssessmentStatus.Should().Be("Complete");
     }
 
-    private static ClassicPage StoredPage(Guid scan, string web, string layout) => new()
-    {
-        ScanId = scan, SiteUrl = SiteUrl, WebUrl = web, PageUrl = "/sites/a" + web + "/Pages/home.aspx",
-        PageType = PageScanComponent.PublishingPage, LayoutUrl = layout, AssessmentStatus = "Complete",
-    };
+    /// <summary>Builds a synthetic stored publishing page for the layout compatibility fixture.</summary>
+    private static ClassicPage StoredPage(Guid scan, string web, string layout) =>
+        new()
+        {
+            ScanId = scan,
+            SiteUrl = SiteUrl,
+            WebUrl = web,
+            PageUrl = "/sites/a" + web + "/Pages/home.aspx",
+            PageType = ClassicPageRules.PublishingPage,
+            LayoutUrl = layout,
+            AssessmentStatus = "Complete",
+        };
 
-    private static ClassicPageDiscovery Discovered(Guid scan, string url, string status) => new()
-    {
-        ScanId = scan, SiteUrl = SiteUrl, WebUrl = "/", RecordKey = Guid.NewGuid().ToString(),
-        RowType = "Page", Url = url, CustomizedPageStatus = status, DiscoveryStatus = "Discovered",
-    };
+    /// <summary>Creates a synthetic discovered layout observation for the compatibility fixture.</summary>
+    private static ClassicPageDiscovery Discovered(Guid scan, string url, string status) =>
+        new()
+        {
+            ScanId = scan,
+            SiteUrl = SiteUrl,
+            WebUrl = "/",
+            RecordKey = Guid.NewGuid().ToString(),
+            RowType = "Page",
+            Url = url,
+            CustomizedPageStatus = status,
+            DiscoveryStatus = "Discovered",
+        };
 
+    /// <summary>Verifies missing layout reference does not infer a status.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     public async Task Missing_layout_reference_does_not_infer_a_status(string url)
     {
-        var reader = new PublishingLayoutStatusReader(SiteUri, _ => throw new InvalidOperationException("Unexpected request"));
+        PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
+            SiteUri,
+            _ => throw new InvalidOperationException("Unexpected request"));
         var page = Page(url);
         await reader.EnrichAsync(page);
         page.LayoutCustomizedPageStatus.Should().BeNull();
@@ -298,6 +386,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         page.LayoutCustomizedPageStatus.Should().Be(expected);
     }
 
+    /// <summary>Verifies invalid layout url surfaces an error instead of guessing.</summary>
     [Theory]
     [InlineData("https://other.sharepoint.com/sites/a/_catalogs/masterpage/Basic.aspx")]
     [InlineData("//other.sharepoint.com/Basic.aspx")]
@@ -312,18 +401,23 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     [InlineData("/sites/a/_catalogs/masterpage/Basic.aspx#fragment")]
     public async Task Invalid_layout_url_surfaces_an_error_instead_of_guessing(string url)
     {
-        var reader = new PublishingLayoutStatusReader(SiteUri, _ => throw new InvalidOperationException("Unexpected request"));
+        PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
+            SiteUri,
+            _ => throw new InvalidOperationException("Unexpected request"));
         var page = Page(url);
         var enrich = () => reader.EnrichAsync(page);
         await enrich.Should().ThrowAsync<InvalidDataException>();
         page.LayoutCustomizedPageStatus.Should().BeNull();
     }
 
+    /// <summary>Verifies layout containment accepts root sites trailing slashes and case variations.</summary>
     [Theory]
     [InlineData("https://contoso.sharepoint.com", "/_catalogs/masterpage/Basic.aspx")]
     [InlineData("https://contoso.sharepoint.com/sites/a/", "/sites/a/_catalogs/masterpage/Basic.aspx")]
     [InlineData("https://contoso.sharepoint.com/sites/A", "/sites/a/_catalogs/masterpage/Basic.aspx")]
-    public async Task Layout_containment_accepts_root_sites_trailing_slashes_and_case_variations(string site, string layout)
+    public async Task Layout_containment_accepts_root_sites_trailing_slashes_and_case_variations(
+        string site,
+        string layout)
     {
         var reader = new PublishingLayoutStatusReader(new Uri(site), _ => Task.FromResult("Uncustomized"));
         var page = Page(layout);
@@ -339,15 +433,18 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         await read.Should().ThrowAsync<InvalidDataException>();
     }
 
+    /// <summary>Verifies different layouts do not share results.</summary>
     [Fact]
     public async Task Different_layouts_do_not_share_results()
     {
         var requests = 0;
+
         Task<string> Read(string url)
         {
             requests++;
             return Task.FromResult(url == LayoutUrl ? "Uncustomized" : "Customized");
         }
+
         var reader = new PublishingLayoutStatusReader(SiteUri, Read);
         var custom = Page("/sites/a/_catalogs/masterpage/Custom.aspx");
         await reader.EnrichAsync(Page(LayoutUrl));
@@ -356,9 +453,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         custom.LayoutCustomizedPageStatus.Should().Be("Customized");
     }
 
-    private static ClassicPage Page(string url) => new()
-    {
-        PageType = PageScanComponent.PublishingPage,
-        LayoutUrl = url,
-    };
+    /// <summary>Builds a synthetic stored publishing page for the layout compatibility fixture.</summary>
+    private static ClassicPage Page(string url) =>
+        new() { PageType = ClassicPageRules.PublishingPage, LayoutUrl = url, };
 }

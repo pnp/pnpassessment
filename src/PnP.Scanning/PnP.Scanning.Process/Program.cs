@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging;
 using PnP.Core.Auth.Services.Builder.Configuration;
 using PnP.Core.Services.Builder.Configuration;
 using PnP.Scanning.Core.Pipeline.Collection.Module;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Pipeline.Collection.Shared;
 using PnP.Scanning.Core.Authentication;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Storage.Pipeline;
@@ -231,8 +231,7 @@ namespace PnP.Scanning.Process
                         services.AddSingleton<StorageManager>();
                         services.AddSingleton(new PipelineStore(StorageManager.GetScannerFolder()));
                         services.AddSingleton<IHostedService, LegacyAssessmentRecovery>();
-                        services.AddSingleton(
-                            PnP.Scanning.Core.Pipeline.Collection.Module.ClassicPageModule.Registry());
+                        services.AddSingleton(PnP.Scanning.Core.ClassicPages.ClassicPageModule.Registry());
                         services.AddSingleton<ICollectionEnvironment>(provider => new CollectionEnvironment(
                             () => provider.GetRequiredService<IDataProtectionProvider>(),
                             () => provider.GetRequiredService<PnP.Core.Services.IPnPContextFactory>(),

@@ -1,3 +1,4 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
 #nullable enable
 using System.Data.Common;
 using System.Reflection;
@@ -68,13 +69,17 @@ public sealed class ContractAndSnapshotTests
     public void Analysis_entrypoints_and_state_machines_have_no_online_or_mutable_storage_dependencies()
     {
         bool PurePageType(Type type) =>
-            type.Namespace == "PnP.Scanning.Core.Discovery" &&
-            new[] { "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent" }.Contains(
-                type.Name);
+            type.Namespace == "PnP.Scanning.Core.Discovery" && new[]
+            {
+                "DiscoveryHash", "DiscoveryGapCodes", "DiscoveryVerdict", "AspxDiscoveryIntent",
+                "SetupPathClassifier", "SetupPathPageFamily"
+            }.Contains(type.Name);
 
         Type[]? types = typeof(AnalysisExecutor).Assembly.GetTypes()
             .Where(x =>
-                x.Namespace == "PnP.Scanning.Core.Pipeline.Analysis.Module" && x.Name != "ClassicContentIndex" ||
+                x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) == true ||
+                x.Namespace?.StartsWith("PnP.Scanning.Core.ClassicPages.Analysis", StringComparison.Ordinal) == true ||
+                x.Namespace?.StartsWith("PnP.Scanning.Core.ClassicPages.Contracts", StringComparison.Ordinal) == true ||
                 x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) == true ||
                 PurePageType(x) || x.DeclaringType != null && PurePageType(x.DeclaringType))
             .ToArray();
@@ -107,18 +112,21 @@ public sealed class ContractAndSnapshotTests
             Assert.False(name.StartsWith("System.Net.", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Authentication", StringComparison.Ordinal), name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Pipeline.Collection", StringComparison.Ordinal), name);
-            bool compatibilityProjection = name == "PnP.Scanning.Core.Storage.Pipeline.ClassicCompatibility";
+            Assert.False(name.StartsWith("PnP.Scanning.Core.ClassicPages.Collection", StringComparison.Ordinal), name);
+            bool compatibilityProjection = type == typeof(ClassicCompatibility);
             Assert.False(
                 name.StartsWith("PnP.Scanning.Core.Storage", StringComparison.Ordinal) && !compatibilityProjection,
                 name);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Services", StringComparison.Ordinal), name);
-            bool pureMapping = name == "PnP.Scanning.Core.Scanners.WebPartMapping.WebPartMappingManager";
+            bool pureMapping = name.StartsWith("PnP.Scanning.Core.Scanners.WebPartMapping.", StringComparison.Ordinal);
             Assert.False(name.StartsWith("PnP.Scanning.Core.Scanners", StringComparison.Ordinal) && !pureMapping, name);
             Assert.False(name.StartsWith("Microsoft.AspNetCore.DataProtection", StringComparison.Ordinal), name);
             if (name.StartsWith("PnP.Scanning.Core.", StringComparison.Ordinal))
                 Assert.True(
                     name.StartsWith("PnP.Scanning.Core.Pipeline.Analysis", StringComparison.Ordinal) ||
                     name.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) || pureMapping ||
+                    name.StartsWith("PnP.Scanning.Core.ClassicPages.Analysis", StringComparison.Ordinal) ||
+                    name.StartsWith("PnP.Scanning.Core.ClassicPages.Contracts", StringComparison.Ordinal) ||
                     compatibilityProjection || PurePageType(type) ||
                     type.DeclaringType != null && PurePageType(type.DeclaringType),
                     name);

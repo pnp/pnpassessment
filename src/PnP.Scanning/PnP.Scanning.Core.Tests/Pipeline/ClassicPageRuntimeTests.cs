@@ -1,15 +1,17 @@
+using PnP.Scanning.Core.ClassicPages.Contracts.Shared;
+using PnP.Scanning.Core.ClassicPages.Collection.Module;
+using PnP.Scanning.Core.ClassicPages.Analysis.Module;
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Analysis.Module;
-using PnP.Scanning.Core.Pipeline.Analysis.Page;
-using PnP.Scanning.Core.Pipeline.Collection.Module;
-using PnP.Scanning.Core.Pipeline.Collection.Page;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using PnP.Scanning.Core.ClassicPages.Collection.Page;
 using PnP.Scanning.Core.Pipeline.Collection.Shared;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.List;
-using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.ClassicPages.Contracts.List;
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
@@ -198,7 +200,7 @@ public sealed class ClassicPageRuntimeTests
             IncludeBlog = true,
             IncludeSecondBlog = true,
             PostsOnNonBlogWeb = true,
-            IncludeDelve = true,
+            IncludeRetiredFile = true,
         };
         ForbiddenOnlineEnvironment? environment = new ForbiddenOnlineEnvironment();
         PipelineCoordinator? coordinator = new PipelineCoordinator(
@@ -218,8 +220,8 @@ public sealed class ClassicPageRuntimeTests
             .Where(x => new VersionedJson(x.MetadataJson).Value.GetProperty("kind").GetString() == "ListItems")
             .Select(x => CollectionJson.Read<ListItemBatch>(x.RawBytes))
             .ToArray();
-        Assert.Equal(5, blogs.Sum(x => x.Items.Length));
-        Assert.Equal(3, blogs.Select(x => x.ListId).Distinct().Count());
+        Assert.Equal(4, blogs.Sum(x => x.Items.Length));
+        Assert.Equal(2, blogs.Select(x => x.ListId).Distinct().Count());
         JsonElement[]? pages = original.Values.Select(x => new VersionedJson(x).Value)
             .Where(x => x.GetProperty("kind").GetString() == "ListItems")
             .SelectMany(x => x.GetProperty("pages").EnumerateArray())
@@ -227,7 +229,9 @@ public sealed class ClassicPageRuntimeTests
         Assert.Contains(
             pages,
             page => page.GetProperty("PageUrl").GetString() == "/sites/a/Lists/Posts/Post.aspx?ID=100");
-        Assert.Contains(pages, page => page.GetProperty("PageUrl").GetString() == "/sites/a/SitePages/post.pointpub");
+        Assert.DoesNotContain(
+            pages,
+            page => page.GetProperty("PageUrl").GetString() == "/sites/a/SitePages/post.pointpub");
         JsonElement discovery = original.Values.Select(x => new VersionedJson(x).Value)
             .Single(x => x.GetProperty("kind").GetString() == "FileInventory");
         Assert.Equal(9, discovery.GetProperty("files").GetArrayLength());

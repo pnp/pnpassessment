@@ -1,8 +1,9 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Xunit;
 using Xunit.Abstractions;
@@ -26,6 +27,7 @@ public class PublishingLayoutPrefetchScaleTests
 
     public PublishingLayoutPrefetchScaleTests(ITestOutputHelper output) => this.output = output;
 
+    /// <summary>Verifies prefetch tracks only the shared layout whatever the page count.</summary>
     [Theory]
     [InlineData(100)]
     [InlineData(1000)]
@@ -42,14 +44,18 @@ public class PublishingLayoutPrefetchScaleTests
         db.ChangeTracker.Clear();
         commands.Clear();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
             _ => throw new InvalidOperationException("The shared layout is in discovery; no fallback is expected."),
             (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
 
         var tracked = db.ChangeTracker.Entries<ClassicPageDiscovery>().Count();
         var prefetch = commands.Single(text => text.Contains("ClassicPageDiscoveries", StringComparison.Ordinal));
 
-        output.WriteLine($"pages={pageCount,6}  trackedDiscoveryRows={tracked,6}  " +
+        output.WriteLine(
+            $"pages={pageCount,6}  trackedDiscoveryRows={tracked,6}  " +
             $"prefetchParameterBytes={ParameterPayloadLength(prefetch),8}");
 
         // One shared layout, matched by both its server-relative and absolute spelling.
@@ -57,10 +63,10 @@ public class PublishingLayoutPrefetchScaleTests
 
         db.ChangeTracker.Clear();
         var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
-        pages.Should().HaveCount(pageCount)
-            .And.OnlyContain(page => page.LayoutCustomizedPageStatus == "Uncustomized");
+        pages.Should().HaveCount(pageCount).And.OnlyContain(page => page.LayoutCustomizedPageStatus == "Uncustomized");
     }
 
+    /// <summary>Verifies prefetch cost is flat across page counts.</summary>
     [Fact]
     public async Task Prefetch_cost_is_flat_across_page_counts()
     {
@@ -76,13 +82,17 @@ public class PublishingLayoutPrefetchScaleTests
             db.ChangeTracker.Clear();
             commands.Clear();
 
-            await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+            await PublishingLayoutStatusReader.EnrichSiteAsync(
+                db,
+                scan,
+                SiteUrl,
                 _ => throw new InvalidOperationException("No fallback expected"),
                 (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
 
             var prefetch = commands.Single(text => text.Contains("ClassicPageDiscoveries", StringComparison.Ordinal));
-            measurements.Add((pageCount, db.ChangeTracker.Entries<ClassicPageDiscovery>().Count(),
-                ParameterPayloadLength(prefetch)));
+            measurements.Add(
+                (pageCount, db.ChangeTracker.Entries<ClassicPageDiscovery>().Count(),
+                    ParameterPayloadLength(prefetch)));
         }
 
         foreach (var (pages, tracked, bytes) in measurements)
@@ -92,6 +102,7 @@ public class PublishingLayoutPrefetchScaleTests
         measurements.Select(value => value.ParameterBytes).Distinct().Should().ContainSingle();
     }
 
+    /// <summary>Verifies a failing page still records the error on its own discovery row.</summary>
     [Fact]
     public async Task A_failing_page_still_records_the_error_on_its_own_discovery_row()
     {
@@ -103,7 +114,10 @@ public class PublishingLayoutPrefetchScaleTests
         db.ChangeTracker.Clear();
 
         var failures = new List<string>();
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
             _ => throw new UnauthorizedAccessException("Layout denied"),
             (_, page) => failures.Add(page.PageUrl));
 
@@ -116,17 +130,22 @@ public class PublishingLayoutPrefetchScaleTests
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
             _ => throw new UnauthorizedAccessException("Layout denied"),
             (_, page) => failures.Add(page.PageUrl));
 
         failures.Should().HaveCount(50, "every page shares the unreadable layout");
         db.ChangeTracker.Clear();
-        var rows = await db.ClassicPageDiscoveries
-            .Where(row => row.ScanId == scan && row.ErrorStage != null).ToListAsync();
-        rows.Should().HaveCount(50)
+        List<ClassicPageDiscovery> rows = await db.ClassicPageDiscoveries
+            .Where(row => row.ScanId == scan && row.ErrorStage != null)
+            .ToListAsync();
+        rows.Should()
+            .HaveCount(50)
             .And.OnlyContain(row => row.ErrorStage == "PageLayoutMetadata" &&
-                row.ErrorDetail.Contains("Layout denied"));
+                                    row.ErrorDetail.Contains("Layout denied"));
     }
 
     private static ScanContext CreateContext(SqliteConnection connection, List<string> commands)
@@ -139,49 +158,53 @@ public class PublishingLayoutPrefetchScaleTests
         return new ScanContext(options);
     }
 
+    /// <summary>Seeds synthetic publishing pages and layout observations for the scale regression.</summary>
     private static async Task<Guid> SeedAsync(ScanContext db, int pageCount)
     {
         var scan = Guid.NewGuid();
         for (var index = 0; index < pageCount; index++)
         {
             var pageUrl = $"/sites/a/Pages/page-{index}.aspx";
-            db.ClassicPages.Add(new ClassicPage
-            {
-                ScanId = scan,
-                SiteUrl = SiteUrl,
-                WebUrl = "/",
-                PageUrl = pageUrl,
-                PageType = PageScanComponent.PublishingPage,
-                LayoutUrl = LayoutUrl,
-                AssessmentStatus = "Complete",
-            });
+            db.ClassicPages.Add(
+                new ClassicPage
+                {
+                    ScanId = scan,
+                    SiteUrl = SiteUrl,
+                    WebUrl = "/",
+                    PageUrl = pageUrl,
+                    PageType = ClassicPageRules.PublishingPage,
+                    LayoutUrl = LayoutUrl,
+                    AssessmentStatus = "Complete",
+                });
 
             // A real scan records a discovery row for every page it enumerated.
-            db.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
+            db.ClassicPageDiscoveries.Add(
+                new ClassicPageDiscovery
+                {
+                    ScanId = scan,
+                    SiteUrl = SiteUrl,
+                    WebUrl = "/",
+                    RecordKey = "page:" + index,
+                    RowType = "Page",
+                    Url = pageUrl,
+                    DiscoveryStatus = "Discovered",
+                    ObservedAtUtc = DateTime.UtcNow,
+                });
+        }
+
+        db.ClassicPageDiscoveries.Add(
+            new ClassicPageDiscovery
             {
                 ScanId = scan,
                 SiteUrl = SiteUrl,
                 WebUrl = "/",
-                RecordKey = "page:" + index,
+                RecordKey = "layout",
                 RowType = "Page",
-                Url = pageUrl,
+                Url = LayoutUrl,
+                CustomizedPageStatus = "Uncustomized",
                 DiscoveryStatus = "Discovered",
                 ObservedAtUtc = DateTime.UtcNow,
             });
-        }
-
-        db.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
-        {
-            ScanId = scan,
-            SiteUrl = SiteUrl,
-            WebUrl = "/",
-            RecordKey = "layout",
-            RowType = "Page",
-            Url = LayoutUrl,
-            CustomizedPageStatus = "Uncustomized",
-            DiscoveryStatus = "Discovered",
-            ObservedAtUtc = DateTime.UtcNow,
-        });
 
         await db.SaveChangesAsync();
         return scan;

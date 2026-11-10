@@ -1,5 +1,5 @@
-﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using FluentAssertions;
 using PnP.Scanning.Core.Scanners.WebPartMapping;
 using Xunit;
 
@@ -224,6 +224,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
               </table>
             </div>";
 
+        /// <summary>Verifies wiki html embedded image emits wiki image part.</summary>
         [Fact]
         public void WikiHtml_EmbeddedImage_EmitsWikiImagePart()
         {
@@ -245,12 +246,15 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
 
             // The image is no longer swallowed into the surrounding wiki text...
             result.TextParts.Should().HaveCount(2);
-            result.TextParts.Should().OnlyContain(t =>
-                !t.Properties["Text"].Contains("diagram.png") && !t.Properties["Text"].Contains("<img"));
+            result.TextParts.Should()
+                .OnlyContain(t =>
+                    !t.Properties["Text"].Contains("diagram.png") && !t.Properties["Text"].Contains("<img"));
 
             // ...and the text on either side of it still survives as its own block(s).
             string.Join(" ", result.TextParts.Select(t => t.Properties["Text"]))
-                .Should().Contain("Before the picture").And.Contain("After the picture");
+                .Should()
+                .Contain("Before the picture")
+                .And.Contain("After the picture");
         }
 
         [Fact]
@@ -278,6 +282,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             result.TextParts.Should().OnlyContain(t => !t.Properties["Text"].Contains("<iframe"));
         }
 
+        /// <summary>Verifies wiki html anchor wrapped image emits image part with anchor.</summary>
         [Fact]
         public void WikiHtml_AnchorWrappedImage_EmitsImagePartWithAnchor()
         {
@@ -293,7 +298,8 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             // image was the only content, so there may be no surviving text part at all).
             result.TextParts
                 .Where(t => t.Properties["Text"].Contains("<img") || t.Properties["Text"].Contains("banner.png"))
-                .Should().BeEmpty();
+                .Should()
+                .BeEmpty();
         }
 
         [Fact]

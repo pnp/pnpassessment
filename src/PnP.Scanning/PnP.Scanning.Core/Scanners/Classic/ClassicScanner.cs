@@ -1,3 +1,6 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using EFCore.BulkExtensions;
 using EFQuery = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 using Microsoft.SharePoint.Client;
@@ -309,23 +312,7 @@ namespace PnP.Scanning.Core.Scanners
                 attempt,
                 ClassicAssessmentInitialization.MaxAttempts - 1);
 
-        /// <summary>Discovers pages after shared metadata, except HOME which discovers its target first.</summary>
-        internal static async Task<List<ClassicPageDiscovery>> DiscoverPagesAsync(
-            bool homePageOnly,
-            SharePointListMetadataSnapshot sharedLists,
-            Func<Task<SharePointListMetadataSnapshot>> loadHomeMetadata,
-            Func<SharePointListMetadataSnapshot, Task<List<ClassicPageDiscovery>>> discover)
-        {
-            if (homePageOnly)
-            {
-                var pages = await discover(null).ConfigureAwait(false);
-                await loadHomeMetadata().ConfigureAwait(false);
-                return pages;
-            }
-
-            return await discover(sharedLists).ConfigureAwait(false);
-        }
-
+        /// <summary>Initializes retained Classic pre-scan work and records initialization failures.</summary>
         internal async override Task PreScanningAsync()
         {
             Logger.Information("Pre assessment work is starting");
@@ -339,7 +326,7 @@ namespace PnP.Scanning.Core.Scanners
             {
                 // Client-tag telemetry against the first site is not an admission gate for
                 // other authorized sites. Each scheduled Web worker records its own result.
-                await ClassicPageDiscoveryComponent.RecordScopeAsync(
+                await LegacyScopeEvidence.RecordScopeAsync(
                     ScanId,
                     SiteUrl,
                     WebUrl,
@@ -358,6 +345,7 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Pre assessment work done");
         }
 
+        /// <summary>Enriches stored legacy publishing layouts for existing report compatibility.</summary>
         private async Task EnrichPublishingLayoutsAsync()
         {
             var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
@@ -366,7 +354,7 @@ namespace PnP.Scanning.Core.Scanners
             {
                 sites = await EFQuery.ToListAsync(
                         db.ClassicPages
-                            .Where(page => page.ScanId == ScanId && page.PageType == PageScanComponent.PublishingPage)
+                            .Where(page => page.ScanId == ScanId && page.PageType == ClassicPageRules.PublishingPage)
                             .Select(page => page.SiteUrl)
                             .Distinct(),
                         token)
@@ -507,7 +495,7 @@ namespace PnP.Scanning.Core.Scanners
                 // transformation readiness up into its ClassicWebSummary and build the scan-wide unique
                 // web part inventory. The site loop below then reads the now-populated web columns.
                 await StorageManager.ComputeAndStoreWebPageRollupsAsync(dbContext, ScanId);
-                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, PageScanComponent.MappingManager);
+                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, ClassicCompatibility.MappingManager);
 
                 // Roll the publishing webs + pages up into one per-site-collection publishing-portal line
                 // (parity with the legacy ModernizationPublishingSiteScanResults.csv). Reads the web summaries

@@ -1,9 +1,10 @@
-﻿using PnP.Scanning.Core.Services;
+﻿using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Scanners;
 using Serilog;
 using System.Threading.Tasks.Dataflow;
-using PnP.Scanning.Core.Discovery;
+
 
 namespace PnP.Scanning.Core.Queues
 {
@@ -12,7 +13,13 @@ namespace PnP.Scanning.Core.Queues
         // Queue containting the tasks to process
         private ActionBlock<SiteCollectionQueueItem> siteCollectionsToScan;
 
-        public SiteCollectionQueue(ScanManager scanManager, StorageManager storageManager, Guid scanId, CancellationToken cancellationToken, string adminCenterUrl, string mySiteHostUrl) : base(storageManager, cancellationToken, adminCenterUrl, mySiteHostUrl)
+        public SiteCollectionQueue(
+            ScanManager scanManager,
+            StorageManager storageManager,
+            Guid scanId,
+            CancellationToken cancellationToken,
+            string adminCenterUrl,
+            string mySiteHostUrl) : base(storageManager, cancellationToken, adminCenterUrl, mySiteHostUrl)
         {
             ScanManager = scanManager;
             ScanId = scanId;
@@ -24,28 +31,40 @@ namespace PnP.Scanning.Core.Queues
 
         private Guid ScanId { get; set; }
 
+        /// <summary>Creates retained site-collection workers using the configured scan concurrency.</summary>
         internal void ConfigureParallelProcessing(int threads)
         {
             if (threads < 1)
             {
-                Log.Information("Threads for assessment {ScanId} was {Threads}. Setting it to it's default again {Default}", ScanId, threads, Environment.ProcessorCount);
+                Log.Information(
+                    "Threads for assessment {ScanId} was {Threads}. Setting it to it's default again {Default}",
+                    ScanId,
+                    threads,
+                    Environment.ProcessorCount);
                 threads = Environment.ProcessorCount;
             }
 
             if (threads == 1)
             {
-                Log.Information("Using {SiteThread} site collection assessment thread and {WebThread} web assessment thread", 1, 1);
+                Log.Information(
+                    "Using {SiteThread} site collection assessment thread and {WebThread} web assessment thread",
+                    1,
+                    1);
                 // Typically used for debugging work
                 ParallelWebProcessingThreads = 1;
             }
             else
             {
                 int siteThreads = threads / ParallelWebProcessingThreads;
-                Log.Information("Using {SiteThread} site collection assessment threads and {WebThread} web assessment threads", siteThreads, ParallelWebProcessingThreads);
+                Log.Information(
+                    "Using {SiteThread} site collection assessment threads and {WebThread} web assessment threads",
+                    siteThreads,
+                    ParallelWebProcessingThreads);
                 ConfigureQueue(siteThreads);
             }
         }
 
+        /// <summary>Queues one selected scope for the retained assessment workers.</summary>
         internal async Task EnqueueAsync(SiteCollectionQueueItem siteCollection)
         {
             if (siteCollectionsToScan == null)
@@ -57,19 +76,24 @@ namespace PnP.Scanning.Core.Queues
                     CancellationToken = CancellationToken
                 };
 
-                Log.Information("Configuring site collection queue for assessment {ScanId} with {MaxDegreeOfParallelism} max degree of parallelism", ScanId, executionDataflowBlockOptions.MaxDegreeOfParallelism);
+                Log.Information(
+                    "Configuring site collection queue for assessment {ScanId} with {MaxDegreeOfParallelism} max degree of parallelism",
+                    ScanId,
+                    executionDataflowBlockOptions.MaxDegreeOfParallelism);
 
                 // Configure the site collection scanning queue
-                siteCollectionsToScan = new ActionBlock<SiteCollectionQueueItem>(async (siteCollection) => await ProcessSiteCollectionAsync(siteCollection)
-                                                                , executionDataflowBlockOptions);
+                siteCollectionsToScan = new ActionBlock<SiteCollectionQueueItem>(
+                    async (siteCollection) => await ProcessSiteCollectionAsync(siteCollection),
+                    executionDataflowBlockOptions);
 
                 Log.Information("Site collection queue for assessment {ScanId} setup", ScanId);
             }
-            
+
             // Send the request into the queue
             await siteCollectionsToScan.SendAsync(siteCollection);
         }
 
+        /// <summary>Enumerates and schedules a retained legacy site collection while recording scope failures.</summary>
         private async Task ProcessSiteCollectionAsync(SiteCollectionQueueItem siteCollection)
         {
             // Check the pausing bit, if so then we'll skip processing this site collection
@@ -77,7 +101,6 @@ namespace PnP.Scanning.Core.Queues
             {
                 try
                 {
-
                     // Mark the scan status as running (if not yet done)
                     await ScanManager.UpdateScanStatusAsync(ScanId, ScanStatus.Running);
 
@@ -92,8 +115,12 @@ namespace PnP.Scanning.Core.Queues
                     Exception webAuthorityError = null;
                     try
                     {
-                        webEnumeration = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, siteCollection.OptionsBase,
-                            ScanManager.GetScanAuthenticationManager(ScanId), siteCollection.Restart);
+                        webEnumeration = await ScanManager.SiteEnumerationManager.EnumerateWebsToScanAsync(
+                            ScanId,
+                            siteCollection.SiteCollectionUrl,
+                            siteCollection.OptionsBase,
+                            ScanManager.GetScanAuthenticationManager(ScanId),
+                            siteCollection.Restart);
                     }
                     catch (Exception ex) when (fullPageDiscovery && !CancellationToken.IsCancellationRequested)
                     {
@@ -101,9 +128,13 @@ namespace PnP.Scanning.Core.Queues
                         // A failed subweb enumeration does not erase the known site root.
                         webEnumeration = new(new() { new EnumeratedWeb { WebUrl = "/", WebTemplate = null } });
                     }
+
                     if (fullPageDiscovery)
-                        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(ScanId,
-                            siteCollection.SiteCollectionUrl, webEnumeration, webAuthorityError);
+                        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
+                            ScanId,
+                            siteCollection.SiteCollectionUrl,
+                            webEnumeration,
+                            webAuthorityError);
 
                     var webUrlsToScan = webEnumeration.Webs;
 
@@ -111,24 +142,41 @@ namespace PnP.Scanning.Core.Queues
                     List<WebQueueItem> webToScan = new();
                     foreach (var web in webUrlsToScan)
                     {
-                        webToScan.Add(new WebQueueItem(siteCollection.OptionsBase,
-                                                       siteCollection.PnPContextFactory,
-                                                       siteCollection.SiteCollectionUrl,
-                                                       web.WebUrl,
-                                                       web.WebTemplate));
+                        webToScan.Add(
+                            new WebQueueItem(
+                                siteCollection.OptionsBase,
+                                siteCollection.PnPContextFactory,
+                                siteCollection.SiteCollectionUrl,
+                                web.WebUrl,
+                                web.WebTemplate));
                     }
 
                     // Store the webs to be processed, for a restart the webs might already be there
-                    await StorageManager.StoreWebsToScanAsync(ScanId, siteCollection.SiteCollectionUrl, webUrlsToScan, siteCollection.Restart);
+                    await StorageManager.StoreWebsToScanAsync(
+                        ScanId,
+                        siteCollection.SiteCollectionUrl,
+                        webUrlsToScan,
+                        siteCollection.Restart);
                     if (fullPageDiscovery)
                     {
                         foreach (var web in webUrlsToScan)
-                            await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, siteCollection.SiteCollectionUrl,
-                                web.WebUrl, "Web", "Pending", stage: "WebScan");
+                            await LegacyScopeEvidence.RecordScopeAsync(
+                                ScanId,
+                                siteCollection.SiteCollectionUrl,
+                                web.WebUrl,
+                                "Web",
+                                "Pending",
+                                stage: "WebScan");
                     }
 
                     // Start parallel execution per web in this site collection
-                    var webQueue = new WebQueue(ScanManager, StorageManager, ScanId, CancellationToken, AdminCenterUrl, MySiteHostUrl);
+                    WebQueue webQueue = new WebQueue(
+                        ScanManager,
+                        StorageManager,
+                        ScanId,
+                        CancellationToken,
+                        AdminCenterUrl,
+                        MySiteHostUrl);
 
                     // Use parallel threads per running site collection task for processing the webs
                     webQueue.ConfigureQueue(ParallelWebProcessingThreads);
@@ -155,9 +203,14 @@ namespace PnP.Scanning.Core.Queues
                         // When pausing is ongoing doing "nothing" will leave the site collection in queued status, however if the pausing
                         // kicked in while the last webs of a given site collection were being already processed then in the end all the 
                         // webs are done and the site collection should be marked as "Finished"
-                        if (await StorageManager.SiteCollectionWasCompletelyHandledAsync(ScanId, siteCollection.SiteCollectionUrl))
+                        if (await StorageManager.SiteCollectionWasCompletelyHandledAsync(
+                                ScanId,
+                                siteCollection.SiteCollectionUrl))
                         {
-                            Log.Information("The assessment {ScanId} is being paused, but as all webs of site collection {SiteCollectionUrl} were done mark it as Finished", ScanId, siteCollection.SiteCollectionUrl);
+                            Log.Information(
+                                "The assessment {ScanId} is being paused, but as all webs of site collection {SiteCollectionUrl} were done mark it as Finished",
+                                ScanId,
+                                siteCollection.SiteCollectionUrl);
                             await StorageManager.EndSiteCollectionScanAsync(ScanId, siteCollection.SiteCollectionUrl);
                         }
                     }
@@ -165,29 +218,46 @@ namespace PnP.Scanning.Core.Queues
                 catch (Exception ex)
                 {
                     if (siteCollection.OptionsBase is ClassicOptions { Pages: true })
-                        await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, siteCollection.SiteCollectionUrl, "",
-                            "SiteCollection", CancellationToken.IsCancellationRequested ? "Cancelled" : "Failed", ex,
+                        await LegacyScopeEvidence.RecordScopeAsync(
+                            ScanId,
+                            siteCollection.SiteCollectionUrl,
+                            "",
+                            "SiteCollection",
+                            CancellationToken.IsCancellationRequested ? "Cancelled" : "Failed",
+                            ex,
                             stage: "SiteScan");
                     // Increase the site collections scanned in memory counter to ensure the "to process count" is updated
                     ScanManager.SiteCollectionScanned(ScanId);
-                    
+
                     // Log the error that happened
-                    Log.Error(ex, "Error happened during assessing of {SiteCollectionUrl} for assessment {ScanId}", siteCollection.SiteCollectionUrl, ScanId);
-                    await StorageManager.EndSiteCollectionScanWithErrorAsync(ScanId, siteCollection.SiteCollectionUrl, ex);
+                    Log.Error(
+                        ex,
+                        "Error happened during assessing of {SiteCollectionUrl} for assessment {ScanId}",
+                        siteCollection.SiteCollectionUrl,
+                        ScanId);
+                    await StorageManager.EndSiteCollectionScanWithErrorAsync(
+                        ScanId,
+                        siteCollection.SiteCollectionUrl,
+                        ex);
                 }
             }
             else
             {
                 if (CancellationToken.IsCancellationRequested)
                 {
-                    Log.Information("Assessment {ScanId} was cancelled, so skipping processing of site collection {SiteCollection}.", ScanId, siteCollection.SiteCollectionUrl);
+                    Log.Information(
+                        "Assessment {ScanId} was cancelled, so skipping processing of site collection {SiteCollection}.",
+                        ScanId,
+                        siteCollection.SiteCollectionUrl);
                 }
                 else
                 {
-                    Log.Information("Assessment {ScanId} has pausing bit set, so skipping processing of site collection {SiteCollection}.", ScanId, siteCollection.SiteCollectionUrl);
+                    Log.Information(
+                        "Assessment {ScanId} has pausing bit set, so skipping processing of site collection {SiteCollection}.",
+                        ScanId,
+                        siteCollection.SiteCollectionUrl);
                 }
             }
-        }        
-
+        }
     }
 }

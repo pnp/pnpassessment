@@ -1,4 +1,5 @@
-﻿using Microsoft.ApplicationInsights;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.EntityFrameworkCore;
 using PnP.Core.Admin.Model.SharePoint;
@@ -35,9 +36,11 @@ namespace PnP.Scanning.Core.Services
             try
             {
 #if DEBUG
-                telemetryConfiguration.ConnectionString = "InstrumentationKey=e9f3c71a-c861-44b1-8e35-b513e101f743;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=367148dd-e9be-4dd5-a93c-4343906f39fa";
+                telemetryConfiguration.ConnectionString =
+ "InstrumentationKey=e9f3c71a-c861-44b1-8e35-b513e101f743;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=367148dd-e9be-4dd5-a93c-4343906f39fa";
 #else
-                telemetryConfiguration.ConnectionString = "InstrumentationKey=2563091f-0bef-4ac7-8bb7-532268d52601;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=27abf4b2-b1e0-4788-a027-3c77fe94b63b";                
+                telemetryConfiguration.ConnectionString =
+                    "InstrumentationKey=2563091f-0bef-4ac7-8bb7-532268d52601;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=27abf4b2-b1e0-4788-a027-3c77fe94b63b";
 #endif
                 telemetryClient = new TelemetryClient(telemetryConfiguration);
 
@@ -86,6 +89,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>Sends the existing assessment telemetry event without altering its metric contract.</summary>
         internal async Task LogEventAsync(Guid scanId, TelemetryEvent telemetryEvent)
         {
             if (telemetryClient == null || skipTelemetry)
@@ -98,10 +102,7 @@ namespace PnP.Scanning.Core.Services
             try
             {
                 // Prepare event data
-                Dictionary<string, string> properties = new()
-                {
-                    { EngineVersion, Version }
-                };
+                Dictionary<string, string> properties = new() { { EngineVersion, Version } };
 
                 // Send the event
                 telemetryClient.TrackEvent($"{telemetryEvent}", properties);
@@ -217,6 +218,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>Loads stored assessment facts and populates the existing mode-specific telemetry metrics.</summary>
         private async Task PopulateMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -224,12 +226,14 @@ namespace PnP.Scanning.Core.Services
                 var siteCollectionCount = await dbContext.SiteCollections.CountAsync();
                 var webCount = await dbContext.Webs.CountAsync();
                 var failedWebCount = await dbContext.Webs.CountAsync(p => p.Status == SiteWebStatus.Failed);
-                var failedSiteCollectionCount = await dbContext.SiteCollections.CountAsync(p => p.Status == SiteWebStatus.Failed);
+                int failedSiteCollectionCount =
+                    await dbContext.SiteCollections.CountAsync(p => p.Status == SiteWebStatus.Failed);
 
                 int scanDurationInMinutes = 0;
                 // Use current value as otherwise end date is not yet set
                 var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
-                if (scan.EndDate != DateTime.MinValue && scan.EndDate != DateTime.MaxValue && scan.StartDate != DateTime.MinValue && scan.StartDate != DateTime.MaxValue)
+                if (scan.EndDate != DateTime.MinValue && scan.EndDate != DateTime.MaxValue &&
+                    scan.StartDate != DateTime.MinValue && scan.StartDate != DateTime.MaxValue)
                 {
                     scanDurationInMinutes = (int)(scan.EndDate - scan.StartDate).TotalMinutes;
                 }
@@ -273,8 +277,8 @@ namespace PnP.Scanning.Core.Services
             // Page transformation readiness — only pages that actually carry web parts contribute to
             // the mapping metrics (empty pages are 100% by the T6 convention and would mask real readiness).
             int pagesWithWebParts = 0;
-            int mappableWebPartPages = 0;   // fully mappable (MappingPercentage >= 100)
-            int unmappedWebPartPages = 0;   // partially/not mappable (< 100)
+            int mappableWebPartPages = 0; // fully mappable (MappingPercentage >= 100)
+            int unmappedWebPartPages = 0; // partially/not mappable (< 100)
             double mappingPercentageSum = 0;
 
             foreach (var page in dbContext.ClassicPages)
@@ -283,12 +287,24 @@ namespace PnP.Scanning.Core.Services
 
                 switch (page.PageType)
                 {
-                    case PageScanComponent.WikiPage: wikiPageCount++; break;
-                    case PageScanComponent.WebPartPage: webPartPageCount++; break;
-                    case PageScanComponent.ASPXPage: aspxPageCount++; break;
-                    case PageScanComponent.PublishingPage: publishingPageCount++; break;
-                    case PageScanComponent.BlogPage: blogPageCount++; break;
-                    case PageScanComponent.DelveBlogPage: delveBlogPageCount++; break;
+                    case ClassicPageRules.WikiPage:
+                        wikiPageCount++;
+                        break;
+                    case ClassicPageRules.WebPartPage:
+                        webPartPageCount++;
+                        break;
+                    case ClassicPageRules.ASPXPage:
+                        aspxPageCount++;
+                        break;
+                    case ClassicPageRules.PublishingPage:
+                        publishingPageCount++;
+                        break;
+                    case ClassicPageRules.BlogPage:
+                        blogPageCount++;
+                        break;
+                    case ClassicPageRules.DelveBlogPage:
+                        delveBlogPageCount++;
+                        break;
                 }
 
                 if (page.HomePage == true)
@@ -354,7 +370,9 @@ namespace PnP.Scanning.Core.Services
             metric.Add("ClassicPagePagesWithWebPartsCount", pagesWithWebParts);
             metric.Add("ClassicPageMappableWebPartPagesCount", mappableWebPartPages);
             metric.Add("ClassicPageUnmappedWebPartPagesCount", unmappedWebPartPages);
-            metric.Add("ClassicPageAvgMappingPercentage", pagesWithWebParts > 0 ? mappingPercentageSum / pagesWithWebParts : 0);
+            metric.Add(
+                "ClassicPageAvgMappingPercentage",
+                pagesWithWebParts > 0 ? mappingPercentageSum / pagesWithWebParts : 0);
 
             metric.Add("ClassicPageWebPartCount", webPartCount);
             metric.Add("ClassicPageUniqueWebPartTypeCount", uniqueWebPartTypeCount);
@@ -362,6 +380,7 @@ namespace PnP.Scanning.Core.Services
             metric.Add("ClassicPageUnmappedWebPartTypeCount", unmappedWebPartTypeCount);
         }
 
+        /// <summary>Populates the existing Add-ins and ACS telemetry counts from stored assessment facts.</summary>
         private async Task PopulateAddInsACSMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -511,7 +530,6 @@ namespace PnP.Scanning.Core.Services
                     {
                         expiredFalse++;
                     }
-
                 }
 
                 metric.Add("AddInACSAddInCount", addInCount);
@@ -576,8 +594,9 @@ namespace PnP.Scanning.Core.Services
                         hasSitePermissions++;
                     }
 
-                    foreach (var acsPrincipalPermission in dbContext.ClassicACSPrincipalSiteScopedPermissions.Where(p => p.ScanId == acsPrincipal.ScanId &&
-                                                                                                                        p.AppIdentifier == acsPrincipal.AppIdentifier))
+                    foreach (ClassicACSPrincipalSiteScopedPermissions acsPrincipalPermission in dbContext
+                                 .ClassicACSPrincipalSiteScopedPermissions.Where(p =>
+                                     p.ScanId == acsPrincipal.ScanId && p.AppIdentifier == acsPrincipal.AppIdentifier))
                     {
                         string permissionScopeString = "";
 
@@ -604,8 +623,9 @@ namespace PnP.Scanning.Core.Services
                         }
                     }
 
-                    foreach (var acsPrincipalPermission in dbContext.ClassicACSPrincipalTenantScopedPermissions.Where(p => p.ScanId == acsPrincipal.ScanId &&
-                                                                                                                           p.AppIdentifier == acsPrincipal.AppIdentifier))
+                    foreach (ClassicACSPrincipalTenantScopedPermissions acsPrincipalPermission in dbContext
+                                 .ClassicACSPrincipalTenantScopedPermissions.Where(p =>
+                                     p.ScanId == acsPrincipal.ScanId && p.AppIdentifier == acsPrincipal.AppIdentifier))
                     {
                         string permissionScopeString = $"{acsPrincipalPermission.Scope}{acsPrincipalPermission.Right}";
 
@@ -627,7 +647,7 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("AddInACSPrincipalHasSitePermissionsCount", hasSitePermissions);
 
                 /* Possible permission scope values:
-                     
+
                 AddInACSPrincipalPermissioncontentlistguest
                 AddInACSPrincipalPermissioncontentlistread
                 AddInACSPrincipalPermissioncontentlistwrite
@@ -674,12 +694,14 @@ namespace PnP.Scanning.Core.Services
 
                 foreach (var permissionScope in permissionScopeCounts)
                 {
-                    metric.Add($"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "" ).ToLowerInvariant()}", permissionScope.Value);
+                    metric.Add(
+                        $"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "").ToLowerInvariant()}",
+                        permissionScope.Value);
                 }
-
             }
         }
 
+        /// <summary>Populates the existing Alerts telemetry counts from stored assessment facts.</summary>
         private async Task PopulateAlertsMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -693,7 +715,7 @@ namespace PnP.Scanning.Core.Services
 
                 // Alert type breakdown
                 int listAlerts = 0;
-                int listItemAlerts = 0;  
+                int listItemAlerts = 0;
 
                 foreach (var alert in dbContext.Alerts)
                 {
@@ -744,6 +766,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>Populates the existing InfoPath telemetry counts from stored assessment facts.</summary>
         private async Task PopulateInfoPathMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -767,7 +790,7 @@ namespace PnP.Scanning.Core.Services
                     else if (infoPath.InfoPathUsage.Equals("CustomForm", StringComparison.InvariantCultureIgnoreCase))
                     {
                         customFormCount++;
-                    }                    
+                    }
                 }
 
                 metric.Add("InfoPathCount", count);
@@ -777,6 +800,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>Populates the existing Workflow telemetry counts from stored assessment facts.</summary>
         private async Task PopulateWorkflowMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -794,19 +818,19 @@ namespace PnP.Scanning.Core.Services
                 int considerUpgradingToFlowCount = 0;
 
                 // Add a line for each possible action
-                foreach(var defaultWorkflow in WorkflowManager.Instance.DefaultActions)
+                foreach (WorkflowAction defaultWorkflow in WorkflowManager.Instance.DefaultActions)
                 {
                     actionCounts.Add(defaultWorkflow.ActionNameShort, 0);
                 }
 
-                foreach(var workflow in dbContext.Workflows)
+                foreach (Workflow workflow in dbContext.Workflows)
                 {
                     count++;
                     instanceCount += workflow.TotalInstances;
                     actionCount += workflow.ActionCount;
                     unsupportedActionCount += workflow.UnsupportedActionCount;
-                    
-                    if(workflow.Scope.Equals("Site", StringComparison.OrdinalIgnoreCase))
+
+                    if (workflow.Scope.Equals("Site", StringComparison.OrdinalIgnoreCase))
                     {
                         siteScopedCount++;
                     }
@@ -836,8 +860,10 @@ namespace PnP.Scanning.Core.Services
 
                     if (!string.IsNullOrEmpty(workflow.UsedActions))
                     {
-                        var actionList = workflow.UsedActions.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach(var action in actionList)
+                        string[] actionList = workflow.UsedActions.Split(
+                            new char[] { ',' },
+                            StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string action in actionList)
                         {
                             if (actionCounts.ContainsKey(action))
                             {
@@ -852,12 +878,14 @@ namespace PnP.Scanning.Core.Services
                 metric.Add("WorkflowSubscriptionCount", uniqueSubscriptions.Count);
                 metric.Add("InstancesInLast30DaysCount", instanceCount);
                 metric.Add("ConsiderUpgradingToFlowCount", considerUpgradingToFlowCount);
-                metric.Add("ToFlowMappingPercentage", (int)((actionCount - unsupportedActionCount) / (double)actionCount * 100));
+                metric.Add(
+                    "ToFlowMappingPercentage",
+                    (int)((actionCount - unsupportedActionCount) / (double)actionCount * 100));
                 metric.Add("SiteScopedCount", siteScopedCount);
                 metric.Add("ListScopedCount", listScopedCount);
                 metric.Add("ContentTypeScopedCount", contentTypeScopedCount);
 
-                foreach(var workflowAction in actionCounts)
+                foreach (KeyValuePair<string, int> workflowAction in actionCounts)
                 {
                     metric.Add($"Activity{workflowAction.Key}", workflowAction.Value);
                 }
@@ -884,6 +912,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>Populates the existing Syntex telemetry counts from stored assessment facts.</summary>
         private async Task PopulateSyntexMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
@@ -914,7 +943,8 @@ namespace PnP.Scanning.Core.Services
 
                 // Was deep scan used?
                 bool deepScanUsed = false;
-                var deepScanProperty = await dbContext.Properties.FirstOrDefaultAsync(p => p.Name == Constants.StartSyntexFull);
+                Property deepScanProperty =
+                    await dbContext.Properties.FirstOrDefaultAsync(p => p.Name == Constants.StartSyntexFull);
                 if (deepScanProperty != null)
                 {
                     if (deepScanProperty.Value.Equals("True", StringComparison.InvariantCultureIgnoreCase))
@@ -937,8 +967,8 @@ namespace PnP.Scanning.Core.Services
                         valueToUse = syntexList.ItemCount;
                     }
 
-                    listCount++;                    
-                    listFileCount += valueToUse;                    
+                    listCount++;
+                    listFileCount += valueToUse;
 
                     if (valueToUse < 100)
                     {
@@ -1128,7 +1158,7 @@ namespace PnP.Scanning.Core.Services
                 List<string> uniqueClassifiers = new();
                 List<Guid> uniqueTargetLists = new();
                 long classifiedFileCount = 0;
- 
+
                 foreach (var syntexModelUsage in dbContext.SyntexModelUsage)
                 {
                     if (!uniqueContentCenters.Contains($"{syntexModelUsage.SiteUrl}{syntexModelUsage.WebUrl}"))
@@ -1141,9 +1171,11 @@ namespace PnP.Scanning.Core.Services
                         uniqueTargetLists.Add(syntexModelUsage.TargetListId);
                     }
 
-                    if (!uniqueClassifiers.Contains($"{syntexModelUsage.SiteUrl}{syntexModelUsage.WebUrl}{syntexModelUsage.Classifier}"))
+                    if (!uniqueClassifiers.Contains(
+                            $"{syntexModelUsage.SiteUrl}{syntexModelUsage.WebUrl}{syntexModelUsage.Classifier}"))
                     {
-                        uniqueClassifiers.Add($"{syntexModelUsage.SiteUrl}{syntexModelUsage.WebUrl}{syntexModelUsage.Classifier}");
+                        uniqueClassifiers.Add(
+                            $"{syntexModelUsage.SiteUrl}{syntexModelUsage.WebUrl}{syntexModelUsage.Classifier}");
                     }
 
                     classifiedFileCount += syntexModelUsage.ClassifiedItemCount;
@@ -1193,6 +1225,7 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
+        /// <summary>Initializes scan-scoped telemetry dimensions from persisted assessment metadata.</summary>
         private async Task InitializeTelemetryDataAsync(Guid scanId)
         {
             var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
@@ -1200,7 +1233,11 @@ namespace PnP.Scanning.Core.Services
             {
                 Scan = scan;
                 TenantId = tenantId;
-                Log.Information("Tenant id for this assessment session {ScanId} is {TenantId}. Assessment mode = {Mode}", scanId, TenantId, Scan.CLIMode);
+                Log.Information(
+                    "Tenant id for this assessment session {ScanId} is {TenantId}. Assessment mode = {Mode}",
+                    scanId,
+                    TenantId,
+                    Scan.CLIMode);
             }
             else
             {
@@ -1210,8 +1247,7 @@ namespace PnP.Scanning.Core.Services
             if (string.IsNullOrEmpty(Version))
             {
                 Version = VersionManager.GetCurrentVersion();
-            }            
+            }
         }
-
     }
 }

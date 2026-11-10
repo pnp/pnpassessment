@@ -1,11 +1,11 @@
-﻿using Google.Protobuf.WellKnownTypes;
+﻿using PnP.Scanning.Core.ClassicPages;
+using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using PnP.Scanning.Core.Authentication;
 using PnP.Scanning.Core.Pipeline.Orchestration;
-using PnP.Scanning.Core.Pipeline.Collection.Module;
 using Serilog;
 using System.Runtime.InteropServices;
 

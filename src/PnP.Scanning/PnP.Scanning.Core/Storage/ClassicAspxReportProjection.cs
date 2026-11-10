@@ -1,9 +1,10 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
 #nullable enable
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Scanners.Classic.Pages;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +17,9 @@ internal static class ClassicAspxReportProjection
     internal const string ClassicAspxCsv = "classicaspx.csv";
     internal const string SummaryJson = "classicaspxsummary.json";
     private const string SummarySchemaVersion = "classic-aspx-summary/v1";
-    private const string SummaryCountBasis = "Selected unique physical ASPX files after existing modern-page exclusions in this assessment stream";
+
+    private const string SummaryCountBasis =
+        "Selected unique physical ASPX files after existing modern-page exclusions in this assessment stream";
 
     private static class AcquisitionStates
     {
@@ -47,11 +50,13 @@ internal static class ClassicAspxReportProjection
         {
             return null;
         }
+
         var classification = ClassicAspxExportClassifier.Classify(file);
         if (classification.IsModern)
         {
             return null;
         }
+
         var poison = ClassicAspxPoisonAnalysis.Analyze(file);
         return new ClassicAspxExport
         {
@@ -86,6 +91,7 @@ internal static class ClassicAspxReportProjection
         {
             return null;
         }
+
         try
         {
             SharePointAspxUrlPolicy.ValidateWeb(site);
@@ -94,24 +100,35 @@ internal static class ClassicAspxReportProjection
         {
             return null;
         }
+
         var policy = new SharePointAspxUrlPolicy(site, site);
         return policy.TryNormalizeDecodedPhysicalPath(file.ServerRelativeUrl, out var path) ? path : null;
     }
 
     /// <summary>Writes only the canonical business CSV and its summary, counting selected rows without asserting complete DocFlags collection or tenant completeness.</summary>
-    internal static async Task ExportCsvAsync(ScanContext context, Guid scanId, string exportPath,
-        CsvConfiguration configuration, CancellationToken cancellationToken = default)
+    internal static async Task ExportCsvAsync(
+        ScanContext context,
+        Guid scanId,
+        string exportPath,
+        CsvConfiguration configuration,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var path = Path.Combine(exportPath, ClassicAspxCsv);
         var counts = await WriteCsvAsync(context, scanId, path, configuration, cancellationToken).ConfigureAwait(false);
-        var declaration = await ClassicAspxProjectionContract.ReadAsync(context, scanId, cancellationToken).ConfigureAwait(false);
+        ClassicAspxProjectionContract.StoredConfiguration? declaration = await ClassicAspxProjectionContract
+            .ReadAsync(context, scanId, cancellationToken)
+            .ConfigureAwait(false);
         var exclusions = await context.Properties.AsNoTracking()
             .Where(row => row.ScanId == scanId && row.Name == Constants.StartExcludeSiteTemplates)
-            .Select(row => row.Value).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            .Select(row => row.Value)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
         var acquisitionState = declaration.IsRecognized
             ? AcquisitionStates.DeclaredScopeObserved
-            : counts.SawPhysicalObservation ? AcquisitionStates.ObservedWithoutNativeMarker : AcquisitionStates.NotAcquiredLegacy;
+            : counts.SawPhysicalObservation
+                ? AcquisitionStates.ObservedWithoutNativeMarker
+                : AcquisitionStates.NotAcquiredLegacy;
         var evidence = await FileEvidenceAsync(path, cancellationToken).ConfigureAwait(false);
         var summary = new
         {
@@ -120,11 +137,12 @@ internal static class ClassicAspxReportProjection
             projectionContract = declaration.Version,
             acquisitionState,
             scopeMode = declaration.ScopeMode ?? SummaryStates.Unknown,
-            templateExclusions = new
-            {
-                state = exclusions == null ? SummaryStates.Unknown : SummaryStates.FrozenPolicy,
-                value = exclusions
-            },
+            templateExclusions =
+                new
+                {
+                    state = exclusions == null ? SummaryStates.Unknown : SummaryStates.FrozenPolicy,
+                    value = exclusions
+                },
             selectedClassicAspxCount = counts.Selected,
             unknownClassificationCount = counts.UnknownClassification,
             poisonedCount = counts.Poisoned,
@@ -142,21 +160,31 @@ internal static class ClassicAspxReportProjection
             fullDocFlagsCollected = false,
             files = new[] { evidence }
         };
-        await File.WriteAllTextAsync(Path.Combine(exportPath, SummaryJson), JsonSerializer.Serialize(summary,
-            new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(
+                Path.Combine(exportPath, SummaryJson),
+                JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }),
+                new UTF8Encoding(false),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Enumerates SQL once with cancellation and constant row memory, writing the fixed header even when no business row is selected.</summary>
-    private static async Task<ExportCounts> WriteCsvAsync(ScanContext context, Guid scanId, string path,
-        CsvConfiguration configuration, CancellationToken cancellationToken)
+    private static async Task<ExportCounts> WriteCsvAsync(
+        ScanContext context,
+        Guid scanId,
+        string path,
+        CsvConfiguration configuration,
+        CancellationToken cancellationToken)
     {
         var counts = new ExportCounts();
         await using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
         using var csv = new CsvWriter(writer, configuration);
         csv.WriteHeader<ClassicAspxExport>();
         await csv.NextRecordAsync().ConfigureAwait(false);
-        await foreach (var file in Files(context, scanId).AsAsyncEnumerable()
-            .WithCancellation(cancellationToken).ConfigureAwait(false))
+        await foreach (SPFile? file in Files(context, scanId)
+                           .AsAsyncEnumerable()
+                           .WithCancellation(cancellationToken)
+                           .ConfigureAwait(false))
         {
             counts.SawPhysicalObservation = true;
             var row = Project(file);
@@ -164,6 +192,7 @@ internal static class ClassicAspxReportProjection
             {
                 continue;
             }
+
             cancellationToken.ThrowIfCancellationRequested();
             csv.WriteRecord(row);
             await csv.NextRecordAsync().ConfigureAwait(false);
@@ -175,6 +204,7 @@ internal static class ClassicAspxReportProjection
             var state = file.CoverageState ?? ClassicAspxCoverageStates.Unknown;
             counts.CoverageStates[state] = counts.CoverageStates.GetValueOrDefault(state) + 1;
         }
+
         return counts;
     }
 

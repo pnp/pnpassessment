@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace PnP.Scanning.Core.Storage
 {
@@ -9,9 +10,9 @@ namespace PnP.Scanning.Core.Storage
         public string PageUrl { get; set; }
 
         public string PageName { get; set; }
-        
+
         public string PageType { get; set; }
-        
+
         public string ListUrl { get; set; }
 
         public string ListTitle { get; set; }
@@ -51,9 +52,10 @@ namespace PnP.Scanning.Core.Storage
 
         public string RemediationCode { get; set; }
 
+        /// <summary>Excludes modern pages from the historical ClassicPages report table.</summary>
         public bool AddToDatabase()
         {
-            if (PageType == PageScanComponent.ModernPage)
+            if (PageType == ClassicPageRules.ModernPage)
             {
                 return false;
             }

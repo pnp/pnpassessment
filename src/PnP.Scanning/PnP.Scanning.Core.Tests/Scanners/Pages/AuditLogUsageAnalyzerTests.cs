@@ -1,7 +1,6 @@
-﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using FluentAssertions;
 using PnP.Scanning.Core.Storage;
-using System.Collections.Generic;
 using Xunit;
 
 namespace PnP.Scanning.Core.Tests.Scanners.Pages
@@ -15,11 +14,16 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
     {
         private const string PageUrl = "https://contoso.sharepoint.com/sites/team/SitePages/Home.aspx";
 
-        private static ClassicPageAuditUsage Record(string pageUrl = PageUrl) =>
-            new() { PageUrl = pageUrl };
+        /// <summary>Verifies record.</summary>
+        private static ClassicPageAuditUsage Record(string pageUrl = PageUrl) => new() { PageUrl = pageUrl };
 
+        /// <summary>Verifies stats.</summary>
         private static IReadOnlyDictionary<string, AuditLogUsageAnalyzer.AuditPageStats> Stats(
-            string url = PageUrl, int views = 5, int creates = 2, int edits = 3, int users = 4) =>
+            string url = PageUrl,
+            int views = 5,
+            int creates = 2,
+            int edits = 3,
+            int users = 4) =>
             new Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>(StringComparer.OrdinalIgnoreCase)
             {
                 [url] = new AuditLogUsageAnalyzer.AuditPageStats(views, creates, edits, users)
@@ -91,13 +95,14 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             record.AuditUniqueUsers.Should().Be(0);
         }
 
-        // ── SplitWindow ──────────────────────────────────────────────────────────
+        /// <summary>Verifies split window exact multiple produces even chunks.</summary>
 
+        // ── SplitWindow ──────────────────────────────────────────────────────────
         [Fact]
         public void SplitWindow_ExactMultiple_ProducesEvenChunks()
         {
             var start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
-            var end   = new DateTime(2026, 6, 7, 0, 0, 0, DateTimeKind.Utc); // 6 days / 2 = 3 chunks
+            DateTime end = new DateTime(2026, 6, 7, 0, 0, 0, DateTimeKind.Utc); // 6 days / 2 = 3 chunks
 
             var chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
 
@@ -107,24 +112,26 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             chunks[2].Should().Be((start.AddDays(4), end));
         }
 
+        /// <summary>Verifies split window non exact multiple last chunk shorter.</summary>
         [Fact]
         public void SplitWindow_NonExactMultiple_LastChunkShorter()
         {
             var start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
-            var end   = new DateTime(2026, 6, 6, 0, 0, 0, DateTimeKind.Utc); // 5 days / 2 = 2 full + 1 partial
+            DateTime end = new DateTime(2026, 6, 6, 0, 0, 0, DateTimeKind.Utc); // 5 days / 2 = 2 full + 1 partial
 
             var chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
 
             chunks.Should().HaveCount(3);
-            chunks[2].End.Should().Be(end);                          // last chunk ends exactly at window end
+            chunks[2].End.Should().Be(end); // last chunk ends exactly at window end
             (chunks[2].End - chunks[2].Start).TotalDays.Should().Be(1); // last chunk is 1 day
         }
 
+        /// <summary>Verifies split window window smaller than chunk produces single chunk.</summary>
         [Fact]
         public void SplitWindow_WindowSmallerThanChunk_ProducesSingleChunk()
         {
             var start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
-            var end   = new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc); // 1 day < ChunkDays=2
+            DateTime end = new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc); // 1 day < ChunkDays=2
 
             var chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
 
@@ -133,18 +140,21 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             chunks[0].End.Should().Be(end);
         }
 
-        // ── MergeChunks ──────────────────────────────────────────────────────────
+        /// <summary>Verifies merge chunks separate pages combines all entries.</summary>
 
+        // ── MergeChunks ──────────────────────────────────────────────────────────
         [Fact]
         public void MergeChunks_SeparatePages_CombinesAllEntries()
         {
             var chunk1 = new Dictionary<string, AuditLogUsageAnalyzer.ChunkPageData>(StringComparer.OrdinalIgnoreCase)
             {
-                ["https://contoso.sharepoint.com/sites/s/SitePages/A.aspx"] = new(3, 1, 0, new HashSet<int> { 1, 2 }),
+                ["https://contoso.sharepoint.com/sites/s/SitePages/A.aspx"] =
+                    new(3, 1, 0, new HashSet<int> { 1, 2 }),
             };
             var chunk2 = new Dictionary<string, AuditLogUsageAnalyzer.ChunkPageData>(StringComparer.OrdinalIgnoreCase)
             {
-                ["https://contoso.sharepoint.com/sites/s/SitePages/B.aspx"] = new(5, 0, 2, new HashSet<int> { 1, 2, 3 }),
+                ["https://contoso.sharepoint.com/sites/s/SitePages/B.aspx"] =
+                    new(5, 0, 2, new HashSet<int> { 1, 2, 3 }),
             };
 
             var merged = AuditLogUsageAnalyzer.MergeChunks(new[] { chunk1, chunk2 });
@@ -154,23 +164,28 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             merged["https://contoso.sharepoint.com/sites/s/SitePages/B.aspx"].ViewsCount.Should().Be(5);
         }
 
+        /// <summary>Verifies merge chunks same page sums counts across chunks.</summary>
         [Fact]
         public void MergeChunks_SamePage_SumsCountsAcrossChunks()
         {
             const string url = "https://contoso.sharepoint.com/sites/s/SitePages/Home.aspx";
             // Users 1 and 2 appear in chunk1; user 1 also appears in chunk2 (cross-chunk dedup case)
             var chunk1 = new Dictionary<string, AuditLogUsageAnalyzer.ChunkPageData>(StringComparer.OrdinalIgnoreCase)
-                { [url] = new(3, 1, 0, new HashSet<int> { 1, 2 }) };
+            {
+                [url] = new(3, 1, 0, new HashSet<int> { 1, 2 })
+            };
             var chunk2 = new Dictionary<string, AuditLogUsageAnalyzer.ChunkPageData>(StringComparer.OrdinalIgnoreCase)
-                { [url] = new(2, 0, 1, new HashSet<int> { 1 }) };
+            {
+                [url] = new(2, 0, 1, new HashSet<int> { 1 })
+            };
 
             var merged = AuditLogUsageAnalyzer.MergeChunks(new[] { chunk1, chunk2 });
 
             merged.Should().HaveCount(1);
-            merged[url].ViewsCount.Should().Be(5);   // 3 + 2
+            merged[url].ViewsCount.Should().Be(5); // 3 + 2
             merged[url].CreatesCount.Should().Be(1); // 1 + 0
-            merged[url].EditsCount.Should().Be(1);   // 0 + 1
-            merged[url].UniqueUsers.Should().Be(2);  // union({1,2}, {1}) = {1,2} — cross-chunk dedup
+            merged[url].EditsCount.Should().Be(1); // 0 + 1
+            merged[url].UniqueUsers.Should().Be(2); // union({1,2}, {1}) = {1,2} — cross-chunk dedup
         }
 
         [Fact]
@@ -182,6 +197,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             merged.Should().BeEmpty();
         }
 
+        /// <summary>Verifies merge chunks union exceeding cap is bounded to max tracked users per page.</summary>
         [Fact]
         public void MergeChunks_UnionExceedingCap_IsBoundedToMaxTrackedUsersPerPage()
         {
@@ -194,9 +210,13 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             var users1 = new HashSet<int>(Enumerable.Range(0, 8_000));
             var users2 = new HashSet<int>(Enumerable.Range(8_000, 8_000));
             var chunk1 = new Dictionary<string, AuditLogUsageAnalyzer.ChunkPageData>(StringComparer.OrdinalIgnoreCase)
-                { [url] = new(8_000, 0, 0, users1) };
+            {
+                [url] = new(8_000, 0, 0, users1)
+            };
             var chunk2 = new Dictionary<string, AuditLogUsageAnalyzer.ChunkPageData>(StringComparer.OrdinalIgnoreCase)
-                { [url] = new(8_000, 0, 0, users2) };
+            {
+                [url] = new(8_000, 0, 0, users2)
+            };
 
             var merged = AuditLogUsageAnalyzer.MergeChunks(new[] { chunk1, chunk2 });
 

@@ -1,6 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Scanners.WebPartMapping;
 using Xunit;
 
@@ -23,18 +22,29 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
     {
         // Short type names the legacy categorization keys on, expanded to fully assembly-qualified types
         // (TypeShort() drops everything after the first comma, recovering the short name).
-        private const string XsltListViewType = "Microsoft.SharePoint.WebPartPages.XsltListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ListViewType = "Microsoft.SharePoint.WebPartPages.ListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string GettingStartedType = "Microsoft.SharePoint.WebPartPages.GettingStartedWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string SiteFeedType = "Microsoft.SharePoint.Portal.WebControls.SiteFeedWebPart, Microsoft.SharePoint.Portal, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
-        private const string ContentEditorType = "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+        private const string XsltListViewType =
+            "Microsoft.SharePoint.WebPartPages.XsltListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ListViewType =
+            "Microsoft.SharePoint.WebPartPages.ListViewWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string GettingStartedType =
+            "Microsoft.SharePoint.WebPartPages.GettingStartedWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string SiteFeedType =
+            "Microsoft.SharePoint.Portal.WebControls.SiteFeedWebPart, Microsoft.SharePoint.Portal, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
+
+        private const string ContentEditorType =
+            "Microsoft.SharePoint.WebPartPages.ContentEditorWebPart, Microsoft.SharePoint, Version=16.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c";
 
         // Captured default team-site home page WikiField HTML: the normalized out-of-the-box layout with
         // realistic whitespace and per-web-part GUIDs (both stripped during the uncustomized compare).
         // "DefaultHtml" = SiteFeed + XsltListView + GettingStarted; "DefaultRootHtml" = the root site variant.
-        private const string DefaultHomeHtml = "<divclass=\"<tableid=\"layoutsTable\"style=\"width&#58;100%;\">\n            <tbody>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdcolspan=\"2\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_CCCCCCCC-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_DDDDDDDD-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdstyle=\"width&#58;49.95%;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_CCCCCCCC-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_DDDDDDDD-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            <tdclass=\"ms-wiki-columnSpacing\"style=\"width&#58;49.95%;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_CCCCCCCC-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_DDDDDDDD-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            </tbody>\n            </table>\n            <spanid=\"layoutsData\"style=\"display&#58;none;\">true,false,2</span>\n            </div>";
+        private const string DefaultHomeHtml =
+            "<divclass=\"<tableid=\"layoutsTable\"style=\"width&#58;100%;\">\n            <tbody>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdcolspan=\"2\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_CCCCCCCC-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_DDDDDDDD-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdstyle=\"width&#58;49.95%;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_CCCCCCCC-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_DDDDDDDD-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            <tdclass=\"ms-wiki-columnSpacing\"style=\"width&#58;49.95%;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_CCCCCCCC-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_DDDDDDDD-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            </tbody>\n            </table>\n            <spanid=\"layoutsData\"style=\"display&#58;none;\">true,false,2</span>\n            </div>";
 
-        private const string DefaultRootHomeHtml = "<divclass=\"<tableid=\"layoutsTable\"style=\"width&#58;100%;\">\n            <tbody>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdstyle=\"width&#58;100%;padding&#58;0px;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"min-height&#58;60px;word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_AAAAAAAA-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_BBBBBBBB-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_AAAAAAAA-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_BBBBBBBB-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            </tbody>\n            </table>\n            <spanid=\"layoutsData\"style=\"display&#58;none;\">false,false,1</span>\n            </div>";
+        private const string DefaultRootHomeHtml =
+            "<divclass=\"<tableid=\"layoutsTable\"style=\"width&#58;100%;\">\n            <tbody>\n            <trstyle=\"vertical-align&#58;top;\">\n            <tdstyle=\"width&#58;100%;padding&#58;0px;\">\n            <divclass=\"ms-rte-layoutszone-outer\"style=\"width&#58;100%;\">\n            <divclass=\"ms-rte-layoutszone-inner\"style=\"min-height&#58;60px;word-wrap&#58;break-word;margin&#58;0px;border&#58;0px;\">\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_AAAAAAAA-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_BBBBBBBB-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            <divclass=\"ms-rtestate-readms-rte-wpbox\">\n            <divclass=\"ms-rtestate-read\"id=\"div_AAAAAAAA-1111-2222-3333-444444444444\">\n            </div>\n            <divclass=\"ms-rtestate-read\"id=\"vid_BBBBBBBB-1111-2222-3333-444444444444\"style=\"display&#58;none;\">\n            </div>\n            </div>\n            </div>\n            </div>\n            </td>\n            </tr>\n            </tbody>\n            </table>\n            <spanid=\"layoutsData\"style=\"display&#58;none;\">false,false,1</span>\n            </div>";
 
         private static WebPartEntity WebPart(string fullType)
         {
@@ -115,6 +125,8 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             HomePageDetector.IsHtmlUncustomized("").Should().BeFalse();
         }
 
+        /// <summary>Verifies default web part set single xslt list view plus defaults true.</summary>
+
         #endregion
 
         #region IsDefaultTeamSiteWebPartSet
@@ -125,47 +137,40 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             // The out-of-the-box team site home page: a single XsltListView plus the getting-started/feed parts.
             var webParts = new List<WebPartEntity>
             {
-                WebPart(GettingStartedType),
-                WebPart(SiteFeedType),
-                WebPart(XsltListViewType),
+                WebPart(GettingStartedType), WebPart(SiteFeedType), WebPart(XsltListViewType),
             };
 
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeTrue();
         }
 
+        /// <summary>Verifies default web part set no list views false.</summary>
         [Fact]
         public void DefaultWebPartSet_NoListViews_False()
         {
             // The list view web part was removed → no longer the default set.
-            var webParts = new List<WebPartEntity>
-            {
-                WebPart(GettingStartedType),
-            };
+            List<WebPartEntity> webParts = new List<WebPartEntity> { WebPart(GettingStartedType), };
 
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeFalse();
         }
 
+        /// <summary>Verifies default web part set multiple list views false.</summary>
         [Fact]
         public void DefaultWebPartSet_MultipleListViews_False()
         {
             var webParts = new List<WebPartEntity>
             {
-                WebPart(XsltListViewType),
-                WebPart(XsltListViewType),
-                WebPart(ListViewType),
+                WebPart(XsltListViewType), WebPart(XsltListViewType), WebPart(ListViewType),
             };
 
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeFalse();
         }
 
+        /// <summary>Verifies default web part set contains other web part false.</summary>
         [Fact]
         public void DefaultWebPartSet_ContainsOtherWebPart_False()
         {
-            var webParts = new List<WebPartEntity>
-            {
-                WebPart(XsltListViewType),
-                WebPart(ContentEditorType),
-            };
+            List<WebPartEntity> webParts =
+                new List<WebPartEntity> { WebPart(XsltListViewType), WebPart(ContentEditorType), };
 
             HomePageDetector.IsDefaultTeamSiteWebPartSet(webParts).Should().BeFalse();
         }
@@ -178,15 +183,16 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             HomePageDetector.IsDefaultTeamSiteWebPartSet(new List<WebPartEntity>()).Should().BeFalse();
         }
 
+        /// <summary>Verifies default home web parts.</summary>
+
         #endregion
 
         #region IsUncustomizedHomePageFallback
 
-        private static List<WebPartEntity> DefaultHomeWebParts() => new()
-        {
-            WebPart(GettingStartedType),
-            WebPart(XsltListViewType),
-        };
+        private static List<WebPartEntity> DefaultHomeWebParts() =>
+            new() { WebPart(GettingStartedType), WebPart(XsltListViewType), };
+
+        /// <summary>Verifies evaluate.</summary>
 
         // Builds the fallback call with all conditions satisfied; each test overrides one input to flip it.
         private static bool Evaluate(
@@ -205,9 +211,19 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             string contentTypeDisplayFormTemplateName = "WikiEditForm")
         {
             return HomePageDetector.IsUncustomizedHomePageFallback(
-                isHomePage, webTemplate, webConfiguration, publishingSiteFeatureEnabled, publishingWebFeatureEnabled,
-                homePageModernizationOptedOut, siteWasGroupified, masterUrl, pageName, localizedHomePageName,
-                wikiHtml, webParts ?? DefaultHomeWebParts(), contentTypeDisplayFormTemplateName);
+                isHomePage,
+                webTemplate,
+                webConfiguration,
+                publishingSiteFeatureEnabled,
+                publishingWebFeatureEnabled,
+                homePageModernizationOptedOut,
+                siteWasGroupified,
+                masterUrl,
+                pageName,
+                localizedHomePageName,
+                wikiHtml,
+                webParts ?? DefaultHomeWebParts(),
+                contentTypeDisplayFormTemplateName);
         }
 
         [Fact]
@@ -243,10 +259,13 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             Evaluate(siteWasGroupified: true).Should().BeFalse();
         }
 
+        /// <summary>Verifies fallback non default master page false.</summary>
         [Fact]
         public void Fallback_NonDefaultMasterPage_False()
         {
-            Evaluate(masterUrl: "https://contoso.sharepoint.com/sites/team/_catalogs/masterpage/custom.master").Should().BeFalse();
+            Evaluate(masterUrl: "https://contoso.sharepoint.com/sites/team/_catalogs/masterpage/custom.master")
+                .Should()
+                .BeFalse();
             Evaluate(masterUrl: null).Should().BeFalse();
         }
 

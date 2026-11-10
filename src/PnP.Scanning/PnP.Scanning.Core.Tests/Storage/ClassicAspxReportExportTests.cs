@@ -1,3 +1,4 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
 #nullable enable
 using System.Globalization;
 using System.Security.Cryptography;
@@ -23,12 +24,13 @@ public sealed class ClassicAspxReportExportTests
     private const string SummaryName = "classicaspxsummary.json";
     private const string ModernApplication = "B6917CB1-93A0-4B97-A84D-7CF49975D4EC";
     private const string ModernContentType = "0x0101009D1CB255DA76424F860D91F20E6C411800";
+
     private static readonly string[] ExpectedHeader =
     {
         "ScanId", "SiteCollectionId", "WebId", "ListId", "FileUniqueId", "SiteUrl", "WebUrl", "Url", "FileName",
         "ClassicPageType", "PageRole", "ClassificationState", "ClassificationReason", "ContentTypeId",
-        "CustomizedPageStatus", "SetupPath", "NoExecute",
-        "MetadataReadState", "ErrorCodes", "ErrorDetail", "ObservedAtUtc"
+        "CustomizedPageStatus", "SetupPath", "NoExecute", "MetadataReadState", "ErrorCodes", "ErrorDetail",
+        "ObservedAtUtc"
     };
 
     /// <summary>Uses invariant comma-delimited CSV for independent golden wire assertions.</summary>
@@ -36,18 +38,21 @@ public sealed class ClassicAspxReportExportTests
 
     /// <summary>Creates a unique output directory whose absolute ownership boundary is checked before cleanup.</summary>
     private static string DirectoryForTest() =>
-        Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "classic-aspx-csv-" + Guid.NewGuid().ToString("N"))).FullName;
+        Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "classic-aspx-csv-" + Guid.NewGuid().ToString("N")))
+            .FullName;
 
     /// <summary>Deletes only this test's resolved absolute directory beneath the temporary root and with the expected ownership prefix.</summary>
     private static void DeleteOwnDirectory(string directory)
     {
         var full = Path.GetFullPath(directory);
-        var temporary = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) + Path.DirectorySeparatorChar;
+        string? temporary = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) +
+                            Path.DirectorySeparatorChar;
         if (!full.StartsWith(temporary, StringComparison.OrdinalIgnoreCase) ||
             !Path.GetFileName(full).StartsWith("classic-aspx-csv-", StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Not an owned report-test directory.");
         }
+
         Directory.Delete(full, true);
     }
 
@@ -114,12 +119,22 @@ public sealed class ClassicAspxReportExportTests
         context.ChangeTracker.Clear();
         var query = ClassicAspxReportProjection.Files(context, scan);
         var sql = query.ToQueryString();
-        sql.Should().Contain("ORDER BY").And.Contain("SPFile").And.Contain("SiteCollectionId").And.Contain("FileUniqueId")
-            .And.NotContain("JOIN").And.NotContain("GROUP BY").And.NotContain("COUNT(").And.NotContain("IsClassic");
+        sql.Should()
+            .Contain("ORDER BY")
+            .And.Contain("SPFile")
+            .And.Contain("SiteCollectionId")
+            .And.Contain("FileUniqueId")
+            .And.NotContain("JOIN")
+            .And.NotContain("GROUP BY")
+            .And.NotContain("COUNT(")
+            .And.NotContain("IsClassic");
         var rows = await query.ToListAsync();
-        rows.Select(row => (row.SiteCollectionId, row.FileUniqueId)).Should().Equal(
-            new[] { first, second }.OrderBy(row => row.SiteCollectionId).ThenBy(row => row.FileUniqueId)
-                .Select(row => (row.SiteCollectionId, row.FileUniqueId)));
+        rows.Select(row => (row.SiteCollectionId, row.FileUniqueId))
+            .Should()
+            .Equal(
+                new[] { first, second }.OrderBy(row => row.SiteCollectionId)
+                    .ThenBy(row => row.FileUniqueId)
+                    .Select(row => (row.SiteCollectionId, row.FileUniqueId)));
         rows.Should().HaveCount(2).And.OnlyContain(row => row.ScanId == scan);
         context.ChangeTracker.Entries().Should().BeEmpty();
     }
@@ -140,8 +155,10 @@ public sealed class ClassicAspxReportExportTests
         secondContext.Add(second);
         await firstContext.SaveChangesAsync();
         await secondContext.SaveChangesAsync();
-        (await ClassicAspxReportProjection.Files(firstContext, first.ScanId).SingleAsync()).ScanId.Should().Be(first.ScanId);
-        (await ClassicAspxReportProjection.Files(secondContext, second.ScanId).SingleAsync()).ScanId.Should().Be(second.ScanId);
+        (await ClassicAspxReportProjection.Files(firstContext, first.ScanId).SingleAsync()).ScanId.Should()
+            .Be(first.ScanId);
+        (await ClassicAspxReportProjection.Files(secondContext, second.ScanId).SingleAsync()).ScanId.Should()
+            .Be(second.ScanId);
     }
 
     /// <summary>Publishes exactly the fixed 21-column business CSV and its summary, without inventory, raw-file or alias outputs.</summary>
@@ -200,7 +217,9 @@ public sealed class ClassicAspxReportExportTests
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             var rows = ReadRows(directory);
-            rows.Select(row => row.FileUniqueId).Should().BeEquivalentTo(new[] { classic.FileUniqueId, unknown.FileUniqueId, fallback.FileUniqueId });
+            rows.Select(row => row.FileUniqueId)
+                .Should()
+                .BeEquivalentTo(new[] { classic.FileUniqueId, unknown.FileUniqueId, fallback.FileUniqueId });
             rows.Single(row => row.FileUniqueId == classic.FileUniqueId).ClassicPageType.Should().Be("WikiPage");
             rows.Single(row => row.FileUniqueId == fallback.FileUniqueId).ClassicPageType.Should().Be("BasicPage");
             var failure = rows.Single(row => row.FileUniqueId == unknown.FileUniqueId);
@@ -241,7 +260,9 @@ public sealed class ClassicAspxReportExportTests
             row.SiteCollectionId.Should().Be(first.SiteCollectionId);
             row.FileUniqueId.Should().Be(first.FileUniqueId);
             row.PageRole.Should().Be("ListForm");
-            (await context.SPFiles.SingleAsync()).ProvenanceJson.Should().Contain("FolderFileObservation").And.Contain("ListDefaultDisplayForm");
+            (await context.SPFiles.SingleAsync()).ProvenanceJson.Should()
+                .Contain("FolderFileObservation")
+                .And.Contain("ListDefaultDisplayForm");
         }
         finally
         {
@@ -324,11 +345,16 @@ public sealed class ClassicAspxReportExportTests
                 csv.Read();
                 csv.ReadHeader();
                 csv.Read();
-                foreach (var column in new[] { "SiteUrl", "WebUrl", "FileName", "ContentTypeId", "CustomizedPageStatus", "SetupPath", "ErrorCodes", "ErrorDetail" })
+                foreach (string? column in new[]
+                         {
+                             "SiteUrl", "WebUrl", "FileName", "ContentTypeId", "CustomizedPageStatus", "SetupPath",
+                             "ErrorCodes", "ErrorDetail"
+                         })
                 {
                     csv.GetField<string>(column).Should().Be(wire);
                 }
             }
+
             (await context.SPFiles.AsNoTracking().SingleAsync()).SiteUrl.Should().Be(raw);
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             summary.RootElement.GetProperty("nullableStringEncoding").GetString().Should().Be("BackslashNullV1");
@@ -439,7 +465,9 @@ public sealed class ClassicAspxReportExportTests
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             var row = ReadRows(directory).Should().ContainSingle().Which;
             row.NoExecute.Should().BeNull();
-            (await context.SPFiles.AsNoTracking().SingleAsync()).ProvenanceJson.Should().Contain("NoExecuteRaw").And.Contain("metadata_changed");
+            (await context.SPFiles.AsNoTracking().SingleAsync()).ProvenanceJson.Should()
+                .Contain("NoExecuteRaw")
+                .And.Contain("metadata_changed");
         }
         finally
         {
@@ -458,7 +486,9 @@ public sealed class ClassicAspxReportExportTests
             using var context = fixture.CreateContext();
             await ClassicAspxReportProjection.ExportCsvAsync(context, Guid.NewGuid(), directory, Configuration());
             Header(directory).Should().Equal(ExpectedHeader);
-            Header(directory).Should().NotContain(new[] { "NoExecuteRaw", "IsPoisoned", "PoisonState", "RenderDisposition" });
+            Header(directory)
+                .Should()
+                .NotContain(new[] { "NoExecuteRaw", "IsPoisoned", "PoisonState", "RenderDisposition" });
             ReadRows(directory).Should().BeEmpty();
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             var root = summary.RootElement;
@@ -513,8 +543,11 @@ public sealed class ClassicAspxReportExportTests
         context.Add(FileFact(scan));
         Mark(context, scan, scope);
         await context.SaveChangesAsync();
-        var before = await context.Properties.AsNoTracking().Where(row => row.ScanId == scan)
-            .OrderBy(row => row.Name).Select(row => new { row.Name, row.Value }).ToListAsync();
+        List<KeyValuePair<string, string>> before = await context.Properties.AsNoTracking()
+            .Where(row => row.ScanId == scan)
+            .OrderBy(row => row.Name)
+            .Select(row => new KeyValuePair<string, string>(row.Name, row.Value))
+            .ToListAsync();
         var directory = DirectoryForTest();
         try
         {
@@ -526,8 +559,11 @@ public sealed class ClassicAspxReportExportTests
             root.GetProperty("acquisitionState").GetString().Should().Be("DeclaredScopeObserved");
             root.GetProperty("coverage").GetProperty("targeted").GetBoolean().Should().Be(targeted);
             root.GetProperty("coverage").GetProperty("tenantCompleteness").GetString().Should().Be("NotAsserted");
-            var after = await context.Properties.AsNoTracking().Where(row => row.ScanId == scan)
-                .OrderBy(row => row.Name).Select(row => new { row.Name, row.Value }).ToListAsync();
+            List<KeyValuePair<string, string>> after = await context.Properties.AsNoTracking()
+                .Where(row => row.ScanId == scan)
+                .OrderBy(row => row.Name)
+                .Select(row => new KeyValuePair<string, string>(row.Name, row.Value))
+                .ToListAsync();
             after.Should().BeEquivalentTo(before, options => options.WithStrictOrdering());
         }
         finally
@@ -586,7 +622,10 @@ public sealed class ClassicAspxReportExportTests
             evidence.GetProperty("name").GetString().Should().Be(CsvName);
             var bytes = await File.ReadAllBytesAsync(Path.Combine(directory, CsvName));
             evidence.GetProperty("length").GetInt64().Should().Be(bytes.Length);
-            evidence.GetProperty("sha256").GetString().Should().Be(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+            evidence.GetProperty("sha256")
+                .GetString()
+                .Should()
+                .Be(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
         }
         finally
         {
@@ -602,13 +641,26 @@ public sealed class ClassicAspxReportExportTests
         var scan = Guid.NewGuid();
         using var context = fixture.CreateContext();
         Mark(context, scan);
-        context.ClassicPageDiscoveries.Add(new ClassicPageDiscovery
-        {
-            ScanId = scan, RecordKey = "metadata-only-reference", RowType = "Reference", ScopeType = "ListDefaultDisplayForm",
-            DiscoveryStatus = "Complete", SiteUrl = "https://example.invalid/sites/test", WebUrl = "/",
-            Url = "/sites/test/Forms/DispForm.aspx"
-        });
-        context.ClassicPages.Add(new ClassicPage { ScanId = scan, SiteUrl = "https://example.invalid/sites/test", WebUrl = "/", PageUrl = "/legacy.aspx" });
+        context.ClassicPageDiscoveries.Add(
+            new ClassicPageDiscovery
+            {
+                ScanId = scan,
+                RecordKey = "metadata-only-reference",
+                RowType = "Reference",
+                ScopeType = "ListDefaultDisplayForm",
+                DiscoveryStatus = "Complete",
+                SiteUrl = "https://example.invalid/sites/test",
+                WebUrl = "/",
+                Url = "/sites/test/Forms/DispForm.aspx"
+            });
+        context.ClassicPages.Add(
+            new ClassicPage
+            {
+                ScanId = scan,
+                SiteUrl = "https://example.invalid/sites/test",
+                WebUrl = "/",
+                PageUrl = "/legacy.aspx"
+            });
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
@@ -632,11 +684,15 @@ public sealed class ClassicAspxReportExportTests
         using var context = fixture.CreateContext();
         context.Add(FileFact(scan));
         Mark(context, scan, "HomePageOnly");
-        context.ClassicPages.Add(new ClassicPage
-        {
-            ScanId = scan, SiteUrl = "https://example.invalid/sites/test", WebUrl = "/",
-            PageUrl = "/Home.aspx", CustomizedPageStatus = "Uncustomized"
-        });
+        context.ClassicPages.Add(
+            new ClassicPage
+            {
+                ScanId = scan,
+                SiteUrl = "https://example.invalid/sites/test",
+                WebUrl = "/",
+                PageUrl = "/Home.aspx",
+                CustomizedPageStatus = "Uncustomized"
+            });
         await context.SaveChangesAsync();
         var directory = DirectoryForTest();
         try
@@ -647,9 +703,16 @@ public sealed class ClassicAspxReportExportTests
             using var csv = new CsvReader(reader, Configuration());
             csv.GetRecords<ClassicPage>().Single().PageUrl.Should().Be("/Home.aspx");
             ReadRows(directory).Should().ContainSingle();
-            Directory.GetFiles(directory).Select(Path.GetFileName).Should().Contain(CsvName).And.Contain(SummaryName)
-                .And.NotContain("aspxinventory.csv").And.NotContain("aspxsummary.json").And.NotContain("spfiles.csv")
-                .And.NotContain("classicaspxinventories.csv").And.NotContain("aspxitembindings.csv");
+            Directory.GetFiles(directory)
+                .Select(Path.GetFileName)
+                .Should()
+                .Contain(CsvName)
+                .And.Contain(SummaryName)
+                .And.NotContain("aspxinventory.csv")
+                .And.NotContain("aspxsummary.json")
+                .And.NotContain("spfiles.csv")
+                .And.NotContain("classicaspxinventories.csv")
+                .And.NotContain("aspxitembindings.csv");
         }
         finally
         {
@@ -663,14 +726,16 @@ public sealed class ClassicAspxReportExportTests
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        await using var context = new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options);
+        await using ScanContext? context =
+            new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options);
         var migrations = context.Database.GetMigrations().ToArray();
         await context.GetService<IMigrator>().MigrateAsync(migrations[^2]);
         var scan = Guid.NewGuid();
-        context.ClassicPages.Add(new ClassicPage
-        {
-            ScanId = scan, SiteUrl = "https://example.invalid/sites/legacy", WebUrl = "/", PageUrl = "/old.aspx"
-        });
+        context.ClassicPages.Add(
+            new ClassicPage
+            {
+                ScanId = scan, SiteUrl = "https://example.invalid/sites/legacy", WebUrl = "/", PageUrl = "/old.aspx"
+            });
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         await context.Database.MigrateAsync();
@@ -703,12 +768,17 @@ public sealed class ClassicAspxReportExportTests
         {
             await writer.WriteAsync(batch);
         }
+
         using var context = fixture.CreateContext();
         var directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            ReadRows(directory).Select(row => (row.SiteCollectionId, row.FileUniqueId)).Should().HaveCount(facts.Length).And.OnlyHaveUniqueItems();
+            ReadRows(directory)
+                .Select(row => (row.SiteCollectionId, row.FileUniqueId))
+                .Should()
+                .HaveCount(facts.Length)
+                .And.OnlyHaveUniqueItems();
             context.ChangeTracker.Entries().Should().BeEmpty();
         }
         finally
@@ -744,7 +814,12 @@ public sealed class ClassicAspxReportExportTests
         cancellation.Cancel();
         try
         {
-            Func<Task> export = () => ClassicAspxReportProjection.ExportCsvAsync(context, Guid.NewGuid(), directory, Configuration(), cancellation.Token);
+            Func<Task> export = () => ClassicAspxReportProjection.ExportCsvAsync(
+                context,
+                Guid.NewGuid(),
+                directory,
+                Configuration(),
+                cancellation.Token);
             await export.Should().ThrowAsync<OperationCanceledException>();
             File.Exists(Path.Combine(directory, SummaryName)).Should().BeFalse();
         }

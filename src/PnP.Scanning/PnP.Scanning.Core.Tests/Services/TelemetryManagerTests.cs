@@ -1,5 +1,5 @@
-﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using FluentAssertions;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -16,6 +16,7 @@ namespace PnP.Scanning.Core.Tests.Services
     /// </summary>
     public class TelemetryManagerTests
     {
+        /// <summary>Verifies telemetry log page scan builds expected payload.</summary>
         [Fact]
         public void Telemetry_LogPageScan_BuildsExpectedPayload()
         {
@@ -27,13 +28,50 @@ namespace PnP.Scanning.Core.Tests.Services
             // The ASPX page is the (uncustomized) home page.
             var pages = new List<ClassicPage>
             {
-                NewPage(scanId, siteUrl, "/Pages/a.aspx", PageScanComponent.WikiPage, webPartCount: 4, mappingPercentage: 75),
-                NewPage(scanId, siteUrl, "/Pages/b.aspx", PageScanComponent.WebPartPage, webPartCount: 2, mappingPercentage: 100),
-                NewPage(scanId, siteUrl, "/Pages/c.aspx", PageScanComponent.PublishingPage, webPartCount: 3, mappingPercentage: 50),
-                NewPage(scanId, siteUrl, "/Lists/Posts/d.aspx", PageScanComponent.BlogPage, webPartCount: 0, mappingPercentage: 100),
-                NewPage(scanId, siteUrl, "/default.aspx", PageScanComponent.ASPXPage, webPartCount: 0, mappingPercentage: 100,
-                        homePage: true, uncustomizedHomePage: true),
-                NewPage(scanId, siteUrl, "/Lists/Posts/f.aspx", PageScanComponent.DelveBlogPage, webPartCount: 0, mappingPercentage: 100),
+                NewPage(
+                    scanId,
+                    siteUrl,
+                    "/Pages/a.aspx",
+                    ClassicPageRules.WikiPage,
+                    webPartCount: 4,
+                    mappingPercentage: 75),
+                NewPage(
+                    scanId,
+                    siteUrl,
+                    "/Pages/b.aspx",
+                    ClassicPageRules.WebPartPage,
+                    webPartCount: 2,
+                    mappingPercentage: 100),
+                NewPage(
+                    scanId,
+                    siteUrl,
+                    "/Pages/c.aspx",
+                    ClassicPageRules.PublishingPage,
+                    webPartCount: 3,
+                    mappingPercentage: 50),
+                NewPage(
+                    scanId,
+                    siteUrl,
+                    "/Lists/Posts/d.aspx",
+                    ClassicPageRules.BlogPage,
+                    webPartCount: 0,
+                    mappingPercentage: 100),
+                NewPage(
+                    scanId,
+                    siteUrl,
+                    "/default.aspx",
+                    ClassicPageRules.ASPXPage,
+                    webPartCount: 0,
+                    mappingPercentage: 100,
+                    homePage: true,
+                    uncustomizedHomePage: true),
+                NewPage(
+                    scanId,
+                    siteUrl,
+                    "/Lists/Posts/f.aspx",
+                    ClassicPageRules.DelveBlogPage,
+                    webPartCount: 0,
+                    mappingPercentage: 100),
             };
 
             // Five web part rows total across the three pages that carry parts.
@@ -49,9 +87,18 @@ namespace PnP.Scanning.Core.Tests.Services
             // Scan-wide unique inventory: 2 mapped types, 1 unmapped type.
             var uniques = new List<ClassicWebPartUnique>
             {
-                new() { ScanId = scanId, WebPartType = "ContentEditorWebPart", InMappingFile = true, PageCount = 1 },
+                new()
+                {
+                    ScanId = scanId, WebPartType = "ContentEditorWebPart", InMappingFile = true, PageCount = 1
+                },
                 new() { ScanId = scanId, WebPartType = "XsltListViewWebPart", InMappingFile = true, PageCount = 1 },
-                new() { ScanId = scanId, WebPartType = "Contoso.Custom.WebPart", InMappingFile = false, PageCount = 1 },
+                new()
+                {
+                    ScanId = scanId,
+                    WebPartType = "Contoso.Custom.WebPart",
+                    InMappingFile = false,
+                    PageCount = 1
+                },
             };
 
             using (var context = fixture.CreateContext())
@@ -83,8 +130,8 @@ namespace PnP.Scanning.Core.Tests.Services
 
             // Readiness — only the three pages with web parts contribute
             metric["ClassicPagePagesWithWebPartsCount"].Should().Be(3);
-            metric["ClassicPageMappableWebPartPagesCount"].Should().Be(1);   // b (100%)
-            metric["ClassicPageUnmappedWebPartPagesCount"].Should().Be(2);   // a (75), c (50)
+            metric["ClassicPageMappableWebPartPagesCount"].Should().Be(1); // b (100%)
+            metric["ClassicPageUnmappedWebPartPagesCount"].Should().Be(2); // a (75), c (50)
             metric["ClassicPageAvgMappingPercentage"].Should().BeApproximately(75.0, 0.0001); // (75+100+50)/3
 
             // Web part inventory
@@ -113,9 +160,16 @@ namespace PnP.Scanning.Core.Tests.Services
             metric["ClassicPageAvgMappingPercentage"].Should().Be(0);
         }
 
-        private static ClassicPage NewPage(Guid scanId, string siteUrl, string pageUrl, string pageType,
-                                           int webPartCount, double mappingPercentage,
-                                           bool homePage = false, bool uncustomizedHomePage = false)
+        /// <summary>Verifies new page.</summary>
+        private static ClassicPage NewPage(
+            Guid scanId,
+            string siteUrl,
+            string pageUrl,
+            string pageType,
+            int webPartCount,
+            double mappingPercentage,
+            bool homePage = false,
+            bool uncustomizedHomePage = false)
         {
             return new ClassicPage
             {
@@ -132,7 +186,13 @@ namespace PnP.Scanning.Core.Tests.Services
             };
         }
 
-        private static ClassicPageWebPart NewWebPart(Guid scanId, string siteUrl, string pageUrl, int index, string type)
+        /// <summary>Verifies new web part.</summary>
+        private static ClassicPageWebPart NewWebPart(
+            Guid scanId,
+            string siteUrl,
+            string pageUrl,
+            int index,
+            string type)
         {
             return new ClassicPageWebPart
             {

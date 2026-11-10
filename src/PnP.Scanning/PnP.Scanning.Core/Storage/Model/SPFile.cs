@@ -1,3 +1,5 @@
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
+
 #nullable enable
 namespace PnP.Scanning.Core.Storage;
 
@@ -33,8 +35,10 @@ internal sealed class SPFile
     public bool? WikiFieldHasValue { get; set; }
     public string ItemMetadataReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     public string ItemMetadataFieldStatesJson { get; set; } = "{}";
+
     /// <summary>Original public NoExecute field text, normally 0/1; this is not a complete server-side document-flags mask.</summary>
     public string? NoExecuteRaw { get; set; }
+
     public string? NoExecuteSource { get; set; }
     public string NoExecuteReadState { get; set; } = ClassicAspxReadStates.NotAttempted;
     public string? AspxEvidenceJson { get; set; }

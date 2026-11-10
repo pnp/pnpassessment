@@ -1,13 +1,12 @@
+using PnP.Scanning.Core.ClassicPages.Contracts.Shared;
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using System.Data.Common;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using PnP.Scanning.Core.Pipeline.Collection.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.List;
+using PnP.Scanning.Core.ClassicPages.Contracts.List;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.Shared;
-using PnP.Scanning.Core.Pipeline.Analysis.Page;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Storage.Pipeline;
@@ -96,10 +95,10 @@ public sealed class ClassicReplacementRecoveryTests
     }
 
     /// <summary>
-    /// Verifies that custom display form items keep the existing supported aspx behavior in the new collector.
+    /// Rejects non-Posts business items even when a custom display-form declaration exists.
     /// </summary>
     [Fact]
-    public void Custom_display_form_items_keep_the_existing_supported_aspx_behavior_in_the_new_collector()
+    public void Non_posts_items_are_rejected_even_with_custom_form_declarations()
     {
         ClassicContentFixture? source = new ClassicContentFixture();
         ListItemBatch? batch = new ListItemBatch(
@@ -111,7 +110,7 @@ public sealed class ClassicReplacementRecoveryTests
             [],
             null,
             SourceReadState.Complete,
-            ListItemQueryKind.CustomDisplayForms,
+            ListItemQueryKind.Posts,
             100,
             "/sites/a/Lists/Custom/DispForm.aspx",
             ContentTypeForms: [new ClassicContentTypeForm("0x0102", "/sites/a/Lists/Custom/Custom.aspx")]);
@@ -119,21 +118,11 @@ public sealed class ClassicReplacementRecoveryTests
         {
             ["ID"] = SourceField.Of("Int32", 9), ["ContentTypeId"] = SourceField.Of("String", "0x010201"),
         };
-        Core.Pipeline.Contracts.Page.ClassicPageRow? page = ListItemPageProjection.Analyze(
+        Assert.Throws<SnapshotIntegrityException>(() => ListItemPageProjection.Analyze(
             Guid.NewGuid(),
             batch,
             new ListItemFacts(9, fields),
             source.Web(),
-            source.Options);
-        Assert.Equal("/sites/a/Lists/Custom/Custom.aspx?ID=9", page!.PageUrl);
-        Assert.Equal("ASPXPage", page.PageType);
-        Assert.Equal("CP5", page.RemediationCode);
-        Assert.Null(
-            ListItemPageProjection.Analyze(
-                Guid.NewGuid(),
-                batch with { ContentTypeForms = null },
-                new ListItemFacts(9, fields),
-                source.Web(),
-                source.Options));
+            source.Options));
     }
 }

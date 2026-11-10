@@ -1,7 +1,6 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
@@ -25,23 +24,49 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     {
         var scan = Guid.NewGuid();
         var siteId = Guid.NewGuid();
-        var roots = Enumerable.Range(0, 130).Select(index => new ClassicPageDiscovery
-        {
-            ScanId = scan, RecordKey = $"scope:web-{index:D3}", RowType = "Scope", ScopeType = "Web",
-            SiteUrl = Site, WebUrl = "/web" + index, Url = Site + "/web" + index,
-            SiteCollectionId = siteId, WebId = Guid.NewGuid(), DiscoveryStatus = "Complete",
-        }).ToArray();
-        await Writer().WriteAsync(roots.Append(new ClassicPageDiscovery
-        {
-            ScanId = scan, RecordKey = "assessment:scheduled-web", RowType = "Scope", ScopeType = "Web",
-            SiteUrl = Site, WebUrl = "/scheduled", Url = Site + "/scheduled",
-            DiscoveryStatus = "Complete",
-        }).Append(new ClassicPageDiscovery
-        {
-            ScanId = Guid.NewGuid(), RecordKey = "scope:other-scan", RowType = "Scope", ScopeType = "Web",
-            SiteUrl = Site, WebUrl = "/other", Url = Site + "/other",
-            SiteCollectionId = siteId, WebId = Guid.NewGuid(), DiscoveryStatus = "Complete",
-        }));
+        ClassicPageDiscovery[] roots = Enumerable.Range(0, 130)
+            .Select(index => new ClassicPageDiscovery
+            {
+                ScanId = scan,
+                RecordKey = $"scope:web-{index:D3}",
+                RowType = "Scope",
+                ScopeType = "Web",
+                SiteUrl = Site,
+                WebUrl = "/web" + index,
+                Url = Site + "/web" + index,
+                SiteCollectionId = siteId,
+                WebId = Guid.NewGuid(),
+                DiscoveryStatus = "Complete",
+            })
+            .ToArray();
+        await Writer()
+            .WriteAsync(
+                roots.Append(
+                        new ClassicPageDiscovery
+                        {
+                            ScanId = scan,
+                            RecordKey = "assessment:scheduled-web",
+                            RowType = "Scope",
+                            ScopeType = "Web",
+                            SiteUrl = Site,
+                            WebUrl = "/scheduled",
+                            Url = Site + "/scheduled",
+                            DiscoveryStatus = "Complete",
+                        })
+                    .Append(
+                        new ClassicPageDiscovery
+                        {
+                            ScanId = Guid.NewGuid(),
+                            RecordKey = "scope:other-scan",
+                            RowType = "Scope",
+                            ScopeType = "Web",
+                            SiteUrl = Site,
+                            WebUrl = "/other",
+                            Url = Site + "/other",
+                            SiteCollectionId = siteId,
+                            WebId = Guid.NewGuid(),
+                            DiscoveryStatus = "Complete",
+                        }));
 
         var discovered = new List<ClassicPageDiscovery>();
         await foreach (var root in Writer().ReadDiscoveredWebScopesAsync(scan)) discovered.Add(root);
@@ -51,6 +76,7 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
         discovered.Select(root => root.WebUrl).Should().Contain("/web129");
     }
 
+    /// <summary>Verifies native restart projection preserves templates and only returns this sites queued webs.</summary>
     [Fact]
     public async Task Native_restart_projection_preserves_templates_and_only_returns_this_sites_queued_webs()
     {
@@ -67,62 +93,84 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
         await db.SaveChangesAsync();
 
         var pending = await StorageManager.WebsToRestartScanningAsync(db, scan, Site);
-        pending.Select(web => (web.WebUrl, web.WebTemplate)).Should().BeEquivalentTo(new[]
-        {
-            ("/team", "STS#0"), ("/wiki", "ENTERWIKI#0"), ("/unknown", (string)null),
-        });
-        (await db.Webs.CountAsync(web => web.ScanId == scan && web.SiteUrl == Site && web.Status == SiteWebStatus.Queued))
-            .Should().Be(3, "reading the restart queue must not mutate work state");
+        pending.Select(web => (web.WebUrl, web.WebTemplate))
+            .Should()
+            .BeEquivalentTo(new[] { ("/team", "STS#0"), ("/wiki", "ENTERWIKI#0"), ("/unknown", (string)null), });
+        (await db.Webs.CountAsync(web =>
+                web.ScanId == scan && web.SiteUrl == Site && web.Status == SiteWebStatus.Queued)).Should()
+            .Be(3, "reading the restart queue must not mutate work state");
     }
 
+    /// <summary>Verifies pending restart subset does not replace full site authority counts or observation time.</summary>
     [Fact]
     public async Task Pending_restart_subset_does_not_replace_full_site_authority_counts_or_observation_time()
     {
         var scan = Guid.NewGuid();
         var all = Enumeration(8);
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, all, writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, all, writer: Writer());
         var original = await Scope(scan);
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(4, replay: true), writer: Writer());
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(2, replay: true), writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
+            scan,
+            Site,
+            Enumeration(4, replay: true),
+            writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
+            scan,
+            Site,
+            Enumeration(2, replay: true),
+            writer: Writer());
         var retained = await Scope(scan);
         retained.Should().BeEquivalentTo(original);
         retained.ExpectedChildCount.Should().Be(8);
         retained.ObservedChildCount.Should().Be(8);
     }
 
+    /// <summary>Verifies restart replay does not turn incomplete web authority into complete.</summary>
     [Theory]
     [InlineData("Denied")]
     [InlineData("Failed")]
     public async Task Restart_replay_does_not_turn_incomplete_web_authority_into_complete(string status)
     {
         var scan = Guid.NewGuid();
-        Exception error = status == "Denied" ? new UnauthorizedAccessException("subweb authority denied") : new IOException("enumeration interrupted");
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(1), error, Writer());
+        Exception error = status == "Denied"
+            ? new UnauthorizedAccessException("subweb authority denied")
+            : new IOException("enumeration interrupted");
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(1), error, Writer());
         var original = await Scope(scan);
         original.DiscoveryStatus.Should().Be(status);
         original.ExpectedChildCount.Should().BeNull();
         original.ErrorCodes.Should().NotBeNullOrEmpty();
 
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(1, replay: true), writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
+            scan,
+            Site,
+            Enumeration(1, replay: true),
+            writer: Writer());
         (await Scope(scan)).Should().BeEquivalentTo(original);
     }
 
+    /// <summary>Verifies legacy checkpoint without authority does not invent a complete enumeration.</summary>
     [Fact]
     public async Task Legacy_checkpoint_without_authority_does_not_invent_a_complete_enumeration()
     {
         var scan = Guid.NewGuid();
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(4, replay: true), writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
+            scan,
+            Site,
+            Enumeration(4, replay: true),
+            writer: Writer());
         using var db = database.CreateContext();
         (await db.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan)).Should().Be(0);
     }
 
+    /// <summary>Verifies fresh enumeration is still recorded including an empty result.</summary>
     [Fact]
     public async Task Fresh_enumeration_is_still_recorded_including_an_empty_result()
     {
         var scan = Guid.NewGuid();
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(3), writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(3), writer: Writer());
         (await Scope(scan)).ExpectedChildCount.Should().Be(3);
-        await ClassicPageDiscoveryComponent.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(0), writer: Writer());
+        await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(0), writer: Writer());
         var empty = await Scope(scan);
         empty.ExpectedChildCount.Should().Be(0);
         empty.ObservedChildCount.Should().Be(0);
@@ -130,17 +178,31 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
         empty.ObservationMethod.Should().Be("EnumerateWebs");
     }
 
+    /// <summary>Projects a registered discovery scope without inventing file or child identities.</summary>
     private async Task<ClassicPageDiscovery> Scope(Guid scan)
     {
         using var db = database.CreateContext();
-        return await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.ScopeType == "SiteCollection");
+        return await db.ClassicPageDiscoveries.SingleAsync(row =>
+            row.ScanId == scan && row.ScopeType == "SiteCollection");
     }
 
-    private static WebEnumerationResult Enumeration(int count, bool replay = false) => new(
-        Enumerable.Range(0, count).Select(index => new EnumeratedWeb { WebUrl = "/web" + index, WebTemplate = "STS#0" }).ToList(), replay);
+    /// <summary>Verifies enumeration.</summary>
+    private static WebEnumerationResult Enumeration(int count, bool replay = false) =>
+        new(
+            Enumerable.Range(0, count)
+                .Select(index => new EnumeratedWeb { WebUrl = "/web" + index, WebTemplate = "STS#0" })
+                .ToList(),
+            replay);
 
-    private static Web Web(Guid scan, string site, string web, string template, SiteWebStatus status) => new()
-    {
-        ScanId = scan, SiteUrl = site, WebUrl = web, WebUrlAbsolute = site + web, Template = template, Status = status,
-    };
+    /// <summary>Verifies web.</summary>
+    private static Web Web(Guid scan, string site, string web, string template, SiteWebStatus status) =>
+        new()
+        {
+            ScanId = scan,
+            SiteUrl = site,
+            WebUrl = web,
+            WebUrlAbsolute = site + web,
+            Template = template,
+            Status = status,
+        };
 }

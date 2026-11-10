@@ -1,3 +1,4 @@
+using PnP.Scanning.Core.ClassicPages.Collection.Discovery;
 using PnP.Core.Admin.Model.SharePoint;
 using PnP.Core.Auth;
 using PnP.Core.Model.SharePoint;
@@ -7,7 +8,6 @@ using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Serilog;
 using System.Linq.Expressions;
-using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Discovery.Aspx;
 using System.Text.Json;
 

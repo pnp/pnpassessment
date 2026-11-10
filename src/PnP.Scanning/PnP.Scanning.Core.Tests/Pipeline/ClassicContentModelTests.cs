@@ -1,15 +1,16 @@
+using PnP.Scanning.Core.ClassicPages.Contracts.Module;
+using PnP.Scanning.Core.ClassicPages.Contracts.Shared;
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages;
 #nullable enable
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Pipeline.Analysis.Module;
-using PnP.Scanning.Core.Pipeline.Analysis.Page;
-using PnP.Scanning.Core.Pipeline.Collection.File;
-using PnP.Scanning.Core.Pipeline.Collection.List;
-using PnP.Scanning.Core.Pipeline.Collection.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.List;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using PnP.Scanning.Core.ClassicPages.Collection.List;
+using PnP.Scanning.Core.ClassicPages.Contracts.List;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
-using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Pipeline.Orchestration;
 using PnP.Scanning.Core.Services;
@@ -26,13 +27,16 @@ namespace PnP.Scanning.Core.Tests.Pipeline;
 public sealed class ClassicContentModelTests
 {
     /// <summary>
-    /// Verifies independent ASPX and pointpub acquisition in one library converges on physical-file identity without collapsing Posts.
+    /// Verifies ASPX and Posts retain independent native identities while retired non-ASPX files remain raw evidence only.
     /// </summary>
     [Fact]
-    public async Task Aspx_and_pointpub_share_a_library_but_only_native_file_links_unify_the_item_and_inventory()
+    public async Task Aspx_and_posts_publish_native_pages_without_promoting_non_aspx_inventory()
     {
         using StoreCase data = new("classic-native-content");
-        ClassicContentFixture source = new() { IncludeBlog = true, IncludeSecondBlog = true, IncludeDelve = true };
+        ClassicContentFixture source = new()
+        {
+            IncludeBlog = true, IncludeSecondBlog = true, IncludeRetiredFile = true
+        };
         Guid rendererFileId = Guid.NewGuid();
         source.TransformInventory = inventory => inventory with
         {
@@ -60,20 +64,8 @@ public sealed class ClassicContentModelTests
         TestExecution execution = await StartAsync(data, source);
         await AssertStatusAsync(data, execution, ScanStatus.Finished);
         ClassicCompatibilityPayload publication = await PublicationAsync(data, execution.AssessmentId);
-        ClassicPageRow pointPublishing = Assert.Single(
-            publication.Pages,
-            page => page.FileUniqueId == ClassicContentFixture.PointPublishingFileId);
-        Assert.Equal(
-            PageIdentity.File(ClassicContentFixture.SiteCollectionId, ClassicContentFixture.PointPublishingFileId),
-            pointPublishing.Identity);
-        Assert.Equal(ClassicContentFixture.ListId, pointPublishing.ListId);
-        Assert.Equal(200, pointPublishing.ListItemId);
-        Assert.Equal("NotAttempted", pointPublishing.ContentReadState);
-        Assert.Equal("File", pointPublishing.SourceKind);
-        Assert.Contains(
-            publication.Pages,
-            page => page.ListId == pointPublishing.ListId && page.PageUrl?.EndsWith(".aspx") == true);
-        Assert.Single(publication.Files, file => file.FileUniqueId == pointPublishing.FileUniqueId);
+        Assert.Contains(publication.Files, file => file.FileUniqueId == ClassicContentFixture.RetiredFileId);
+        Assert.DoesNotContain(publication.Pages, page => page.FileUniqueId == ClassicContentFixture.RetiredFileId);
         ClassicPageRow[] posts = publication.Pages.Where(page => page.Identity!.ObjectKind == PageObjectKind.ListItem)
             .ToArray();
         Assert.Equal(4, posts.Length);
@@ -96,12 +88,12 @@ public sealed class ClassicContentModelTests
             await db.ClassicPages.ToListAsync(),
             page => page.PageType == ClassicPageRules.ModernPage);
         Assert.Contains(publication.Pages, page => page.PageType == ClassicPageRules.ModernPage);
-        SourceObservationRow receipt = (await db.SourceObservations.ToListAsync()).Single(row =>
-            CollectionJson.Kind(ToRecord(row)) == "ListItems" &&
-            CollectionJson.Read<ListItemBatch>(row.RawBytes).QueryKind == ListItemQueryKind.PointPublishingFiles);
-        ListItemFacts item = Assert.Single(CollectionJson.Read<ListItemBatch>(receipt.RawBytes).Items);
-        Assert.Equal(pointPublishing.FileUniqueId, item.FileAssociation!.FileFacts!.FileUniqueId);
-        Assert.Null(item.FileAssociation.FileFacts.AspxEvidenceJson);
+        ListItemBatch[] batches = (await db.SourceObservations.ToListAsync())
+            .Where(row => CollectionJson.Kind(ToRecord(row)) == "ListItems")
+            .Select(row => CollectionJson.Read<ListItemBatch>(row.RawBytes))
+            .ToArray();
+        Assert.All(batches, batch => Assert.Equal(301, batch.ListTemplate));
+        Assert.Equal(2, batches.Select(batch => batch.ListId).Distinct().Count());
     }
 
     /// <summary>
@@ -175,7 +167,7 @@ public sealed class ClassicContentModelTests
     public async Task Conflicting_native_acquisition_cannot_be_published_as_success(string conflict)
     {
         using StoreCase data = new("classic-native-conflict");
-        ClassicContentFixture source = new() { IncludeDelve = true };
+        ClassicContentFixture source = new() { IncludeBlog = true, IncludeRetiredFile = true };
         if (conflict == "candidate")
             source.TransformInventory = inventory =>
                 inventory with { Evidence = [.. inventory.Evidence, inventory.Evidence[0]] };
@@ -188,11 +180,11 @@ public sealed class ClassicContentModelTests
         else if (conflict == "paging")
             source.TransformBatch = batch => batch with { NextPage = "repeated-native-token" };
         else if (conflict == "backing-item")
-            source.TransformBatch = batch =>
+            source.TransformInventory = inventory =>
             {
-                batch.Items[0].FileAssociation!.FileFacts!.FileUniqueId =
-                    Guid.Parse("00000000-0000-0000-0000-000000000001");
-                return batch;
+                PhysicalFileFacts conflictFile = CollectionJson.Convert<PhysicalFileFacts>(inventory.Files![0]);
+                conflictFile.ListItemId = 999;
+                return inventory with { Files = [.. inventory.Files, conflictFile] };
             };
         else
             throw new ArgumentOutOfRangeException(nameof(conflict));
@@ -205,119 +197,63 @@ public sealed class ClassicContentModelTests
         Assert.NotEmpty((await data.Store.LatestRootAsync(execution.AssessmentId))!.LastError!);
     }
 
-    /// <summary>
-    /// Verifies the two native file extensions have independent acquisition filters rather than exclusive final page types.
-    /// </summary>
-    [Fact]
-    public void Query_filters_name_acquired_file_objects_and_do_not_classify_the_library_as_a_page_family()
-    {
-        string pointPublishing = ListItemQueryBuilder.Create(
-            [],
-            filterOnAspxFiles: false,
-            filterOnPointPublishingFiles: true);
-        string aspx = ListItemQueryBuilder.Create([]);
-        string posts = ListItemQueryBuilder.Create([], filterOnAspxFiles: false);
-        Assert.Contains("<Value Type='Text'>pointpub</Value>", pointPublishing);
-        Assert.DoesNotContain("<Value Type='text'>aspx</Value>", pointPublishing);
-        Assert.Contains("<Value Type='text'>aspx</Value>", aspx);
-        Assert.DoesNotContain("pointpub", aspx);
-        Assert.DoesNotContain("<Where>", posts);
-        Assert.Contains("<RowLimit Paged='TRUE'>1000</RowLimit>", pointPublishing);
-    }
-
-    /// <summary>
-    /// Verifies denied and missing native file links remain explicit unknown item evidence without creating item Pages.
-    /// </summary>
+    /// <summary>Reads physical metadata by exact item ID and scans only Posts content, never a document-library extension query.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Unproven_pointpub_file_links_are_unknown_evidence_not_fabricated_pages(bool denied)
+    public void Query_builders_separate_exact_file_metadata_from_posts_content(bool skipUsers)
     {
-        using StoreCase data = new("classic-unproven-file");
-        ClassicContentFixture source = new() { IncludeDelve = true };
-        source.TransformInventory = inventory => inventory with
-        {
-            Files = inventory.Files!.Where(file => file.FileUniqueId != ClassicContentFixture.PointPublishingFileId)
-                .ToArray(),
-        };
+        string physical = ListItemQueryBuilder.ForFileItem(7, skipUsers);
+        string posts = ListItemQueryBuilder.ForPosts(skipUsers);
+        Assert.Contains("<Value Type='Counter'>7</Value>", physical);
+        Assert.Contains("<RowLimit Paged='TRUE'>2</RowLimit>", physical);
+        Assert.Contains("NoExecute", physical);
+        Assert.DoesNotContain("<Where>", posts);
+        Assert.DoesNotContain("FileRef", posts);
+        Assert.DoesNotContain("File_x0020_Type", posts);
+        Assert.DoesNotContain("pointpub", posts);
+        Assert.Equal(!skipUsers, posts.Contains("Editor", StringComparison.Ordinal));
+        Assert.Contains("<RowLimit Paged='TRUE'>1000</RowLimit>", posts);
+    }
+
+    /// <summary>Does not admit ordinary lists or document libraries as independent content, irrespective of form declarations.</summary>
+    [Theory]
+    [InlineData(100, false)]
+    [InlineData(101, false)]
+    [InlineData(119, false)]
+    [InlineData(301, true)]
+    [InlineData(850, false)]
+    public void Only_the_real_posts_template_selects_independent_items(int template, bool expected) =>
+        Assert.Equal(expected, ListItemContentReader.IsPostsTemplate(template));
+
+    /// <summary>Retains failed and unattempted Posts reads as unknown content and incomplete coverage, never authoritative zero.</summary>
+    [Theory]
+    [InlineData("Denied", "Incomplete")]
+    [InlineData("Failed", "Incomplete")]
+    [InlineData("NotAttempted", "Unknown")]
+    public async Task Unavailable_posts_acquisition_never_becomes_complete_empty_content(string status, string coverage)
+    {
+        using StoreCase data = new("classic-posts-unavailable");
+        ClassicContentFixture source = new() { IncludeBlog = true };
         source.TransformBatch = batch => batch with
         {
-            Items = batch.Items.Select(item => item with
-                {
-                    FileAssociation = denied ? new(new("Denied", "Synthetic native File denial"), null) : null,
-                })
-                .ToArray(),
+            Items = [], NextPage = null, State = new(status, "Synthetic Posts read was not completed"),
         };
         TestExecution execution = await StartAsync(data, source);
         await AssertStatusAsync(data, execution, ScanStatus.Finished);
         ClassicCompatibilityPayload publication = await PublicationAsync(data, execution.AssessmentId);
-        Assert.DoesNotContain(
-            publication.Pages,
-            page => page.ListItemId == 200 || page.Identity!.ObjectKind == PageObjectKind.ListItem);
+        Assert.DoesNotContain(publication.Pages, page => page.Identity!.ObjectKind == PageObjectKind.ListItem);
+        Assert.Contains(
+            publication.Discovery,
+            row => row.ErrorStage == "ListItemAcquisition" && row.AssessmentStatus == "Unknown" &&
+                   row.ErrorDetail == "Synthetic Posts read was not completed");
+        Assert.Equal(
+            coverage,
+            publication.Discovery.Single(row => row.RecordKey == "summary:coverage").DiscoveryStatus);
         using ScanContext db = data.Store.CreateContext(execution.AssessmentId);
         AnalysisResultRow result = (await db.AnalysisResults.ToListAsync()).Single(row =>
             new VersionedJson(row.PayloadJson).Value.GetProperty("kind").GetString() == "ListItems");
         Assert.Equal(AnalysisOutcome.Unknown, result.Outcome);
-        Assert.Equal(1, new VersionedJson(result.PayloadJson).Value.GetProperty("unresolvedFileLinks").GetInt32());
-        SourceObservationRow receipt =
-            (await db.SourceObservations.ToListAsync()).Single(row =>
-                CollectionJson.Kind(ToRecord(row)) == "ListItems");
-        Assert.Equal(AcquisitionStatus.Partial, receipt.AcquisitionStatus);
-        Assert.Single(CollectionJson.Read<ListItemBatch>(receipt.RawBytes).Items);
-        Assert.Contains(
-            await db.ClassicPageDiscoveries.ToListAsync(),
-            row => row.ErrorStage == "NativeFileAssociation" && row.ListItemId == 200 && row.FileUniqueId == null);
-        Assert.Equal(
-            denied ? "Incomplete" : "Unknown",
-            (await db.ClassicPageDiscoveries.SingleAsync(row => row.RecordKey == "summary:coverage")).DiscoveryStatus);
-    }
-
-    /// <summary>
-    /// Verifies native File relationship validation never guesses identity from a matching URL, item ID, or missing GUID.
-    /// </summary>
-    [Theory]
-    [InlineData("file")]
-    [InlineData("site")]
-    [InlineData("web")]
-    [InlineData("list")]
-    [InlineData("item")]
-    [InlineData("locator")]
-    public void Native_file_relationship_requires_each_observed_identity_and_consistent_locators(string conflict)
-    {
-        ClassicContentFixture source = new();
-        ListItemFacts item = new(
-            7,
-            new()
-            {
-                ["ID"] = SourceField.Of("Int32", 7),
-                ["FileRef"] = SourceField.Of("String", "/sites/a/Stories/a.pointpub"),
-            });
-        NativeItemFile observed = new(
-            ClassicContentFixture.SiteCollectionId,
-            ClassicContentFixture.WebId,
-            ClassicContentFixture.ListId,
-            7,
-            ClassicContentFixture.PointPublishingFileId,
-            "a.pointpub",
-            "/sites/a/Stories/a.pointpub",
-            99,
-            "Customized");
-        NativeItemFile invalid = conflict switch
-        {
-            "file" => observed with { FileUniqueId = Guid.Empty },
-            "site" => observed with { SiteCollectionId = Guid.NewGuid() },
-            "web" => observed with { WebId = Guid.NewGuid() },
-            "list" => observed with { ListId = Guid.NewGuid() },
-            "item" => observed with { ListItemId = 8 },
-            "locator" => observed with { ServerRelativeUrl = "/sites/a/Stories/b.pointpub" },
-            _ => throw new ArgumentOutOfRangeException(nameof(conflict)),
-        };
-        Assert.Throws<SnapshotIntegrityException>(() => NativeFileAssociationReader.FromNative(
-            Guid.NewGuid(),
-            source.Web(),
-            ClassicContentFixture.ListId,
-            item,
-            invalid));
     }
 
     /// <summary>
@@ -425,7 +361,7 @@ public sealed class ClassicContentModelTests
     public async Task Home_only_mode_keeps_the_inventory_but_only_publishes_the_selected_home_page()
     {
         using StoreCase data = new("classic-home-only-native");
-        ClassicContentFixture source = new() { IncludeBlog = true, IncludeDelve = true };
+        ClassicContentFixture source = new() { IncludeBlog = true, IncludeRetiredFile = true };
         TestExecution execution = await StartAsync(data, source, homeOnly: true);
         await AssertStatusAsync(data, execution, ScanStatus.Finished);
         ClassicCompatibilityPayload publication = await PublicationAsync(data, execution.AssessmentId);
@@ -441,6 +377,7 @@ public sealed class ClassicContentModelTests
     [Theory]
     [InlineData("classicpage-source-v1")]
     [InlineData("classicpage-source-v2")]
+    [InlineData("classic-objects-v3")]
     public async Task Sealed_legacy_snapshots_are_rejected_without_reinterpretation_or_mutation(string inputVersion)
     {
         using StoreCase data = new("classic-legacy-shape");
