@@ -142,7 +142,7 @@ internal sealed partial class PipelineStore
                                 ScanId = assessment,
                                 SiteUrl = site,
                                 WebUrl = "/",
-                                PageUrl = new Uri(url).PathAndQuery,
+                                PageUrl = AuditServerRelativeLocator(url),
                                 AuditWindowStart = payload.Scope.AuditWindowStart,
                                 AuditWindowEnd = payload.Scope.AuditWindowEnd,
                                 QueryStatus = status,
@@ -201,5 +201,20 @@ internal sealed partial class PipelineStore
         if (authorities.Length != 1)
             throw new SnapshotIntegrityException("A server-relative audit locator has no unique declared authority.");
         return authorities[0] + locator;
+    }
+
+    /// <summary>
+    /// Removes only the verified HTTPS origin for legacy presentation, retaining the original path and opaque query/fragment bytes.
+    /// URI parsing validates the locator but never rewrites or drops its suffix.
+    /// </summary>
+    internal static string AuditServerRelativeLocator(string locator)
+    {
+        if (!Uri.TryCreate(locator, UriKind.Absolute, out Uri? uri) || uri.Scheme != "https" || !uri.IsDefaultPort ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+            throw new SnapshotIntegrityException("Legacy audit presentation requires a verified HTTPS locator.");
+        int authorityStart = locator.IndexOf("://", StringComparison.Ordinal) + 3;
+        int suffix = locator.IndexOfAny(['/', '?', '#'], authorityStart);
+        if (suffix < 0) return "/";
+        return locator[suffix] == '/' ? locator[suffix..] : "/" + locator[suffix..];
     }
 }

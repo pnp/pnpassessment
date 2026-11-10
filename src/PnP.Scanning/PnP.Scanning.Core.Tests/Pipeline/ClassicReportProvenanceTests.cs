@@ -30,6 +30,8 @@ public sealed class ClassicReportProvenanceTests
     [InlineData(false, true, "succeeded")]
     [InlineData(true, true, "succeeded")]
     [InlineData(false, false, "mixed")]
+    [InlineData(false, false, "fragment-pair")]
+    [InlineData(true, false, "fragment-pair")]
     [InlineData(false, false, "partial")]
     [InlineData(false, false, "failed")]
     [InlineData(false, false, "skipped")]
@@ -58,6 +60,16 @@ public sealed class ClassicReportProvenanceTests
                     "ClassicPageViewed",
                     authority + "/sites/a/Lists/Posts2/Post.aspx?ID=100",
                     "other-list")));
+        if (status == "fragment-pair")
+        {
+            events.AddRange(
+                Enumerable.Range(0, 2)
+                    .Select(_ => new AuditEvent("ClassicPageViewed", authority + post + "#A", "fragment-A")));
+            events.AddRange(
+                Enumerable.Range(0, 4)
+                    .Select(_ => new AuditEvent("ClassicPageViewed", authority + post + "#B", "fragment-B")));
+        }
+
         events.Add(new("ClassicPageViewed", authority + "/sites/a/not-a-page.txt?next=misleading.aspx", "ignored"));
         events.Add(new("ClassicPageViewed", "https://foreign.invalid/sites/a/Lists/Posts/Post.aspx?ID=100", "foreign"));
         ClassicContentFixture recorded = new()
@@ -65,7 +77,8 @@ public sealed class ClassicReportProvenanceTests
             IncludeBlog = true,
             IncludeSecondBlog = true,
             PartialAudit = status == "partial",
-            AuditStatus = status is "partial" or "intentional-skip" or "mixed" ? "succeeded" : status,
+            AuditStatus =
+                status is "partial" or "intentional-skip" or "mixed" or "fragment-pair" ? "succeeded" : status,
             AuditBody =
                 JsonSerializer.Serialize(
                     new { value = events },
@@ -81,7 +94,7 @@ public sealed class ClassicReportProvenanceTests
         };
         (Guid assessment, ClassicReportSource source, string directory) =
             await RunAsync(data, recorded, status != "intentional-skip");
-        bool observed = status is "succeeded" or "partial" or "mixed";
+        bool observed = status is "succeeded" or "partial" or "mixed" or "fragment-pair";
         if (observed)
         {
             Assert.Equal(99, Assert.Single(source.Publication.Audit, row => row.PageUrl == authority + renderer).Views);
@@ -117,7 +130,7 @@ public sealed class ClassicReportProvenanceTests
         Assert.Equal(
             status == "intentional-skip"
                 ? "skipped"
-                : status == "mixed"
+                : status is "mixed" or "fragment-pair"
                     ? "succeeded"
                     : status,
             first.UsageQueryStatus);
@@ -128,6 +141,18 @@ public sealed class ClassicReportProvenanceTests
         Assert.Equal(observed ? 7 : null, other.AuditViewsCount);
         using ScanContext context = data.Store.CreateContext(assessment);
         Assert.Equal(ScanStatus.Finished, (await context.Scans.SingleAsync()).Status);
+        if (status == "fragment-pair")
+        {
+            Assert.Equal(
+                2,
+                (await context.ClassicPageAuditUsages.SingleAsync(row => row.PageUrl == post + "#A")).AuditViewsCount);
+            Assert.Equal(
+                4,
+                (await context.ClassicPageAuditUsages.SingleAsync(row => row.PageUrl == post + "#B")).AuditViewsCount);
+            Assert.Equal(
+                3,
+                (await context.ClassicPageAuditUsages.SingleAsync(row => row.PageUrl == post)).AuditViewsCount);
+        }
     }
 
     /// <summary>Preserves opaque query case/order and rejects invalid paths without folding distinct item addresses together.</summary>
@@ -177,6 +202,10 @@ public sealed class ClassicReportProvenanceTests
         Assert.Throws<SnapshotIntegrityException>(() => PipelineStore.AuditCompatibilityLocator(
             "//foreign.invalid/Posts.aspx?ID=100",
             ["https://contoso.invalid/sites/a"]));
+        Assert.Equal(
+            "/sites/a/Post.aspx?Source=%2fA&ID=100#Opaque",
+            PipelineStore.AuditServerRelativeLocator(
+                "https://contoso.invalid/sites/a/Post.aspx?Source=%2fA&ID=100#Opaque"));
     }
 
     /// <summary>Separates an observed zero part count from withheld mapping, and retains genuinely computed zero and 100 percentages.</summary>
