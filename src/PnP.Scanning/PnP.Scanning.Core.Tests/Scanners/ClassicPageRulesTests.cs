@@ -43,7 +43,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         public void GetPageType_NonDelveItem_DoesNotReturnDelveBlog()
         {
             // Control 1: a classic web part page is still typed as a web part page.
-            var webPartPage = new Dictionary<string, object>
+            Dictionary<string, object> webPartPage = new Dictionary<string, object>
             {
                 { HtmlFileTypeField, "SharePoint.WebPartPage.Document" }, { FileTypeField, "aspx" },
             };
@@ -55,7 +55,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
             ClassicPageRules.GetPageType(aspxPage).Should().NotBe(ClassicPageRules.DelveBlogPage);
 
             // Control 3: a wiki page (WikiField present) wins before the Delve check.
-            var wikiPage = new Dictionary<string, object>
+            Dictionary<string, object> wikiPage = new Dictionary<string, object>
             {
                 { WikiField, "<div></div>" }, { FileTypeField, "pointpub" },
             };
@@ -67,7 +67,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         public void ModifiedBy_EditorField_ReturnsEmail()
         {
             // Parity with legacy LastModifiedBy: the account email wins when present.
-            var fields = new Dictionary<string, object>
+            Dictionary<string, object> fields = new Dictionary<string, object>
             {
                 { ModifiedByField, new FakeUserValue(email: "jane.doe@contoso.com", lookupValue: "Jane Doe") },
             };
@@ -81,7 +81,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         [Fact]
         public void ModifiedBy_EditorField_FallsBackToLookupValue_WhenEmailEmpty()
         {
-            var fields = new Dictionary<string, object>
+            Dictionary<string, object> fields = new Dictionary<string, object>
             {
                 { ModifiedByField, new FakeUserValue(email: "", lookupValue: "John Smith") },
             };
@@ -95,7 +95,7 @@ namespace PnP.Scanning.Core.Tests.Scanners
         [Fact]
         public void ModifiedBy_SkipUserInformation_IsNull()
         {
-            var fields = new Dictionary<string, object>
+            Dictionary<string, object> fields = new Dictionary<string, object>
             {
                 { ModifiedByField, new FakeUserValue(email: "jane.doe@contoso.com", lookupValue: "Jane Doe") },
             };

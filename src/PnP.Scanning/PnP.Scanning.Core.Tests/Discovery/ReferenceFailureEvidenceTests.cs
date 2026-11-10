@@ -98,13 +98,13 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         string stage,
         string errorType)
     {
-        using var sdk = await OfflineFileSdk.CreateAsync();
+        using OfflineFileSdk sdk = await OfflineFileSdk.CreateAsync();
         if (failure == "projection")
             sdk.Transport.FileJson = ReferenceFileResolutionTests.FilePayload("item", omitName: true);
         else
             SetFailure(sdk, failure == "denied" ? HttpStatusCode.Forbidden : HttpStatusCode.InternalServerError);
-        var scan = Guid.NewGuid();
-        using var provider = Provider(sdk);
+        Guid scan = Guid.NewGuid();
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(sdk);
 
         await new AssessmentWebDiscovery(
             scan,
@@ -112,18 +112,19 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
             "/",
             new AssessmentDiscoveryWriter(database.CreateContext)).RunAsync(provider, CancellationToken.None);
 
-        var candidate = provider.ReferenceCollector.ReadReferenceEvidence().Should().ContainSingle().Which;
+        AspxReferenceCandidate candidate =
+            provider.ReferenceCollector.ReadReferenceEvidence().Should().ContainSingle().Which;
         candidate.Disposition.Should().Be(AspxReferenceDispositions.ReferenceUnavailable);
         candidate.ErrorStage.Should().Be(stage);
         candidate.ErrorDetail.Should().Contain(errorType);
-        using var db = database.CreateContext();
+        using Core.Storage.ScanContext db = database.CreateContext();
         Core.Storage.ClassicPageDiscovery reference =
             await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
         reference.DiscoveryStatus.Should().Be("Failed");
         reference.ErrorStage.Should().Be(stage);
         reference.ErrorDetail.Should().Be(candidate.ErrorDetail);
         reference.ErrorCodes.Should().Be(failure == "denied" ? "locator_denied" : "locator_resolution_failed");
-        using var evidence = JsonDocument.Parse(reference.EvidenceJson);
+        using JsonDocument evidence = JsonDocument.Parse(reference.EvidenceJson);
         evidence.RootElement.GetProperty("errorStage").GetString().Should().Be(stage);
         evidence.RootElement.GetProperty("errorDetail").GetString().Should().Be(candidate.ErrorDetail);
         (await db.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan && row.RowType == "Page")).Should()
@@ -136,10 +137,10 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
     [Fact]
     public async Task Successful_file_without_item_metadata_reaches_page_and_linked_reference_persistence()
     {
-        using var sdk = await OfflineFileSdk.CreateAsync();
+        using OfflineFileSdk sdk = await OfflineFileSdk.CreateAsync();
         sdk.Transport.FileJson = ReferenceFileResolutionTests.FilePayload("omitted", "missing");
-        var scan = Guid.NewGuid();
-        using var provider = Provider(sdk);
+        Guid scan = Guid.NewGuid();
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(sdk);
 
         await new AssessmentWebDiscovery(
             scan,
@@ -147,14 +148,15 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
             "/",
             new AssessmentDiscoveryWriter(database.CreateContext)).RunAsync(provider, CancellationToken.None);
 
-        using var db = database.CreateContext();
+        using Core.Storage.ScanContext db = database.CreateContext();
         Core.Storage.ClassicPageDiscovery reference =
             await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
         reference.DiscoveryStatus.Should().Be("Discovered");
         reference.FileUniqueId.Should().Be(OfflineFileSdk.FileId);
         reference.ErrorStage.Should().BeNull();
         reference.ErrorDetail.Should().BeNull();
-        var page = await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Page");
+        Core.Storage.ClassicPageDiscovery page =
+            await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Page");
         page.FileUniqueId.Should().Be(OfflineFileSdk.FileId);
         page.Url.Should().Be(OfflineFileSdk.FilePath);
         page.DiscoveryStatus.Should().Be("Discovered");
@@ -174,13 +176,13 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
         const string jwt = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJvZmZsaW5lIn0.signature";
         const string password = "fixture-password-do-not-persist";
         const string secret = "fixture-clientsecret-do-not-persist";
-        using var sdk = await OfflineFileSdk.CreateAsync();
+        using OfflineFileSdk sdk = await OfflineFileSdk.CreateAsync();
         sdk.Transport.FileStatus = HttpStatusCode.InternalServerError;
         sdk.Transport.FileJson = ErrorPayload(
             "Offline safe failure; Authorization: Bearer " + bearer + "; access_token=" + jwt + "; password=" +
             password + "; client_secret=" + secret);
-        var scan = Guid.NewGuid();
-        using var provider = Provider(sdk);
+        Guid scan = Guid.NewGuid();
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(sdk);
 
         await new AssessmentWebDiscovery(
             scan,
@@ -188,7 +190,7 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
             "/",
             new AssessmentDiscoveryWriter(database.CreateContext)).RunAsync(provider, CancellationToken.None);
 
-        using var db = database.CreateContext();
+        using Core.Storage.ScanContext db = database.CreateContext();
         Core.Storage.ClassicPageDiscovery reference =
             await db.ClassicPageDiscoveries.SingleAsync(row => row.ScanId == scan && row.RowType == "Reference");
         reference.ErrorDetail.Should()
@@ -196,7 +198,7 @@ public sealed class ReferenceFailureEvidenceTests : IClassFixture<ScanContextFix
             .And.Contain("Offline safe failure")
             .And.Contain("500")
             .And.Contain("redacted");
-        foreach (var sensitive in new[] { bearer, jwt, password, secret })
+        foreach (string sensitive in new[] { bearer, jwt, password, secret })
         {
             reference.ErrorDetail.Should().NotContain(sensitive);
             reference.EvidenceJson.Should().NotContain(sensitive);

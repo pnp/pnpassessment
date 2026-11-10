@@ -13,23 +13,23 @@ public sealed class ClassicAspxConsolidationRetentionTests
     [Fact]
     public async Task ActualRestartRetainsPhysicalInventoryAndRawEvidence()
     {
-        var scan = Guid.NewGuid();
-        var site = Guid.NewGuid();
-        var pendingWeb = Guid.NewGuid();
-        var finishedWeb = Guid.NewGuid();
-        var list = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
+        Guid site = Guid.NewGuid();
+        Guid pendingWeb = Guid.NewGuid();
+        Guid finishedWeb = Guid.NewGuid();
+        Guid list = Guid.NewGuid();
         const string url = "https://example.invalid/sites/retention";
-        var folder = Path.GetFullPath(StorageManager.GetScanDataFolder(scan));
-        var expected = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, scan.ToString()));
+        string folder = Path.GetFullPath(StorageManager.GetScanDataFolder(scan));
+        string expected = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, scan.ToString()));
         Assert.Equal(expected, folder);
         Assert.Equal(scan.ToString(), Path.GetFileName(folder));
         Assert.False(Directory.Exists(folder));
-        var created = false;
+        bool created = false;
         try
         {
             Directory.CreateDirectory(folder);
             created = true;
-            using (var db = new ScanContext(scan))
+            using (ScanContext db = new ScanContext(scan))
             {
                 await db.Database.MigrateAsync();
                 db.SiteCollections.Add(
@@ -87,10 +87,10 @@ public sealed class ClassicAspxConsolidationRetentionTests
                 await db.SaveChangesAsync();
             }
 
-            var pending = Inventory(scan, site, pendingWeb, list, "/sites/retention/pending.aspx", "1");
-            var finished = Inventory(scan, site, finishedWeb, list, "/sites/retention/finished/retained.json", "0");
+            SPFile pending = Inventory(scan, site, pendingWeb, list, "/sites/retention/pending.aspx", "1");
+            SPFile finished = Inventory(scan, site, finishedWeb, list, "/sites/retention/finished/retained.json", "0");
             await new SPFileWriter(scan).WriteAsync(new[] { pending, finished });
-            var raw = new AssessmentDiscoveryWriter(scan);
+            AssessmentDiscoveryWriter raw = new AssessmentDiscoveryWriter(scan);
             await raw.WriteAsync(
                 new[]
                 {
@@ -109,10 +109,10 @@ public sealed class ClassicAspxConsolidationRetentionTests
                     }
                 });
 
-            var storage = new StorageManager(new EphemeralDataProtectionProvider());
+            StorageManager storage = new StorageManager(new EphemeralDataProtectionProvider());
             await storage.ConsolidatedScanToEnableRestartAsync(scan);
 
-            using var retained = new ScanContext(scan);
+            using ScanContext retained = new ScanContext(scan);
             Assert.Equal(SiteWebStatus.Queued, (await retained.SiteCollections.SingleAsync()).Status);
             Assert.Equal(SiteWebStatus.Queued, (await retained.Webs.SingleAsync(row => row.WebUrl == "/")).Status);
             Assert.Equal(DateTime.MinValue, (await retained.Webs.SingleAsync(row => row.WebUrl == "/")).StartDate);
@@ -123,7 +123,7 @@ public sealed class ClassicAspxConsolidationRetentionTests
             Assert.Empty(await retained.ClassicPageWebParts.ToArrayAsync());
             Assert.Empty(await retained.ClassicLists.ToArrayAsync());
             Assert.Single(await retained.ClassicPages.Where(row => row.WebUrl == "/finished").ToArrayAsync());
-            var inventories = await retained.SPFiles.OrderBy(row => row.FileUniqueId).ToArrayAsync();
+            SPFile[] inventories = await retained.SPFiles.OrderBy(row => row.FileUniqueId).ToArrayAsync();
             Assert.Equal(2, inventories.Length);
             Assert.Contains(
                 inventories,
@@ -157,7 +157,8 @@ public sealed class ClassicAspxConsolidationRetentionTests
         {
             if (created)
             {
-                using var poolKey = new SqliteConnection("Data Source=" + Path.Combine(folder, StorageManager.DbName));
+                using SqliteConnection poolKey =
+                    new SqliteConnection("Data Source=" + Path.Combine(folder, StorageManager.DbName));
                 SqliteConnection.ClearPool(poolKey);
                 if (Path.GetFullPath(folder) != expected || Path.GetFileName(folder) != scan.ToString())
                 {

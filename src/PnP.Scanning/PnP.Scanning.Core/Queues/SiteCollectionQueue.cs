@@ -110,7 +110,7 @@ namespace PnP.Scanning.Core.Queues
                     // Get the sub sites in the given site collection
 
                     // Enumerate the webs to scan
-                    var fullPageDiscovery = siteCollection.OptionsBase is ClassicOptions { Pages: true };
+                    bool fullPageDiscovery = siteCollection.OptionsBase is ClassicOptions { Pages: true };
                     WebEnumerationResult webEnumeration;
                     Exception webAuthorityError = null;
                     try
@@ -136,11 +136,11 @@ namespace PnP.Scanning.Core.Queues
                             webEnumeration,
                             webAuthorityError);
 
-                    var webUrlsToScan = webEnumeration.Webs;
+                    List<EnumeratedWeb> webUrlsToScan = webEnumeration.Webs;
 
                     // Build list of web queue items to be processed
                     List<WebQueueItem> webToScan = new();
-                    foreach (var web in webUrlsToScan)
+                    foreach (EnumeratedWeb web in webUrlsToScan)
                     {
                         webToScan.Add(
                             new WebQueueItem(
@@ -159,7 +159,7 @@ namespace PnP.Scanning.Core.Queues
                         siteCollection.Restart);
                     if (fullPageDiscovery)
                     {
-                        foreach (var web in webUrlsToScan)
+                        foreach (EnumeratedWeb web in webUrlsToScan)
                             await LegacyScopeEvidence.RecordScopeAsync(
                                 ScanId,
                                 siteCollection.SiteCollectionUrl,
@@ -181,7 +181,7 @@ namespace PnP.Scanning.Core.Queues
                     // Use parallel threads per running site collection task for processing the webs
                     webQueue.ConfigureQueue(ParallelWebProcessingThreads);
 
-                    foreach (var web in webToScan)
+                    foreach (WebQueueItem web in webToScan)
                     {
                         await webQueue.EnqueueAsync(web);
                     }

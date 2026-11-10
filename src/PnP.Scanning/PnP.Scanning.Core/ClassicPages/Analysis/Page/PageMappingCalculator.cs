@@ -50,11 +50,13 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
             }
 
             int mapped = 0;
-            var unmapped = new List<string>();
+            List<string> unmapped = new List<string>();
 
             // Process in page-layout order (row, then column, then order) so the unmapped list reads in
             // the same order as the legacy scanner emitted it.
-            foreach (var webPart in webParts.OrderBy(w => w.Row).ThenBy(w => w.Column).ThenBy(w => w.Order))
+            foreach (ClassicPageWebPartRow webPart in webParts.OrderBy(w => w.Row)
+                         .ThenBy(w => w.Column)
+                         .ThenBy(w => w.Order))
             {
                 bool isMappable = mappingManager.IsMappable(webPart.WebPartType);
                 webPart.IsMappable = isMappable;

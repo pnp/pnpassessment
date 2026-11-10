@@ -20,13 +20,13 @@ namespace PnP.Scanning.Core.Tests.Services
         [Fact]
         public void Telemetry_LogPageScan_BuildsExpectedPayload()
         {
-            using var fixture = new ScanContextFixture();
-            var scanId = Guid.NewGuid();
-            var siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
+            using ScanContextFixture fixture = new ScanContextFixture();
+            Guid scanId = Guid.NewGuid();
+            string siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
 
             // One page per classic type; three carry web parts (75 / 100 / 50), three carry none.
             // The ASPX page is the (uncustomized) home page.
-            var pages = new List<ClassicPage>
+            List<ClassicPage> pages = new List<ClassicPage>
             {
                 NewPage(
                     scanId,
@@ -75,7 +75,7 @@ namespace PnP.Scanning.Core.Tests.Services
             };
 
             // Five web part rows total across the three pages that carry parts.
-            var webParts = new List<ClassicPageWebPart>
+            List<ClassicPageWebPart> webParts = new List<ClassicPageWebPart>
             {
                 NewWebPart(scanId, siteUrl, "/Pages/a.aspx", 0, "ContentEditorWebPart"),
                 NewWebPart(scanId, siteUrl, "/Pages/a.aspx", 1, "ContentEditorWebPart"),
@@ -85,7 +85,7 @@ namespace PnP.Scanning.Core.Tests.Services
             };
 
             // Scan-wide unique inventory: 2 mapped types, 1 unmapped type.
-            var uniques = new List<ClassicWebPartUnique>
+            List<ClassicWebPartUnique> uniques = new List<ClassicWebPartUnique>
             {
                 new()
                 {
@@ -101,7 +101,7 @@ namespace PnP.Scanning.Core.Tests.Services
                 },
             };
 
-            using (var context = fixture.CreateContext())
+            using (ScanContext context = fixture.CreateContext())
             {
                 context.ClassicPages.AddRange(pages);
                 context.ClassicPageWebParts.AddRange(webParts);
@@ -109,8 +109,8 @@ namespace PnP.Scanning.Core.Tests.Services
                 context.SaveChanges();
             }
 
-            var metric = new Dictionary<string, double>();
-            using (var context = fixture.CreateContext())
+            Dictionary<string, double> metric = new Dictionary<string, double>();
+            using (ScanContext context = fixture.CreateContext())
             {
                 TelemetryManager.BuildClassicMetrics(context, metric);
             }

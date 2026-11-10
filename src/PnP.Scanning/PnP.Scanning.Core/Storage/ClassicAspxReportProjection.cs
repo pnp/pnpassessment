@@ -114,57 +114,63 @@ internal static class ClassicAspxReportProjection
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var path = Path.Combine(exportPath, ClassicAspxCsv);
-        var counts = await WriteCsvAsync(context, scanId, path, configuration, cancellationToken).ConfigureAwait(false);
+        string? path = Path.Combine(exportPath, ClassicAspxCsv);
+        ExportCounts? counts = await WriteCsvAsync(context, scanId, path, configuration, cancellationToken)
+            .ConfigureAwait(false);
         ClassicAspxProjectionContract.StoredConfiguration? declaration = await ClassicAspxProjectionContract
             .ReadAsync(context, scanId, cancellationToken)
             .ConfigureAwait(false);
-        var exclusions = await context.Properties.AsNoTracking()
+        string? exclusions = await context.Properties.AsNoTracking()
             .Where(row => row.ScanId == scanId && row.Name == Constants.StartExcludeSiteTemplates)
             .Select(row => row.Value)
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
-        var acquisitionState = declaration.IsRecognized
+        string? acquisitionState = declaration.IsRecognized
             ? AcquisitionStates.DeclaredScopeObserved
             : counts.SawPhysicalObservation
                 ? AcquisitionStates.ObservedWithoutNativeMarker
                 : AcquisitionStates.NotAcquiredLegacy;
-        var evidence = await FileEvidenceAsync(path, cancellationToken).ConfigureAwait(false);
-        var summary = new
-        {
-            schemaVersion = SummarySchemaVersion,
-            scanId,
-            projectionContract = declaration.Version,
-            acquisitionState,
-            scopeMode = declaration.ScopeMode ?? SummaryStates.Unknown,
-            templateExclusions =
-                new
-                {
-                    state = exclusions == null ? SummaryStates.Unknown : SummaryStates.FrozenPolicy,
-                    value = exclusions
-                },
-            selectedClassicAspxCount = counts.Selected,
-            unknownClassificationCount = counts.UnknownClassification,
-            poisonedCount = counts.Poisoned,
-            poisonUnknownCount = counts.PoisonUnknown,
-            noExecuteMissingCount = counts.NoExecuteMissing,
-            countBasis = SummaryCountBasis,
-            coverage = new
-            {
-                targeted = declaration.ScopeMode == ClassicAspxProjectionContract.HomePageOnly,
-                tenantCompleteness = SummaryStates.NotAsserted,
-                selectedFileStates = counts.CoverageStates
-            },
-            nullableStringEncoding = ClassicAspxNullableStringConverter.EncodingVersion,
-            poisonEvidenceKind = ClassicAspxPoisonAnalysis.EvidenceKind,
-            fullDocFlagsCollected = false,
-            files = new[] { evidence }
-        };
-        await File.WriteAllTextAsync(
+        ExportFileEvidence? evidence = await FileEvidenceAsync(path, cancellationToken).ConfigureAwait(false);
+
+        /// <summary>Writes the pre-evaluated summary with the original path, serialization and encoding evaluation order.</summary>
+        Task WriteSummaryAsync<TSummary>(TSummary summary) =>
+            File.WriteAllTextAsync(
                 Path.Combine(exportPath, SummaryJson),
                 JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }),
                 new UTF8Encoding(false),
-                cancellationToken)
+                cancellationToken);
+
+        await WriteSummaryAsync(
+                new
+                {
+                    schemaVersion = SummarySchemaVersion,
+                    scanId,
+                    projectionContract = declaration.Version,
+                    acquisitionState,
+                    scopeMode = declaration.ScopeMode ?? SummaryStates.Unknown,
+                    templateExclusions =
+                        new
+                        {
+                            state = exclusions == null ? SummaryStates.Unknown : SummaryStates.FrozenPolicy,
+                            value = exclusions
+                        },
+                    selectedClassicAspxCount = counts.Selected,
+                    unknownClassificationCount = counts.UnknownClassification,
+                    poisonedCount = counts.Poisoned,
+                    poisonUnknownCount = counts.PoisonUnknown,
+                    noExecuteMissingCount = counts.NoExecuteMissing,
+                    countBasis = SummaryCountBasis,
+                    coverage = new
+                    {
+                        targeted = declaration.ScopeMode == ClassicAspxProjectionContract.HomePageOnly,
+                        tenantCompleteness = SummaryStates.NotAsserted,
+                        selectedFileStates = counts.CoverageStates
+                    },
+                    nullableStringEncoding = ClassicAspxNullableStringConverter.EncodingVersion,
+                    poisonEvidenceKind = ClassicAspxPoisonAnalysis.EvidenceKind,
+                    fullDocFlagsCollected = false,
+                    files = new[] { evidence }
+                })
             .ConfigureAwait(false);
     }
 
@@ -176,9 +182,9 @@ internal static class ClassicAspxReportProjection
         CsvConfiguration configuration,
         CancellationToken cancellationToken)
     {
-        var counts = new ExportCounts();
-        await using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-        using var csv = new CsvWriter(writer, configuration);
+        ExportCounts? counts = new ExportCounts();
+        await using StreamWriter? writer = new StreamWriter(path, false, new UTF8Encoding(false));
+        using CsvWriter? csv = new CsvWriter(writer, configuration);
         csv.WriteHeader<ClassicAspxExport>();
         await csv.NextRecordAsync().ConfigureAwait(false);
         await foreach (SPFile? file in Files(context, scanId)
@@ -187,7 +193,7 @@ internal static class ClassicAspxReportProjection
                            .ConfigureAwait(false))
         {
             counts.SawPhysicalObservation = true;
-            var row = Project(file);
+            ClassicAspxExport? row = Project(file);
             if (row == null)
             {
                 continue;
@@ -201,7 +207,7 @@ internal static class ClassicAspxReportProjection
             counts.Poisoned += row.NoExecute == true ? 1 : 0;
             counts.PoisonUnknown += row.NoExecute == null ? 1 : 0;
             counts.NoExecuteMissing += string.IsNullOrEmpty(file.NoExecuteRaw) ? 1 : 0;
-            var state = file.CoverageState ?? ClassicAspxCoverageStates.Unknown;
+            string? state = file.CoverageState ?? ClassicAspxCoverageStates.Unknown;
             counts.CoverageStates[state] = counts.CoverageStates.GetValueOrDefault(state) + 1;
         }
 

@@ -26,20 +26,20 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         string status,
         bool absoluteDiscoveryUrl)
     {
-        var scan = Guid.NewGuid();
-        var first = StoredPage(scan, "/first", "https://contoso.sharepoint.com" + LayoutUrl);
-        var second = StoredPage(scan, "/second", LayoutUrl.ToLowerInvariant());
+        Guid scan = Guid.NewGuid();
+        ClassicPage first = StoredPage(scan, "/first", "https://contoso.sharepoint.com" + LayoutUrl);
+        ClassicPage second = StoredPage(scan, "/second", LayoutUrl.ToLowerInvariant());
         first.CustomizedPageStatus = "Customized";
         first.WebPartCount = 3;
-        var wiki = StoredPage(scan, "/wiki", null);
+        ClassicPage wiki = StoredPage(scan, "/wiki", null);
         wiki.PageType = "WikiPage";
-        using (var db = fixture.CreateContext())
+        using (ScanContext db = fixture.CreateContext())
         {
             db.ClassicPages.AddRange(first, second, wiki);
             await db.SaveChangesAsync();
         }
 
-        using (var db = fixture.CreateContext())
+        using (ScanContext db = fixture.CreateContext())
         {
             ClassicPageDiscovery layout = Discovered(
                 scan,
@@ -50,7 +50,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
             await db.SaveChangesAsync();
         }
 
-        using (var db = fixture.CreateContext())
+        using (ScanContext db = fixture.CreateContext())
         {
             await PublishingLayoutStatusReader.EnrichSiteAsync(
                 db,
@@ -60,13 +60,13 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
                 (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
         }
 
-        using (var db = fixture.CreateContext())
+        using (ScanContext db = fixture.CreateContext())
         {
-            var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
+            List<ClassicPage> pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
             pages.Where(page => page.PageType == "PublishingPage")
                 .Should()
                 .OnlyContain(page => page.LayoutCustomizedPageStatus == status && page.AssessmentStatus == "Complete");
-            var saved = pages.Single(page => page.WebUrl == "/first");
+            ClassicPage saved = pages.Single(page => page.WebUrl == "/first");
             saved.CustomizedPageStatus.Should().Be("Customized");
             saved.WebPartCount.Should().Be(3);
             saved.LayoutUrl.Should().Be(first.LayoutUrl);
@@ -317,8 +317,8 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
     [Fact]
     public async Task Post_scan_cancellation_propagates_without_recording_a_layout_failure()
     {
-        var scan = Guid.NewGuid();
-        using var db = fixture.CreateContext();
+        Guid scan = Guid.NewGuid();
+        using ScanContext db = fixture.CreateContext();
         db.ClassicPages.Add(StoredPage(scan, "/first", LayoutUrl));
         await db.SaveChangesAsync();
 
@@ -369,7 +369,7 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
             SiteUri,
             _ => throw new InvalidOperationException("Unexpected request"));
-        var page = Page(url);
+        ClassicPage page = Page(url);
         await reader.EnrichAsync(page);
         page.LayoutCustomizedPageStatus.Should().BeNull();
     }
@@ -404,8 +404,8 @@ public class PublishingLayoutStatusReaderTests : IClassFixture<ScanContextFixtur
         PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
             SiteUri,
             _ => throw new InvalidOperationException("Unexpected request"));
-        var page = Page(url);
-        var enrich = () => reader.EnrichAsync(page);
+        ClassicPage page = Page(url);
+        Func<Task> enrich = () => reader.EnrichAsync(page);
         await enrich.Should().ThrowAsync<InvalidDataException>();
         page.LayoutCustomizedPageStatus.Should().BeNull();
     }

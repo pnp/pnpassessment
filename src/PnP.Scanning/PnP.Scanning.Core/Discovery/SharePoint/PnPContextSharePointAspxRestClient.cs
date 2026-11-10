@@ -102,15 +102,15 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             throw new ArgumentException("JSON requests must stay in the authenticated web API.");
         }
 
-        var budget = timeout ?? TimeSpan.FromSeconds(20);
+        TimeSpan budget = timeout ?? TimeSpan.FromSeconds(20);
         if (maxBytes is < 1 or > MaximumJsonResponseBytes || budget <= TimeSpan.Zero ||
             budget > TimeSpan.FromMinutes(5))
         {
             throw new ArgumentOutOfRangeException(nameof(maxBytes));
         }
 
-        var policy = throttlePolicy ?? SharePointRestThrottlePolicy.Default;
-        var started = policy.Clock.GetTimestamp();
+        SharePointRestThrottlePolicy policy = throttlePolicy ?? SharePointRestThrottlePolicy.Default;
+        long started = policy.Clock.GetTimestamp();
         SharePointRestPage evidence = new SharePointRestPage(
             uri,
             0,
@@ -122,7 +122,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             ReceivedAtUtc: policy.Clock.GetUtcNow(),
             AttemptCount: 0,
             AttemptLimit: policy.AttemptLimit);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(budget);
         try
         {
@@ -148,7 +148,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 };
                 TimeSpan retryDelay;
                 // The failed response, its content/stream, and the request leave scope before any retry delay.
-                using (var request = CreateGetRequest(uri))
+                using (HttpRequestMessage request = CreateGetRequest(uri))
                 {
                     await authenticate(request, deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
                     deadline.Token.ThrowIfCancellationRequested();
@@ -235,7 +235,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                                 policy.Clock);
                         }
 
-                        using var buffer = new MemoryStream();
+                        using MemoryStream buffer = new MemoryStream();
                         using Stream stream =
                             await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
                         byte[] chunk = new byte[Math.Min(maxBytes + 1, 8192)];
@@ -381,7 +381,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         string serverRelativeUrl,
         CancellationToken cancellationToken = default)
     {
-        var stage = "FileRequest";
+        string stage = "FileRequest";
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -410,7 +410,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var denied = AssessmentWebDiscovery.Classify(ex) == DiscoveryTerminalOutcome.Denied || IsDenied(ex);
+            bool denied = AssessmentWebDiscovery.Classify(ex) == DiscoveryTerminalOutcome.Denied || IsDenied(ex);
             return new(
                 denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
                 null,
@@ -559,7 +559,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
         catch (Exception ex)
         {
-            var denied = IsDenied(ex);
+            bool denied = IsDenied(ex);
             return new(
                 denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
                 null,
@@ -670,7 +670,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     /// <summary>Returns the first supported response or content-header value in the supplied precedence order.</summary>
     private static string Header(HttpResponseMessage response, params string[] names)
     {
-        foreach (var name in names)
+        foreach (string name in names)
         {
             if (response.Headers.TryGetValues(name, out IEnumerable<string> values))
                 return BoundedHeader(values.FirstOrDefault());

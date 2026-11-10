@@ -69,7 +69,7 @@ internal static class PhysicalFileConsolidator
         }
 
         _ = UnionProvenance(EmptyProvenance, row.ProvenanceJson);
-        var states = ReadFieldStates(row.ItemMetadataFieldStatesJson);
+        SortedDictionary<string, string> states = ReadFieldStates(row.ItemMetadataFieldStatesJson);
         ValidateItemValue(states, ClientSideApplicationIdField, row.ClientSideApplicationId);
         ValidateItemValue(states, HtmlFileTypeField, row.HtmlFileType);
         ValidateItemValue(states, FileTypeField, row.FileType);
@@ -182,7 +182,7 @@ internal static class PhysicalFileConsolidator
         PhysicalFileFacts incoming,
         IReadOnlyDictionary<string, string> states)
     {
-        states.TryGetValue(NoExecuteField, out var state);
+        states.TryGetValue(NoExecuteField, out string state);
         if (state != FieldOmitted)
         {
             if (state == FieldValue && previous.NoExecuteRaw == null &&
@@ -211,10 +211,10 @@ internal static class PhysicalFileConsolidator
     /// <summary>Accepts actual NoExecute value/null outcomes while retaining both known null and known value facts when later attempts omit or fail.</summary>
     private static string MergeNoExecuteReadState(PhysicalFileFacts row, string incoming, string fieldState)
     {
-        var previous = row.NoExecuteReadState;
-        var returned = fieldState != FieldOmitted && ((fieldState is FieldNull or FieldValue) ||
-                                                      (incoming is ClassicAspxReadStates.Available
-                                                          or NoExecuteNullReadState));
+        string previous = row.NoExecuteReadState;
+        bool returned = fieldState != FieldOmitted && ((fieldState is FieldNull or FieldValue) ||
+                                                       (incoming is ClassicAspxReadStates.Available
+                                                           or NoExecuteNullReadState));
         if (returned)
         {
             if ((previous is ClassicAspxReadStates.Available or NoExecuteNullReadState) &&
@@ -261,7 +261,7 @@ internal static class PhysicalFileConsolidator
         row.BSN = InitialItemText(BsnField, row.BSN, states);
         row.ContentTypeId = InitialItemText(ContentTypeIdField, row.ContentTypeId, states);
         row.NoExecuteRaw = InitialItemText(NoExecuteField, row.NoExecuteRaw, states);
-        if (states.TryGetValue(WikiField, out var state))
+        if (states.TryGetValue(WikiField, out string state))
         {
             row.WikiFieldHasValue = state switch
             {
@@ -287,7 +287,7 @@ internal static class PhysicalFileConsolidator
         string incoming,
         IReadOnlyDictionary<string, string> states)
     {
-        if (states.TryGetValue(key, out var state))
+        if (states.TryGetValue(key, out string state))
         {
             if (state == FieldOmitted)
             {
@@ -356,10 +356,10 @@ internal static class PhysicalFileConsolidator
     /// <summary>Combines per-field read outcomes, retaining prior states on omission and preserving explicit null/value transitions as conflicts.</summary>
     private static string MergeFieldStates(PhysicalFileFacts row, string incomingJson)
     {
-        var states = ReadFieldStates(row.ItemMetadataFieldStatesJson);
-        foreach (var incoming in ReadFieldStates(incomingJson))
+        SortedDictionary<string, string> states = ReadFieldStates(row.ItemMetadataFieldStatesJson);
+        foreach (KeyValuePair<string, string> incoming in ReadFieldStates(incomingJson))
         {
-            if (states.TryGetValue(incoming.Key, out var previous))
+            if (states.TryGetValue(incoming.Key, out string previous))
             {
                 if (incoming.Value == FieldOmitted)
                 {

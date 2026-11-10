@@ -101,10 +101,10 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         [Fact]
         public void SplitWindow_ExactMultiple_ProducesEvenChunks()
         {
-            var start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
             DateTime end = new DateTime(2026, 6, 7, 0, 0, 0, DateTimeKind.Utc); // 6 days / 2 = 3 chunks
 
-            var chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
+            List<(DateTime Start, DateTime End)> chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
 
             chunks.Should().HaveCount(3);
             chunks[0].Should().Be((start, start.AddDays(2)));
@@ -116,10 +116,10 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         [Fact]
         public void SplitWindow_NonExactMultiple_LastChunkShorter()
         {
-            var start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
             DateTime end = new DateTime(2026, 6, 6, 0, 0, 0, DateTimeKind.Utc); // 5 days / 2 = 2 full + 1 partial
 
-            var chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
+            List<(DateTime Start, DateTime End)> chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
 
             chunks.Should().HaveCount(3);
             chunks[2].End.Should().Be(end); // last chunk ends exactly at window end
@@ -130,10 +130,10 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         [Fact]
         public void SplitWindow_WindowSmallerThanChunk_ProducesSingleChunk()
         {
-            var start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime start = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
             DateTime end = new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc); // 1 day < ChunkDays=2
 
-            var chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
+            List<(DateTime Start, DateTime End)> chunks = AuditLogUsageAnalyzer.SplitWindow(start, end, chunkDays: 2);
 
             chunks.Should().HaveCount(1);
             chunks[0].Start.Should().Be(start);

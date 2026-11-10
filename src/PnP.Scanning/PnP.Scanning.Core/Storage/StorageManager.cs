@@ -1231,9 +1231,10 @@ namespace PnP.Scanning.Core.Storage
         //   LastPageUpdateDate    = most recent publishing-page modification (null when no pages were scanned).
         internal static async Task PopulatePublishingSiteSummaryAsync(ScanContext dbContext, Guid scanId)
         {
-            var publishingWebs = await dbContext.ClassicWebSummaries
+            List<(string SiteUrl, string WebUrl, int ClassicPublishingPages)> publishingWebs = await dbContext
+                .ClassicWebSummaries
                 .Where(w => w.ScanId == scanId && (w.IsClassicPublishingSite || w.ClassicPublishingPages > 0))
-                .Select(w => new { w.SiteUrl, w.WebUrl, w.ClassicPublishingPages })
+                .Select(w => new ValueTuple<string, string, int>(w.SiteUrl, w.WebUrl, w.ClassicPublishingPages))
                 .ToListAsync();
 
             if (publishingWebs.Count == 0)
@@ -1243,28 +1244,36 @@ namespace PnP.Scanning.Core.Storage
             }
 
             // The (SiteUrl, WebUrl) set of publishing webs — used to scope master-page data to publishing webs.
-            var publishingWebKeys = publishingWebs.Select(w => (w.SiteUrl, w.WebUrl)).ToHashSet();
+            HashSet<(string SiteUrl, string WebUrl)> publishingWebKeys =
+                publishingWebs.Select(w => (w.SiteUrl, w.WebUrl)).ToHashSet();
 
             // Master page data is per web and only present when the Extensibility component ran. MasterPage =
             // the web's MasterUrl (system master), CustomMasterPage = CustomMasterUrl (custom/site master).
-            var extensibilities = await dbContext.ClassicExtensibilities.Where(e => e.ScanId == scanId)
-                .Select(e => new { e.SiteUrl, e.WebUrl, e.MasterPage, e.CustomMasterPage })
-                .ToListAsync();
+            List<(string SiteUrl, string WebUrl, string MasterPage, string CustomMasterPage)> extensibilities =
+                await dbContext.ClassicExtensibilities.Where(e => e.ScanId == scanId)
+                    .Select(e => new ValueTuple<string, string, string, string>(
+                        e.SiteUrl,
+                        e.WebUrl,
+                        e.MasterPage,
+                        e.CustomMasterPage))
+                    .ToListAsync();
 
-            var publishingPages = await dbContext.ClassicPages
+            List<(string SiteUrl, string Layout, DateTime ModifiedAt)> publishingPages = await dbContext.ClassicPages
                 .Where(p => p.ScanId == scanId && p.PageType == ClassicPageRules.PublishingPage)
-                .Select(p => new { p.SiteUrl, p.Layout, p.ModifiedAt })
+                .Select(p => new ValueTuple<string, string, DateTime>(p.SiteUrl, p.Layout, p.ModifiedAt))
                 .ToListAsync();
 
-            var rows = new List<ClassicPublishingSiteSummary>();
+            List<ClassicPublishingSiteSummary> rows = new List<ClassicPublishingSiteSummary>();
 
-            foreach (var siteGroup in publishingWebs.GroupBy(w => w.SiteUrl))
+            foreach (IGrouping<string, (string SiteUrl, string WebUrl, int ClassicPublishingPages)> siteGroup in
+                     publishingWebs.GroupBy(w => w.SiteUrl))
             {
-                var siteUrl = siteGroup.Key;
+                string siteUrl = siteGroup.Key;
 
-                var siteMasters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-                var systemMasters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var e in extensibilities)
+                SortedSet<string> siteMasters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                SortedSet<string> systemMasters = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach ((string SiteUrl, string WebUrl, string MasterPage, string CustomMasterPage) e in
+                         extensibilities)
                 {
                     if (!publishingWebKeys.Contains((e.SiteUrl, e.WebUrl)))
                     {
@@ -1282,9 +1291,9 @@ namespace PnP.Scanning.Core.Storage
                     }
                 }
 
-                var layouts = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                SortedSet<string> layouts = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
                 DateTime? lastUpdate = null;
-                foreach (var page in publishingPages)
+                foreach ((string SiteUrl, string Layout, DateTime ModifiedAt) page in publishingPages)
                 {
                     if (page.SiteUrl != siteUrl)
                     {
@@ -1338,11 +1347,11 @@ namespace PnP.Scanning.Core.Storage
             if (m365env != PnP.Core.Services.Microsoft365Environment.Production &&
                 m365env != PnP.Core.Services.Microsoft365Environment.PreProduction)
             {
-                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
+                List<string> sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
                     .Select(p => p.SiteUrl)
                     .ToList();
-                var skipRecords = new List<ClassicPageAuditUsage>();
-                foreach (var siteUrl in sites)
+                List<ClassicPageAuditUsage> skipRecords = new List<ClassicPageAuditUsage>();
+                foreach (string siteUrl in sites)
                     BuildAuditLogRecords(
                         skipRecords,
                         scanId,
@@ -1371,11 +1380,11 @@ namespace PnP.Scanning.Core.Storage
             catch (Exception ex)
             {
                 Log.Warning("Failed to acquire audit log token for scan {ScanId}: {Error}", scanId, ex.Message);
-                var sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
+                List<string> sites = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
                     .Select(p => p.SiteUrl)
                     .ToList();
-                var skipRecords = new List<ClassicPageAuditUsage>();
-                foreach (var siteUrl in sites)
+                List<ClassicPageAuditUsage> skipRecords = new List<ClassicPageAuditUsage>();
+                foreach (string siteUrl in sites)
                     BuildAuditLogRecords(
                         skipRecords,
                         scanId,
@@ -1397,11 +1406,11 @@ namespace PnP.Scanning.Core.Storage
 
             // Pass site URLs as objectIdFilters only when --siteslist / --sitesfile was explicitly
             // used. For full-tenant scans, pass null so the query covers the whole tenant.
-            var scanRecord = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
+            Scan scanRecord = dbContext.Scans.FirstOrDefault(p => p.ScanId == scanId);
             bool hasExplicitSiteList = !string.IsNullOrEmpty(scanRecord?.CLISiteList) ||
                                        !string.IsNullOrEmpty(scanRecord?.CLISiteFile);
 
-            var siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
+            List<string> siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId)
                 .Select(p => p.SiteUrl)
                 .ToList();
             IReadOnlyList<string> siteUrlsForFilter = hasExplicitSiteList ? siteUrls : null;
@@ -1443,9 +1452,9 @@ namespace PnP.Scanning.Core.Storage
             // total cost is O(pages × sites) for the prefix match but only O(pages) dictionary inserts —
             // avoiding a second O(sites × pages) scan (one full Where/ToDictionary over every page, per
             // site) that would dominate a full-tenant scan (100k pages × 10k sites).
-            var sortedSiteUrls = siteUrls.OrderByDescending(s => s.Length).ToList();
+            List<string> sortedSiteUrls = siteUrls.OrderByDescending(s => s.Length).ToList();
             // Pre-compute the "<site>/" prefixes once instead of re-allocating (s + "/") per page × site.
-            var sitePrefixes = sortedSiteUrls.Select(s => s + "/").ToList();
+            List<string> sitePrefixes = sortedSiteUrls.Select(s => s + "/").ToList();
 
             Dictionary<string, Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>> statsBySite = null;
             if (allStats != null)
@@ -1453,7 +1462,7 @@ namespace PnP.Scanning.Core.Storage
                 statsBySite =
                     new Dictionary<string, Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>>(
                         StringComparer.OrdinalIgnoreCase);
-                foreach (var kvp in allStats)
+                foreach (KeyValuePair<string, AuditLogUsageAnalyzer.AuditPageStats> kvp in allStats)
                 {
                     string owningSite = null;
                     for (int i = 0; i < sitePrefixes.Count; i++)
@@ -1467,7 +1476,9 @@ namespace PnP.Scanning.Core.Storage
 
                     if (owningSite == null) continue; // page under no scanned site — same exclusion as before
 
-                    if (!statsBySite.TryGetValue(owningSite, out var siteDict))
+                    if (!statsBySite.TryGetValue(
+                            owningSite,
+                            out Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats> siteDict))
                         statsBySite[owningSite] = siteDict =
                             new Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats>(
                                 StringComparer.OrdinalIgnoreCase);
@@ -1475,11 +1486,13 @@ namespace PnP.Scanning.Core.Storage
                 }
             }
 
-            var allRecords = new List<ClassicPageAuditUsage>();
-            foreach (var siteUrl in siteUrls)
+            List<ClassicPageAuditUsage> allRecords = new List<ClassicPageAuditUsage>();
+            foreach (string siteUrl in siteUrls)
             {
                 IReadOnlyDictionary<string, AuditLogUsageAnalyzer.AuditPageStats> siteStats = null;
-                if (statsBySite != null && statsBySite.TryGetValue(siteUrl, out var assigned) && assigned.Count > 0)
+                if (statsBySite != null && statsBySite.TryGetValue(
+                        siteUrl,
+                        out Dictionary<string, AuditLogUsageAnalyzer.AuditPageStats> assigned) && assigned.Count > 0)
                     siteStats = assigned;
                 BuildAuditLogRecords(
                     allRecords,
@@ -1521,7 +1534,7 @@ namespace PnP.Scanning.Core.Storage
             {
                 if (tenantOrigin == null || !abs.StartsWith(tenantOrigin, StringComparison.OrdinalIgnoreCase))
                     return abs;
-                var rel = abs.Substring(tenantOrigin.Length);
+                string rel = abs.Substring(tenantOrigin.Length);
                 // Root site collection (host only, no path) strips to ""; normalize to "/".
                 return rel.Length == 0 ? "/" : rel;
             }
@@ -1547,9 +1560,9 @@ namespace PnP.Scanning.Core.Storage
             }
             else
             {
-                foreach (var kvp in stats)
+                foreach (KeyValuePair<string, AuditLogUsageAnalyzer.AuditPageStats> kvp in stats)
                 {
-                    var record = new ClassicPageAuditUsage
+                    ClassicPageAuditUsage record = new ClassicPageAuditUsage
                     {
                         ScanId = scanId,
                         SiteUrl = siteUrl,

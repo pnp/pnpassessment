@@ -106,14 +106,14 @@ public class PublishingLayoutPrefetchScaleTests
     [Fact]
     public async Task A_failing_page_still_records_the_error_on_its_own_discovery_row()
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        using var db = CreateContext(connection, new List<string>());
+        using ScanContext db = CreateContext(connection, new List<string>());
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, 50);
+        Guid scan = await SeedAsync(db, 50);
         db.ChangeTracker.Clear();
 
-        var failures = new List<string>();
+        List<string> failures = new List<string>();
         await PublishingLayoutStatusReader.EnrichSiteAsync(
             db,
             scan,
@@ -125,7 +125,7 @@ public class PublishingLayoutPrefetchScaleTests
         failures.Should().BeEmpty("discovery satisfied every page");
 
         db.ChangeTracker.Clear();
-        var layoutRow = await db.ClassicPageDiscoveries.SingleAsync(row => row.RecordKey == "layout");
+        ClassicPageDiscovery layoutRow = await db.ClassicPageDiscoveries.SingleAsync(row => row.RecordKey == "layout");
         db.ClassicPageDiscoveries.Remove(layoutRow);
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
@@ -161,10 +161,10 @@ public class PublishingLayoutPrefetchScaleTests
     /// <summary>Seeds synthetic publishing pages and layout observations for the scale regression.</summary>
     private static async Task<Guid> SeedAsync(ScanContext db, int pageCount)
     {
-        var scan = Guid.NewGuid();
-        for (var index = 0; index < pageCount; index++)
+        Guid scan = Guid.NewGuid();
+        for (int index = 0; index < pageCount; index++)
         {
-            var pageUrl = $"/sites/a/Pages/page-{index}.aspx";
+            string pageUrl = $"/sites/a/Pages/page-{index}.aspx";
             db.ClassicPages.Add(
                 new ClassicPage
                 {

@@ -50,14 +50,14 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public async Task Native_report_exports_one_discovery_csv_with_page_and_scope_rows_and_quoted_errors()
     {
-        var scan = Guid.NewGuid();
-        using var source = new NativeFixture();
+        Guid scan = Guid.NewGuid();
+        using NativeFixture source = new NativeFixture();
         await Runner(scan).RunAsync(source, CancellationToken.None);
-        var folder = Path.Combine(Path.GetTempPath(), "assessment-native-report-" + Guid.NewGuid().ToString("N"));
+        string folder = Path.Combine(Path.GetTempPath(), "assessment-native-report-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            using var db = database.CreateContext();
+            using ScanContext db = database.CreateContext();
             await ReportManager.ExportClassicReportDataAsync(
                 db,
                 scan,
@@ -67,7 +67,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
             using CsvReader csv = new CsvReader(
                 new StreamReader(Path.Combine(folder, "discovery.csv")),
                 CultureInfo.InvariantCulture);
-            var rows = csv.GetRecords<ClassicPageDiscovery>().ToArray();
+            ClassicPageDiscovery[] rows = csv.GetRecords<ClassicPageDiscovery>().ToArray();
             csv.HeaderRecord.Should()
                 .Equal(
                     new[]
@@ -107,10 +107,10 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public async Task Reobservation_merges_file_identity_without_erasing_enrichment_failure_or_metadata()
     {
-        var scan = Guid.NewGuid();
-        var writer = Writer();
-        var file = Guid.NewGuid();
-        var record = File(file, "a.aspx");
+        Guid scan = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = Writer();
+        Guid file = Guid.NewGuid();
+        RawDiscoveryRecord record = File(file, "a.aspx");
         DiscoveryEvidence rich = AssessmentWebDiscovery.Page(
             scan,
             Site,
@@ -128,7 +128,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
             new("forms", null, DiscoveryScopeKind.Folder, DiscoverySourceKind.ListFormBackingFiles, "/forms", "test"),
             record);
         await writer.WriteAsync(new[] { sparse });
-        var rows = await writer.ReadPagesAsync(scan, Site, "/");
+        List<ClassicPageDiscovery> rows = await writer.ReadPagesAsync(scan, Site, "/");
         rows.Should().ContainSingle();
         rows[0].ListItemId.Should().Be(7);
         rows[0].HomePage.Should().BeTrue();
@@ -142,7 +142,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public async Task Changed_customization_status_is_preserved_with_a_visible_conflict()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         DiscoveryScopeRegistration scope = new DiscoveryScopeRegistration(
             "files",
             null,
@@ -150,12 +150,22 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
             DiscoverySourceKind.RawListLibraryFiles,
             "/pages",
             "test");
-        var file = File(Guid.NewGuid(), "a.aspx");
-        var first = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { CustomizedPageStatusRaw = "1" });
-        var second = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { CustomizedPageStatusRaw = "2" });
+        RawDiscoveryRecord file = File(Guid.NewGuid(), "a.aspx");
+        DiscoveryEvidence first = AssessmentWebDiscovery.Page(
+            scan,
+            Site,
+            "/",
+            scope,
+            file with { CustomizedPageStatusRaw = "1" });
+        DiscoveryEvidence second = AssessmentWebDiscovery.Page(
+            scan,
+            Site,
+            "/",
+            scope,
+            file with { CustomizedPageStatusRaw = "2" });
         await Writer().WriteAsync(new[] { first });
         await Writer().WriteAsync(new[] { second });
-        var row = (await Writer().ReadPagesAsync(scan, Site, "/")).Single();
+        ClassicPageDiscovery row = (await Writer().ReadPagesAsync(scan, Site, "/")).Single();
         row.CustomizedPageStatus.Should().Be("Customized");
         row.ErrorCodes.Should().Contain(DiscoveryGapCodes.ChangedDuringScan);
         row.ErrorDetail.Should().Contain("CustomizedPageStatus");
@@ -250,7 +260,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public async Task Parallel_web_writers_use_the_same_scan_without_sharing_ef_contexts()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await Task.WhenAll(
             Enumerable.Range(0, 8)
                 .Select(async number =>
@@ -270,7 +280,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
                         File(Guid.NewGuid(), "a.aspx") with { WebId = Guid.NewGuid() });
                     await Writer().WriteAsync(new[] { page });
                 }));
-        using var db = database.CreateContext();
+        using ScanContext db = database.CreateContext();
         (await db.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan)).Should().Be(8);
     }
 
@@ -280,7 +290,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public void Missing_item_fields_never_collapse_physical_pages_to_their_list_item_number()
     {
-        var minimalFields = new Dictionary<string, object> { ["Id"] = 1 };
+        Dictionary<string, object> minimalFields = new Dictionary<string, object> { ["Id"] = 1 };
         string first = ClassicPageRules.ResolvePhysicalPageUrl(minimalFields, "/Pages/a.aspx");
         string second = ClassicPageRules.ResolvePhysicalPageUrl(minimalFields, "/OtherPages/b.aspx");
         first.Should().Be("/Pages/a.aspx");
@@ -293,7 +303,8 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public void Metadata_for_a_different_file_is_rejected_before_it_enters_classic_page_assessment()
     {
-        var fields = new Dictionary<string, object> { ["FileRef"] = "/OtherPages/not-this-file.aspx" };
+        Dictionary<string, object> fields =
+            new Dictionary<string, object> { ["FileRef"] = "/OtherPages/not-this-file.aspx" };
         Func<string> resolve = () => ClassicPageRules.ResolvePhysicalPageUrl(fields, "/Pages/a.aspx");
         resolve.Should().Throw<InvalidDataException>();
     }
@@ -314,7 +325,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public async Task Conflicting_metadata_keeps_one_physical_page_and_a_visible_discovery_error()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         DiscoveryScopeRegistration scope = new DiscoveryScopeRegistration(
             "files",
             null,
@@ -322,12 +333,12 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
             DiscoverySourceKind.RawListLibraryFiles,
             "/pages",
             "test");
-        var file = File(Guid.NewGuid(), "a.aspx");
-        var first = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { HomePage = true });
-        var second = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { HomePage = false });
+        RawDiscoveryRecord file = File(Guid.NewGuid(), "a.aspx");
+        DiscoveryEvidence first = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { HomePage = true });
+        DiscoveryEvidence second = AssessmentWebDiscovery.Page(scan, Site, "/", scope, file with { HomePage = false });
         await Writer().WriteAsync(new[] { first });
         await Writer().WriteAsync(new[] { second });
-        var rows = await Writer().ReadPagesAsync(scan, Site, "/");
+        List<ClassicPageDiscovery> rows = await Writer().ReadPagesAsync(scan, Site, "/");
         rows.Should().ContainSingle();
         rows[0].DiscoveryStatus.Should().Be("Discovered");
         rows[0].ErrorCodes.Should().Contain(DiscoveryGapCodes.ChangedDuringScan);
@@ -378,7 +389,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
     [Fact]
     public void Direct_list_item_guid_classifies_modern_page_without_string_cast_failure()
     {
-        var fields = new Dictionary<string, object>
+        Dictionary<string, object> fields = new Dictionary<string, object>
         {
             ["ClientSideApplicationId"] = Guid.Parse("B6917CB1-93A0-4B97-A84D-7CF49975D4EC"),
         };
@@ -430,7 +441,7 @@ public sealed class AssessmentDiscoveryIntegrationTests : IDisposable
         {
             if (parent.ScopeKey == "web")
             {
-                var children = new[]
+                DiscoveryScopeRegistration[] children = new[]
                 {
                     new DiscoveryScopeRegistration(
                         "partial",

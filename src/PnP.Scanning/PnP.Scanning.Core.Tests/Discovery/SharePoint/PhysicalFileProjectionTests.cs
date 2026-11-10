@@ -25,8 +25,8 @@ public sealed class PhysicalFileProjectionTests
     [InlineData("document.docx")]
     public void Physical_facts_preserve_every_native_file_type_and_decoded_locator(string name)
     {
-        var scanId = Guid.NewGuid();
-        var record = Record(1, name);
+        Guid scanId = Guid.NewGuid();
+        RawDiscoveryRecord record = Record(1, name);
         PhysicalFileFacts result = PhysicalFileProjection.FromPhysicalRecord(scanId, record);
         result.Should().NotBeNull();
         result.ScanId.Should().Be(scanId);
@@ -44,7 +44,7 @@ public sealed class PhysicalFileProjectionTests
     [InlineData(true, false)]
     public void Unproved_physical_records_do_not_create_facts(bool guaranteed, bool fileId)
     {
-        var record = Record(1, "page.aspx") with
+        RawDiscoveryRecord record = Record(1, "page.aspx") with
         {
             LocatorIsGuaranteedPhysicalFilePath = guaranteed,
             FileUniqueId = fileId ? Guid.NewGuid().ToString("D") : null
@@ -56,8 +56,8 @@ public sealed class PhysicalFileProjectionTests
     [Fact]
     public void Item_metadata_captures_raw_inputs_without_running_classification()
     {
-        var row = Page(Guid.NewGuid());
-        var values = new Dictionary<string, object>
+        DiscoveryEvidence row = Page(Guid.NewGuid());
+        Dictionary<string, object> values = new Dictionary<string, object>
         {
             ["ClientSideApplicationId"] = "B6917CB1-93A0-4B97-A84D-7CF49975D4EC",
             ["HTML_x0020_File_x0020_Type"] = null,
@@ -98,7 +98,7 @@ public sealed class PhysicalFileProjectionTests
     [InlineData("wrong-type", "InvalidType")]
     public void NoExecute_unknown_observations_never_become_zero(string input, string expected)
     {
-        var values = new Dictionary<string, object>();
+        Dictionary<string, object> values = new Dictionary<string, object>();
         if (input != "omitted")
         {
             values["NoExecute"] = input == "null" ? null : true;

@@ -53,15 +53,16 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [Fact]
     public async Task Overlapping_roots_preserve_parent_evidence_without_duplicate_requests_or_files()
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.Files[RootPath] = new[] { FileRow(1, RootPath + "/root.aspx") };
         factory.Client.Files[RootPath + "/Forms"] = new[] { FileRow(2, RootPath + "/Forms/DispForm.aspx") };
         factory.Client.Folders[RootPath] = new[] { FolderRow(RootPath + "/Forms"), FolderRow(RootPath + "/Deep") };
         factory.Client.Folders[RootPath + "/Deep"] = new[] { FolderRow(RootPath + "/Deep/Deeper") };
         factory.Client.Files[RootPath + "/Deep/Deeper"] = new[] { FileRow(3, RootPath + "/Deep/Deeper/custom.aspx") };
-        using var provider = Provider(factory);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
 
-        var result = await TraverseAsync(provider);
+        (List<DiscoveryScopeRegistration> Scopes, List<RawDiscoveryRecord> Records) result =
+            await TraverseAsync(provider);
 
         result.Scopes.GroupBy(scope => scope.ScopeKey).Should().OnlyContain(group => group.Count() == 1);
         result.Scopes.Where(scope => scope.Locator == RootPath + "/Forms")
@@ -71,7 +72,8 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             .HaveCountGreaterThan(1);
         result.Records.Should().HaveCount(3).And.OnlyContain(record => record.ListId == ListId);
         result.Records.Select(record => record.FileUniqueId).Should().OnlyHaveUniqueItems();
-        foreach (var group in factory.Client.Requests.Where(IsFolderCollection).GroupBy(uri => uri.AbsoluteUri))
+        foreach (IGrouping<string, Uri> group in factory.Client.Requests.Where(IsFolderCollection)
+                     .GroupBy(uri => uri.AbsoluteUri))
         {
             group.Should().ContainSingle();
         }
@@ -85,7 +87,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 row.ParentScopeKey != null && row.EvidenceRefs.Any(value => value.StartsWith(
                     "reused-surface=",
                     StringComparison.Ordinal)));
-        foreach (var row in reused)
+        foreach (AspxSurfaceDenominatorRow row in reused)
         {
             string sourceId =
                 row.EvidenceRefs.Single(value => value.StartsWith("reused-surface=", StringComparison.Ordinal))[15..];
@@ -103,14 +105,15 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [Fact]
     public async Task Files_and_folders_pagination_is_retained_and_reused_without_reissuing_HTTP()
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.Files[RootPath] =
             new[] { FileRow(1, RootPath + "/first.aspx"), FileRow(2, RootPath + "/second.aspx") };
         factory.Client.Folders[RootPath] = new[] { FolderRow(RootPath + "/One"), FolderRow(RootPath + "/Two") };
         factory.Client.PageRootCollections = true;
-        using var provider = Provider(factory);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
 
-        var result = await TraverseAsync(provider);
+        (List<DiscoveryScopeRegistration> Scopes, List<RawDiscoveryRecord> Records) result =
+            await TraverseAsync(provider);
 
         result.Records.Should().HaveCount(2);
         factory.Client.Requests.Count(uri => FolderPath(uri) == RootPath && uri.AbsolutePath.EndsWith("/Files"))
@@ -125,9 +128,9 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             .ToArray();
         paged.Should().HaveCount(2);
         paged.Select(group => group.Count()).Should().BeEquivalentTo(new[] { 3, 2 });
-        foreach (var receipts in paged)
+        foreach (IGrouping<string, AspxPaginationPageReceipt> receipts in paged)
         {
-            var ordered = receipts.OrderBy(receipt => receipt.PageOrdinal).ToArray();
+            AspxPaginationPageReceipt[] ordered = receipts.OrderBy(receipt => receipt.PageOrdinal).ToArray();
             for (int index = 1; index < ordered.Length; index++)
             {
                 ordered[index - 1].NextTokenHash.Should().Be(ordered[index].RequestTokenHash);
@@ -353,7 +356,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     public async Task Partial_enriched_and_fallback_reads_union_files_with_separate_failure_receipts(
         bool repeatsFirstFile)
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
             bool files = uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal);
@@ -378,10 +381,10 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 SharePointSemanticDetectorResults.None,
                 DateTimeOffset.UtcNow);
         };
-        using var provider = Provider(factory);
-        var root = await ListRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await ListRootAsync(provider);
 
-        var batches = await ReadBatchesAsync(provider, root);
+        List<RawDiscoveryBatch> batches = await ReadBatchesAsync(provider, root);
 
         batches.SelectMany(batch => batch.Records)
             .Select(record => record.FileUniqueId)
@@ -446,7 +449,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [InlineData(true)]
     public async Task Discovery_engine_persists_both_attempts_before_the_final_fallback_terminal(bool fallbackSucceeds)
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
             bool files = uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) && FolderPath(uri) == RootPath;
@@ -468,14 +471,15 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 SharePointSemanticDetectorResults.None,
                 DateTimeOffset.UtcNow);
         };
-        using var provider = Provider(factory);
-        await using var connection = new SqliteConnection("Data Source=:memory:");
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        await using SqliteConnection connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options;
-        using var context = new ScanContext(options);
+        DbContextOptions<ScanContext>
+            options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options;
+        using ScanContext context = new ScanContext(options);
         await context.Database.MigrateAsync();
-        var scanId = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(() => new ScanContext(options));
+        Guid scanId = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(() => new ScanContext(options));
 
         await new AssessmentWebDiscovery(scanId, WebUrl.AbsoluteUri, "/", writer).RunAsync(
             provider,
@@ -502,14 +506,14 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [Fact]
     public async Task Recovered_size_attempts_preserve_complete_authority_and_cache()
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
-            var top = QueryNumber(uri, "$top", 0);
-            var skip = QueryNumber(uri, "$skip", 0);
+            int top = QueryNumber(uri, "$top", 0);
+            int skip = QueryNumber(uri, "$skip", 0);
             bool rootFiles = uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) &&
                              FolderPath(uri) == RootPath;
-            var sizeFailure = rootFiles && skip == 0 && top > 200;
+            bool sizeFailure = rootFiles && skip == 0 && top > 200;
             return FixturePage(
                 uri,
                 sizeFailure
@@ -520,10 +524,10 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 sizeFailure ? DiscoveryTerminalOutcome.Truncated : DiscoveryTerminalOutcome.Complete,
                 sizeFailure ? "json_response_size_limit" : null);
         };
-        using var provider = Provider(factory);
-        var root = await ListRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await ListRootAsync(provider);
 
-        var batches = await ReadBatchesAsync(provider, root);
+        List<RawDiscoveryBatch> batches = await ReadBatchesAsync(provider, root);
 
         batches.SelectMany(batch => batch.Records).Should().HaveCount(2);
         batches.Last().TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Complete);
@@ -555,7 +559,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             .Select(uri => QueryNumber(uri, "$top", 0))
             .Should()
             .Equal(1000, 500, 200, 200);
-        var beforeReuse = factory.Client.Requests.Count;
+        int beforeReuse = factory.Client.Requests.Count;
         await ReadBatchesAsync(provider, root);
         factory.Client.Requests.Should().HaveCount(beforeReuse);
     }
@@ -564,12 +568,12 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [Fact]
     public async Task Minimum_size_failure_retains_facts_and_is_reread()
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
             bool rootFiles = uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) &&
                              FolderPath(uri) == RootPath;
-            var sizeFailure = rootFiles && QueryNumber(uri, "$skip", 0) > 0;
+            bool sizeFailure = rootFiles && QueryNumber(uri, "$skip", 0) > 0;
             return FixturePage(
                 uri,
                 rootFiles && !sizeFailure
@@ -578,10 +582,10 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 sizeFailure ? DiscoveryTerminalOutcome.Truncated : DiscoveryTerminalOutcome.Complete,
                 sizeFailure ? "json_response_size_limit" : null);
         };
-        using var provider = Provider(factory);
-        var root = await ListRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await ListRootAsync(provider);
 
-        var batches = await ReadBatchesAsync(provider, root);
+        List<RawDiscoveryBatch> batches = await ReadBatchesAsync(provider, root);
 
         batches.SelectMany(batch => batch.Records).Should().ContainSingle();
         batches.Last().TerminalOutcome.Should().Be(DiscoveryTerminalOutcome.Truncated);
@@ -592,7 +596,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
         surface.EvidenceRefs.Count(value => value.StartsWith("file-page-attempt;", StringComparison.Ordinal))
             .Should()
             .Be(4);
-        var firstRequests = factory.Client.Requests.Count;
+        int firstRequests = factory.Client.Requests.Count;
         await ReadBatchesAsync(provider, root);
         factory.Client.Requests.Count.Should().Be(firstRequests + 4);
     }
@@ -601,8 +605,8 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [Fact]
     public async Task Cancellation_retains_unresolved_size_attempts_and_restarts_at_zero()
     {
-        using var cancellation = new CancellationTokenSource();
-        using var factory = new FolderFactory();
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
             if (QueryNumber(uri, "$top", 0) == 500)
@@ -616,10 +620,10 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 DiscoveryTerminalOutcome.Truncated,
                 "json_response_size_limit");
         };
-        using var provider = Provider(factory);
-        var root = await ListRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await ListRootAsync(provider);
 
-        var action = () => ReadBatchesAsync(provider, root, cancellation.Token);
+        Func<Task<List<RawDiscoveryBatch>>> action = () => ReadBatchesAsync(provider, root, cancellation.Token);
         await action.Should().ThrowAsync<OperationCanceledException>();
 
         AspxSurfaceDenominatorRow surface = provider.ReferenceCollector.ReadSurfaceEvidence()
@@ -637,7 +641,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             QueryNumber(uri, "$skip", 0) == 0
                 ? new[] { FileRow(1, RootPath + "/replayed.aspx") }
                 : Array.Empty<JsonElement>());
-        var retried = await ReadBatchesAsync(provider, root);
+        List<RawDiscoveryBatch> retried = await ReadBatchesAsync(provider, root);
         retried.SelectMany(batch => batch.Records).Should().ContainSingle();
         factory.Client.Requests.Where(uri => uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal))
             .Select(uri => QueryNumber(uri, "$skip", -1))
@@ -649,7 +653,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [Fact]
     public async Task Complete_modeled_files_cannot_bypass_bounded_REST()
     {
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.CompleteModeledFolder = true;
         factory.Client.ModeledFiles = new[]
         {
@@ -662,12 +666,12 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
         factory.Client.Files["/sites/a"] = Enumerable.Range(1, 1111)
             .Select(id => FileRow(id, "/sites/a/page-" + id + ".aspx"))
             .ToArray();
-        using var provider = Provider(factory);
-        var root = await WebRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await WebRootAsync(provider);
 
-        var batches = await ReadBatchesAsync(provider, root);
+        List<RawDiscoveryBatch> batches = await ReadBatchesAsync(provider, root);
 
-        var records = batches.SelectMany(batch => batch.Records).ToArray();
+        RawDiscoveryRecord[] records = batches.SelectMany(batch => batch.Records).ToArray();
         records.Should().HaveCount(1111).And.NotContain(record => record.PhysicalLocator == "/sites/a/sdk-only.aspx");
         records.Select(record => record.FileUniqueId)
             .Should()
@@ -945,12 +949,12 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 return Task.FromResult(FolderResponse(requestUri));
             }
 
-            var items = (IReadOnlyList<JsonElement>)Array.Empty<JsonElement>();
-            var outcome = DiscoveryTerminalOutcome.Complete;
+            IReadOnlyList<JsonElement> items = (IReadOnlyList<JsonElement>)Array.Empty<JsonElement>();
+            DiscoveryTerminalOutcome outcome = DiscoveryTerminalOutcome.Complete;
             string next = null;
-            var path = requestUri.AbsolutePath;
-            var folder = FolderPath(requestUri);
-            var secondPage = requestUri.Query.Contains("$skiptoken=second", StringComparison.Ordinal);
+            string path = requestUri.AbsolutePath;
+            string folder = FolderPath(requestUri);
+            bool secondPage = requestUri.Query.Contains("$skiptoken=second", StringComparison.Ordinal);
             if (path.EndsWith("/lists", StringComparison.Ordinal))
             {
                 if (DenyExpandedLists && requestUri.Query.Contains("ContentTypes", StringComparison.Ordinal))
@@ -960,7 +964,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             }
             else if (IsFolderCollection(requestUri))
             {
-                var files = path.EndsWith("/Files", StringComparison.Ordinal);
+                bool files = path.EndsWith("/Files", StringComparison.Ordinal);
                 if (files && secondPage && CancelOnSecondFilePage != null)
                 {
                     CancelOnSecondFilePage.Cancel();
@@ -974,14 +978,14 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                     outcome = DiscoveryTerminalOutcome.Truncated;
                 else
                 {
-                    var collection = files ? Files : Folders;
+                    Dictionary<string, JsonElement[]> collection = files ? Files : Folders;
                     items = folder != null && collection.TryGetValue(folder, out JsonElement[] rows)
                         ? rows
                         : Array.Empty<JsonElement>();
                     if (files)
                     {
-                        var skip = secondPage ? 1 : QueryNumber(requestUri, "$skip", 0);
-                        var top = QueryNumber(requestUri, "$top", 1000);
+                        int skip = secondPage ? 1 : QueryNumber(requestUri, "$skip", 0);
+                        int top = QueryNumber(requestUri, "$top", 1000);
                         items = items.Skip(skip).Take(top).ToArray();
                         if (PageRootCollections && folder == RootPath && skip == 0 && items.Count > 1)
                         {

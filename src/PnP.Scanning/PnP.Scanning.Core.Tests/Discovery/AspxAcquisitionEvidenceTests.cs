@@ -63,13 +63,13 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
         AspxPaginationValidation repeatedOrdinal = AspxPaginationContract.Validate(
             new[] { Page(0, null, "token-1", terminal: false), Page(0, "token-1", null, terminal: true), },
             DiscoveryTerminalOutcome.Complete);
-        var terminalWithToken = AspxPaginationContract.Validate(
+        AspxPaginationValidation terminalWithToken = AspxPaginationContract.Validate(
             new[] { Page(0, null, "token-1", terminal: true) },
             DiscoveryTerminalOutcome.Complete);
-        var missingTerminal = AspxPaginationContract.Validate(
+        AspxPaginationValidation missingTerminal = AspxPaginationContract.Validate(
             new[] { Page(0, null, "token-1", terminal: false) },
             DiscoveryTerminalOutcome.Complete);
-        var denied = AspxPaginationContract.Validate(
+        AspxPaginationValidation denied = AspxPaginationContract.Validate(
             new[] { Page(0, null, null, terminal: true) },
             DiscoveryTerminalOutcome.Denied);
 
@@ -84,9 +84,9 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
     public void Pagination_evidence_hashes_continuation_values()
     {
         const string rawToken = "Paged=TRUE&p_ID=42";
-        var nextLink = "https://contoso.sharepoint.com/_api/web/lists?$select=Id&$skiptoken=" +
-                       Uri.EscapeDataString(rawToken);
-        var request = new Uri(nextLink);
+        string nextLink = "https://contoso.sharepoint.com/_api/web/lists?$select=Id&$skiptoken=" +
+                          Uri.EscapeDataString(rawToken);
+        Uri request = new Uri(nextLink);
         SharePointRestPage page = SharePointRestResponseParser.Parse(
             request,
             HttpStatusCode.OK,
@@ -96,12 +96,12 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
             "correlation",
             DateTimeOffset.Parse("2026-09-12T12:00:00Z"));
 
-        var durableEndpoint = AspxDurableRequestEvidence.Endpoint(request);
-        var durableEvidence = AspxDurableRequestEvidence.Reference(request, page, "Id");
+        string durableEndpoint = AspxDurableRequestEvidence.Endpoint(request);
+        string durableEvidence = AspxDurableRequestEvidence.Reference(request, page, "Id");
         durableEndpoint.Should().Contain("$skiptoken=sha256").And.NotContain("Paged");
         durableEvidence.Should().Contain("$skiptoken=sha256").And.NotContain("Paged");
 
-        var receipts = new[]
+        AspxPaginationPageReceipt[] receipts = new[]
         {
             Page(0, null, nextLink, terminal: false),
             Page(1, nextLink, null, terminal: true) with { ActualEndpoint = durableEndpoint },
@@ -114,7 +114,7 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
     [Fact]
     public void Semantic_denial_is_terminal_and_has_no_items()
     {
-        var uri = new Uri("https://contoso.sharepoint.com/sites/a/_api/web/webs?$select=Id");
+        Uri uri = new Uri("https://contoso.sharepoint.com/sites/a/_api/web/webs?$select=Id");
         SharePointRestPage login = SharePointRestResponseParser.Parse(
             uri,
             HttpStatusCode.OK,
@@ -180,16 +180,16 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
     [Fact]
     public async Task Acquisition_evidence_is_persisted_in_the_assessment_database()
     {
-        var scanId = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
-        using var provider = new EvidenceProvider();
+        Guid scanId = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        using EvidenceProvider provider = new EvidenceProvider();
 
         await new AssessmentWebDiscovery(scanId, "https://contoso.sharepoint.com/sites/a", "/", writer).RunAsync(
             provider,
             CancellationToken.None);
 
-        using var read = database.CreateContext();
-        var rows = read.ClassicPageDiscoveries.Where(row => row.ScanId == scanId).ToArray();
+        using ScanContext read = database.CreateContext();
+        ClassicPageDiscovery[] rows = read.ClassicPageDiscoveries.Where(row => row.ScanId == scanId).ToArray();
         rows.Should()
             .Contain(row =>
                 row.RowType == "Scope" && row.ScopeType == "Surface" && !string.IsNullOrWhiteSpace(row.EvidenceJson));
@@ -202,11 +202,11 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
                 !string.IsNullOrWhiteSpace(row.EvidenceJson));
         rows.Should().Contain(row => row.RowType == "Gap" && row.ErrorCodes == "fixture:coverage_gap");
 
-        var report = Path.Combine(Path.GetTempPath(), "aspx-evidence-report-" + Guid.NewGuid().ToString("N"));
+        string report = Path.Combine(Path.GetTempPath(), "aspx-evidence-report-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(report);
         try
         {
-            using var export = database.CreateContext();
+            using ScanContext export = database.CreateContext();
             await ReportManager.ExportClassicReportDataAsync(
                 export,
                 scanId,
@@ -215,7 +215,7 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
             using CsvReader csv = new CsvReader(
                 new StreamReader(Path.Combine(report, "discovery.csv")),
                 CultureInfo.InvariantCulture);
-            var exported = csv.GetRecords<ClassicPageDiscovery>().ToArray();
+            ClassicPageDiscovery[] exported = csv.GetRecords<ClassicPageDiscovery>().ToArray();
             exported.Should()
                 .Contain(row => row.RowType == "Reference" && !string.IsNullOrWhiteSpace(row.EvidenceJson));
             exported.Should()
@@ -231,10 +231,10 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
     [Fact]
     public async Task Cancellation_still_persists_evidence_already_collected_by_the_web_worker()
     {
-        var scanId = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
-        using var provider = new EvidenceProvider();
-        using var cancellation = new CancellationTokenSource();
+        Guid scanId = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        using EvidenceProvider provider = new EvidenceProvider();
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         Func<Task> action = () =>
@@ -243,7 +243,7 @@ public sealed class AspxAcquisitionEvidenceTests : IClassFixture<ScanContextFixt
                 cancellation.Token);
         await action.Should().ThrowAsync<OperationCanceledException>();
 
-        using var read = database.CreateContext();
+        using ScanContext read = database.CreateContext();
         read.ClassicPageDiscoveries.Any(row => row.ScanId == scanId &&
                                                row.RowType == "Reference" && row.EvidenceJson != null)
             .Should()

@@ -35,8 +35,8 @@ internal static class PhysicalFileProjection
             return null;
         }
 
-        var observed = DateTime.UtcNow;
-        var fields = new Dictionary<string, string>(StringComparer.Ordinal)
+        DateTime observed = DateTime.UtcNow;
+        Dictionary<string, string> fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [ContentTypeField] = record.ContentTypeId == null ? OmittedState : ValueState
         };
@@ -87,7 +87,7 @@ internal static class PhysicalFileProjection
     /// <summary>Retains the exact fields already returned for selected-page assessment, without copying Wiki HTML or running classification.</summary>
     internal static PhysicalFileFacts FromItemMetadata(DiscoveryEvidence page, IDictionary<string, object> values)
     {
-        var result = FromDiscoveredFile(page);
+        PhysicalFileFacts result = FromDiscoveredFile(page);
         if (result == null)
         {
             return null;
@@ -106,8 +106,8 @@ internal static class PhysicalFileProjection
         result.HtmlFileType = ReadScalar(values, HtmlTypeField);
         result.FileType = ReadScalar(values, FileTypeField);
         result.BSN = ReadScalar(values, BsnField);
-        result.WikiFieldHasValue = values.TryGetValue(WikiField, out var wiki) ? wiki != null : null;
-        if (!values.TryGetValue(NoExecuteField, out var noExecute))
+        result.WikiFieldHasValue = values.TryGetValue(WikiField, out object wiki) ? wiki != null : null;
+        if (!values.TryGetValue(NoExecuteField, out object noExecute))
         {
             result.NoExecuteReadState = "NotReturned";
         }
@@ -136,7 +136,7 @@ internal static class PhysicalFileProjection
     /// <summary>Retains an item read failure separately from the already observed physical file and never changes its identity.</summary>
     internal static PhysicalFileFacts FromItemFailure(DiscoveryEvidence page, Exception error)
     {
-        var result = FromDiscoveredFile(page);
+        PhysicalFileFacts result = FromDiscoveredFile(page);
         if (result != null)
         {
             result.ItemMetadataReadState = "Failed";

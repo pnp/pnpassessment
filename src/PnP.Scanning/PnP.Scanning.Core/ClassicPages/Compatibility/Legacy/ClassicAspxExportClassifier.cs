@@ -27,7 +27,8 @@ internal static class ClassicAspxExportClassifier
     internal static Classification Classify(SPFile file)
     {
         ArgumentNullException.ThrowIfNull(file);
-        if (file.ItemMetadataReadState == ClassicAspxReadStates.Available && TryRestoreFields(file, out var fields))
+        if (file.ItemMetadataReadState == ClassicAspxReadStates.Available &&
+            TryRestoreFields(file, out IDictionary<string, object?> fields))
         {
             if (ClassicPageRules.IsPublishingContentType(file.ContentTypeId))
             {
@@ -48,7 +49,7 @@ internal static class ClassicAspxExportClassifier
             return new Classification(pageType, ItemMetadata, "ExistingItemFieldHeuristics");
         }
 
-        var inferred = SharePointLiveAspxDiscoveryProvider.InferPageType(file.ContentTypeId);
+        string? inferred = SharePointLiveAspxDiscoveryProvider.InferPageType(file.ContentTypeId);
         return new Classification(
             inferred,
             inferred == null ? Unknown : FileOnlyFallback,
@@ -63,14 +64,14 @@ internal static class ClassicAspxExportClassifier
         fields = new Dictionary<string, object?>(StringComparer.Ordinal);
         try
         {
-            using var document = JsonDocument.Parse(file.ItemMetadataFieldStatesJson);
+            using JsonDocument document = JsonDocument.Parse(file.ItemMetadataFieldStatesJson);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 return false;
             }
 
-            var states = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var property in document.RootElement.EnumerateObject())
+            Dictionary<string, string> states = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (JsonProperty property in document.RootElement.EnumerateObject())
             {
                 if (property.Value.ValueKind != JsonValueKind.String || !states.TryAdd(
                         property.Name,
@@ -104,7 +105,7 @@ internal static class ClassicAspxExportClassifier
         string? value,
         bool valueIsKnownNull = false)
     {
-        if (!states.TryGetValue(name, out var state) || state == Omitted)
+        if (!states.TryGetValue(name, out string? state) || state == Omitted)
         {
             return true;
         }

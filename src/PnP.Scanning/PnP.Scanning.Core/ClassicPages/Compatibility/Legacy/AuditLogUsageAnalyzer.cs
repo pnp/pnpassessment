@@ -119,7 +119,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 CancellationToken cancellationToken,
                 Action<string> progress = null)
         {
-            var chunks = SplitWindow(windowStart, windowEnd, ChunkDays);
+            List<(DateTime Start, DateTime End)> chunks = SplitWindow(windowStart, windowEnd, ChunkDays);
             int total = chunks.Count;
 
             progress?.Invoke(
@@ -128,10 +128,11 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 $"for window {windowStart:yyyy-MM-dd} → {windowEnd:yyyy-MM-dd}");
 
             // Cap concurrency so we don't flood Graph with 90 simultaneous queries for large windows
-            using var semaphore = new SemaphoreSlim(MaxParallelChunks);
+            using SemaphoreSlim semaphore = new SemaphoreSlim(MaxParallelChunks);
             int completed = 0;
 
-            var tasks = chunks.Select(async c =>
+            List<Task<(IReadOnlyDictionary<string, ChunkPageData> Stats, string SkipReason)>> tasks = chunks
+                .Select(async c =>
                 {
                     await semaphore.WaitAsync(cancellationToken);
                     try
@@ -171,11 +172,13 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 })
                 .ToList();
 
-            var chunkResults = await Task.WhenAll(tasks);
+            (IReadOnlyDictionary<string, ChunkPageData> Stats, string SkipReason)[] chunkResults =
+                await Task.WhenAll(tasks);
 
             // Partial-success: use data from succeeded chunks; warn about failed ones.
             // Dropping everything because one chunk timed out would throw away valid data from other chunks.
-            var succeeded = chunkResults.Where(r => r.Stats != null).Select(r => r.Stats).ToList();
+            List<IReadOnlyDictionary<string, ChunkPageData>> succeeded =
+                chunkResults.Where(r => r.Stats != null).Select(r => r.Stats).ToList();
             List<string> failures = chunkResults.Where(r => r.Stats == null).Select(r => r.SkipReason).ToList();
 
             // One-line terminal roll-up of every chunk's outcome. When some chunks time out while others
@@ -195,7 +198,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 return (null, failures[0]);
             }
 
-            var merged = MergeChunks(succeeded);
+            IReadOnlyDictionary<string, AuditPageStats> merged = MergeChunks(succeeded);
 
             // Total attributed events across all pages (views + creates + edits). Reported alongside the
             // page count so the log answers both "how many pages had activity" and "how much activity" —
@@ -248,11 +251,13 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
             Dictionary<string, (int Views, int Creates, int Edits, HashSet<int> Users)> merged =
                 new Dictionary<string, (int Views, int Creates, int Edits, HashSet<int> Users)>(
                     StringComparer.OrdinalIgnoreCase);
-            foreach (var chunk in chunks)
+            foreach (IReadOnlyDictionary<string, ChunkPageData> chunk in chunks)
             {
-                foreach (var kvp in chunk)
+                foreach (KeyValuePair<string, ChunkPageData> kvp in chunk)
                 {
-                    if (!merged.TryGetValue(kvp.Key, out var existing))
+                    if (!merged.TryGetValue(
+                            kvp.Key,
+                            out (int Views, int Creates, int Edits, HashSet<int> Users) existing))
                     {
                         // Copy so we never alias (or later mutate) the input chunk's own set.
                         // The chunk set is already ≤ MaxTrackedUsersPerPage (capped at fetch time).
@@ -266,7 +271,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                         // hashes. Stop unioning once the merged set reaches the cap — beyond that the page
                         // is clearly "heavily used" and the exact distinct count matters less, while memory
                         // stays bounded to MaxTrackedUsersPerPage × 4 bytes per page.
-                        foreach (var userHash in kvp.Value.UserHashes)
+                        foreach (int userHash in kvp.Value.UserHashes)
                         {
                             if (existing.Users.Count >= MaxTrackedUsersPerPage) break;
                             existing.Users.Add(userHash);
@@ -306,7 +311,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
             string queryId;
             try
             {
-                var queryBody = new Dictionary<string, object>
+                Dictionary<string, object> queryBody = new Dictionary<string, object>
                 {
                     ["filterStartDateTime"] =
                         chunkStart.ToUniversalTime()
@@ -324,7 +329,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 if (siteUrls != null && siteUrls.Count > 0)
                     queryBody["objectIdFilters"] = siteUrls.Select(u => u.TrimEnd('/') + "/*").ToArray();
 
-                var body = JsonSerializer.Serialize(queryBody);
+                string body = JsonSerializer.Serialize(queryBody);
 
                 using HttpResponseMessage postResponse = await SendWithRetryAsync(
                     httpClient,
@@ -341,12 +346,12 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                     return (null,
                         "NoPermission: The Entra app is missing the 'AuditLogsQuery-SharePoint.Read.All' application permission for Microsoft Graph. Add it in Entra Portal → API permissions and grant admin consent.");
 
-                var postBody = await postResponse.Content.ReadAsStringAsync(cancellationToken);
+                string postBody = await postResponse.Content.ReadAsStringAsync(cancellationToken);
                 if (!postResponse.IsSuccessStatusCode)
                     return (null,
                         $"SubmitError: HTTP {(int)postResponse.StatusCode}: {postBody[..Math.Min(200, postBody.Length)]}");
 
-                using var postDoc = JsonDocument.Parse(postBody);
+                using JsonDocument postDoc = JsonDocument.Parse(postBody);
                 queryId = postDoc.RootElement.GetProperty("id").GetString();
                 if (string.IsNullOrEmpty(queryId)) return (null, "SubmitError: response contained no query id");
             }
@@ -381,11 +386,11 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                     $"operations=[ClassicPageViewed, ClassicPageCreated, ClassicPageEdited]; " +
                     $"objectIdFilters=[{objectScope}]");
             }
-            var pollStart = DateTime.UtcNow;
-            var deadline = pollStart.Add(QueryTimeout);
+            DateTime pollStart = DateTime.UtcNow;
+            DateTime deadline = pollStart.Add(QueryTimeout);
             string lastStatus = null;
             int pollCount = 0;
-            var lastHeartbeat = pollStart;
+            DateTime lastHeartbeat = pollStart;
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -428,15 +433,15 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 {
                     if (!pollResponse.IsSuccessStatusCode)
                     {
-                        var errBody = await pollResponse.Content.ReadAsStringAsync(cancellationToken);
+                        string errBody = await pollResponse.Content.ReadAsStringAsync(cancellationToken);
                         return (null,
                             $"PollError: HTTP {(int)pollResponse.StatusCode}: {errBody[..Math.Min(200, errBody.Length)]}");
                     }
 
-                    var pollBody = await pollResponse.Content.ReadAsStringAsync(cancellationToken);
+                    string pollBody = await pollResponse.Content.ReadAsStringAsync(cancellationToken);
                     try
                     {
-                        using var pollDoc = JsonDocument.Parse(pollBody);
+                        using JsonDocument pollDoc = JsonDocument.Parse(pollBody);
                         status = pollDoc.RootElement.GetProperty("status").GetString() ?? string.Empty;
                     }
                     catch (Exception ex)
@@ -446,7 +451,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 }
 
                 pollCount++;
-                var elapsed = DateTime.UtcNow - pollStart;
+                TimeSpan elapsed = DateTime.UtcNow - pollStart;
                 // Log on every status change, and otherwise a heartbeat every ~2 min so a long
                 // "notStarted"/"running" wait is visibly progressing rather than silently frozen.
                 if (status != lastStatus)
@@ -481,7 +486,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
             // silence. Track page/record counts so the fetch phase is visible and its throughput auditable.
             int recordsFetched = 0;
             int recordPages = 0;
-            var fetchStart = DateTime.UtcNow;
+            DateTime fetchStart = DateTime.UtcNow;
             progress?.Invoke($"[{chunkLabel}] query {queryId} succeeded — fetching records");
 
             while (nextLink != null)
@@ -517,7 +522,7 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 {
                     if (!recordsResponse.IsSuccessStatusCode)
                     {
-                        var errBody = await recordsResponse.Content.ReadAsStringAsync(cancellationToken);
+                        string errBody = await recordsResponse.Content.ReadAsStringAsync(cancellationToken);
                         return (null,
                             $"RecordsError after {recordsFetched} records ({recordPages} pages): HTTP {(int)recordsResponse.StatusCode}: {errBody[..Math.Min(200, errBody.Length)]}");
                     }
@@ -593,8 +598,9 @@ namespace PnP.Scanning.Core.ClassicPages.Compatibility.Legacy
                 $"[{chunkLabel}] query {queryId} fetched {recordsFetched} record(s) in {recordPages} page(s) " +
                 $"over {(DateTime.UtcNow - fetchStart).TotalSeconds:0}s → {results.Count} distinct page(s)");
 
-            var output = new Dictionary<string, ChunkPageData>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kvp in results)
+            Dictionary<string, ChunkPageData> output =
+                new Dictionary<string, ChunkPageData>(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, (int Views, int Creates, int Edits, HashSet<int> Users)> kvp in results)
                 output[kvp.Key] = new ChunkPageData(
                     kvp.Value.Views,
                     kvp.Value.Creates,

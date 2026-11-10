@@ -361,8 +361,9 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [Fact]
     public async Task OversizedBatchStopsEnumerationBeforeContextCreation()
     {
-        var enumerated = 0;
-        var writer = new SPFileWriter(() => throw new InvalidOperationException("No context should be opened."));
+        int enumerated = 0;
+        SPFileWriter writer =
+            new SPFileWriter(() => throw new InvalidOperationException("No context should be opened."));
         IEnumerable<SPFile> rows = Enumerable.Range(1, 1000)
             .Select(_ =>
             {
@@ -520,7 +521,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [Fact]
     public async Task NewRawMetadataConflictsRetainBothValues()
     {
-        var first = File();
+        SPFile first = File();
         first.ListItemId = 42;
         first.Length = 100;
         first.WikiFieldHasValue = false;
@@ -532,7 +533,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         first.FileType = "file-one";
         first.BSN = "bsn-one";
         first.ItemMetadataFieldStatesJson = "{\"WikiField\":\"value\",\"other-field\":\"value\"}";
-        var next = File();
+        SPFile next = File();
         next.ListItemId = 84;
         next.Length = 200;
         next.WikiFieldHasValue = true;
@@ -546,8 +547,8 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         next.ItemMetadataFieldStatesJson = "{\"WikiField\":\"value\",\"other-field\":\"null\"}";
         await Writer.WriteAsync(new[] { first, next });
         await Writer.WriteAsync(new[] { next });
-        using var db = new ScanContext(options);
-        var saved = await db.SPFiles.SingleAsync();
+        using ScanContext db = new ScanContext(options);
+        SPFile saved = await db.SPFiles.SingleAsync();
         saved.ListItemId.Should().Be(84);
         saved.Length.Should().Be(200);
         saved.WikiFieldHasValue.Should().BeTrue();
@@ -564,7 +565,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         }
 
         saved.ProvenanceJson.Should().Contain("bsn-one").And.Contain("bsn-two");
-        using var evidence = JsonDocument.Parse(saved.ProvenanceJson);
+        using JsonDocument evidence = JsonDocument.Parse(saved.ProvenanceJson);
         evidence.RootElement.GetArrayLength().Should().Be(11);
         JsonElement rawConflict = evidence.RootElement.EnumerateArray()
             .Single(entry => entry.ValueKind == JsonValueKind.Object &&
@@ -710,26 +711,26 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [InlineData("1")]
     public async Task ExplicitNoExecuteNullClearsRawAndRetainsBeforeAfter(string raw)
     {
-        var first = File();
+        SPFile first = File();
         first.NoExecuteRaw = raw;
         first.NoExecuteSource = "SPO.ListItem.NoExecute";
         first.NoExecuteReadState = "Available";
         first.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"value\"}";
         await Writer.WriteAsync(new[] { first });
-        var next = File();
+        SPFile next = File();
         next.NoExecuteSource = "SPO.ListItem.NoExecute";
         next.NoExecuteReadState = "Null";
         next.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"null\"}";
         await Writer.WriteAsync(new[] { next });
         await Writer.WriteAsync(new[] { next });
-        using var db = new ScanContext(options);
-        var saved = await db.SPFiles.SingleAsync();
+        using ScanContext db = new ScanContext(options);
+        SPFile saved = await db.SPFiles.SingleAsync();
         saved.NoExecuteRaw.Should().BeNull();
         saved.NoExecuteSource.Should().Be("SPO.ListItem.NoExecute");
         saved.NoExecuteReadState.Should().Be("Null");
         saved.ItemMetadataFieldStatesJson.Should().Be("{\"NoExecute\":\"null\"}");
         saved.CoverageState.Should().Be("ChangedDuringScan");
-        using var evidence = JsonDocument.Parse(saved.ProvenanceJson);
+        using JsonDocument evidence = JsonDocument.Parse(saved.ProvenanceJson);
         JsonElement rawConflict = evidence.RootElement.EnumerateArray()
             .Single(entry => entry.ValueKind == JsonValueKind.Object &&
                              entry.TryGetProperty("field", out JsonElement field) &&
@@ -795,23 +796,23 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [Fact]
     public async Task ReturnedNoExecuteValueSupersedesNullWithRawConflictEvidence()
     {
-        var first = File();
+        SPFile first = File();
         first.NoExecuteSource = "SPO.ListItem.NoExecute";
         first.NoExecuteReadState = "Null";
         first.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"null\"}";
         await Writer.WriteAsync(new[] { first });
-        var next = File();
+        SPFile next = File();
         next.NoExecuteRaw = "0";
         next.NoExecuteSource = "SPO.ListItem.NoExecute";
         next.NoExecuteReadState = "Available";
         next.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"value\"}";
         await Writer.WriteAsync(new[] { next });
-        using var db = new ScanContext(options);
-        var saved = await db.SPFiles.SingleAsync();
+        using ScanContext db = new ScanContext(options);
+        SPFile saved = await db.SPFiles.SingleAsync();
         saved.NoExecuteRaw.Should().Be("0");
         saved.NoExecuteReadState.Should().Be("Available");
         saved.ItemMetadataFieldStatesJson.Should().Be("{\"NoExecute\":\"value\"}");
-        using var evidence = JsonDocument.Parse(saved.ProvenanceJson);
+        using JsonDocument evidence = JsonDocument.Parse(saved.ProvenanceJson);
         JsonElement rawConflict = evidence.RootElement.EnumerateArray()
             .Single(entry => entry.ValueKind == JsonValueKind.Object &&
                              entry.TryGetProperty("field", out JsonElement field) &&

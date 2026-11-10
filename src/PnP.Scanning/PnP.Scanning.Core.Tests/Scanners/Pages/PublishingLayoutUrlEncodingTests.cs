@@ -66,7 +66,7 @@ public class PublishingLayoutUrlEncodingTests : IClassFixture<ScanContextFixture
     [InlineData("/sites/a/_catalogs/masterpage/P\u00e1gina.aspx", "/sites/a/_catalogs/masterpage/P%C3%A1gina.aspx")]
     public async Task Encoded_and_decoded_spellings_of_one_layout_share_a_single_read(string first, string second)
     {
-        var requests = new List<string>();
+        List<string> requests = new List<string>();
         PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
             SiteUri,
             url =>
@@ -94,7 +94,7 @@ public class PublishingLayoutUrlEncodingTests : IClassFixture<ScanContextFixture
             SiteUri,
             _ => throw new InvalidOperationException("A multiply-encoded reference must never be requested."));
 
-        var enrich = () => reader.EnrichAsync(Page(layoutUrl));
+        Func<Task> enrich = () => reader.EnrichAsync(Page(layoutUrl));
 
         await enrich.Should().ThrowAsync<InvalidDataException>();
     }
@@ -104,8 +104,8 @@ public class PublishingLayoutUrlEncodingTests : IClassFixture<ScanContextFixture
     public async Task Escaped_layout_name_matches_discovery_without_a_fallback_request()
     {
         const string decoded = "/sites/a/_catalogs/masterpage/My Layout.aspx";
-        var scan = Guid.NewGuid();
-        using var db = fixture.CreateContext();
+        Guid scan = Guid.NewGuid();
+        using ScanContext db = fixture.CreateContext();
         db.ClassicPages.Add(
             new ClassicPage
             {
@@ -142,7 +142,7 @@ public class PublishingLayoutUrlEncodingTests : IClassFixture<ScanContextFixture
             (error, _) => throw new InvalidOperationException("Unexpected enrichment failure", error));
 
         db.ChangeTracker.Clear();
-        var page = await db.ClassicPages.SingleAsync(value => value.ScanId == scan);
+        ClassicPage page = await db.ClassicPages.SingleAsync(value => value.ScanId == scan);
         page.LayoutCustomizedPageStatus.Should().Be("Uncustomized");
     }
 

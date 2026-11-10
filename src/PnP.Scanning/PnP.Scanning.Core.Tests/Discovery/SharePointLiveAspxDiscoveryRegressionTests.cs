@@ -60,9 +60,9 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
     [Fact]
     public async Task Later_sparse_observation_does_not_erase_known_file_ownership()
     {
-        var scanId = Guid.NewGuid();
-        var siteUrl = "https://contoso.sharepoint.com/sites/a";
-        var webUrl = "/";
+        Guid scanId = Guid.NewGuid();
+        string siteUrl = "https://contoso.sharepoint.com/sites/a";
+        string webUrl = "/";
         DiscoveryScopeRegistration richScope = new DiscoveryScopeRegistration(
             "rich",
             null,
@@ -77,11 +77,11 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
             DiscoverySourceKind.ListViewBackingFiles,
             "/view",
             "test");
-        var siteId = Guid.NewGuid();
-        var webId = Guid.NewGuid();
-        var listId = Guid.NewGuid();
-        var folderId = Guid.NewGuid();
-        var fileId = Guid.NewGuid();
+        Guid siteId = Guid.NewGuid();
+        Guid webId = Guid.NewGuid();
+        Guid listId = Guid.NewGuid();
+        Guid folderId = Guid.NewGuid();
+        Guid fileId = Guid.NewGuid();
         RawDiscoveryRecord rich = new RawDiscoveryRecord(
             fileId.ToString("D"),
             fileId.ToString("D"),
@@ -98,7 +98,7 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
             ContentTypeId: "0x0101",
             PageType: "WikiPage",
             LibraryHidden: false);
-        var sparse = rich with
+        RawDiscoveryRecord sparse = rich with
         {
             ListId = null,
             FolderUniqueId = null,
@@ -107,12 +107,13 @@ public sealed class SharePointLiveAspxDiscoveryRegressionTests : IClassFixture<S
             PageType = null,
             LibraryHidden = null,
         };
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(new[] { AssessmentWebDiscovery.Page(scanId, siteUrl, webUrl, richScope, rich) });
         await writer.WriteAsync(new[] { AssessmentWebDiscovery.Page(scanId, siteUrl, webUrl, sparseScope, sparse) });
 
-        using var read = database.CreateContext();
-        var row = read.ClassicPageDiscoveries.Single(value => value.ScanId == scanId && value.RowType == "Page");
+        using Core.Storage.ScanContext read = database.CreateContext();
+        Core.Storage.ClassicPageDiscovery row =
+            read.ClassicPageDiscoveries.Single(value => value.ScanId == scanId && value.RowType == "Page");
         row.ListId.Should().Be(listId);
         row.FolderUniqueId.Should().Be(folderId);
         row.ListItemId.Should().Be(7);

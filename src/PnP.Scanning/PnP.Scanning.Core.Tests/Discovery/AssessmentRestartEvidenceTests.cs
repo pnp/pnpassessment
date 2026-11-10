@@ -22,8 +22,8 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Scan_wide_acquisition_reads_only_discovered_web_roots_across_keyset_batches()
     {
-        var scan = Guid.NewGuid();
-        var siteId = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
+        Guid siteId = Guid.NewGuid();
         ClassicPageDiscovery[] roots = Enumerable.Range(0, 130)
             .Select(index => new ClassicPageDiscovery
             {
@@ -68,8 +68,8 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
                             DiscoveryStatus = "Complete",
                         }));
 
-        var discovered = new List<ClassicPageDiscovery>();
-        await foreach (var root in Writer().ReadDiscoveredWebScopesAsync(scan)) discovered.Add(root);
+        List<ClassicPageDiscovery> discovered = new List<ClassicPageDiscovery>();
+        await foreach (ClassicPageDiscovery root in Writer().ReadDiscoveredWebScopesAsync(scan)) discovered.Add(root);
 
         discovered.Should().HaveCount(130);
         discovered.Select(root => root.RecordKey).Should().BeInAscendingOrder();
@@ -105,10 +105,10 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Pending_restart_subset_does_not_replace_full_site_authority_counts_or_observation_time()
     {
-        var scan = Guid.NewGuid();
-        var all = Enumeration(8);
+        Guid scan = Guid.NewGuid();
+        WebEnumerationResult all = Enumeration(8);
         await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, all, writer: Writer());
-        var original = await Scope(scan);
+        ClassicPageDiscovery original = await Scope(scan);
         await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
             scan,
             Site,
@@ -119,7 +119,7 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
             Site,
             Enumeration(2, replay: true),
             writer: Writer());
-        var retained = await Scope(scan);
+        ClassicPageDiscovery retained = await Scope(scan);
         retained.Should().BeEquivalentTo(original);
         retained.ExpectedChildCount.Should().Be(8);
         retained.ObservedChildCount.Should().Be(8);
@@ -131,12 +131,12 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     [InlineData("Failed")]
     public async Task Restart_replay_does_not_turn_incomplete_web_authority_into_complete(string status)
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         Exception error = status == "Denied"
             ? new UnauthorizedAccessException("subweb authority denied")
             : new IOException("enumeration interrupted");
         await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(1), error, Writer());
-        var original = await Scope(scan);
+        ClassicPageDiscovery original = await Scope(scan);
         original.DiscoveryStatus.Should().Be(status);
         original.ExpectedChildCount.Should().BeNull();
         original.ErrorCodes.Should().NotBeNullOrEmpty();
@@ -153,13 +153,13 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Legacy_checkpoint_without_authority_does_not_invent_a_complete_enumeration()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(
             scan,
             Site,
             Enumeration(4, replay: true),
             writer: Writer());
-        using var db = database.CreateContext();
+        using ScanContext db = database.CreateContext();
         (await db.ClassicPageDiscoveries.CountAsync(row => row.ScanId == scan)).Should().Be(0);
     }
 
@@ -167,11 +167,11 @@ public sealed class AssessmentRestartEvidenceTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Fresh_enumeration_is_still_recorded_including_an_empty_result()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(3), writer: Writer());
         (await Scope(scan)).ExpectedChildCount.Should().Be(3);
         await LegacyScopeEvidence.RecordWebEnumerationScopeAsync(scan, Site, Enumeration(0), writer: Writer());
-        var empty = await Scope(scan);
+        ClassicPageDiscovery empty = await Scope(scan);
         empty.ExpectedChildCount.Should().Be(0);
         empty.ObservedChildCount.Should().Be(0);
         empty.DiscoveryStatus.Should().Be("Complete");

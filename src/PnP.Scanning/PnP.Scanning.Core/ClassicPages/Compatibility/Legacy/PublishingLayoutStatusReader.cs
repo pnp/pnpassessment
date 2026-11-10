@@ -31,30 +31,30 @@ internal sealed class PublishingLayoutStatusReader
         Action<Exception, ClassicPage> logFailure,
         CancellationToken cancellationToken = default)
     {
-        var pages = await db.ClassicPages.Where(page => page.ScanId == scanId &&
-                                                        page.SiteUrl == siteUrl &&
-                                                        page.PageType == ClassicPageRules.PublishingPage)
+        List<ClassicPage> pages = await db.ClassicPages.Where(page => page.ScanId == scanId &&
+                                                                      page.SiteUrl == siteUrl &&
+                                                                      page.PageType == ClassicPageRules.PublishingPage)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         if (pages.Count == 0) return;
 
-        var siteUri = new Uri(siteUrl);
-        var origin = siteUri.GetLeftPart(UriPartial.Authority);
+        Uri siteUri = new Uri(siteUrl);
+        string origin = siteUri.GetLeftPart(UriPartial.Authority);
         // Only the distinct layouts are read up front. Seeding this with every page URL as well
         // would size the prefetch - the IN-list parameter and the tracked result alike - by the
         // page count of the site collection instead of by the handful of layouts it shares.
-        var urls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var page in pages)
+        HashSet<string> urls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (ClassicPage page in pages)
         {
-            if (!TryResolveServerRelativeUrl(siteUri, page.LayoutUrl, out var url)) continue;
+            if (!TryResolveServerRelativeUrl(siteUri, page.LayoutUrl, out string url)) continue;
             urls.Add(url);
             urls.Add(origin + url);
         }
 
-        var requestedUrls = urls.ToArray();
+        string[] requestedUrls = urls.ToArray();
 
         // Post-scanning runs after all Web workers commit, including the root gallery.
-        var discovered = requestedUrls.Length == 0
+        List<ClassicPageDiscovery> discovered = requestedUrls.Length == 0
             ? new List<ClassicPageDiscovery>()
             : await db.ClassicPageDiscoveries.Where(row => row.ScanId == scanId &&
                                                            row.SiteUrl == siteUrl && row.RowType == "Page" &&
@@ -62,13 +62,13 @@ internal sealed class PublishingLayoutStatusReader
                                                                EF.Functions.Collate(row.Url, "NOCASE")))
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
-        var byUrl = discovered.Where(row => !string.IsNullOrWhiteSpace(row.Url))
+        ILookup<string, ClassicPageDiscovery> byUrl = discovered.Where(row => !string.IsNullOrWhiteSpace(row.Url))
             .ToLookup(row => row.Url, StringComparer.OrdinalIgnoreCase);
-        var reader = new PublishingLayoutStatusReader(
+        PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
             siteUri,
             async url =>
             {
-                var observations = byUrl[url]
+                ClassicPageDiscovery[] observations = byUrl[url]
                     .Concat(byUrl[origin + url])
                     .Where(row => !string.IsNullOrWhiteSpace(row.CustomizedPageStatus))
                     .OrderByDescending(row => row.ObservedAtUtc)
@@ -76,7 +76,7 @@ internal sealed class PublishingLayoutStatusReader
                     .ToArray();
                 if (observations.Length > 0)
                 {
-                    var latest = observations[0];
+                    ClassicPageDiscovery latest = observations[0];
                     if (observations.Any(row => row.CustomizedPageStatus != latest.CustomizedPageStatus))
                         AssessmentWebDiscovery.AddError(
                             latest,
@@ -90,8 +90,8 @@ internal sealed class PublishingLayoutStatusReader
                 return await readMissingStatus(url).ConfigureAwait(false);
             });
 
-        var failures = new List<LayoutFailure>();
-        foreach (var page in pages)
+        List<LayoutFailure> failures = new List<LayoutFailure>();
+        foreach (ClassicPage page in pages)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try

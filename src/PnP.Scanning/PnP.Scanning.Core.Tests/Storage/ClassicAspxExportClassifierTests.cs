@@ -29,7 +29,7 @@ public sealed class ClassicAspxExportClassifierTests
             HtmlFileType = fields.GetValueOrDefault("HTML_x0020_File_x0020_Type") as string,
             FileType = fields.GetValueOrDefault("File_x0020_Type") as string,
             BSN = fields.GetValueOrDefault("BSN") as string,
-            WikiFieldHasValue = fields.TryGetValue("WikiField", out var wiki) ? wiki != null : null
+            WikiFieldHasValue = fields.TryGetValue("WikiField", out object? wiki) ? wiki != null : null
         };
     }
 
@@ -51,7 +51,7 @@ public sealed class ClassicAspxExportClassifierTests
             ["ClientSideApplicationId"] = application,
             ["WikiField"] = wiki ? string.Empty : null
         };
-        var result = ClassicAspxExportClassifier.Classify(ItemFile(fields));
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(ItemFile(fields));
         result.PageType.Should().Be(ClassicPageRules.GetPageType(fields)).And.Be(expected);
         result.State.Should().Be("ItemMetadata");
     }
@@ -63,7 +63,7 @@ public sealed class ClassicAspxExportClassifierTests
         SPFile file = ItemFile(new Dictionary<string, object?> { ["ClientSideApplicationId"] = ModernApplication });
         file.ContentTypeId = PublishingContentType;
         ClassicPageRules.IsPublishingContentType(file.ContentTypeId).Should().BeTrue();
-        var result = ClassicAspxExportClassifier.Classify(file);
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("PublishingPage");
         result.IsModern.Should().BeFalse();
     }
@@ -74,7 +74,7 @@ public sealed class ClassicAspxExportClassifierTests
     {
         SPFile file = ItemFile(new Dictionary<string, object?> { ["BSN"] = "" });
         file.ContentTypeId = ModernContentType;
-        var result = ClassicAspxExportClassifier.Classify(file);
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("WikiPage");
         result.IsModern.Should().BeFalse();
     }
@@ -160,7 +160,7 @@ public sealed class ClassicAspxExportClassifierTests
         {
             ItemMetadataReadState = "Available", ItemMetadataFieldStatesJson = states, ContentTypeId = "0x010109"
         };
-        var result = ClassicAspxExportClassifier.Classify(file);
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("BasicPage");
         result.State.Should().Be("FileOnlyFallback");
     }

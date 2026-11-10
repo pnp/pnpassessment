@@ -259,7 +259,7 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
                 return order;
             }
 
-            using var document = parser.ParseDocument(html);
+            using IHtmlDocument document = parser.ParseDocument(html);
 
             // Embedded media nodes in document order — the same set the PnP.Framework wiki analyzer treats
             // as standalone image/video parts.
@@ -276,15 +276,15 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
 
             // Build a media part for each embedded node and replace it (or its wrapping anchor) with a
             // split marker so the surrounding wiki text can be recovered as separate text parts around it.
-            var mediaParts = new List<WebPartEntity>(mediaElements.Count);
-            foreach (var element in mediaElements)
+            List<WebPartEntity> mediaParts = new List<WebPartEntity>(mediaElements.Count);
+            foreach (IElement element in mediaElements)
             {
                 mediaParts.Add(CreateMediaPart(element));
 
-                var splitter = document.CreateElement("span");
+                IElement splitter = document.CreateElement("span");
                 splitter.ClassName = SplitMarkerClass;
 
-                var nodeToReplace = element;
+                IElement nodeToReplace = element;
                 if (element is IHtmlImageElement && element.ParentElement != null &&
                     element.ParentElement.TagName.Equals("A", StringComparison.InvariantCultureIgnoreCase))
                 {
@@ -309,7 +309,7 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
                 }
 
                 order++;
-                var media = mediaParts[i];
+                WebPartEntity media = mediaParts[i];
                 media.Row = row;
                 media.Column = col;
                 media.Order = order;
@@ -362,13 +362,13 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
         {
             if (element is IHtmlImageElement image)
             {
-                var properties = new Dictionary<string, string>();
+                Dictionary<string, string> properties = new Dictionary<string, string>();
                 if (image.Source != null)
                 {
                     properties["ImageUrl"] = image.Source.Replace("about://", "");
                 }
 
-                var alt = element.GetAttribute("alt");
+                string alt = element.GetAttribute("alt");
                 if (!string.IsNullOrEmpty(alt))
                 {
                     properties["AlternativeText"] = alt;
@@ -391,7 +391,7 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
                 };
             }
 
-            var iframe = (IHtmlInlineFrameElement)element;
+            IHtmlInlineFrameElement iframe = (IHtmlInlineFrameElement)element;
             Dictionary<string, string> videoProperties =
                 new Dictionary<string, string> { { "IFrameEmbed", element.OuterHtml }, };
             if (iframe.Source != null)
@@ -399,19 +399,19 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page
                 videoProperties["Source"] = iframe.Source;
             }
 
-            var allowFullScreen = element.GetAttribute("allowfullscreen");
+            string allowFullScreen = element.GetAttribute("allowfullscreen");
             if (allowFullScreen != null && bool.TryParse(allowFullScreen, out bool allowFullScreenValue))
             {
                 videoProperties["AllowFullScreen"] = allowFullScreenValue.ToString();
             }
 
-            var width = element.GetAttribute("width");
+            string width = element.GetAttribute("width");
             if (width != null)
             {
                 videoProperties["Width"] = width;
             }
 
-            var height = element.GetAttribute("height");
+            string height = element.GetAttribute("height");
             if (height != null)
             {
                 videoProperties["Height"] = height;

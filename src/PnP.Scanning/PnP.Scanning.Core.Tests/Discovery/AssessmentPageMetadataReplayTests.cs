@@ -46,8 +46,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     [Fact]
     public async Task Same_item_number_in_different_libraries_survives_projection_database_and_native_report()
     {
-        var scan = Guid.NewGuid();
-        var fixtures = new[]
+        Guid scan = Guid.NewGuid();
+        MetadataFixture[] fixtures = new[]
         {
             new MetadataFixture(
                 scan,
@@ -69,11 +69,11 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 "SitePages/modern.aspx",
                 new() { ["ClientSideApplicationId"] = Guid.Parse("B6917CB1-93A0-4B97-A84D-7CF49975D4EC"), }),
         };
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(fixtures.Select(fixture => fixture.Row));
-        var assessedPages = new List<ClassicPage>();
+        List<ClassicPage> assessedPages = new List<ClassicPage>();
 
-        foreach (var fixture in fixtures)
+        foreach (MetadataFixture fixture in fixtures)
         {
             fixture.Row.CustomizedPageStatus = fixture.Row.Url.EndsWith("/wiki.aspx", StringComparison.Ordinal)
                 ? "Customized"
@@ -100,7 +100,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             await writer.WriteAsync(new[] { fixture.Row });
         }
 
-        var denied = new ClassicPageDiscovery
+        ClassicPageDiscovery denied = new ClassicPageDiscovery
         {
             ScanId = scan,
             SiteUrl = Site,
@@ -117,7 +117,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
         };
         await writer.WriteAsync(new[] { denied });
 
-        using (var db = database.CreateContext())
+        using (ScanContext db = database.CreateContext())
         {
             // The original failure occurred here: each PageUrl was the string "1", so EF rejected
             // tracking the second page. All five fixtures intentionally share that list-item number.
@@ -125,8 +125,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             await db.SaveChangesAsync();
         }
 
-        using var read = database.CreateContext();
-        var stored = await read.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
+        using ScanContext read = database.CreateContext();
+        List<ClassicPage> stored = await read.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
         stored.Should().HaveCount(4);
         stored.Select(page => page.PageUrl).Should().OnlyHaveUniqueItems();
         stored.Should().OnlyContain(page => page.ListItemId == 1 && page.PageUrl.StartsWith(Web + "/"));
@@ -151,8 +151,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 scan,
                 reportDirectory,
                 new CsvConfiguration(CultureInfo.InvariantCulture));
-            var classic = ReadCsv<ClassicPage>(reportDirectory, "classicpages.csv");
-            var discovery = ReadCsv<ClassicPageDiscovery>(reportDirectory, "discovery.csv");
+            ClassicPage[] classic = ReadCsv<ClassicPage>(reportDirectory, "classicpages.csv");
+            ClassicPageDiscovery[] discovery = ReadCsv<ClassicPageDiscovery>(reportDirectory, "discovery.csv");
             classic.Should().HaveCount(4);
             classic.Single(page => page.PageType == "PublishingPage")
                 .PageName.Should()
@@ -196,7 +196,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 ["ContentTypeId"] = "0x010109006DC758714F143A4FB8A7253506F98C5F",
                 ["HTML_x0020_File_x0020_Type"] = "SharePoint.WebPartPage.Document",
             });
-        var wildcardItem = await fixture.List.Items.GetByIdAsync(1, value => value.All);
+        IListItem wildcardItem = await fixture.List.Items.GetByIdAsync(1, value => value.All);
         wildcardItem.Values.Should().ContainKey("ContentTypeId");
         wildcardItem.Values.Should().NotContainKey("HTML_x0020_File_x0020_Type");
         wildcardItem.Values.Should().NotContainKey("FileLeafRef");
@@ -263,7 +263,10 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     [Fact]
     public async Task Native_metadata_query_requests_editor_only_when_user_information_is_enabled()
     {
-        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/wiki.aspx", new() { ["WikiField"] = "<p>body</p>" });
+        MetadataFixture fixture = new MetadataFixture(
+            Guid.NewGuid(),
+            "Pages/wiki.aspx",
+            new() { ["WikiField"] = "<p>body</p>" });
         await ReadAndAnalyzeAsync(fixture, false);
         fixture.LastViewFields.Should().Contain("Editor");
     }
@@ -296,7 +299,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     [Fact]
     public async Task Publishing_type_can_fall_back_to_discovered_content_type()
     {
-        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/enterprise.aspx", new());
+        MetadataFixture fixture = new MetadataFixture(Guid.NewGuid(), "Pages/enterprise.aspx", new());
         fixture.Row.ContentTypeId = PublishingContentType;
         (FilePageEvidence loaded, FilePageAnalysis analysis) = await ReadAndAnalyzeAsync(fixture, true);
         analysis.Page.PageType.Should().Be("PublishingPage");
@@ -311,7 +314,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             Guid.NewGuid(),
             "Pages/one.aspx",
             new() { ["FileRef"] = Web + "/Other/two.aspx" });
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(new[] { fixture.Row });
         Func<Task<(FilePageEvidence Source, FilePageAnalysis Result)>> load = () => ReadAndAnalyzeAsync(fixture, true);
         await load.Should().ThrowAsync<InvalidDataException>().WithMessage("*FileRef differs*");
@@ -327,7 +330,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     [InlineData(2)]
     public async Task Absent_or_different_item_cannot_be_assessed_as_the_requested_file(int? returnedId)
     {
-        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new()) { ReturnedId = returnedId };
+        MetadataFixture fixture =
+            new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new()) { ReturnedId = returnedId };
         (FilePageEvidence source, FilePageAnalysis analysis) = await ReadAndAnalyzeAsync(fixture, true);
         source.MetadataState.Status.Should().Be("NotReturned");
         source.ReturnedItems.Length.Should().Be(returnedId.HasValue ? 1 : 0);
@@ -339,7 +343,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
     [Fact]
     public async Task Wrong_list_is_rejected_before_requesting_an_item()
     {
-        var fixture = new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new());
+        MetadataFixture fixture = new MetadataFixture(Guid.NewGuid(), "Pages/one.aspx", new());
         fixture.Row.ListId = Guid.NewGuid();
         Func<Task<(FilePageEvidence Source, FilePageAnalysis Result)>> load = () => ReadAndAnalyzeAsync(fixture, true);
         await load.Should().ThrowAsync<InvalidDataException>().WithMessage("*list and list-item identity*");
@@ -408,8 +412,8 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             string siteUrl = Site,
             string webUrl = Web)
         {
-            var listId = Guid.NewGuid();
-            var fileId = Guid.NewGuid();
+            Guid listId = Guid.NewGuid();
+            Guid fileId = Guid.NewGuid();
             Row = new ClassicPageDiscovery
             {
                 ScanId = scan,
@@ -430,14 +434,14 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 ObservedAtUtc = DateTime.UtcNow,
             };
             fields["FileLeafRef"] = Row.FileName;
-            var values = SdkValues(fields);
-            var item = StrictProxy.Create<IListItem>((method, _) => method.Name switch
+            TransientDictionary values = SdkValues(fields);
+            IListItem item = StrictProxy.Create<IListItem>((method, _) => method.Name switch
             {
                 "get_Id" => ReturnedId.GetValueOrDefault(),
                 "get_Values" => values,
                 _ => throw new InvalidOperationException("Unexpected item call: " + method.Name),
             });
-            var minimalItem = StrictProxy.Create<IListItem>((method, _) => method.Name switch
+            IListItem minimalItem = StrictProxy.Create<IListItem>((method, _) => method.Name switch
             {
                 "get_Id" => 1,
                 "get_Values" => SdkValues(new() { ["Id"] = 1 }),
@@ -455,14 +459,14 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
             TransientDictionary wildcardValues = SdkValues(
                 fields.Where(field => !computed.Contains(field.Key))
                     .ToDictionary(field => field.Key, field => field.Value));
-            var wildcardItem = StrictProxy.Create<IListItem>((method, _) => method.Name switch
+            IListItem wildcardItem = StrictProxy.Create<IListItem>((method, _) => method.Name switch
             {
                 "get_Id" => ReturnedId.GetValueOrDefault(),
                 "get_Values" => wildcardValues,
                 _ => throw new InvalidOperationException("Unexpected wildcard-projection call: " + method.Name),
             });
-            var requestedItems = new List<IListItem>();
-            var items = StrictProxy.Create<IListItemCollection>((method, args) =>
+            List<IListItem> requestedItems = new List<IListItem>();
+            IListItemCollection items = StrictProxy.Create<IListItemCollection>((method, args) =>
             {
                 if (method.Name == "Clear")
                 {
@@ -475,7 +479,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                     throw new InvalidOperationException("Unexpected collection call: " + method.Name);
                 ItemRequests++;
                 ((int)args[0]).Should().Be(1);
-                var selectors = (Expression<Func<IListItem, object>>[])args[1];
+                Expression<Func<IListItem, object>>[] selectors = (Expression<Func<IListItem, object>>[])args[1];
                 bool hasAll = selectors.Any(selector =>
                     selector.Body is MemberExpression { Member.Name: nameof(IListItem.All) });
                 if (hasAll) AllProjectionRequests++;
@@ -486,7 +490,7 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                             ? wildcardItem
                             : minimalItem);
             });
-            var folder = StrictProxy.Create<IFolder>((method, _) => method.Name == "get_ServerRelativeUrl"
+            IFolder folder = StrictProxy.Create<IFolder>((method, _) => method.Name == "get_ServerRelativeUrl"
                 ? webUrl + "/" + path.Split('/')[0]
                 : throw new InvalidOperationException("Unexpected folder call: " + method.Name));
             List = StrictProxy.Create<IList>((method, args) =>
@@ -495,11 +499,11 @@ public sealed class AssessmentPageMetadataReplayTests : IClassFixture<ScanContex
                 {
                     ItemRequests++;
                     StreamRequests++;
-                    var options = (RenderListDataOptions)args[0];
+                    RenderListDataOptions options = (RenderListDataOptions)args[0];
                     options.RenderOptions.Should().Be(RenderListDataOptionsFlags.ListData);
-                    var view = XDocument.Parse(options.ViewXml);
+                    XDocument view = XDocument.Parse(options.ViewXml);
                     view.Root.Attribute("Scope").Value.Should().Be("RecursiveAll");
-                    var equal = view.Root.Element("Query").Element("Where").Element("Eq");
+                    XElement equal = view.Root.Element("Query").Element("Where").Element("Eq");
                     equal.Element("FieldRef").Attribute("Name").Value.Should().Be("ID");
                     equal.Element("Value").Value.Should().Be("1");
                     view.Root.Element("RowLimit").Value.Should().Be("2");

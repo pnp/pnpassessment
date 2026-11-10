@@ -39,11 +39,11 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Exhausted_initialization_preserves_all_116_files_and_exports_explicit_failed_dispositions()
     {
-        var scan = Guid.NewGuid();
-        var pages = Enumerable.Range(0, 116).Select(i => Page(scan, i)).ToArray();
+        Guid scan = Guid.NewGuid();
+        ClassicPageDiscovery[] pages = Enumerable.Range(0, 116).Select(i => Page(scan, i)).ToArray();
         await Writer().WriteAsync(pages);
-        var attempts = 0;
-        var failure = ResponseEnded();
+        int attempts = 0;
+        HttpRequestException failure = ResponseEnded();
         Func<Task<object>> operation = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () =>
             {
@@ -58,7 +58,7 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
             delay: NoDelay);
         (await operation.Should().ThrowAsync<HttpRequestException>()).Which.Should().BeSameAs(failure);
         attempts.Should().Be(3);
-        var stored = await Writer().ReadPagesAsync(scan, Site, Web);
+        List<ClassicPageDiscovery> stored = await Writer().ReadPagesAsync(scan, Site, Web);
         stored.Should()
             .HaveCount(116)
             .And.OnlyContain(row =>
@@ -70,11 +70,13 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
             .BeEquivalentTo(pages.Select(row => (row.FileUniqueId, row.Url)));
         stored.Should().OnlyContain(row => row.ObservedAtUtc == pages[0].ObservedAtUtc);
 
-        var folder = Path.Combine(Path.GetTempPath(), "native-initialization-failure-" + Guid.NewGuid().ToString("N"));
+        string folder = Path.Combine(
+            Path.GetTempPath(),
+            "native-initialization-failure-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         try
         {
-            using var db = database.CreateContext();
+            using ScanContext db = database.CreateContext();
             await ReportManager.ExportClassicReportDataAsync(
                 db,
                 scan,
@@ -83,7 +85,8 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
             using CsvReader csv = new CsvReader(
                 new StreamReader(Path.Combine(folder, "discovery.csv")),
                 CultureInfo.InvariantCulture);
-            var exported = csv.GetRecords<ClassicPageDiscovery>().Where(row => row.RowType == "Page").ToArray();
+            ClassicPageDiscovery[] exported =
+                csv.GetRecords<ClassicPageDiscovery>().Where(row => row.RowType == "Page").ToArray();
             exported.Should()
                 .HaveCount(116)
                 .And.OnlyContain(row => row.AssessmentStatus == "Failed" && row.ErrorDetail.Contains("ResponseEnded"));
@@ -99,12 +102,12 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Response_body_interruption_retries_at_most_three_attempts_without_stamping_failures_on_success()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await Writer().WriteAsync(new[] { Page(scan, 0) });
-        var attempts = 0;
-        var delays = new List<TimeSpan>();
-        var retried = new List<int>();
-        var expected = new object();
+        int attempts = 0;
+        List<TimeSpan> delays = new List<TimeSpan>();
+        List<int> retried = new List<int>();
+        object expected = new object();
         object result = await ClassicAssessmentInitialization.ExecuteAsync(
             () => ++attempts < 3 ? Task.FromException<object>(ResponseEnded()) : Task.FromResult(expected),
             Writer(),
@@ -122,7 +125,7 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
         attempts.Should().Be(3);
         retried.Should().Equal(1, 2);
         delays.Should().Equal(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
-        var row = (await Writer().ReadPagesAsync(scan, Site, Web)).Single();
+        ClassicPageDiscovery row = (await Writer().ReadPagesAsync(scan, Site, Web)).Single();
         row.AssessmentStatus.Should()
             .BeNull("the page loop, not context initialization, determines success/applicability");
         row.ErrorCodes.Should().BeNullOrEmpty();
@@ -134,9 +137,9 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [InlineData(HttpStatusCode.Forbidden)]
     public async Task Permission_errors_are_finalized_but_not_retried(HttpStatusCode status)
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await Writer().WriteAsync(new[] { Page(scan, 0) });
-        var attempts = 0;
+        int attempts = 0;
         Func<Task<object>> operation = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () =>
             {
@@ -158,11 +161,11 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Genuine_cancellation_before_initialization_preserves_resumable_rows()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await Writer().WriteAsync(new[] { Page(scan, 0) });
-        using var cancel = new CancellationTokenSource();
+        using CancellationTokenSource cancel = new CancellationTokenSource();
         cancel.Cancel();
-        var attempts = 0;
+        int attempts = 0;
         Func<Task<object>> operation = () => ClassicAssessmentInitialization.ExecuteAsync(
             () =>
             {
@@ -184,10 +187,10 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Cancellation_during_backoff_stops_retry_without_marking_pages_failed()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await Writer().WriteAsync(new[] { Page(scan, 0) });
-        using var cancel = new CancellationTokenSource();
-        var attempts = 0;
+        using CancellationTokenSource cancel = new CancellationTokenSource();
+        int attempts = 0;
         Func<Task<object>> operation = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () =>
             {
@@ -214,9 +217,9 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Non_transient_initialization_failure_is_not_retried()
     {
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         await Writer().WriteAsync(new[] { Page(scan, 0) });
-        var attempts = 0;
+        int attempts = 0;
         Func<Task<object>> operation = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () =>
             {
@@ -238,13 +241,14 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Failure_finalization_is_idempotent_and_scoped_and_preserves_terminal_rows_and_scope_evidence()
     {
-        var scan = Guid.NewGuid();
-        var unfinished = Page(scan, 0);
+        Guid scan = Guid.NewGuid();
+        ClassicPageDiscovery unfinished = Page(scan, 0);
         unfinished.ErrorStage = "DiscoveryMetadata";
         unfinished.ErrorCodes = "earlier_warning";
         ClassicPageDiscovery emptyStatus = Page(scan, 1);
         emptyStatus.AssessmentStatus = "";
-        var terminal = new[] { "Complete", "Failed", "NotApplicable", "NotSelected" }.Select((status, i) =>
+        ClassicPageDiscovery[] terminal = new[] { "Complete", "Failed", "NotApplicable", "NotSelected" }
+            .Select((status, i) =>
             {
                 ClassicPageDiscovery row = Page(scan, i + 2);
                 row.AssessmentStatus = status;
@@ -256,7 +260,7 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
         anotherWeb.WebUrl = "/other";
         ClassicPageDiscovery anotherSite = Page(scan, 8);
         anotherSite.SiteUrl = Site + "-other";
-        var anotherScan = Page(Guid.NewGuid(), 9);
+        ClassicPageDiscovery anotherScan = Page(Guid.NewGuid(), 9);
         ClassicPageDiscovery scope = new ClassicPageDiscovery
         {
             ScanId = scan,
@@ -272,8 +276,8 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
         (await Writer().FailUnassessedPagesAsync(scan, Site, Web, ResponseEnded(), "WebScan")).Should().Be(2);
         (await Writer().FailUnassessedPagesAsync(scan, Site, Web, new IOException("later"), "LaterStage")).Should()
             .Be(0);
-        using var db = database.CreateContext();
-        var all = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
+        using ScanContext db = database.CreateContext();
+        List<ClassicPageDiscovery> all = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
         all.Single(row => row.RecordKey == unfinished.RecordKey)
             .ErrorCodes.Should()
             .Contain("earlier_warning")
@@ -291,7 +295,8 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     [Fact]
     public async Task Failure_to_persist_finalization_is_not_reported_as_success()
     {
-        var writer = new AssessmentDiscoveryWriter(() => throw new IOException("database unavailable"));
+        AssessmentDiscoveryWriter writer =
+            new AssessmentDiscoveryWriter(() => throw new IOException("database unavailable"));
         Func<Task<object>> operation = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () => throw new InvalidOperationException("bad response"),
             writer,

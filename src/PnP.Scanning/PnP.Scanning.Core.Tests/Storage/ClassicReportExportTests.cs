@@ -111,9 +111,9 @@ namespace PnP.Scanning.Core.Tests.Storage
         [Fact]
         public async Task Csv_WebPartUnique_HeaderAndRows()
         {
-            var scanId = Guid.NewGuid();
+            Guid scanId = Guid.NewGuid();
 
-            var uniques = new List<ClassicWebPartUnique>
+            List<ClassicWebPartUnique> uniques = new List<ClassicWebPartUnique>
             {
                 new()
                 {
@@ -131,18 +131,18 @@ namespace PnP.Scanning.Core.Tests.Storage
                 },
             };
 
-            using (var context = fixture.CreateContext())
+            using (ScanContext context = fixture.CreateContext())
             {
                 await context.ClassicWebPartUniques.AddRangeAsync(uniques);
                 await context.SaveChangesAsync();
             }
 
-            var exportDir = NewTempDir();
+            string exportDir = NewTempDir();
             try
             {
                 await ExportAsync(scanId, exportDir);
 
-                var file = Path.Join(exportDir, "classicwebpartunique.csv");
+                string file = Path.Join(exportDir, "classicwebpartunique.csv");
                 File.Exists(file).Should().BeTrue();
 
                 ReadHeader(file)
@@ -165,7 +165,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                 contentEditor.InMappingFile.Should().BeTrue();
                 contentEditor.PageCount.Should().Be(3);
 
-                var custom = rows.Single(u => u.WebPartType == "Contoso.Custom.WebPart");
+                ClassicWebPartUnique custom = rows.Single(u => u.WebPartType == "Contoso.Custom.WebPart");
                 custom.InMappingFile.Should().BeFalse();
                 custom.PageCount.Should().Be(1);
             }
@@ -404,12 +404,12 @@ namespace PnP.Scanning.Core.Tests.Storage
         [Fact]
         public async Task Csv_ClassicPageAuditUsage_HeaderAndRows()
         {
-            var scanId = Guid.NewGuid();
-            var siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
-            var windowStart = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            Guid scanId = Guid.NewGuid();
+            string siteUrl = $"https://contoso.sharepoint.com/sites/{scanId:N}";
+            DateTime windowStart = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
             DateTime windowEnd = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc);
 
-            var rows = new List<ClassicPageAuditUsage>
+            List<ClassicPageAuditUsage> rows = new List<ClassicPageAuditUsage>
             {
                 new()
                 {
@@ -443,21 +443,21 @@ namespace PnP.Scanning.Core.Tests.Storage
                 },
             };
 
-            using (var context = fixture.CreateContext())
+            using (ScanContext context = fixture.CreateContext())
             {
                 await context.ClassicPageAuditUsages.AddRangeAsync(rows);
                 await context.SaveChangesAsync();
             }
 
-            var exportDir = NewTempDir();
+            string exportDir = NewTempDir();
             try
             {
                 await ExportAsync(scanId, exportDir);
 
-                var file = Path.Join(exportDir, "classicpageauditusage.csv");
+                string file = Path.Join(exportDir, "classicpageauditusage.csv");
                 File.Exists(file).Should().BeTrue();
 
-                var header = ReadHeader(file);
+                string[] header = ReadHeader(file);
                 header.Should()
                     .Contain(
                         new[]
@@ -473,14 +473,14 @@ namespace PnP.Scanning.Core.Tests.Storage
                         });
                 header.Should().NotContain(nameof(ClassicPageAuditUsage.WebUrl));
 
-                var exported = ReadRecordsIgnoreMissingFields<ClassicPageAuditUsage>(file)
+                List<ClassicPageAuditUsage> exported = ReadRecordsIgnoreMissingFields<ClassicPageAuditUsage>(file)
                     .Where(r => r.ScanId == scanId)
                     .OrderBy(r => r.PageUrl)
                     .ToList();
 
                 exported.Should().HaveCount(2);
 
-                var home = exported.Single(r => r.PageUrl.EndsWith("Home.aspx"));
+                ClassicPageAuditUsage home = exported.Single(r => r.PageUrl.EndsWith("Home.aspx"));
                 home.AuditViewsCount.Should().Be(7);
                 home.AuditCreatesCount.Should().Be(1);
                 home.AuditEditsCount.Should().Be(2);
@@ -490,7 +490,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                 home.QueryStatus.Should().Be("succeeded");
                 home.SkipReason.Should().BeNullOrEmpty();
 
-                var skipped = exported.Single(r => r.PageUrl.EndsWith("Page1.aspx"));
+                ClassicPageAuditUsage skipped = exported.Single(r => r.PageUrl.EndsWith("Page1.aspx"));
                 skipped.QueryStatus.Should().Be("skipped");
                 skipped.SkipReason.Should().Be("AuditLogDisabled");
             }

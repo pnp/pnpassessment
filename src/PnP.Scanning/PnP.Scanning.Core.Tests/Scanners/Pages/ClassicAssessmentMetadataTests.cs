@@ -94,17 +94,18 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Real_sdk_shared_projection_preserves_content_type_form_declarations_without_item_requests()
     {
-        using var sdk = new OfflineSdk();
-        var context = await sdk.CreateAsync();
+        using OfflineSdk sdk = new OfflineSdk();
+        PnPContext context = await sdk.CreateAsync();
         sdk.Transport.ListResponse = "displayForm";
-        var snapshot = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        SharePointListMetadataSnapshot snapshot =
+            await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
         snapshot.Should().NotBeNull();
         using PnPContextSharePointAspxRestClientFactory factory = new PnPContextSharePointAspxRestClientFactory(
             sdk.Factory,
             sdk.Authentication,
             sharedContext: context,
             jsonTransportFactory: ctx => ctx.RestClient.Client);
-        using var provider = new SharePointLiveAspxDiscoveryProvider(
+        using SharePointLiveAspxDiscoveryProvider provider = new SharePointLiveAspxDiscoveryProvider(
             new SharePointLiveAspxDiscoveryOptions("test", "sdk-shared-web", "shared-sdk-v1", new string('a', 64)),
             factory,
             new AspxWebAcquisitionContext(
@@ -328,10 +329,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Exhausted_response_body_retries_run_fallback_only_after_last_attempt()
     {
-        var scan = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
-        var order = new List<string>();
-        var failure = new HttpRequestException(HttpRequestError.ResponseEnded, "response ended");
+        Guid scan = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        List<string> order = new List<string>();
+        HttpRequestException failure = new HttpRequestException(HttpRequestError.ResponseEnded, "response ended");
         Func<Task<object>> run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () =>
             {
@@ -365,13 +366,13 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
     [InlineData(true)]
     public async Task Genuine_cancellation_never_runs_fallback_or_marks_existing_pages_failed(bool cancelDuringLoad)
     {
-        var scan = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        Guid scan = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(new[] { Page(scan) });
-        using var cancel = new CancellationTokenSource();
+        using CancellationTokenSource cancel = new CancellationTokenSource();
         if (!cancelDuringLoad) cancel.Cancel();
-        var attempts = 0;
-        var fallbacks = 0;
+        int attempts = 0;
+        int fallbacks = 0;
         Func<Task<object>> run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () =>
             {

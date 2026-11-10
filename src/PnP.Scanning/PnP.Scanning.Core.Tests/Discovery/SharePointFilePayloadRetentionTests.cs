@@ -27,12 +27,14 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     {
         const int folderCount = 20;
         const int rowsPerFolder = 500;
-        var payloads = new FilePayloadProbe();
-        using var factory = new FolderFactory();
-        var paths = Enumerable.Range(0, folderCount).Select(index => RootPath + "/F" + index.ToString("D2")).ToArray();
+        FilePayloadProbe payloads = new FilePayloadProbe();
+        using FolderFactory factory = new FolderFactory();
+        string[] paths = Enumerable.Range(0, folderCount)
+            .Select(index => RootPath + "/F" + index.ToString("D2"))
+            .ToArray();
         factory.Client.FolderResponse = uri =>
         {
-            var path = FolderPath(uri);
+            string path = FolderPath(uri);
             if (uri.AbsolutePath.EndsWith("/Folders", StringComparison.Ordinal))
             {
                 JsonElement[] children = path == "/sites/a"
@@ -55,14 +57,14 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 ? payloads.Page(uri, folderIndex * rowsPerFolder + 1, rowsPerFolder, mixedExtensions)
                 : FixturePage(uri, Array.Empty<JsonElement>());
         };
-        using var provider = Provider(factory);
-        var pending = new Queue<DiscoveryScopeRegistration>();
-        var observed = new HashSet<string>();
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        Queue<DiscoveryScopeRegistration> pending = new Queue<DiscoveryScopeRegistration>();
+        HashSet<string> observed = new HashSet<string>();
         int aspx = 0;
         long peakRetainedBytes = 0;
         DiscoveryScopeRegistration revisit = null;
         pending.Enqueue(provider.RootScope);
-        while (pending.TryDequeue(out var scope))
+        while (pending.TryDequeue(out DiscoveryScopeRegistration scope))
         {
             if (scope.Locator == paths[0]) revisit = scope;
             if (scope.SourceKind != null)
@@ -83,7 +85,8 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                 peakRetainedBytes = Math.Max(peakRetainedBytes, payloads.CollectAndCountLiveBytes());
             }
 
-            foreach (var child in (await provider.EnumerateChildrenAsync(scope)).ObservedChildren)
+            foreach (DiscoveryScopeRegistration child in
+                     (await provider.EnumerateChildrenAsync(scope)).ObservedChildren)
             {
                 pending.Enqueue(child);
             }
@@ -93,7 +96,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
         aspx.Should().Be(mixedExtensions ? 1000 : 0);
         payloads.Rows.Should().Be(folderCount * rowsPerFolder);
         payloads.TotalBytes.Should().BeGreaterThan(40_000_000);
-        var beforeRevisit = factory.Client.Requests.Count;
+        int beforeRevisit = factory.Client.Requests.Count;
         await DrainFilesAsync(
             provider,
             revisit,
@@ -109,16 +112,16 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             mixedExtensions);
         retainedBytes.Should().Be(0, "completed collections must not accumulate JSON across the Web");
         peakRetainedBytes.Should().Be(0, "consumed payloads must be released between folders, not only after the Web");
-        var cached = provider.ReferenceCollector.ReadSurfaceEvidence()
+        AspxSurfaceDenominatorRow[] cached = provider.ReferenceCollector.ReadSurfaceEvidence()
             .Where(surface => surface.ActualMethod == "CACHE" &&
                               surface.SurfaceId.StartsWith("files:", StringComparison.Ordinal))
             .ToArray();
         cached.Should().NotBeEmpty();
-        foreach (var surface in cached)
+        foreach (AspxSurfaceDenominatorRow surface in cached)
         {
             string original = surface.EvidenceRefs.Single(reference =>
                 reference.StartsWith("reused-surface=", StringComparison.Ordinal))[15..];
-            var receipts = provider.ReferenceCollector.ReadPaginationEvidence()
+            AspxPaginationPageReceipt[] receipts = provider.ReferenceCollector.ReadPaginationEvidence()
                 .Where(receipt => receipt.CollectionScopeKey == original)
                 .OrderBy(receipt => receipt.PageOrdinal)
                 .ToArray();
@@ -137,16 +140,16 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [InlineData(true)]
     public async Task Size_backoff_releases_rejected_JSON_while_preserving_attempt_counts_and_digests(bool recover)
     {
-        var payloads = new FilePayloadProbe();
-        using var factory = new FolderFactory();
+        FilePayloadProbe payloads = new FilePayloadProbe();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
             if (QueryNumber(uri, "$skip", 0) > 0) return FixturePage(uri, Array.Empty<JsonElement>());
             int top = QueryNumber(uri, "$top", 0);
             return payloads.Page(uri, 1, top == 200 && recover ? 7 : top + 1, true);
         };
-        using var provider = Provider(factory);
-        var root = await ListRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await ListRootAsync(provider);
         int observed = 0;
         await DrainFilesAsync(
             provider,
@@ -294,14 +297,14 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     [InlineData(true)]
     public async Task Early_disposal_or_cancellation_releases_payloads_without_caching_complete_coverage(bool cancel)
     {
-        var payloads = new FilePayloadProbe();
-        using var cancellation = new CancellationTokenSource();
-        using var factory = new FolderFactory();
+        FilePayloadProbe payloads = new FilePayloadProbe();
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri => QueryNumber(uri, "$skip", 0) == 0
             ? payloads.Page(uri, 1, 200, true)
             : FixturePage(uri, Array.Empty<JsonElement>());
-        using var provider = Provider(factory);
-        var root = await ListRootAsync(provider);
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        DiscoveryScopeRegistration root = await ListRootAsync(provider);
         await ReadThenStopAsync();
         payloads.CollectAndCountLiveBytes().Should().Be(0);
         AspxSurfaceDenominatorRow incomplete = provider.ReferenceCollector.ReadSurfaceEvidence()
@@ -331,7 +334,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
             if (cancel)
             {
                 cancellation.Cancel();
-                var next = async () => await reader.MoveNextAsync();
+                Func<Task<bool>> next = async () => await reader.MoveNextAsync();
                 await next.Should().ThrowAsync<OperationCanceledException>();
             }
         }
@@ -344,15 +347,15 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
     public async Task Production_consumer_persists_all_file_types_before_next_page_and_propagates_storage_errors(
         bool failStorage)
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await using SqliteConnection connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        var storageError = new IOException("offline physical-file commit failed");
-        var options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection)
+        IOException storageError = new IOException("offline physical-file commit failed");
+        DbContextOptions<ScanContext> options = new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection)
             .AddInterceptors(new FileSaveFailure(failStorage ? storageError : null))
             .Options;
-        using var context = new ScanContext(options);
+        using ScanContext context = new ScanContext(options);
         await context.Database.MigrateAsync();
-        using var factory = new FolderFactory();
+        using FolderFactory factory = new FolderFactory();
         factory.Client.FolderResponse = uri =>
         {
             if (!uri.AbsolutePath.EndsWith("/Files", StringComparison.Ordinal) || FolderPath(uri) != RootPath)
@@ -365,8 +368,8 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
                     ? new[] { FileRow(1, RootPath + "/document.txt"), FileRow(2, RootPath + "/page.aspx") }
                     : Array.Empty<JsonElement>());
         };
-        using var provider = Provider(factory);
-        var scan = Guid.NewGuid();
+        using SharePointLiveAspxDiscoveryProvider provider = Provider(factory);
+        Guid scan = Guid.NewGuid();
         Func<Task> run = () =>
             new AssessmentWebDiscovery(
                 scan,
@@ -444,7 +447,7 @@ public sealed partial class SharePointLiveAspxDiscoveryProviderTests
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal SharePointRestPage Page(Uri endpoint, int first, int count, bool mixed)
         {
-            var folder = FolderPath(endpoint);
+            string folder = FolderPath(endpoint);
             JsonDocument document = JsonSerializer.SerializeToDocument(
                 new
                 {

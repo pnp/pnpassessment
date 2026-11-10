@@ -221,17 +221,17 @@ namespace PnP.Scanning.Core.Services
         /// <summary>Loads stored assessment facts and populates the existing mode-specific telemetry metrics.</summary>
         private async Task PopulateMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
-            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            using (ScanContext dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
-                var siteCollectionCount = await dbContext.SiteCollections.CountAsync();
-                var webCount = await dbContext.Webs.CountAsync();
-                var failedWebCount = await dbContext.Webs.CountAsync(p => p.Status == SiteWebStatus.Failed);
+                int siteCollectionCount = await dbContext.SiteCollections.CountAsync();
+                int webCount = await dbContext.Webs.CountAsync();
+                int failedWebCount = await dbContext.Webs.CountAsync(p => p.Status == SiteWebStatus.Failed);
                 int failedSiteCollectionCount =
                     await dbContext.SiteCollections.CountAsync(p => p.Status == SiteWebStatus.Failed);
 
                 int scanDurationInMinutes = 0;
                 // Use current value as otherwise end date is not yet set
-                var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
+                Storage.Scan scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
                 if (scan.EndDate != DateTime.MinValue && scan.EndDate != DateTime.MaxValue &&
                     scan.StartDate != DateTime.MinValue && scan.StartDate != DateTime.MaxValue)
                 {
@@ -281,7 +281,7 @@ namespace PnP.Scanning.Core.Services
             int unmappedWebPartPages = 0; // partially/not mappable (< 100)
             double mappingPercentageSum = 0;
 
-            foreach (var page in dbContext.ClassicPages)
+            foreach (ClassicPage page in dbContext.ClassicPages)
             {
                 pageCount++;
 
@@ -334,7 +334,7 @@ namespace PnP.Scanning.Core.Services
             }
 
             int webPartCount = 0;
-            foreach (var webPart in dbContext.ClassicPageWebParts)
+            foreach (ClassicPageWebPart webPart in dbContext.ClassicPageWebParts)
             {
                 webPartCount++;
             }
@@ -343,7 +343,7 @@ namespace PnP.Scanning.Core.Services
             int uniqueWebPartTypeCount = 0;
             int mappableWebPartTypeCount = 0;
             int unmappedWebPartTypeCount = 0;
-            foreach (var unique in dbContext.ClassicWebPartUniques)
+            foreach (ClassicWebPartUnique unique in dbContext.ClassicWebPartUniques)
             {
                 uniqueWebPartTypeCount++;
                 if (unique.InMappingFile)
@@ -383,7 +383,7 @@ namespace PnP.Scanning.Core.Services
         /// <summary>Populates the existing Add-ins and ACS telemetry counts from stored assessment facts.</summary>
         private async Task PopulateAddInsACSMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
-            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            using (ScanContext dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
                 int addInCount = 0;
                 int sharePointHostedAddins = 0;
@@ -415,7 +415,7 @@ namespace PnP.Scanning.Core.Services
                 int expiredTrue = 0;
                 int expiredFalse = 0;
 
-                foreach (var addIn in dbContext.ClassicAddIns)
+                foreach (ClassicAddIn addIn in dbContext.ClassicAddIns)
                 {
                     addInCount++;
 
@@ -570,7 +570,7 @@ namespace PnP.Scanning.Core.Services
                 int hasSitePermissions = 0;
                 Dictionary<string, int> permissionScopeCounts = new();
 
-                foreach (var acsPrincipal in dbContext.ClassicACSPrincipals)
+                foreach (ClassicACSPrincipal acsPrincipal in dbContext.ClassicACSPrincipals)
                 {
                     principalCount++;
 
@@ -692,7 +692,7 @@ namespace PnP.Scanning.Core.Services
 
                  */
 
-                foreach (var permissionScope in permissionScopeCounts)
+                foreach (KeyValuePair<string, int> permissionScope in permissionScopeCounts)
                 {
                     metric.Add(
                         $"AddInACSPrincipalPermission{permissionScope.Key.Replace("/", "").ToLowerInvariant()}",
@@ -803,7 +803,7 @@ namespace PnP.Scanning.Core.Services
         /// <summary>Populates the existing Workflow telemetry counts from stored assessment facts.</summary>
         private async Task PopulateWorkflowMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
-            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            using (ScanContext dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
                 int count = 0;
                 List<Guid> uniqueDefinitions = new();
@@ -915,7 +915,7 @@ namespace PnP.Scanning.Core.Services
         /// <summary>Populates the existing Syntex telemetry counts from stored assessment facts.</summary>
         private async Task PopulateSyntexMetricsAsync(Guid scanId, Dictionary<string, double> metric)
         {
-            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            using (ScanContext dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
                 int listCount = 0;
                 int listsWithContentTypeCount = 0;
@@ -958,7 +958,7 @@ namespace PnP.Scanning.Core.Services
                 }
 
                 // Syntex lists metrics
-                foreach (var syntexList in dbContext.SyntexLists)
+                foreach (SyntexList syntexList in dbContext.SyntexLists)
                 {
                     int valueToUse = syntexList.DocumentCount;
 
@@ -1099,7 +1099,7 @@ namespace PnP.Scanning.Core.Services
                 int contentTypesWith5000to49999Items = 0;
                 int contentTypesWith50000PlusItems = 0;
 
-                foreach (var syntexContentType in dbContext.SyntexContentTypes)
+                foreach (SyntexContentType syntexContentType in dbContext.SyntexContentTypes)
                 {
                     contentTypeCount++;
 
@@ -1159,7 +1159,7 @@ namespace PnP.Scanning.Core.Services
                 List<Guid> uniqueTargetLists = new();
                 long classifiedFileCount = 0;
 
-                foreach (var syntexModelUsage in dbContext.SyntexModelUsage)
+                foreach (SyntexModelUsage syntexModelUsage in dbContext.SyntexModelUsage)
                 {
                     if (!uniqueContentCenters.Contains($"{syntexModelUsage.SiteUrl}{syntexModelUsage.WebUrl}"))
                     {

@@ -77,8 +77,8 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
     [Fact]
     public async Task Later_sparse_observation_does_not_erase_a_known_setup_path()
     {
-        var scanId = Guid.NewGuid();
-        var fileId = Guid.NewGuid();
+        Guid scanId = Guid.NewGuid();
+        Guid fileId = Guid.NewGuid();
         DiscoveryScopeRegistration richScope = new DiscoveryScopeRegistration(
             "rich",
             null,
@@ -102,15 +102,15 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
             true,
             "test",
             SetupPath: @"pages\viewpage.aspx");
-        var sparse = rich with { SetupPath = null };
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        RawDiscoveryRecord sparse = rich with { SetupPath = null };
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
 
         await writer.WriteAsync(
             new[] { AssessmentWebDiscovery.Page(scanId, SiteUrl.AbsoluteUri, "/", richScope, rich) });
         await writer.WriteAsync(
             new[] { AssessmentWebDiscovery.Page(scanId, SiteUrl.AbsoluteUri, "/", sparseScope, sparse) });
 
-        using var read = database.CreateContext();
+        using Core.Storage.ScanContext read = database.CreateContext();
         read.ClassicPageDiscoveries.Single(row => row.ScanId == scanId && row.RowType == "Page")
             .SetupPath.Should()
             .Be(@"pages\viewpage.aspx");
@@ -214,8 +214,8 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default)
         {
             Requests.Add(requestUri);
-            var files = requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase);
-            var root = requestUri.AbsolutePath.EndsWith("/RootFolder/Files", StringComparison.OrdinalIgnoreCase);
+            bool files = requestUri.AbsolutePath.EndsWith("/Files", StringComparison.OrdinalIgnoreCase);
+            bool root = requestUri.AbsolutePath.EndsWith("/RootFolder/Files", StringComparison.OrdinalIgnoreCase);
             string rootJson = JsonSerializer.Serialize(
                 new[]
                 {
@@ -236,7 +236,7 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
                 : requestUri.AbsolutePath.EndsWith("/lists", StringComparison.OrdinalIgnoreCase)
                     ? ListsJson
                     : "[]";
-            var items = Items(json);
+            IReadOnlyList<JsonElement> items = Items(json);
             if (files)
             {
                 Dictionary<string, string> query = requestUri.Query.TrimStart('?')
@@ -245,8 +245,8 @@ public sealed class SetupPathAcquisitionTests : IClassFixture<ScanContextFixture
                     .ToDictionary(
                         parts => Uri.UnescapeDataString(parts[0]),
                         parts => parts.Length == 2 ? Uri.UnescapeDataString(parts[1]) : "");
-                int offset = query.TryGetValue("$skip", out var skip) ? int.Parse(skip) : 0;
-                int size = query.TryGetValue("$top", out var top) ? int.Parse(top) : int.MaxValue;
+                int offset = query.TryGetValue("$skip", out string skip) ? int.Parse(skip) : 0;
+                int size = query.TryGetValue("$top", out string top) ? int.Parse(top) : int.MaxValue;
                 items = items.Skip(offset).Take(size).ToArray();
             }
 

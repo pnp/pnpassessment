@@ -44,7 +44,7 @@ public sealed class ClassicAspxReportExportTests
     /// <summary>Deletes only this test's resolved absolute directory beneath the temporary root and with the expected ownership prefix.</summary>
     private static void DeleteOwnDirectory(string directory)
     {
-        var full = Path.GetFullPath(directory);
+        string? full = Path.GetFullPath(directory);
         string? temporary = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) +
                             Path.DirectorySeparatorChar;
         if (!full.StartsWith(temporary, StringComparison.OrdinalIgnoreCase) ||
@@ -317,11 +317,11 @@ public sealed class ClassicAspxReportExportTests
     [InlineData("測試,\"quote\"\nline", "測試,\"quote\"\nline")]
     public async Task NullableTextEncodingIsReversibleAndDeclared(string? raw, string wire)
     {
-        using var fixture = new ScanContextFixture();
+        using ScanContextFixture? fixture = new ScanContextFixture();
         ClassicAspxNullableStringConverter.Encode(raw).Should().Be(wire);
         ClassicAspxNullableStringConverter.Decode(wire).Should().Be(raw);
-        var scan = Guid.NewGuid();
-        var fact = FileFact(scan);
+        Guid scan = Guid.NewGuid();
+        SPFile? fact = FileFact(scan);
         fact.SiteUrl = raw;
         fact.WebUrl = raw;
         fact.FileName = raw;
@@ -331,16 +331,16 @@ public sealed class ClassicAspxReportExportTests
         fact.NoExecuteRaw = raw;
         fact.FileErrorCodes = raw;
         fact.FileErrorDetail = raw;
-        using var context = fixture.CreateContext();
+        using ScanContext? context = fixture.CreateContext();
         context.Add(fact);
         await context.SaveChangesAsync();
-        var directory = DirectoryForTest();
+        string? directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
             ReadRows(directory).Single().Should().BeEquivalentTo(ClassicAspxReportProjection.Project(fact));
-            using (var reader = new StreamReader(Path.Combine(directory, CsvName)))
-            using (var csv = new CsvReader(reader, Configuration()))
+            using (StreamReader? reader = new StreamReader(Path.Combine(directory, CsvName)))
+            using (CsvReader? csv = new CsvReader(reader, Configuration()))
             {
                 csv.Read();
                 csv.ReadHeader();
@@ -356,7 +356,8 @@ public sealed class ClassicAspxReportExportTests
             }
 
             (await context.SPFiles.AsNoTracking().SingleAsync()).SiteUrl.Should().Be(raw);
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
+            using JsonDocument? summary =
+                JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
             summary.RootElement.GetProperty("nullableStringEncoding").GetString().Should().Be("BackslashNullV1");
         }
         finally
@@ -537,9 +538,9 @@ public sealed class ClassicAspxReportExportTests
     [InlineData("HomePageOnly", true)]
     public async Task CurrentScopeExportsWithoutMutationOrCoveragePromotion(string scope, bool targeted)
     {
-        using var fixture = new ScanContextFixture();
-        var scan = Guid.NewGuid();
-        using var context = fixture.CreateContext();
+        using ScanContextFixture? fixture = new ScanContextFixture();
+        Guid scan = Guid.NewGuid();
+        using ScanContext? context = fixture.CreateContext();
         context.Add(FileFact(scan));
         Mark(context, scan, scope);
         await context.SaveChangesAsync();
@@ -548,12 +549,13 @@ public sealed class ClassicAspxReportExportTests
             .OrderBy(row => row.Name)
             .Select(row => new KeyValuePair<string, string>(row.Name, row.Value))
             .ToListAsync();
-        var directory = DirectoryForTest();
+        string? directory = DirectoryForTest();
         try
         {
             await ClassicAspxReportProjection.ExportCsvAsync(context, scan, directory, Configuration());
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
-            var root = summary.RootElement;
+            using JsonDocument? summary =
+                JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, SummaryName)));
+            JsonElement root = summary.RootElement;
             root.GetProperty("projectionContract").GetString().Should().Be("aspx-inventory/v1");
             root.GetProperty("scopeMode").GetString().Should().Be(scope);
             root.GetProperty("acquisitionState").GetString().Should().Be("DeclaredScopeObserved");
@@ -724,13 +726,13 @@ public sealed class ClassicAspxReportExportTests
     [Fact]
     public async Task MigrationPreservesLegacyExportWithoutBackfill()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await using SqliteConnection? connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         await using ScanContext? context =
             new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(connection).Options);
-        var migrations = context.Database.GetMigrations().ToArray();
+        string[]? migrations = context.Database.GetMigrations().ToArray();
         await context.GetService<IMigrator>().MigrateAsync(migrations[^2]);
-        var scan = Guid.NewGuid();
+        Guid scan = Guid.NewGuid();
         context.ClassicPages.Add(
             new ClassicPage
             {
@@ -740,12 +742,12 @@ public sealed class ClassicAspxReportExportTests
         context.ChangeTracker.Clear();
         await context.Database.MigrateAsync();
         (await context.SPFiles.CountAsync()).Should().Be(0);
-        var directory = DirectoryForTest();
+        string? directory = DirectoryForTest();
         try
         {
             await ReportManager.ExportClassicReportDataAsync(context, scan, directory, Configuration());
-            using var reader = new StreamReader(Path.Combine(directory, "classicpages.csv"));
-            using var csv = new CsvReader(reader, Configuration());
+            using StreamReader? reader = new StreamReader(Path.Combine(directory, "classicpages.csv"));
+            using CsvReader? csv = new CsvReader(reader, Configuration());
             csv.GetRecords<ClassicPage>().Single().PageUrl.Should().Be("/old.aspx");
             Header(directory).Should().Equal(ExpectedHeader);
             ReadRows(directory).Should().BeEmpty();

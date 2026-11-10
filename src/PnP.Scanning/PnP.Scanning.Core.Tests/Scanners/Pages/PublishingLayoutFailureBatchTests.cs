@@ -28,16 +28,16 @@ public class PublishingLayoutFailureBatchTests
     [InlineData(5000)]
     public async Task Shared_layout_failure_scans_identities_once_and_fetches_bounded_indexed_batches(int pageCount)
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        var reads = new DiscoveryReads();
-        using var db = CreateContext(connection, reads);
+        DiscoveryReads reads = new DiscoveryReads();
+        using ScanContext db = CreateContext(connection, reads);
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, pageCount);
+        Guid scan = await SeedAsync(db, pageCount);
         db.ChangeTracker.Clear();
         reads.Commands.Clear();
-        var requests = 0;
-        var failures = 0;
+        int requests = 0;
+        int failures = 0;
 
         await PublishingLayoutStatusReader.EnrichSiteAsync(
             db,
@@ -61,9 +61,9 @@ public class PublishingLayoutFailureBatchTests
             .Where(command => command.Sql.Contains("\"RecordKey\" IN", StringComparison.Ordinal))
             .ToArray();
         batches.Should().HaveCount((pageCount + MaximumKeysPerQuery - 1) / MaximumKeysPerQuery);
-        foreach (var batch in batches)
+        foreach (RecordedCommand batch in batches)
         {
-            var keys = batch.Parameters.Where(parameter => parameter.Value is string text && text.StartsWith('['))
+            string[] keys = batch.Parameters.Where(parameter => parameter.Value is string text && text.StartsWith('['))
                 .Select(parameter => JsonSerializer.Deserialize<string[]>((string)parameter.Value))
                 .Single();
             keys.Should().NotBeEmpty().And.HaveCountLessThanOrEqualTo(MaximumKeysPerQuery);
@@ -71,13 +71,13 @@ public class PublishingLayoutFailureBatchTests
         }
 
         // Check the actual EF-generated query against this product's migrated SQLite schema.
-        using (var explain = connection.CreateCommand())
+        using (SqliteCommand explain = connection.CreateCommand())
         {
             explain.CommandText = "EXPLAIN QUERY PLAN " + batches[0].Sql;
-            foreach (var parameter in batches[0].Parameters)
+            foreach ((string Name, object Value) parameter in batches[0].Parameters)
                 explain.Parameters.AddWithValue(parameter.Name, parameter.Value);
-            var plan = new List<string>();
-            using var result = await explain.ExecuteReaderAsync();
+            List<string> plan = new List<string>();
+            using SqliteDataReader result = await explain.ExecuteReaderAsync();
             while (await result.ReadAsync()) plan.Add(result.GetString(3));
             plan.Should()
                 .Contain(detail =>
@@ -88,14 +88,15 @@ public class PublishingLayoutFailureBatchTests
 
         output.WriteLine($"pages={pageCount} identityScans={identityReads.Length} keyBatches={batches.Length}");
         db.ChangeTracker.Clear();
-        var rows = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
+        List<ClassicPageDiscovery>
+            rows = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
         rows.Should()
             .HaveCount(pageCount)
             .And.OnlyContain(row => row.ErrorStage.Contains("PageLayoutMetadata") &&
                                     row.ErrorStage.Contains("ExistingStage") &&
                                     row.ErrorDetail.Contains("Shared layout denied") &&
                                     row.ErrorDetail.Contains("Existing detail") && row.AssessmentStatus == "Complete");
-        var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
+        List<ClassicPage> pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
         pages.Should()
             .HaveCount(pageCount)
             .And.OnlyContain(page =>
@@ -256,14 +257,14 @@ public class PublishingLayoutFailureBatchTests
     [InlineData(true)]
     public async Task Failure_lookup_database_errors_propagate_without_partially_saving_errors(bool duringKeyBatch)
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        var reads = new DiscoveryReads();
-        using var db = CreateContext(connection, reads);
+        DiscoveryReads reads = new DiscoveryReads();
+        using ScanContext db = CreateContext(connection, reads);
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, 300);
+        Guid scan = await SeedAsync(db, 300);
         db.ChangeTracker.Clear();
-        var keyBatches = 0;
+        int keyBatches = 0;
         reads.OnRead = command =>
         {
             if (duringKeyBatch
@@ -292,13 +293,13 @@ public class PublishingLayoutFailureBatchTests
     [InlineData(true)]
     public async Task Cancellation_during_failure_lookup_propagates_without_persisting_errors(bool duringKeyBatch)
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        using var cancellation = new CancellationTokenSource();
-        var reads = new DiscoveryReads();
-        using var db = CreateContext(connection, reads);
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        DiscoveryReads reads = new DiscoveryReads();
+        using ScanContext db = CreateContext(connection, reads);
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, 2);
+        Guid scan = await SeedAsync(db, 2);
         db.ChangeTracker.Clear();
         reads.OnRead = command =>
         {

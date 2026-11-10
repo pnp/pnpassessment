@@ -348,9 +348,9 @@ namespace PnP.Scanning.Core.Scanners
         /// <summary>Enriches stored legacy publishing layouts for existing report compatibility.</summary>
         private async Task EnrichPublishingLayoutsAsync()
         {
-            var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
+            CancellationToken token = ScanManager.GetCancellationTokenSource(ScanId).Token;
             List<string> sites;
-            using (var db = new ScanContext(ScanId))
+            using (ScanContext db = new ScanContext(ScanId))
             {
                 sites = await EFQuery.ToListAsync(
                         db.ClassicPages
@@ -361,13 +361,13 @@ namespace PnP.Scanning.Core.Scanners
                     .ConfigureAwait(false);
             }
 
-            var failedPages = 0;
-            var failedSites = await EnrichSitesAsync(
+            int failedPages = 0;
+            int failedSites = await EnrichSitesAsync(
                     sites,
                     async siteUrl =>
                     {
-                        using var db = new ScanContext(ScanId);
-                        var siteScanner = new ClassicScanner(
+                        using ScanContext db = new ScanContext(ScanId);
+                        ClassicScanner siteScanner = new ClassicScanner(
                             ScanManager,
                             StorageManager,
                             PnPContextFactory,
@@ -389,7 +389,8 @@ namespace PnP.Scanning.Core.Scanners
                                         // Create network contexts only when discovery cannot supply the status.
                                         context ??= await siteScanner.GetPnPContextAsync().ConfigureAwait(false);
                                         csomContext ??= siteScanner.GetClientContext(context);
-                                        var file = csomContext.Site.RootWeb.GetFileByServerRelativeUrl(url);
+                                        Microsoft.SharePoint.Client.File file =
+                                            csomContext.Site.RootWeb.GetFileByServerRelativeUrl(url);
                                         csomContext.Load(file, value => value.CustomizedPageStatus);
                                         await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
                                         return file.CustomizedPageStatus.ToString();
@@ -481,7 +482,7 @@ namespace PnP.Scanning.Core.Scanners
                     Logger.Warning(ex, "Publishing layout enrichment did not complete for assessment {ScanId}", ScanId);
                 }
 
-                var verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
+                DiscoveryVerdict verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
                     .ConfigureAwait(false);
                 Logger.Information(
                     "ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",
@@ -489,7 +490,7 @@ namespace PnP.Scanning.Core.Scanners
                     verdict);
             }
 
-            using (var dbContext = new ScanContext(ScanId))
+            using (ScanContext dbContext = new ScanContext(ScanId))
             {
                 // T9: before aggregating webs into site collections, roll each web's per-page
                 // transformation readiness up into its ClassicWebSummary and build the scan-wide unique
@@ -508,7 +509,7 @@ namespace PnP.Scanning.Core.Scanners
                 HashSet<string> remediationCodes = null;
                 ClassicSiteSummary classicSiteCollection = null;
 
-                foreach (var web in dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId)
+                foreach (ClassicWebSummary web in dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId)
                              .OrderBy(p => p.SiteUrl)
                              .ThenBy(p => p.WebUrl))
                 {
@@ -597,8 +598,8 @@ namespace PnP.Scanning.Core.Scanners
                 // Skipped when --skipusageinformation is passed, matching the semantics of the old flag.
                 if (!Options.SkipUsageInformation)
                 {
-                    var authManager = ScanManager.GetScanAuthenticationManager(ScanId);
-                    var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == ScanId);
+                    Authentication.AuthenticationManager authManager = ScanManager.GetScanAuthenticationManager(ScanId);
+                    Storage.Scan scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == ScanId);
                     string environment = scan?.CLIEnvironment ??
                                          PnP.Core.Services.Microsoft365Environment.Production.ToString();
                     int windowDays = Options.AuditLogWindowDays;
@@ -606,7 +607,7 @@ namespace PnP.Scanning.Core.Scanners
                     DateTime windowStart = windowEnd.AddDays(-windowDays);
                     // Use the scan's live cancellation token so pause/abort is honoured during the
                     // potentially long audit log query (up to 45 min per chunk).
-                    var ct = ScanManager.GetCancellationTokenSource(ScanId).Token;
+                    CancellationToken ct = ScanManager.GetCancellationTokenSource(ScanId).Token;
                     try
                     {
                         await StorageManager.CollectAndStoreAuditLogUsageAsync(
@@ -638,10 +639,10 @@ namespace PnP.Scanning.Core.Scanners
                         {
                             // Reuse the outer dbContext — opening a second ScanContext while the outer
                             // connection is still alive causes "database is locked" in SQLite DELETE mode.
-                            var siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == ScanId)
+                            List<string> siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == ScanId)
                                 .Select(p => p.SiteUrl)
                                 .ToList();
-                            var errorRecords = siteUrls.Select(siteUrl =>
+                            List<ClassicPageAuditUsage> errorRecords = siteUrls.Select(siteUrl =>
                                     new PnP.Scanning.Core.Storage.ClassicPageAuditUsage
                                     {
                                         ScanId = ScanId,
