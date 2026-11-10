@@ -15,7 +15,7 @@ internal static class ClassicComponentStorage
     /// <summary>
     /// Atomically removes incomplete retained component writes for one Web before retry.
     /// </summary>
-    internal static async Task ResetAsync(Guid assessment, ClassicPageWebSource web, CancellationToken token)
+    internal static async Task ResetAsync(Guid assessment, WebFacts web, CancellationToken token)
     {
         using ScanContext? db = new ScanContext(assessment);
         await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction =
@@ -41,7 +41,7 @@ internal static class ClassicComponentStorage
     /// </summary>
     internal static async Task<ClassicComponentSource> CaptureAsync(
         Guid assessment,
-        ClassicPageWebSource web,
+        WebFacts web,
         CancellationToken token)
     {
         using ScanContext? db = new ScanContext(assessment);

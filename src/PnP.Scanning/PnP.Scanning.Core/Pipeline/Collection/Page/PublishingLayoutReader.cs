@@ -11,7 +11,7 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Page;
 /// <summary>
 /// Caches each site's distinct publishing-layout status and retains optional read failures.
 /// </summary>
-internal sealed class PublishingLayoutSourceReader
+internal sealed class PublishingLayoutReader
 {
     private readonly ConcurrentDictionary<(Guid Site, string Path), string> observed = new();
 
@@ -62,7 +62,7 @@ internal sealed class PublishingLayoutSourceReader
                     catch (Exception error) when (error is not OperationCanceledException &&
                                                   !token.IsCancellationRequested)
                     {
-                        return new(path, raw, null, ClassicPageOnlineSource.Failure(error));
+                        return new(path, raw, null, ClassicContentReader.Failure(error));
                     }
                 }))
             .Value;

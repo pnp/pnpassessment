@@ -29,7 +29,7 @@ internal static class FileLevelPageProjection
     /// Distinguishes a matched list, an unmatched named owner, and an unknown list association.
     /// </summary>
     internal static ListAssociationState ClassifyListAssociation(
-        ClassicPageDiscoveryRow row,
+        DiscoveryEvidence row,
         bool listMatched,
         IEnumerable<string> listRootFolderUrls) =>
         row.ListId != null
@@ -65,7 +65,7 @@ internal static class FileLevelPageProjection
     /// <summary>
     /// Builds a file-level page result while preserving missing-association diagnostics.
     /// </summary>
-    internal static ClassicPageRow Project(ClassicPageDiscoveryRow row, ListAssociationState association)
+    internal static ClassicPageRow Project(DiscoveryEvidence row, ListAssociationState association)
     {
         void Error(string code, string detail)
         {

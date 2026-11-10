@@ -4,7 +4,7 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 /// <summary>
 /// Retains native physical-file observations before admission or offline classification.
 /// </summary>
-internal sealed class SPFileSource
+internal sealed class PhysicalFileFacts
 {
     public Guid SiteCollectionId { get; set; }
     public Guid FileUniqueId { get; set; }

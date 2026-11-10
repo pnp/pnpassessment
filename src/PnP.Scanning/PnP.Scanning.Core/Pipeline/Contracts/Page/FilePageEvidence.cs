@@ -6,7 +6,7 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Page;
 /// <summary>
 /// Preserves typed item fields, web-part exports, native identity, and independent read states.
 /// </summary>
-internal sealed record ClassicPageItemSource(
+internal sealed record FilePageEvidence(
     string SiteUrl,
     string WebUrl,
     string DiscoveryKey,
@@ -20,7 +20,7 @@ internal sealed record ClassicPageItemSource(
     SourceReadState WebPartsState,
     string? ContentTypeDisplayFormTemplateName,
     SourceReadState HomeFallbackState,
-    SPFileSource? FileFacts = null,
+    PhysicalFileFacts? FileFacts = null,
     bool FileLevelOnly = false,
     string[]? ListRootFolderUrls = null,
     bool? OwningListMatched = null,

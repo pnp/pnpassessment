@@ -7,7 +7,7 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Shared;
 /// <summary>
 /// Serializes detached source contracts in versioned envelopes and normalizes scope keys.
 /// </summary>
-internal static class ClassicPageSourceJson
+internal static class CollectionJson
 {
     /// <summary>
     /// Copies matching contract properties through detached JSON serialization.

@@ -7,17 +7,17 @@ namespace PnP.Scanning.Core.Pipeline.Collection.List;
 /// <summary>
 /// Builds bounded CAML queries for native items, ASPX metadata, and pointpub content.
 /// </summary>
-internal static class ClassicPageQuery
+internal static class ListItemQueryBuilder
 {
     /// <summary>
     /// Builds a paged CAML query for exact items or explicitly selected content evidence.
     /// </summary>
     internal static string Create(
         List<string> extraFields,
-        bool filterOnASPXPages = true,
+        bool filterOnAspxFiles = true,
         int? itemId = null,
         bool skipUserInformation = false,
-        bool filterOnDelveBlogs = false)
+        bool filterOnPointPublishingFiles = false)
     {
         string extraViewFields = "";
         string filter = "";
@@ -35,12 +35,12 @@ internal static class ClassicPageQuery
             filter =
                 $"<Query><Where><Eq><FieldRef Name='ID' /><Value Type='Counter'>{itemId.Value}</Value></Eq></Where></Query>";
         }
-        else if (filterOnDelveBlogs)
+        else if (filterOnPointPublishingFiles)
         {
             filter = "<Query><Where><Eq><FieldRef Name='File_x0020_Type' />" +
                      "<Value Type='Text'>pointpub</Value></Eq></Where></Query>";
         }
-        else if (filterOnASPXPages)
+        else if (filterOnAspxFiles)
         {
             filter = $@"
                       <Query>

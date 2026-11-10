@@ -1,7 +1,5 @@
 using PnP.Scanning.Core.Pipeline.Analysis.Page;
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
-using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPageRow;
-using ClassicPageWebPart = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPageWebPartRow;
 using PnP.Scanning.Core.Pipeline.Contracts.Page;
 using PnP.Scanning.Core.Scanners.WebPartMapping;
 
@@ -16,9 +14,9 @@ internal static partial class PageWebPartExtractor
     /// <summary>
     /// Builds ordered detached web-part rows from captured page fields, definitions, and original exports.
     /// </summary>
-    internal static List<ClassicPageWebPart> Build(
-        ClassicPage page,
-        ClassicPageItemSource source,
+    internal static List<ClassicPageWebPartRow> Build(
+        ClassicPageRow page,
+        FilePageEvidence source,
         bool exportProperties,
         bool includeTitleBar = false)
     {
@@ -79,8 +77,8 @@ internal static partial class PageWebPartExtractor
             }
         }
 
-        return ToRows(ClassicPageSourceJson.Convert<Storage.ClassicPage>(page), entities, exportProperties)
-            .Select(ClassicPageSourceJson.Convert<ClassicPageWebPartRow>)
+        return ToRows(Storage.Pipeline.ClassicCompatibility.ToLegacyPage(page), entities, exportProperties)
+            .Select(CollectionJson.Convert<ClassicPageWebPartRow>)
             .ToList();
     }
 

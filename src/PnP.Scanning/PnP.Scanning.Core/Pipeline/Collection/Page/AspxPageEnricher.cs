@@ -229,7 +229,7 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
     /// <summary>
     /// Captures bounded original source bytes and independent native role evidence for one physical file.
     /// </summary>
-    internal async Task<string> ReadAsync(SPFileSource file, CancellationToken token)
+    internal async Task<string> ReadAsync(PhysicalFileFacts file, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         ListContext? owner = null;

@@ -1,5 +1,3 @@
-using PnP.Scanning.Core.Scanners;
-using PnP.Scanning.Core.Discovery;
 #nullable enable
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
@@ -11,89 +9,88 @@ using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Pipeline.Contracts.Site;
 using PnP.Scanning.Core.Pipeline.Contracts.Web;
 using PnP.Scanning.Core.Pipeline.Orchestration;
+using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Services;
 
 namespace PnP.Scanning.Core.Pipeline.Collection.Module;
 
 /// <summary>
-/// Registers Classic page contracts and validates existing assessment options before collection.
+/// Registers versioned Classic object acquisition and Page analysis behind the existing Classic command.
 /// </summary>
 internal static class ClassicPageModule
 {
-    internal const string Key = "classicpage";
-    internal const string InputVersion = "classicpage-source-v2";
-    internal const string RuleVersion = "classicpage-v2";
+    internal const string Key = ClassicContentContract.ModuleKey;
+    internal const string InputVersion = ClassicContentContract.InputVersion;
+    internal const string RuleVersion = ClassicContentContract.RuleVersion;
 
     /// <summary>
-    /// Registers the production collector and analyzer with explicit supported input and rule versions.
+    /// Registers matching object contracts and rules; earlier snapshot shapes are rejected before execution rather than reinterpreted.
     /// </summary>
     internal static ModuleRegistry
-        Registry(Func<CollectionContext, CancellationToken, Task<IClassicPageOnlineSource>>? online = null) =>
+        Registry(Func<CollectionContext, CancellationToken, Task<IClassicContentReader>>? online = null) =>
         new(
-            new[]
-            {
+            [
                 new CollectionRegistration(
                     Key,
                     InputVersion,
-                    () => new ClassicPageCollectionModule(online),
+                    () => new ClassicContentCollectionModule(online),
                     ValidateParameters,
                     ValidateOptions)
-            },
-            new[]
-            {
+            ],
+            [
                 new AnalysisRegistration(
                     Key,
                     RuleVersion,
-                    new[] { InputVersion, "classicpage-source-v1" },
+                    [InputVersion],
                     () => new ClassicPageAnalysisModule(),
                     ClassicPageRuleMetadata.Validate,
                     ClassicPageRuleMetadata.Pin)
-            },
+            ],
             new Dictionary<string, string> { [Key] = RuleVersion });
 
     /// <summary>
-    /// Requires the empty version-one collection parameter object used by typed Classic options.
+    /// Requires the typed-options collection parameter envelope without accepting unrecognized configuration.
     /// </summary>
     internal static void ValidateParameters(VersionedJson parameters)
     {
         if (parameters.SchemaVersion != 1 || parameters.Value.ValueKind != System.Text.Json.JsonValueKind.Object ||
             parameters.Value.EnumerateObject().Any())
             throw new ArgumentException(
-                "Classic Pages v1 uses its typed CLI page options; module parameters must be empty.");
+                "Classic object collection uses typed Classic options; module parameters must be empty.");
     }
 
     /// <summary>
-    /// Validates existing Classic Pages selection, authentication metadata, and option bounds before acquisition.
+    /// Validates existing Pages selection, authentication metadata, property uniqueness, and audit bounds before acquisition.
     /// </summary>
     internal static void ValidateOptions(StartRequest request)
     {
-        if (!request.Mode.Equals(Mode.Classic.ToString(), StringComparison.OrdinalIgnoreCase) ||
-            OptionsBase.FromScannerInput(request) is not ClassicOptions { Pages: true })
+        if (!Handles(request))
             throw new ArgumentException("The page pipeline requires Classic mode with the Pages component.");
         if (!Guid.TryParse(request.ApplicationId, out Guid application) || application == Guid.Empty)
-            throw new ArgumentException("A nonempty application ID is required for Classic Page collection.");
+            throw new ArgumentException("A nonempty application ID is required for Classic collection.");
         if (string.IsNullOrWhiteSpace(request.Tenant))
-            throw new ArgumentException("A tenant is required for Classic Page collection.");
+            throw new ArgumentException("A tenant is required for Classic collection.");
         if (!Enum.TryParse<Authentication.AuthenticationMode>(request.AuthMode, true, out _) ||
             !Enum.TryParse<global::PnP.Core.Services.Microsoft365Environment>(request.Environment, true, out _))
             throw new ArgumentException("A supported authentication mode and cloud environment are required.");
-        ClassicPageSourceOptions? options = Options(request);
-        if (request.Properties.GroupBy(x => x.Property, StringComparer.Ordinal).Any(x => x.Count() > 1))
+        if (request.Properties.GroupBy(property => property.Property, StringComparer.Ordinal)
+            .Any(group => group.Count() > 1))
             throw new ArgumentException("Collection property names must be unique.");
-        if (options.AuditLogWindowDays is < 1 or > 180)
+        if (Options(request).AuditLogWindowDays is < 1 or > 180)
             throw new ArgumentException("Audit log window must be between 1 and 180 days.");
     }
 
     /// <summary>
-    /// Reads fixed page collection flags from persisted existing start properties.
+    /// Reads fixed acquisition flags from persisted existing start properties.
     /// </summary>
-    internal static ClassicPageSourceOptions Options(StartRequest request)
+    internal static ClassicCollectionOptions Options(StartRequest request)
     {
-        // Read the page option flag from the persisted Classic command properties.
         bool Flag(string key) =>
-            request.Properties.FirstOrDefault(x => x.Property == key)?.Value is string value && bool.Parse(value);
+            request.Properties.FirstOrDefault(property => property.Property == key)?.Value is string value &&
+            bool.Parse(value);
 
-        string? window = request.Properties.FirstOrDefault(x => x.Property == Constants.StartClassicAuditLogWindowDays)
+        string? window = request.Properties
+            .FirstOrDefault(property => property.Property == Constants.StartClassicAuditLogWindowDays)
             ?.Value;
         return new(
             Flag(Constants.StartClassicExportWebPartProperties),
@@ -101,18 +98,19 @@ internal static class ClassicPageModule
             Flag(Constants.StartClassicSkipUserInformation),
             Flag(Constants.StartClassicHomePageOnly),
             window == null ? 14 : int.Parse(window),
-            request.Properties.FirstOrDefault(x => x.Property == Constants.StartExcludeSiteTemplates)?.Value);
+            request.Properties.FirstOrDefault(property => property.Property == Constants.StartExcludeSiteTemplates)
+                ?.Value);
     }
 
     /// <summary>
-    /// Determines whether an existing Classic start request selects the replacement Pages pipeline.
+    /// Selects the internal object pipeline for existing Classic requests that include Pages.
     /// </summary>
     internal static bool Handles(StartRequest request) =>
         request.Mode.Equals(Mode.Classic.ToString(), StringComparison.OrdinalIgnoreCase) &&
         OptionsBase.FromScannerInput(request) is ClassicOptions { Pages: true };
 
     /// <summary>
-    /// Determines whether retained non-page Classic components accompany Pages collection.
+    /// Determines whether retained non-page collectors accompany Pages acquisition.
     /// </summary>
     internal static bool HasOtherComponents(StartRequest request) =>
         OptionsBase.FromScannerInput(request) is ClassicOptions options &&
@@ -120,10 +118,10 @@ internal static class ClassicPageModule
 }
 
 /// <summary>
-/// Orchestrates resumable scope, file, page, content-item, component, and audit acquisition.
+/// Acquires object facts and discovery evidence with durable receipts; only analysis decides which objects become Pages.
 /// </summary>
-internal sealed class ClassicPageCollectionModule(
-    Func<CollectionContext, CancellationToken, Task<IClassicPageOnlineSource>>? online = null)
+internal sealed class ClassicContentCollectionModule(
+    Func<CollectionContext, CancellationToken, Task<IClassicContentReader>>? online = null)
     : ICollectionModule, ICollectionSnapshotValidator
 {
     private Guid assessmentId;
@@ -131,283 +129,244 @@ internal sealed class ClassicPageCollectionModule(
     public string InputVersion => ClassicPageModule.InputVersion;
 
     /// <summary>
-    /// Captures fixed scope and journaled page, content-item, component, and audit evidence with bounded workers.
+    /// Freezes typed Web scopes, then acquires each Web's file inventory, file enrichment, selected items, and audit receipts.
     /// </summary>
     public async IAsyncEnumerable<CollectionRecord> CollectAsync(
         CollectionContext context,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         assessmentId = context.AssessmentId;
-        ClassicPageAcquisitionJournal? journal = new ClassicPageAcquisitionJournal(context);
+        AcquisitionJournal journal = new(context);
         await journal.InitializeAsync(cancellationToken);
-        await using IClassicPageOnlineSource? source = online == null
-            ? new ClassicPageOnlineSource(
-                context,
-                await context.Environment.OpenAsync(context.Options, cancellationToken))
+        await using IClassicContentReader reader = online == null
+            ? new ClassicContentReader(context, await context.Environment.OpenAsync(context.Options, cancellationToken))
             : await online(context, cancellationToken);
-        ClassicPageScopeSource? plan = await journal.ReadOrAcquireAsync(
-            "ScopePlan",
+        ClassicCollectionScope selection = await journal.ReadOrAcquireAsync(
+            "CollectionPlan",
             "assessment",
-            () => source.ReadSitesAsync(ClassicPageModule.Options(context.Options), cancellationToken),
+            () => reader.ReadSiteSelectionAsync(ClassicPageModule.Options(context.Options), cancellationToken),
             cancellationToken);
-        List<ClassicPageSiteScope>? sites = new List<ClassicPageSiteScope>();
-        List<(string Site, string Web, string Template)>? webs = new List<(string Site, string Web, string Template)>();
-        foreach (string? site in plan.Sites)
+        List<SiteCollectionScope> siteCollections = [];
+        List<WebScope> webScopes = [];
+        foreach (string siteCollectionUrl in selection.SiteCollectionUrls)
         {
-            ClassicPageSiteScope? scope = await journal.ReadOrAcquireAsync(
-                "SiteScope",
-                site.ToLowerInvariant(),
-                () => source.ReadWebsAsync(site, cancellationToken),
+            SiteCollectionScope siteScope = await journal.ReadOrAcquireAsync(
+                "SiteCollectionScope",
+                siteCollectionUrl.ToLowerInvariant(),
+                () => reader.ReadWebScopesAsync(siteCollectionUrl, cancellationToken),
                 cancellationToken,
-                x => ClassicPageAcquisitionJournal.Status(x.State),
-                x => x.State.Error);
-            if (scope.WebUrls.Length != scope.Templates.Length)
-                throw new SnapshotIntegrityException("Web scope identities and templates are inconsistent.");
-            sites.Add(scope);
-            webs.AddRange(scope.WebUrls.Select((web, index) => (site, web, scope.Templates[index])));
+                value => AcquisitionJournal.Status(value.State),
+                value => value.State.Error);
+            if (siteScope.Webs.Any(web => !string.Equals(
+                    web.SiteCollectionUrl,
+                    siteCollectionUrl,
+                    StringComparison.OrdinalIgnoreCase)))
+                throw new SnapshotIntegrityException("A Web scope belongs to a different site collection.");
+            siteCollections.Add(siteScope);
+            webScopes.AddRange(siteScope.Webs);
         }
 
-        ClassicPageScopeSource? fixedScope = plan with { SiteScopes = sites.ToArray() };
-        await journal.ReadOrAcquireAsync("Scope", "assessment", () => Task.FromResult(fixedScope), cancellationToken);
-        ActionBlock<(string Site, string Web, string Template)>? workers =
-            new ActionBlock<(string Site, string Web, string Template)>(
-                async work =>
-                {
-                    string? key = ClassicPageSourceJson.WebKey(work.Site, work.Web);
-                    ClassicPageWebSource? identity = await journal.ReadOrAcquireAsync(
-                        "WebIdentity",
-                        key,
-                        async () =>
-                        {
-                            try
-                            {
-                                return await source.ReadIdentityAsync(
-                                    work.Site,
-                                    work.Web,
-                                    work.Template,
-                                    cancellationToken);
-                            }
-                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                            {
-                                throw;
-                            }
-                            catch (Exception ex)
-                            {
-                                return new ClassicPageWebSource(
-                                    work.Site,
-                                    work.Web,
-                                    work.Template,
-                                    Guid.Empty,
-                                    Guid.Empty,
-                                    default,
-                                    [],
-                                    [],
-                                    null,
-                                    SourceReadState.NotAttempted,
-                                    null,
-                                    SourceReadState.NotAttempted,
-                                    null,
-                                    0,
-                                    null,
-                                    SourceReadState.NotAttempted,
-                                    ClassicPageOnlineSource.Failure(ex));
-                            }
-                        },
-                        cancellationToken,
-                        x => ClassicPageAcquisitionJournal.Status(x.State),
-                        x => x.State.Error);
-                    ClassicPageDiscoverySource? discovery = identity.State.Succeeded
-                        ? await journal.ReadOrAcquireAsync(
-                            "Discovery",
-                            key,
-                            () => source.DiscoverAsync(identity, journal, cancellationToken),
-                            cancellationToken)
-                        : new ClassicPageDiscoverySource(work.Site, work.Web, []);
-                    ClassicPageWebSource? web = await journal.ReadOrAcquireAsync(
-                        "Web",
-                        key,
-                        async () =>
-                        {
-                            if (!identity.State.Succeeded) return identity;
-                            try
-                            {
-                                return await source.ReadWebAsync(work.Site, work.Web, work.Template, cancellationToken);
-                            }
-                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                            {
-                                throw;
-                            }
-                            catch (Exception ex)
-                            {
-                                return new ClassicPageWebSource(
-                                    work.Site,
-                                    work.Web,
-                                    work.Template,
-                                    identity.SiteId,
-                                    identity.WebId,
-                                    default,
-                                    [],
-                                    [],
-                                    null,
-                                    SourceReadState.NotAttempted,
-                                    null,
-                                    SourceReadState.NotAttempted,
-                                    null,
-                                    0,
-                                    null,
-                                    SourceReadState.NotAttempted,
-                                    ClassicPageOnlineSource.Failure(ex));
-                            }
-                        },
-                        cancellationToken,
-                        x => ClassicPageAcquisitionJournal.Status(x.State),
-                        x => x.State.Error);
-                    if (ClassicPageModule.HasOtherComponents(context.Options))
-                        await journal.ReadOrAcquireAsync(
-                            "ClassicComponents",
-                            key,
-                            () => source.ReadClassicComponentsAsync(web, cancellationToken),
-                            cancellationToken,
-                            x => ClassicPageAcquisitionJournal.Status(x.State),
-                            x => x.State.Error);
-                    foreach (ClassicPageDiscoveryRow? page in discovery.Rows.Where(x => x.RowType == "Page"))
+        ClassicCollectionScope scope = selection with { SiteCollections = siteCollections.ToArray() };
+        await journal.ReadOrAcquireAsync(
+            "CollectionScope",
+            "assessment",
+            () => Task.FromResult(scope),
+            cancellationToken);
+        ActionBlock<WebScope> workers = new(
+            async webScope =>
+            {
+                string webKey = CollectionJson.WebKey(webScope.SiteCollectionUrl, webScope.WebUrl);
+                WebFacts identity = await journal.ReadOrAcquireAsync(
+                    "WebIdentity",
+                    webKey,
+                    async () =>
                     {
-                        await journal.ReadOrAcquireAsync(
-                            "Page",
-                            key + "|" + page.RecordKey,
-                            async () =>
-                            {
-                                if (!web.State.Succeeded)
-                                    return ClassicPageOnlineSource.EmptyPage(web, page, web.State);
-                                try
-                                {
-                                    return await source.ReadPageAsync(
-                                        web,
-                                        page,
-                                        plan.Options.SkipUserInformation,
-                                        cancellationToken);
-                                }
-                                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                                {
-                                    throw;
-                                }
-                                catch (Exception ex)
-                                {
-                                    return ClassicPageOnlineSource.EmptyPage(
-                                        web,
-                                        page,
-                                        ClassicPageOnlineSource.Failure(ex));
-                                }
-                            },
-                            cancellationToken,
-                            x => x.MetadataState.Succeeded
-                                ? x.WebPartsState.Status is "Failed" or "Denied"
-                                    ? AcquisitionStatus.Partial
-                                    : AcquisitionStatus.Complete
-                                : ClassicPageAcquisitionJournal.Status(x.MetadataState),
-                            x => x.MetadataState.Error ?? x.WebPartsState.Error);
-                    }
-
-                    ClassicBlogListScopeSource? blogLists = await journal.ReadOrAcquireAsync(
-                        "BlogLists",
-                        key,
+                        try
+                        {
+                            return await reader.ReadIdentityAsync(webScope, cancellationToken);
+                        }
+                        catch (Exception error) when (error is not OperationCanceledException &&
+                                                      !cancellationToken.IsCancellationRequested)
+                        {
+                            return UnavailableWeb(
+                                webScope,
+                                Guid.Empty,
+                                Guid.Empty,
+                                ClassicContentReader.Failure(error));
+                        }
+                    },
+                    cancellationToken,
+                    value => AcquisitionJournal.Status(value.State),
+                    value => value.State.Error);
+                WebFileInventory inventory = identity.State.Succeeded
+                    ? await journal.ReadOrAcquireAsync(
+                        "FileInventory",
+                        webKey,
+                        () => reader.ReadFileInventoryAsync(identity, journal, cancellationToken),
+                        cancellationToken)
+                    : new(webScope.SiteCollectionUrl, webScope.WebUrl, [], []);
+                WebFacts web = await journal.ReadOrAcquireAsync(
+                    "WebFacts",
+                    webKey,
+                    async () =>
+                    {
+                        if (!identity.State.Succeeded) return identity;
+                        try
+                        {
+                            return await reader.ReadWebFactsAsync(webScope, cancellationToken);
+                        }
+                        catch (Exception error) when (error is not OperationCanceledException &&
+                                                      !cancellationToken.IsCancellationRequested)
+                        {
+                            return UnavailableWeb(
+                                webScope,
+                                identity.SiteCollectionId,
+                                identity.WebId,
+                                ClassicContentReader.Failure(error));
+                        }
+                    },
+                    cancellationToken,
+                    value => AcquisitionJournal.Status(value.State),
+                    value => value.State.Error);
+                if (scope.ClassicComponentsRequested)
+                    await journal.ReadOrAcquireAsync(
+                        "ClassicComponents",
+                        webKey,
+                        () => reader.ReadClassicComponentsAsync(web, cancellationToken),
+                        cancellationToken,
+                        value => AcquisitionJournal.Status(value.State),
+                        value => value.State.Error);
+                foreach (DiscoveryEvidence candidate in
+                         inventory.Evidence.Where(evidence => evidence.RowType == "Page"))
+                    await journal.ReadOrAcquireAsync(
+                        "FileEnrichment",
+                        webKey + "|" + candidate.RecordKey,
                         async () =>
                         {
                             if (!web.State.Succeeded)
-                                return new ClassicBlogListScopeSource(web.SiteUrl, web.WebUrl, [], web.State);
-                            if (plan.Options.HomePageOnly)
-                                return new ClassicBlogListScopeSource(
-                                    web.SiteUrl,
-                                    web.WebUrl,
-                                    [],
-                                    SourceReadState.NotAttempted);
+                                return ClassicContentReader.UnavailableFileEnrichment(web, candidate, web.State);
                             try
                             {
-                                return await source.ReadBlogListsAsync(web, cancellationToken);
+                                return await reader.ReadFileEnrichmentAsync(
+                                    web,
+                                    candidate,
+                                    scope.Options.SkipUserInformation,
+                                    cancellationToken);
                             }
-                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                            catch (Exception error) when (error is not OperationCanceledException &&
+                                                          !cancellationToken.IsCancellationRequested)
                             {
-                                throw;
-                            }
-                            catch (Exception error)
-                            {
-                                return new ClassicBlogListScopeSource(
-                                    web.SiteUrl,
-                                    web.WebUrl,
-                                    [],
-                                    ClassicPageOnlineSource.Failure(error));
+                                return ClassicContentReader.UnavailableFileEnrichment(
+                                    web,
+                                    candidate,
+                                    ClassicContentReader.Failure(error));
                             }
                         },
                         cancellationToken,
-                        x => ClassicPageAcquisitionJournal.Status(x.State),
-                        x => x.State.Error);
-                    foreach (ClassicBlogListSource? list in blogLists.Lists)
+                        value => value.MetadataState.Succeeded
+                            ? value.WebPartsState.Status is "Failed" or "Denied"
+                                ? AcquisitionStatus.Partial
+                                : AcquisitionStatus.Complete
+                            : AcquisitionJournal.Status(value.MetadataState),
+                        value => value.MetadataState.Error ?? value.WebPartsState.Error);
+                WebListItemQueries queries = await journal.ReadOrAcquireAsync(
+                    "ListItemQueries",
+                    webKey,
+                    async () =>
                     {
-                        string? paging = null;
-                        int ordinal = 0;
-                        HashSet<string>? seen = new HashSet<string>();
-                        do
+                        if (!web.State.Succeeded) return new(web.SiteUrl, web.WebUrl, [], web.State);
+                        if (scope.Options.HomePageOnly)
+                            return new(web.SiteUrl, web.WebUrl, [], SourceReadState.NotAttempted);
+                        try
                         {
-                            int pageOrdinal = ordinal++;
-                            string? requestPaging = paging;
-                            ClassicPageBlogBatchSource? batch = await journal.ReadOrAcquireAsync(
-                                "Blog",
-                                key + "|" + list.ListId.ToString("D") + "|" + pageOrdinal,
-                                async () =>
-                                {
-                                    try
-                                    {
-                                        return (await source.ReadBlogBatchAsync(
-                                                web,
-                                                list,
-                                                requestPaging,
-                                                plan.Options.SkipUserInformation,
-                                                cancellationToken)) with
-                                            {
-                                                PageOrdinal = pageOrdinal, PagingToken = requestPaging
-                                            };
-                                    }
-                                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                                    {
-                                        throw;
-                                    }
-                                    catch (Exception error)
-                                    {
-                                        return new ClassicPageBlogBatchSource(
-                                            web.SiteUrl,
-                                            web.WebUrl,
-                                            list.ListId,
-                                            list.ListTitle,
-                                            list.ListUrl,
-                                            [],
-                                            null,
-                                            ClassicPageOnlineSource.Failure(error),
-                                            list.DisplayFormUrl,
-                                            list.PageType,
-                                            pageOrdinal,
-                                            requestPaging,
-                                            list.ContentTypeForms);
-                                    }
-                                },
-                                cancellationToken,
-                                x => ClassicPageAcquisitionJournal.Status(x.State),
-                                x => x.State.Error);
-                            paging = batch.NextPage;
-                            if (paging != null && !seen.Add(paging))
-                                throw new SnapshotIntegrityException("Blog/Delve pagination repeated a continuation.");
-                        } while (paging != null);
-                    }
-                },
-                new ExecutionDataflowBlockOptions
+                            return await reader.ReadListItemQueriesAsync(web, cancellationToken);
+                        }
+                        catch (Exception error) when (error is not OperationCanceledException &&
+                                                      !cancellationToken.IsCancellationRequested)
+                        {
+                            return new(web.SiteUrl, web.WebUrl, [], ClassicContentReader.Failure(error));
+                        }
+                    },
+                    cancellationToken,
+                    value => AcquisitionJournal.Status(value.State),
+                    value => value.State.Error);
+                foreach (ListItemQueryScope query in queries.Queries)
                 {
-                    CancellationToken = cancellationToken,
-                    MaxDegreeOfParallelism = context.Options.Threads,
-                    BoundedCapacity = Math.Max(1, context.Options.Threads * 2)
-                });
+                    string? continuation = null;
+                    int ordinal = 0;
+                    HashSet<string> continuations = new(StringComparer.Ordinal);
+                    do
+                    {
+                        int batchOrdinal = ordinal++;
+                        string? requestContinuation = continuation;
+                        ListItemBatch batch = await journal.ReadOrAcquireAsync(
+                            "ListItems",
+                            webKey + "|" + query.ListId.ToString("D") + "|" + batchOrdinal,
+                            async () =>
+                            {
+                                try
+                                {
+                                    return (await reader.ReadListItemBatchAsync(
+                                            web,
+                                            query,
+                                            requestContinuation,
+                                            scope.Options.SkipUserInformation,
+                                            cancellationToken)) with
+                                        {
+                                            PageOrdinal = batchOrdinal, PagingToken = requestContinuation
+                                        };
+                                }
+                                catch (Exception error) when (error is not OperationCanceledException &&
+                                                              !cancellationToken.IsCancellationRequested)
+                                {
+                                    return new(
+                                        web.SiteUrl,
+                                        web.WebUrl,
+                                        query.ListId,
+                                        query.ListTitle,
+                                        query.ListUrl,
+                                        [],
+                                        null,
+                                        ClassicContentReader.Failure(error),
+                                        query.QueryKind,
+                                        query.ListTemplate,
+                                        query.DisplayFormUrl,
+                                        batchOrdinal,
+                                        requestContinuation,
+                                        query.ContentTypeForms);
+                                }
+                            },
+                            cancellationToken,
+                            value => !value.State.Succeeded
+                                ? AcquisitionJournal.Status(value.State)
+                                : value.QueryKind == ListItemQueryKind.PointPublishingFiles && value.Items.Any(item =>
+                                    item.FileAssociation is not { State.Succeeded: true })
+                                    ? AcquisitionStatus.Partial
+                                    : AcquisitionStatus.Complete,
+                            value => value.State.Error ??
+                                     value.Items.FirstOrDefault(item =>
+                                             item.FileAssociation is { State.Succeeded: false })
+                                         ?.FileAssociation?.State.Error ??
+                                     (value.QueryKind == ListItemQueryKind.PointPublishingFiles &&
+                                      value.Items.Any(item => item.FileAssociation == null)
+                                         ? "Native File relationship evidence was not acquired."
+                                         : null));
+                        continuation = batch.NextPage;
+                        if (continuation != null && !continuations.Add(continuation))
+                            throw new SnapshotIntegrityException("List-item pagination repeated a continuation.");
+                    } while (continuation != null);
+                }
+            },
+            new ExecutionDataflowBlockOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = context.Options.Threads,
+                BoundedCapacity = Math.Max(1, context.Options.Threads * 2),
+            });
         try
         {
-            foreach ((string Site, string Web, string Template) web in webs)
-                if (!await workers.SendAsync(web, cancellationToken))
+            foreach (WebScope webScope in webScopes)
+                if (!await workers.SendAsync(webScope, cancellationToken))
                     break;
         }
         finally
@@ -416,40 +375,63 @@ internal sealed class ClassicPageCollectionModule(
             await workers.Completion;
         }
 
-        if (!plan.Options.SkipUsageInformation) await source.CollectAuditAsync(fixedScope, journal, cancellationToken);
-        yield return new(null, VersionedJson.From(new { stage = "ClassicPageCollectionComplete" }));
+        if (!scope.Options.SkipUsageInformation) await reader.CollectAuditAsync(scope, journal, cancellationToken);
+        yield return new(null, VersionedJson.From(new { stage = "ClassicObjectCollectionComplete" }));
     }
 
     /// <summary>
-    /// Rejects inconsistent collected identities or incomplete source relationships before sealing.
+    /// Validates relationships across the exact committed object receipts without mutating them or fabricating missing facts.
     /// </summary>
     public async Task ValidateAsync(ICollectionJournal journal, CancellationToken cancellationToken)
     {
-        IReadOnlyList<CollectedObservation>? headers = await journal.ReadCommittedAsync(
+        IReadOnlyList<CollectedObservation> receipts = await journal.ReadCommittedAsync(
             cancellationToken,
             metadataOnly: true);
 
-        // Stream acquired records as detached inputs for consistency checking before sealing.
         async IAsyncEnumerable<SourceRecord> Records()
         {
-            foreach (CollectedObservation? header in headers)
+            foreach (CollectedObservation receipt in receipts)
             {
-                if (ClassicPageSourceJson.Kind(header) is not ("Scope" or "Web" or "Discovery" or "Page" or "BlogLists"
-                    or "Blog" or "AuditPage" or "AuditChunk" or "ClassicComponents"))
+                if (CollectionJson.Kind(receipt) is not ("CollectionScope" or "WebFacts" or "FileInventory"
+                    or "FileEnrichment" or "ListItemQueries" or "ListItems" or "AuditPage" or "AuditChunk"
+                    or "ClassicComponents"))
                     continue;
-                CollectedObservation? record = await journal.ReadAsync(header.ObservationId, cancellationToken);
+                CollectedObservation value = await journal.ReadAsync(receipt.ObservationId, cancellationToken);
                 yield return new(
-                    record.ObservationId,
+                    value.ObservationId,
                     Guid.Empty,
-                    record.SourceIdentity,
-                    record.SourceRevision,
-                    record.AcquisitionStatus,
-                    record.Metadata,
-                    new SourceArtifact(record.RawBytes?.LongLength, null, record.RawBytes),
-                    record.AcquisitionError);
+                    value.SourceIdentity,
+                    value.SourceRevision,
+                    value.AcquisitionStatus,
+                    value.Metadata,
+                    new SourceArtifact(value.RawBytes?.LongLength, null, value.RawBytes),
+                    value.AcquisitionError);
             }
         }
 
-        await ClassicPageInputIndex.CreateAsync(Records(), cancellationToken, assessmentId);
+        await ClassicContentIndex.CreateAsync(Records(), cancellationToken, assessmentId);
     }
+
+    /// <summary>
+    /// Retains an unavailable Web read under its fixed locator and observed template; it never creates physical file identity.
+    /// </summary>
+    private static WebFacts UnavailableWeb(WebScope scope, Guid siteId, Guid webId, SourceReadState state) =>
+        new(
+            scope.SiteCollectionUrl,
+            scope.WebUrl,
+            scope.WebTemplate,
+            siteId,
+            webId,
+            default,
+            [],
+            [],
+            null,
+            SourceReadState.NotAttempted,
+            null,
+            SourceReadState.NotAttempted,
+            null,
+            0,
+            null,
+            SourceReadState.NotAttempted,
+            state);
 }

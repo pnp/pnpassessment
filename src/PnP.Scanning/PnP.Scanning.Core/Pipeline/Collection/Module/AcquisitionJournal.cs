@@ -12,7 +12,7 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Module;
 /// <summary>
 /// Replays committed acquisition receipts and checkpoints newly completed requests.
 /// </summary>
-internal sealed class ClassicPageAcquisitionJournal(CollectionContext context)
+internal sealed class AcquisitionJournal(CollectionContext context)
 {
     private readonly ConcurrentDictionary<string, CollectedObservation> committed = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> gates = new(StringComparer.Ordinal);
@@ -53,10 +53,10 @@ internal sealed class ClassicPageAcquisitionJournal(CollectionContext context)
         try
         {
             if (committed.TryGetValue(identity, out CollectedObservation? original))
-                return ClassicPageSourceJson.Read<T>((await Writer.ReadAsync(original.ObservationId, token)).RawBytes);
+                return CollectionJson.Read<T>((await Writer.ReadAsync(original.ObservationId, token)).RawBytes);
             T? value = await acquire();
             token.ThrowIfCancellationRequested();
-            byte[]? bytes = ClassicPageSourceJson.Bytes(value);
+            byte[]? bytes = CollectionJson.Bytes(value);
             CollectedObservation? record = new CollectedObservation(
                 Id(identity),
                 identity,

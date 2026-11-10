@@ -6,11 +6,11 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Web;
 /// <summary>
 /// Preserves native Web identity, features, home-page facts, and independent acquisition states.
 /// </summary>
-internal sealed record ClassicPageWebSource(
+internal sealed record WebFacts(
     string SiteUrl,
     string WebUrl,
-    string Template,
-    Guid SiteId,
+    string WebTemplate,
+    Guid SiteCollectionId,
     Guid WebId,
     DateTime LastItemUserModifiedDate,
     Guid[] SiteFeatures,

@@ -16,12 +16,11 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Module;
 /// </summary>
 internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnapshotPreparation, IAnalysisFinalizer
 {
-    private ClassicPageInputIndex index = null!;
+    private ClassicContentIndex index = null!;
     private Guid assessmentId;
     private readonly WebPartMappingManager mapping = new();
-    public string ModuleKey => ClassicPageModuleKey;
-    private const string ClassicPageModuleKey = "classicpage";
-    public string RuleVersion => "classicpage-v2";
+    public string ModuleKey => ClassicContentContract.ModuleKey;
+    public string RuleVersion => ClassicContentContract.RuleVersion;
 
     /// <summary>
     /// Publishes existing-report compatibility results from fixed source and committed analysis output.
@@ -40,6 +39,9 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
     public async Task PrepareAsync(ISnapshotReader snapshot, CancellationToken cancellationToken)
     {
         SnapshotInfo? manifest = await snapshot.OpenAsync(cancellationToken);
+        if (manifest.ModuleKey != ModuleKey || manifest.InputVersion != ClassicContentContract.InputVersion)
+            throw new NotSupportedException(
+                $"Rule '{RuleVersion}' requires '{ClassicContentContract.InputVersion}'; snapshot '{manifest.InputVersion}' is not reinterpreted as the new object contract.");
         assessmentId = manifest.AssessmentId;
 
         async IAsyncEnumerable<SourceRecord> Records()
@@ -47,7 +49,7 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
             foreach (Guid id in manifest.ObservationIds) yield return await snapshot.ReadAsync(id, cancellationToken);
         }
 
-        index = await ClassicPageInputIndex.CreateAsync(Records(), cancellationToken, manifest.AssessmentId);
+        index = await ClassicContentIndex.CreateAsync(Records(), cancellationToken, manifest.AssessmentId);
     }
 
     /// <summary>
@@ -59,24 +61,25 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        string? kind = ClassicPageSourceJson.Kind(source);
-        if (kind == "Page")
+        string? kind = CollectionJson.Kind(source);
+        if (kind == "FileEnrichment")
         {
-            ClassicPageItemSource? input =
-                ClassicPageSourceJson.Read<ClassicPageItemSource>(source.Artifact.GetBytes());
-            string? key = ClassicPageSourceJson.WebKey(input.SiteUrl, input.WebUrl);
-            ClassicPageProjectionResult? output = ClassicPageProjection.Analyze(
+            FilePageEvidence? input = CollectionJson.Read<FilePageEvidence>(source.Artifact.GetBytes());
+            string? key = CollectionJson.WebKey(input.SiteUrl, input.WebUrl);
+            FilePageAnalysis? output = FilePageProjection.Analyze(
                 assessmentId,
                 index.Webs[key],
-                index.Pages[key + "|" + input.DiscoveryKey],
+                index.FileCandidates[key + "|" + input.DiscoveryKey],
                 input,
                 index.Scope.Options,
                 mapping);
-            AnalysisOutcome outcome = output.Error != null
-                ? output.Page == null ? AnalysisOutcome.Failed : AnalysisOutcome.Unknown
-                : output.Page == null
-                    ? AnalysisOutcome.NotApplicable
-                    : AnalysisOutcome.Analyzed;
+            AnalysisOutcome outcome = output.Modern
+                ? AnalysisOutcome.NotApplicable
+                : output.Error != null
+                    ? output.Page == null ? AnalysisOutcome.Failed : AnalysisOutcome.Unknown
+                    : output.Page == null
+                        ? AnalysisOutcome.NotApplicable
+                        : AnalysisOutcome.Analyzed;
             return Task.FromResult(
                 new AnalysisResult(
                     source.ObservationId,
@@ -85,32 +88,35 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
                     VersionedJson.From(new { kind, output })));
         }
 
-        if (kind == "Blog")
+        if (kind == "ListItems")
         {
-            ClassicPageBlogBatchSource? input =
-                ClassicPageSourceJson.Read<ClassicPageBlogBatchSource>(source.Artifact.GetBytes());
-            Contracts.Web.ClassicPageWebSource? web = index.Webs[ClassicPageSourceJson.WebKey(
-                input.SiteUrl,
-                input.WebUrl)];
-            ClassicPageRow?[]? pages = input.Items.Select(fields =>
-                    ClassicBlogPageProjection.Analyze(assessmentId, input, fields, web, index.Scope.Options))
+            ListItemBatch? input = CollectionJson.Read<ListItemBatch>(source.Artifact.GetBytes());
+            Contracts.Web.WebFacts? web = index.Webs[CollectionJson.WebKey(input.SiteUrl, input.WebUrl)];
+            ClassicPageRow?[] pages = input.Items.Select(item =>
+                    ListItemPageProjection.Analyze(assessmentId, input, item, web, index.Scope.Options))
                 .ToArray();
+            int unresolvedFileLinks = input.QueryKind == ListItemQueryKind.PointPublishingFiles
+                ? input.Items.Count(item => item.FileAssociation is not { State.Succeeded: true })
+                : 0;
             return Task.FromResult(
                 new AnalysisResult(
                     source.ObservationId,
-                    input.State.Succeeded ? AnalysisOutcome.Analyzed : AnalysisOutcome.Unknown,
-                    input.State.Error ?? input.State.Status,
-                    VersionedJson.From(new { kind, pages })));
+                    input.State.Succeeded && unresolvedFileLinks == 0
+                        ? AnalysisOutcome.Analyzed
+                        : AnalysisOutcome.Unknown,
+                    input.State.Error ?? (unresolvedFileLinks > 0
+                        ? "Native File relationships were not acquired; unlinked items remain evidence, not Pages."
+                        : input.State.Status),
+                    VersionedJson.From(new { kind, pages, unresolvedFileLinks })));
         }
 
-        if (kind == "Discovery")
+        if (kind == "FileInventory")
         {
-            ClassicPageDiscoverySource? input =
-                ClassicPageSourceJson.Read<ClassicPageDiscoverySource>(source.Artifact.GetBytes());
+            WebFileInventory? input = CollectionJson.Read<WebFileInventory>(source.Artifact.GetBytes());
             PhysicalFileAnalysis[]? files = (input.Files ?? []).Select(file => PhysicalFileAnalysisRules.Analyze(
                     index.Files[(file.SiteCollectionId, file.FileUniqueId)]))
                 .ToArray();
-            ClassicPageDiscoveryRow[]? coverage = input.Rows.Where(row => row.RowType is "Scope" or "Gap").ToArray();
+            DiscoveryEvidence[]? coverage = input.Evidence.Where(row => row.RowType is "Scope" or "Gap").ToArray();
             bool incomplete =
                 coverage.Any(row => row.DiscoveryStatus is not ("Complete" or "Empty" or "PolicyExcluded"));
             return Task.FromResult(
@@ -128,7 +134,7 @@ internal sealed class ClassicPageAnalysisModule : IAnalysisModule, IAnalysisSnap
         if (kind == "AuditPage")
         {
             ClassicPageAuditPageSource? input =
-                ClassicPageSourceJson.Read<ClassicPageAuditPageSource>(source.Artifact.GetBytes());
+                CollectionJson.Read<ClassicPageAuditPageSource>(source.Artifact.GetBytes());
             bool complete = index.AuditChunks[input.Chunk].Status == "succeeded";
             ClassicAuditPageStats[]? output = complete ? ClassicPageAuditAnalysis.Parse(input.Body) : [];
             return Task.FromResult(

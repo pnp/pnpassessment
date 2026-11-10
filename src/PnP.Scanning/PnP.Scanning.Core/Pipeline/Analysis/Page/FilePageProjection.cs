@@ -1,9 +1,6 @@
 using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Discovery;
 #nullable enable
-using ClassicPage = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPageRow;
-using ClassicPageDiscovery = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPageDiscoveryRow;
-using ClassicPageWebPart = PnP.Scanning.Core.Pipeline.Contracts.Page.ClassicPageWebPartRow;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
@@ -18,32 +15,84 @@ namespace PnP.Scanning.Core.Pipeline.Analysis.Page;
 /// <summary>
 /// Carries an assessed page, web parts, discovery disposition, and explicit failures.
 /// </summary>
-internal sealed record ClassicPageProjectionResult(
-    ClassicPage? Page,
-    ClassicPageWebPart[] Parts,
-    ClassicPageDiscovery? Discovery,
+internal sealed record FilePageAnalysis(
+    ClassicPageRow? Page,
+    ClassicPageWebPartRow[] Parts,
+    DiscoveryEvidence? Discovery,
     bool Modern,
     string? Error = null);
 
 /// <summary>
 /// Applies page readiness rules to detached evidence without modifying collected source.
 /// </summary>
-internal static class ClassicPageProjection
+internal static class FilePageProjection
 {
     /// <summary>
     /// Assesses captured page fields and web parts while retaining nullable selection and failure provenance.
     /// </summary>
-    internal static ClassicPageProjectionResult Analyze(
+    internal static FilePageAnalysis Analyze(
         Guid assessmentId,
-        ClassicPageWebSource web,
-        ClassicPageDiscovery discovered,
-        ClassicPageItemSource source,
-        ClassicPageSourceOptions options,
+        WebFacts web,
+        DiscoveryEvidence discovered,
+        FilePageEvidence source,
+        ClassicCollectionOptions options,
+        WebPartMappingManager mapping)
+    {
+        if (discovered.SiteCollectionId is not Guid site || site == Guid.Empty ||
+            discovered.FileUniqueId is not Guid file || file == Guid.Empty)
+            return new(
+                null,
+                [],
+                discovered,
+                false,
+                "Physical file identity was not acquired; no file Page can be invented.");
+        FilePageAnalysis result = AnalyzeCapturedEvidence(assessmentId, web, discovered, source, options, mapping);
+        if (result.Modern)
+            result = result with
+            {
+                Page = new ClassicPageRow
+                {
+                    ScanId = assessmentId,
+                    SiteCollectionId = site,
+                    WebId = discovered.WebId,
+                    FileUniqueId = file,
+                    SiteUrl = web.SiteUrl,
+                    WebUrl = web.WebUrl,
+                    ListId = source.ListId,
+                    ListItemId = discovered.ListItemId,
+                    ListTitle = source.ListTitle,
+                    ListUrl = source.ListUrl,
+                    PageUrl = discovered.Url,
+                    PageName = source.Fields.GetValueOrDefault("Title")?.Text ?? discovered.FileName,
+                    PageType = ClassicPageRules.ModernPage,
+                    AssessmentStatus = "NotApplicable",
+                    DiscoveryStatus = discovered.DiscoveryStatus,
+                    ClassificationReason = "ObservedModernPageItemMetadata",
+                }
+            };
+        if (result.Page != null)
+        {
+            result.Page.Identity = PageIdentity.File(site, file);
+            result.Page.SourceKind = "File";
+            result.Page.AssessmentPageType = result.Page.PageType;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Applies readiness analysis only after native physical identity is established, retaining original discovery and failure provenance.
+    /// </summary>
+    private static FilePageAnalysis AnalyzeCapturedEvidence(
+        Guid assessmentId,
+        WebFacts web,
+        DiscoveryEvidence discovered,
+        FilePageEvidence source,
+        ClassicCollectionOptions options,
         WebPartMappingManager mapping)
     {
         // The analysis mutates only a detached projection, never the source facts.
-        ClassicPageDiscovery? row =
-            JsonSerializer.Deserialize<ClassicPageDiscovery>(JsonSerializer.Serialize(discovered))!;
+        DiscoveryEvidence? row = JsonSerializer.Deserialize<DiscoveryEvidence>(JsonSerializer.Serialize(discovered))!;
         row.HomePage = SnapshotHomePage.ResolveHomePageState(
             row.Url,
             web.WelcomePage,
@@ -61,9 +110,9 @@ internal static class ClassicPageProjection
                 row,
                 source.OwningListMatched == true,
                 source.ListRootFolderUrls);
-            ClassicPage? filePage = FileLevelPageProjection.Project(row, association);
+            ClassicPageRow? filePage = FileLevelPageProjection.Project(row, association);
             if (filePage == null) return new(null, [], row, false);
-            ClassicPageWebPart[] fileParts = [];
+            ClassicPageWebPartRow[] fileParts = [];
             if (source.WebPartsState.Succeeded)
             {
                 fileParts = PageWebPartExtractor.Build(filePage, source, options.ExportWebPartProperties).ToArray();
@@ -97,21 +146,21 @@ internal static class ClassicPageProjection
         Dictionary<string, object?>? values = source.Fields.ToDictionary(x => x.Key, x => x.Value.ToValue());
         string? url = ClassicPageRules.ResolvePhysicalPageUrl(values, row.Url);
         string? contentType = source.Fields.GetValueOrDefault("ContentTypeId")?.Text ?? row.ContentTypeId;
-        string? type = ClassicPageRules.IsPublishingContentType(contentType)
+        string type = ClassicPageRules.IsPublishingContentType(contentType)
             ? ClassicPageRules.PublishingPage
             : ClassicPageRules.GetPageType(values);
         row.PageType = type;
         row.AssessmentStatus = type == ClassicPageRules.ModernPage ? "NotApplicable" : "Complete";
         if (type == ClassicPageRules.ModernPage) return new(null, [], row, true);
         string? name = source.Fields.GetValueOrDefault("Title")?.Text;
-        ClassicPage? page = new ClassicPage
+        ClassicPageRow? page = new ClassicPageRow
         {
             ScanId = assessmentId,
             SiteUrl = web.SiteUrl,
             WebUrl = web.WebUrl,
             PageUrl = url,
             PageName = !string.IsNullOrEmpty(name) ? name : Path.GetFileNameWithoutExtension(url),
-            ListId = source.ListId ?? Guid.Empty,
+            ListId = source.ListId,
             ListTitle = source.ListTitle,
             ListUrl = source.ListUrl,
             ModifiedAt =
@@ -139,7 +188,7 @@ internal static class ClassicPageProjection
                 _ => null
             },
         };
-        ClassicPageWebPart[] parts = [];
+        ClassicPageWebPartRow[] parts = [];
         string? error = null;
         if (type is ClassicPageRules.WebPartPage or ClassicPageRules.WikiPage or ClassicPageRules.PublishingPage)
         {
@@ -184,12 +233,12 @@ internal static class ClassicPageProjection
     /// Evaluates the existing home-page fallback from saved features, layout, and part evidence.
     /// </summary>
     private static bool HomeFallback(
-        ClassicPageWebSource web,
-        ClassicPage page,
-        ClassicPageItemSource source,
-        ClassicPageWebPart[] parts)
+        WebFacts web,
+        ClassicPageRow page,
+        FilePageEvidence source,
+        ClassicPageWebPartRow[] parts)
     {
-        string[]? split = web.Template.Split('#');
+        string[]? split = web.WebTemplate.Split('#');
         int configuration = split.Length == 2 && int.TryParse(split[1], out int parsed) ? parsed : -1;
         return HomePageDetector.IsUncustomizedHomePageFallback(
             true,
@@ -227,7 +276,7 @@ internal static class ClassicPageProjection
     /// <summary>
     /// Appends distinct assessment stage and acquisition diagnostics to a detached discovery row.
     /// </summary>
-    internal static void AddError(ClassicPageDiscovery row, string stage, SourceReadState state)
+    internal static void AddError(DiscoveryEvidence row, string stage, SourceReadState state)
     {
         row.ErrorStage = string.Join(
             ';',

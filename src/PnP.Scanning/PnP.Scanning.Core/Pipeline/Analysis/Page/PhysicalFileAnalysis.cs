@@ -25,7 +25,7 @@ internal static class PhysicalFileAnalysisRules
     /// <summary>
     /// Classifies acquired ASPX bytes independently of file admission and preserves native identity.
     /// </summary>
-    internal static PhysicalFileAnalysis Analyze(SPFileSource file)
+    internal static PhysicalFileAnalysis Analyze(PhysicalFileFacts file)
     {
         AspxPageEvidence? evidence = file.AspxEvidenceJson == null
             ? null
@@ -57,7 +57,7 @@ internal static class PhysicalFileAnalysisRules
     /// <summary>
     /// Returns a captured file path relative to its owning Web when that relationship is known.
     /// </summary>
-    private static string? WebRelativePath(SPFileSource file)
+    private static string? WebRelativePath(PhysicalFileFacts file)
     {
         if (file.SiteUrl == null || file.WebUrl == null || file.ServerRelativeUrl == null) return null;
         string? locator = file.SiteUrl.TrimEnd('/') + (file.WebUrl == "/" ? "" : file.WebUrl);

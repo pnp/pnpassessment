@@ -32,8 +32,8 @@ public sealed class NativePipelineTests
     {
         using StoreCase? output = new StoreCase("classic-native-report");
         PipelineStore? store = new PipelineStore(AppContext.BaseDirectory);
-        ClassicPageFixture? source =
-            new ClassicPageFixture { IncludePhysicalFacts = true, IncludeBlog = true, IncludeDelve = true };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { IncludePhysicalFacts = true, IncludeBlog = true, IncludeDelve = true };
         Guid assessment = Guid.Empty;
         try
         {
@@ -42,7 +42,7 @@ public sealed class NativePipelineTests
                 ClassicPageModule.Registry(source.OpenAsync),
                 new());
             using (AsyncServerStreamingCall<StartStatus>? call = host.Client.Start(
-                       ClassicPageFixture.MakeOptions(usage: true)))
+                       ClassicContentFixture.MakeOptions(usage: true)))
                 await foreach (StartStatus? message in call.ResponseStream.ReadAllAsync())
                 {
                     Assert.NotEqual(Constants.MessageError, message.Type);
@@ -108,7 +108,7 @@ public sealed class NativePipelineTests
         using (ScanContext? db = data.Store.CreateContext(assessment))
         {
             await db.Database.MigrateAsync();
-            StartRequest? request = ClassicPageFixture.MakeOptions();
+            StartRequest? request = ClassicContentFixture.MakeOptions();
             db.Scans.Add(
                 new PnP.Scanning.Core.Storage.Scan
                 {
@@ -132,7 +132,7 @@ public sealed class NativePipelineTests
             await db.SaveChangesAsync();
         }
 
-        ClassicPageFixture? source = new ClassicPageFixture { IncludePhysicalFacts = true };
+        ClassicContentFixture? source = new ClassicContentFixture { IncludePhysicalFacts = true };
         await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
@@ -158,8 +158,8 @@ public sealed class NativePipelineTests
     public async Task Existing_start_command_routes_pages_and_mixed_components_through_the_new_pipeline(bool mixed)
     {
         using StoreCase? data = new StoreCase("classic-existing-cli");
-        ClassicPageFixture? source =
-            new ClassicPageFixture { IncludePhysicalFacts = true, IncludeBlog = true, IncludeDelve = true };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { IncludePhysicalFacts = true, IncludeBlog = true, IncludeDelve = true };
         await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
@@ -174,9 +174,9 @@ public sealed class NativePipelineTests
             "--tenant",
             "contoso.sharepoint.com",
             "--tenantid",
-            ClassicPageFixture.SiteId.ToString(),
+            ClassicContentFixture.SiteCollectionId.ToString(),
             "--applicationid",
-            ClassicPageFixture.App,
+            ClassicContentFixture.App,
             "--authmode",
             "application",
             "--certpath",
@@ -211,7 +211,7 @@ public sealed class NativePipelineTests
     public async Task Default_all_classic_selection_uses_the_same_replacement()
     {
         using StoreCase? data = new StoreCase("classic-default-all");
-        ClassicPageFixture? source = new ClassicPageFixture { IncludePhysicalFacts = true };
+        ClassicContentFixture? source = new ClassicContentFixture { IncludePhysicalFacts = true };
         await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
@@ -223,9 +223,9 @@ public sealed class NativePipelineTests
             "--tenant",
             "contoso.sharepoint.com",
             "--tenantid",
-            ClassicPageFixture.SiteId.ToString(),
+            ClassicContentFixture.SiteCollectionId.ToString(),
             "--applicationid",
-            ClassicPageFixture.App,
+            ClassicContentFixture.App,
             "--authmode",
             "application",
             "--certpath",
@@ -246,13 +246,14 @@ public sealed class NativePipelineTests
     public async Task Existing_native_Start_pause_restart_and_list_preserve_phase_identity()
     {
         using StoreCase? data = new StoreCase("classic-native-restart");
-        ClassicPageFixture? source = new ClassicPageFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
         ForbiddenOnlineEnvironment? environment = new ForbiddenOnlineEnvironment();
         await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
             environment);
-        using (AsyncServerStreamingCall<StartStatus>? call = host.Client.Start(ClassicPageFixture.MakeOptions()))
+        using (AsyncServerStreamingCall<StartStatus>? call = host.Client.Start(ClassicContentFixture.MakeOptions()))
         {
             List<StartStatus>? messages = new List<StartStatus>();
             await foreach (StartStatus? message in call.ResponseStream.ReadAllAsync()) messages.Add(message);
@@ -292,12 +293,13 @@ public sealed class NativePipelineTests
     public async Task Existing_stop_rpc_settles_new_collection_before_stopping_the_engine()
     {
         using StoreCase? data = new StoreCase("classic-native-stop");
-        ClassicPageFixture? source = new ClassicPageFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
         await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
             new());
-        using (AsyncServerStreamingCall<StartStatus>? call = host.Client.Start(ClassicPageFixture.MakeOptions()))
+        using (AsyncServerStreamingCall<StartStatus>? call = host.Client.Start(ClassicContentFixture.MakeOptions()))
             await foreach (StartStatus? message in call.ResponseStream.ReadAllAsync())
                 Assert.NotEqual(Constants.MessageError, message.Type);
         await source.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
@@ -348,7 +350,7 @@ public sealed class NativePipelineTests
                 Tenant = "offline.invalid",
                 AuthMode = "InvalidFixtureAuth",
                 Environment = "Production",
-                ApplicationId = ClassicPageFixture.App,
+                ApplicationId = ClassicContentFixture.App,
                 Threads = 1,
             });
         List<StartStatus>? messages = new List<StartStatus>();

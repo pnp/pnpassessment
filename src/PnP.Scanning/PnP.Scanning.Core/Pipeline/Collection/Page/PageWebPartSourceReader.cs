@@ -86,14 +86,14 @@ internal static class PageWebPartSourceReader
             await context.ExecuteQueryAsync();
             definitions.AddRange(parts.Select(x => ((string?)null, x)));
             if (pageType == ClassicPageRules.WebPartPage)
-                properties = ClassicPageOnlineSource.Fields(file.Properties.FieldValues);
+                properties = ClassicContentReader.Fields(file.Properties.FieldValues);
             if (pageType == ClassicPageRules.PublishingPage &&
                 file.ListItemAllFields.FieldValues.TryGetValue("PublishingPageLayout", out object? layout))
             {
                 // Retain the original URL field, including its friendly description.
                 fields["PublishingPageLayout"] =
-                    ClassicPageOnlineSource.Fields(new Dictionary<string, object> { ["PublishingPageLayout"] = layout })
-                        ["PublishingPageLayout"];
+                    ClassicContentReader.Fields(new Dictionary<string, object> { ["PublishingPageLayout"] = layout })[
+                        "PublishingPageLayout"];
             }
         }
 
@@ -125,7 +125,7 @@ internal static class PageWebPartSourceReader
                     x.Definition.WebPart.Hidden,
                     x.Definition.WebPart.IsClosed,
                     x.Definition.WebPart.ExportMode.ToString(),
-                    ClassicPageOnlineSource.Fields(x.Definition.WebPart.Properties.FieldValues),
+                    ClassicContentReader.Fields(x.Definition.WebPart.Properties.FieldValues),
                     xml?.Value,
                     xml == null ? SourceReadState.NotAttempted : SourceReadState.Complete);
             })

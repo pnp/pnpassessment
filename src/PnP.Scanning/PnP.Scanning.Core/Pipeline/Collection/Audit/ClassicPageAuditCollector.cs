@@ -34,10 +34,7 @@ internal sealed class ClassicPageAuditCollector(
     /// <summary>
     /// Collects and journals settled coverage for every fixed audit subwindow.
     /// </summary>
-    internal async Task CollectAsync(
-        ClassicPageScopeSource scope,
-        ClassicPageAcquisitionJournal journal,
-        CancellationToken token)
+    internal async Task CollectAsync(ClassicCollectionScope scope, AcquisitionJournal journal, CancellationToken token)
     {
         Enum.TryParse<Microsoft365Environment>(options.Environment, out Microsoft365Environment cloud);
         string graph = CloudManager.GetMicrosoftGraphAuthority(cloud);
@@ -110,8 +107,8 @@ internal sealed class ClassicPageAuditCollector(
         int chunk,
         DateTime start,
         DateTime end,
-        ClassicPageScopeSource scope,
-        ClassicPageAcquisitionJournal journal,
+        ClassicCollectionScope scope,
+        AcquisitionJournal journal,
         string graph,
         Func<CancellationToken, Task<string>> provider,
         CancellationToken token)
@@ -128,8 +125,8 @@ internal sealed class ClassicPageAuditCollector(
             ["recordTypeFilters"] = new[] { "sharePoint" },
             ["operationFilters"] = new[] { "ClassicPageViewed", "ClassicPageCreated", "ClassicPageEdited" },
         };
-        if (scope.ExplicitSites && scope.Sites.Length > 0)
-            query["objectIdFilters"] = scope.Sites.Select(x => x.TrimEnd('/') + "/*").ToArray();
+        if (scope.ExplicitSites && scope.SiteCollectionUrls.Length > 0)
+            query["objectIdFilters"] = scope.SiteCollectionUrls.Select(x => x.TrimEnd('/') + "/*").ToArray();
         ClassicAuditHttpReceipt? submitted = await journal.ReadOrAcquireAsync(
             "AuditSubmit",
             chunk.ToString(),

@@ -7,12 +7,12 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Module;
 /// <summary>
 /// Freezes selected sites, Web enumeration, options, audit window, and scope evidence.
 /// </summary>
-internal sealed record ClassicPageScopeSource(
-    string[] Sites,
-    ClassicPageSiteScope[] SiteScopes,
+internal sealed record ClassicCollectionScope(
+    string[] SiteCollectionUrls,
+    SiteCollectionScope[] SiteCollections,
     bool ExplicitSites,
-    ClassicPageSourceOptions Options,
+    ClassicCollectionOptions Options,
     DateTime AuditWindowStart,
     DateTime AuditWindowEnd,
-    ClassicPageDiscoveryRow[] Evidence,
+    DiscoveryEvidence[] Evidence,
     bool ClassicComponentsRequested = false);

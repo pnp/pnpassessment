@@ -15,11 +15,11 @@ internal static class SPFileFactConsolidator
     /// <summary>
     /// Merges detached observations through the existing native-file evidence policy.
     /// </summary>
-    internal static SPFileSource Consolidate(SPFileSource? previous, SPFileSource incoming) =>
-        ClassicPageSourceJson.Convert<SPFileSource>(
+    internal static PhysicalFileFacts Consolidate(PhysicalFileFacts? previous, PhysicalFileFacts incoming) =>
+        CollectionJson.Convert<PhysicalFileFacts>(
             SPFileWriter.Consolidate(
-                previous == null ? null : ClassicPageSourceJson.Convert<SPFile>(previous),
-                ClassicPageSourceJson.Convert<SPFile>(incoming)));
+                previous == null ? null : CollectionJson.Convert<SPFile>(previous),
+                CollectionJson.Convert<SPFile>(incoming)));
 }
 
 /// <summary>
@@ -35,8 +35,8 @@ internal static class SnapshotPageMappingCalculator
         IReadOnlyList<ClassicPageWebPartRow> parts,
         WebPartMappingManager mapping)
     {
-        ClassicPage? legacyPage = ClassicPageSourceJson.Convert<ClassicPage>(page);
-        ClassicPageWebPart[]? legacyParts = parts.Select(ClassicPageSourceJson.Convert<ClassicPageWebPart>).ToArray();
+        ClassicPage legacyPage = Storage.Pipeline.ClassicCompatibility.ToLegacyPage(page);
+        ClassicPageWebPart[]? legacyParts = parts.Select(CollectionJson.Convert<ClassicPageWebPart>).ToArray();
         PageMappingCalculator.ApplyMapping(legacyPage, legacyParts, mapping);
         page.WebPartCount = legacyPage.WebPartCount;
         page.MappingPercentage = legacyPage.MappingPercentage;

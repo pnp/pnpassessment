@@ -9,6 +9,9 @@ using PnP.Scanning.Core.Discovery;
 
 namespace PnP.Scanning.Core.Scanners
 {
+    /// <summary>
+    /// Retains Classic page classification and compatibility helpers without owning replacement scan scheduling.
+    /// </summary>
     internal static class PageScanComponent
     {
         internal static readonly Guid FeatureId_Site_Publishing = new("F6924D36-2FA8-4F0B-B16D-06B7250180FA");

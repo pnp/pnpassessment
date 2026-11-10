@@ -1,15 +1,15 @@
 #nullable enable
 using PnP.Scanning.Core.Pipeline.Contracts.Shared;
 using PnP.Scanning.Core.Pipeline.Contracts.Page;
+using PnP.Scanning.Core.Pipeline.Contracts.Web;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts.Site;
 
 /// <summary>
 /// Retains one site's fixed Web identities, templates, and enumeration evidence.
 /// </summary>
-internal sealed record ClassicPageSiteScope(
+internal sealed record SiteCollectionScope(
     string SiteUrl,
-    string[] WebUrls,
-    string[] Templates,
+    WebScope[] Webs,
     SourceReadState State,
-    ClassicPageDiscoveryRow[]? Evidence = null);
+    DiscoveryEvidence[]? Evidence = null);

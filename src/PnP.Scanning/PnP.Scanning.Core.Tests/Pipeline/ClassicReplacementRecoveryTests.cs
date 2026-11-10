@@ -37,14 +37,14 @@ public sealed class ClassicReplacementRecoveryTests
                     .UseSqlite($"Data Source={data.Store.DatabasePath(id)};Pooling=False")
                     .AddInterceptors(interceptor)
                     .Options));
-        ClassicPageFixture? source = new ClassicPageFixture { IncludePhysicalFacts = true, IncludeBlog = true };
+        ClassicContentFixture? source = new ClassicContentFixture { IncludePhysicalFacts = true, IncludeBlog = true };
         ForbiddenOnlineEnvironment? environment = new ForbiddenOnlineEnvironment();
         PipelineCoordinator? coordinator = new PipelineCoordinator(
             store,
             ClassicPageModule.Registry(source.OpenAsync),
             environment);
         Core.Services.PhaseReply? ticket =
-            await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request() });
         Guid assessment = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Terminated, await coordinator.WaitForCompletionAsync(assessment));
         using (ScanContext? db = store.CreateContext(assessment, readOnly: true))
@@ -101,37 +101,38 @@ public sealed class ClassicReplacementRecoveryTests
     [Fact]
     public void Custom_display_form_items_keep_the_existing_supported_aspx_behavior_in_the_new_collector()
     {
-        ClassicPageFixture? source = new ClassicPageFixture();
-        ClassicPageBlogBatchSource? batch = new ClassicPageBlogBatchSource(
-            ClassicPageFixture.Site,
+        ClassicContentFixture? source = new ClassicContentFixture();
+        ListItemBatch? batch = new ListItemBatch(
+            ClassicContentFixture.Site,
             "/",
-            ClassicPageFixture.ListId,
+            ClassicContentFixture.ListId,
             "Custom content",
             "/sites/a/Lists/Custom",
             [],
             null,
             SourceReadState.Complete,
+            ListItemQueryKind.CustomDisplayForms,
+            100,
             "/sites/a/Lists/Custom/DispForm.aspx",
-            "ASPXPage",
             ContentTypeForms: [new ClassicContentTypeForm("0x0102", "/sites/a/Lists/Custom/Custom.aspx")]);
         Dictionary<string, SourceField>? fields = new Dictionary<string, SourceField>
         {
             ["ID"] = SourceField.Of("Int32", 9), ["ContentTypeId"] = SourceField.Of("String", "0x010201"),
         };
-        Core.Pipeline.Contracts.Page.ClassicPageRow? page = ClassicBlogPageProjection.Analyze(
+        Core.Pipeline.Contracts.Page.ClassicPageRow? page = ListItemPageProjection.Analyze(
             Guid.NewGuid(),
             batch,
-            fields,
+            new ListItemFacts(9, fields),
             source.Web(),
             source.Options);
         Assert.Equal("/sites/a/Lists/Custom/Custom.aspx?ID=9", page!.PageUrl);
         Assert.Equal("ASPXPage", page.PageType);
         Assert.Equal("CP5", page.RemediationCode);
         Assert.Null(
-            ClassicBlogPageProjection.Analyze(
+            ListItemPageProjection.Analyze(
                 Guid.NewGuid(),
                 batch with { ContentTypeForms = null },
-                fields,
+                new ListItemFacts(9, fields),
                 source.Web(),
                 source.Options));
     }

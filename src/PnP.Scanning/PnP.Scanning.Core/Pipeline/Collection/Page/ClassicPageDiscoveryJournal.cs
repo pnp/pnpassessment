@@ -8,9 +8,8 @@ namespace PnP.Scanning.Core.Pipeline.Collection.Page;
 /// <summary>
 /// Wraps discovery requests with durable acquisition receipts for restart.
 /// </summary>
-internal sealed class ClassicPageDiscoveryJournal(
-    ISharePointAspxRestClientFactory inner,
-    ClassicPageAcquisitionJournal journal) : ISharePointAspxRestClientFactory
+internal sealed class ClassicPageDiscoveryJournal(ISharePointAspxRestClientFactory inner, AcquisitionJournal journal)
+    : ISharePointAspxRestClientFactory
 {
     /// <summary>
     /// Returns a discovery client whose individual requests are durably journaled.
@@ -26,8 +25,7 @@ internal sealed class ClassicPageDiscoveryJournal(
     /// <summary>
     /// Journals discovery operations while leaving cached transport ownership with its factory.
     /// </summary>
-    private sealed class Client(ISharePointAspxRestClient inner, ClassicPageAcquisitionJournal journal)
-        : ISharePointAspxRestClient
+    private sealed class Client(ISharePointAspxRestClient inner, AcquisitionJournal journal) : ISharePointAspxRestClient
     {
         public Uri WebUrl => inner.WebUrl;
 

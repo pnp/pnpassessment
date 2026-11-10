@@ -74,7 +74,7 @@ public sealed class ContractAndSnapshotTests
 
         Type[]? types = typeof(AnalysisExecutor).Assembly.GetTypes()
             .Where(x =>
-                x.Namespace == "PnP.Scanning.Core.Pipeline.Analysis.Module" && x.Name != "ClassicPageInputIndex" ||
+                x.Namespace == "PnP.Scanning.Core.Pipeline.Analysis.Module" && x.Name != "ClassicContentIndex" ||
                 x.Namespace?.StartsWith("PnP.Scanning.Core.Pipeline.Contracts", StringComparison.Ordinal) == true ||
                 PurePageType(x) || x.DeclaringType != null && PurePageType(x.DeclaringType))
             .ToArray();

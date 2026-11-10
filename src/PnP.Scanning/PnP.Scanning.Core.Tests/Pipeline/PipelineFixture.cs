@@ -306,7 +306,9 @@ internal sealed class StoreCase : IDisposable
     /// </summary>
     internal async Task<(Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer)> UnsealedAsync(
         IReadOnlyList<CollectedObservation>? records = null,
-        Guid? existingAssessment = null)
+        Guid? existingAssessment = null,
+        string moduleKey = FixedSource.ModuleKey,
+        string inputVersion = FixedSource.InputVersion)
     {
         Guid assessment = existingAssessment ?? Guid.NewGuid();
         Guid snapshot = Guid.NewGuid();
@@ -315,8 +317,8 @@ internal sealed class StoreCase : IDisposable
         {
             AssessmentId = assessment,
             SnapshotId = snapshot,
-            ModuleKey = FixedSource.ModuleKey,
-            InputVersion = FixedSource.InputVersion,
+            ModuleKey = moduleKey,
+            InputVersion = inputVersion,
             ScopeJson = VersionedJson.From(new { scope = "fixed fixture" }).Json,
             CreatedAtUtc = DateTime.UtcNow,
         };
@@ -325,8 +327,8 @@ internal sealed class StoreCase : IDisposable
             AssessmentId = assessment,
             RunId = run,
             SnapshotId = snapshot,
-            ModuleKey = FixedSource.ModuleKey,
-            InputVersion = FixedSource.InputVersion,
+            ModuleKey = moduleKey,
+            InputVersion = inputVersion,
             Kind = PhaseKind.Collection,
             CurrentPhase = PhaseKind.Collection,
             Status = ScanStatus.Queued,
@@ -338,7 +340,7 @@ internal sealed class StoreCase : IDisposable
             await Store.CreateCollectionAsync(
                 new PnP.Scanning.Core.Storage.Scan
                 {
-                    ScanId = assessment, CLIMode = "Pipeline:" + FixedSource.ModuleKey, Status = ScanStatus.Queued
+                    ScanId = assessment, CLIMode = "Pipeline:" + moduleKey, Status = ScanStatus.Queued
                 },
                 source,
                 phase,

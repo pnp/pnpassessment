@@ -16,15 +16,12 @@ namespace PnP.Scanning.Core.Pipeline.Collection.List;
 /// <summary>
 /// Acquires paged content items using isolated SDK contexts and captured list scope.
 /// </summary>
-internal static class ClassicBlogContentReader
+internal static class ListItemContentReader
 {
     /// <summary>
     /// Captures candidate native list scopes and display-form declarations using a cloned SDK context.
     /// </summary>
-    internal static async Task<ClassicBlogListScopeSource> ReadListsAsync(
-        PnPContext pnp,
-        ClassicPageWebSource web,
-        CancellationToken token)
+    internal static async Task<WebListItemQueries> ReadListsAsync(PnPContext pnp, WebFacts web, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         // List reloads replace SDK metadata needed by the other mixed Classic components.
@@ -38,16 +35,17 @@ internal static class ClassicBlogContentReader
             l => l.ContentTypes.QueryProperties(type => type.StringId, type => type.DisplayFormUrl),
             l => l.RootFolder.QueryProperties(f => f.ServerRelativeUrl)));
         token.ThrowIfCancellationRequested();
-        ClassicBlogListSource[]? lists = contentContext.Web.Lists.AsRequested()
-            .Select(l => new ClassicBlogListSource(
+        ListItemQueryScope[]? lists = contentContext.Web.Lists.AsRequested()
+            .Select(l => new ListItemQueryScope(
                 l.Id,
                 l.Title,
                 l.RootFolder.ServerRelativeUrl,
                 l.BaseType == ListBaseType.DocumentLibrary
-                    ? ClassicPageRules.DelveBlogPage
+                    ? ListItemQueryKind.PointPublishingFiles
                     : l.TemplateType == ListTemplateType.Posts
-                        ? ClassicPageRules.BlogPage
-                        : ClassicPageRules.ASPXPage,
+                        ? ListItemQueryKind.Posts
+                        : ListItemQueryKind.CustomDisplayForms,
+                (int)l.TemplateType,
                 l.BaseType == ListBaseType.DocumentLibrary
                     ? null
                     : NormalizeDisplayForm(l.DefaultDisplayFormUrl, pnp.Uri, web.SiteUrl),
@@ -60,7 +58,7 @@ internal static class ClassicBlogContentReader
                         .Where(type => type.FormUrl != null)
                         .OrderByDescending(type => type.ContentTypeId.Length)
                         .ToArray()))
-            .Where(list => list.PageType != ClassicPageRules.ASPXPage ||
+            .Where(list => list.QueryKind != ListItemQueryKind.CustomDisplayForms ||
                            LegacyDisplayFormAssessment.IsContentPageForm(list.DisplayFormUrl) ||
                            list.ContentTypeForms?.Any(type =>
                                LegacyDisplayFormAssessment.IsContentPageForm(type.FormUrl)) == true)
@@ -79,7 +77,7 @@ internal static class ClassicBlogContentReader
             !SharePointAspxUrlPolicy.HasSameHttpsAuthority(site, absolute))
         {
             Serilog.Log.Warning(
-                "A Blog display-form declaration has a foreign authority; its content URL remains unknown");
+                "A content display-form declaration has a foreign authority; its content URL remains unknown");
             return null;
         }
 
@@ -89,10 +87,10 @@ internal static class ClassicBlogContentReader
     /// <summary>
     /// Validates the selected native list and acquires one bounded content-item page with its continuation.
     /// </summary>
-    internal static async Task<ClassicPageBlogBatchSource> ReadBatchAsync(
+    internal static async Task<ListItemBatch> ReadBatchAsync(
         PnPContext pnp,
-        ClassicPageWebSource web,
-        ClassicBlogListSource expected,
+        WebFacts web,
+        ListItemQueryScope expected,
         string? paging,
         bool skipUsers,
         CancellationToken token)
@@ -108,25 +106,44 @@ internal static class ClassicBlogContentReader
             l => l.RootFolder.QueryProperties(f => f.ServerRelativeUrl));
         token.ThrowIfCancellationRequested();
         if (!string.Equals(list.RootFolder.ServerRelativeUrl, expected.ListUrl, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("The selected Blog/Delve list root changed after scope acquisition.");
-        bool delve = expected.PageType == ClassicPageRules.DelveBlogPage;
-        if ((!delve && expected.PageType == ClassicPageRules.BlogPage && list.TemplateType != ListTemplateType.Posts) ||
-            (!delve && list.BaseType == ListBaseType.DocumentLibrary) ||
-            (delve && list.BaseType != ListBaseType.DocumentLibrary))
-            throw new InvalidDataException("The Blog/Delve source type differs from its selected list.");
-        string? query = ClassicPageQuery.Create(new(), false, null, skipUsers, delve);
-        ClassicPageBlogBatchSource? batch = await ClassicPageOnlineSource.LoadBatchAsync(
-            list,
-            query,
-            paging,
-            token,
+            throw new InvalidDataException("The selected native list root changed after query-scope acquisition.");
+        bool pointPublishingQuery = expected.QueryKind == ListItemQueryKind.PointPublishingFiles;
+        if ((int)list.TemplateType != expected.ListTemplate ||
+            (!pointPublishingQuery && expected.QueryKind == ListItemQueryKind.Posts &&
+             list.TemplateType != ListTemplateType.Posts) ||
+            (!pointPublishingQuery && list.BaseType == ListBaseType.DocumentLibrary) ||
+            (pointPublishingQuery && list.BaseType != ListBaseType.DocumentLibrary))
+            throw new InvalidDataException("The observed list template or query kind differs from its fixed scope.");
+        string query = ListItemQueryBuilder.Create(
+            new(),
+            filterOnAspxFiles: false,
+            skipUserInformation: skipUsers,
+            filterOnPointPublishingFiles: pointPublishingQuery);
+        ListItemFieldBatch batch = await ClassicContentReader.LoadItemFieldsAsync(list, query, paging, token);
+        return new ListItemBatch(
             web.SiteUrl,
-            web.WebUrl);
-        return batch with
-        {
-            DisplayFormUrl = expected.DisplayFormUrl,
-            PageType = expected.PageType,
-            ContentTypeForms = expected.ContentTypeForms
-        };
+            web.WebUrl,
+            batch.ListId,
+            batch.ListTitle,
+            batch.ListUrl,
+            batch.Items.Select(fields => new ListItemFacts(ParseItemId(fields), fields)).ToArray(),
+            batch.NextPage,
+            batch.State,
+            expected.QueryKind,
+            (int)list.TemplateType,
+            expected.DisplayFormUrl,
+            ContentTypeForms: expected.ContentTypeForms);
     }
+
+    /// <summary>
+    /// Requires the real returned native item ID before an acquisition receipt can represent a ListItem.
+    /// </summary>
+    private static int ParseItemId(Dictionary<string, SourceField> fields) =>
+        int.TryParse(
+            fields.GetValueOrDefault("ID")?.Text,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out int itemId) && itemId > 0
+            ? itemId
+            : throw new InvalidDataException("The list response did not contain a valid native item ID.");
 }

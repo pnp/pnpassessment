@@ -31,13 +31,14 @@ public sealed class ClassicPageRuntimeTests
     public async Task Foreign_assessment_file_evidence_cannot_seal_or_start_analysis()
     {
         using StoreCase? data = new StoreCase("classicpage-foreign-assessment");
-        ClassicPageFixture? source =
-            new ClassicPageFixture { IncludePhysicalFacts = true, ExtraFileAssessment = Guid.NewGuid() };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { IncludePhysicalFacts = true, ExtraFileAssessment = Guid.NewGuid() };
         PipelineCoordinator? coordinator = new PipelineCoordinator(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
             new ForbiddenOnlineEnvironment());
-        PhaseReply? ticket = await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
+        PhaseReply? ticket =
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request() });
         Guid id = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Terminated, await coordinator.WaitForCompletionAsync(id));
         using ScanContext? db = data.Store.CreateContext(id);
@@ -54,7 +55,7 @@ public sealed class ClassicPageRuntimeTests
     {
         using HttpClient? shared = new HttpClient(new RecordedHandler());
         HttpClient? transport = new HttpClient(new CollectionHttpClient(shared, default));
-        using (new ClassicPageOnlineSource.CsomLease(
+        using (new ClassicContentReader.CsomLease(
                    new Microsoft.SharePoint.Client.ClientContext("https://contoso.invalid"),
                    transport))
         {
@@ -88,17 +89,18 @@ public sealed class ClassicPageRuntimeTests
     public async Task Denied_discovery_is_not_an_authoritative_empty_result()
     {
         using StoreCase? data = new StoreCase("classicpage-denied-discovery");
-        ClassicPageFixture? source = new ClassicPageFixture { DeniedDiscovery = true };
+        ClassicContentFixture? source = new ClassicContentFixture { DeniedDiscovery = true };
         PipelineCoordinator? coordinator = new PipelineCoordinator(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
             new ForbiddenOnlineEnvironment());
-        PhaseReply? ticket = await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
+        PhaseReply? ticket =
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request() });
         Guid id = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
         using ScanContext? db = data.Store.CreateContext(id);
         Core.Storage.Pipeline.AnalysisResultRow? result = (await db.AnalysisResults.ToListAsync()).Single(row =>
-            new VersionedJson(row.PayloadJson).Value.GetProperty("kind").GetString() == "Discovery");
+            new VersionedJson(row.PayloadJson).Value.GetProperty("kind").GetString() == "FileInventory");
         Assert.Equal(AnalysisOutcome.Unknown, result.Outcome);
         JsonElement value = new VersionedJson(result.PayloadJson).Value;
         Assert.Empty(value.GetProperty("files").EnumerateArray());
@@ -115,14 +117,17 @@ public sealed class ClassicPageRuntimeTests
     public async Task Denied_optional_web_metadata_retains_discovered_native_files()
     {
         using StoreCase? data = new StoreCase("classicpage-partial-web");
-        ClassicPageFixture? source = new ClassicPageFixture { IncludePhysicalFacts = true, FailEnrichment = true };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { IncludePhysicalFacts = true, FailEnrichment = true };
         PipelineCoordinator? coordinator = new PipelineCoordinator(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
             new ForbiddenOnlineEnvironment());
-        PhaseReply? ticket = await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request() });
+        PhaseReply? ticket =
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request() });
         Guid id = Guid.Parse(ticket.AssessmentId);
-        Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
+        ScanStatus status = await coordinator.WaitForCompletionAsync(id);
+        Assert.True(status == ScanStatus.Finished, (await data.Store.LatestRootAsync(id))!.LastError);
         using ScanContext? db = data.Store.CreateContext(id);
         Assert.All(
             await db.AnalysisRuns.AsNoTracking().ToListAsync(),
@@ -132,8 +137,8 @@ public sealed class ClassicPageRuntimeTests
                 Assert.NotNull(run.ReportPublishedAtUtc);
             });
         Core.Storage.Pipeline.SourceObservationRow? discovery =
-            await db.SourceObservations.SingleAsync(x => x.SourceIdentity.StartsWith("Discovery:"));
-        Assert.Equal(8, ClassicPageSourceJson.Read<ClassicPageDiscoverySource>(discovery.RawBytes).Files!.Length);
+            await db.SourceObservations.SingleAsync(x => x.SourceIdentity.StartsWith("FileInventory:"));
+        Assert.Equal(8, CollectionJson.Read<WebFileInventory>(discovery.RawBytes).Files!.Length);
         Assert.True(await db.AnalysisResults.AnyAsync(x => x.Outcome == AnalysisOutcome.Unknown));
         Assert.DoesNotContain(source.Calls.Keys, key => key.StartsWith("page:", StringComparison.Ordinal));
     }
@@ -187,7 +192,7 @@ public sealed class ClassicPageRuntimeTests
     public async Task Production_module_replays_native_files_actual_blog_items_and_audit_without_online_access()
     {
         using StoreCase? data = new StoreCase("classicpage-replay");
-        ClassicPageFixture? source = new ClassicPageFixture
+        ClassicContentFixture? source = new ClassicContentFixture
         {
             IncludePhysicalFacts = true,
             IncludeBlog = true,
@@ -201,7 +206,7 @@ public sealed class ClassicPageRuntimeTests
             ClassicPageModule.Registry(source.OpenAsync),
             environment);
         PhaseReply? ticket =
-            await coordinator.StartPipelineAsync(new() { Collection = ClassicPageFixture.Request(usage: true) });
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request(usage: true) });
         Guid id = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(id));
         using ScanContext? db = data.Store.CreateContext(id);
@@ -209,28 +214,28 @@ public sealed class ClassicPageRuntimeTests
             .ToDictionaryAsync(x => x.ObservationId, x => x.PayloadJson);
         List<Core.Storage.Pipeline.SourceObservationRow>? observations =
             await db.SourceObservations.AsNoTracking().ToListAsync();
-        ClassicPageBlogBatchSource[]? blogs = observations
-            .Where(x => new VersionedJson(x.MetadataJson).Value.GetProperty("kind").GetString() == "Blog")
-            .Select(x => ClassicPageSourceJson.Read<ClassicPageBlogBatchSource>(x.RawBytes))
+        ListItemBatch[]? blogs = observations
+            .Where(x => new VersionedJson(x.MetadataJson).Value.GetProperty("kind").GetString() == "ListItems")
+            .Select(x => CollectionJson.Read<ListItemBatch>(x.RawBytes))
             .ToArray();
         Assert.Equal(5, blogs.Sum(x => x.Items.Length));
         Assert.Equal(3, blogs.Select(x => x.ListId).Distinct().Count());
         JsonElement[]? pages = original.Values.Select(x => new VersionedJson(x).Value)
-            .Where(x => x.GetProperty("kind").GetString() == "Blog")
+            .Where(x => x.GetProperty("kind").GetString() == "ListItems")
             .SelectMany(x => x.GetProperty("pages").EnumerateArray())
             .ToArray();
         Assert.Contains(
             pages,
             page => page.GetProperty("PageUrl").GetString() == "/sites/a/Lists/Posts/Post.aspx?ID=100");
-        Assert.Contains(pages, page => page.GetProperty("PageUrl").GetString() == "/sites/a/Stories/post.pointpub");
+        Assert.Contains(pages, page => page.GetProperty("PageUrl").GetString() == "/sites/a/SitePages/post.pointpub");
         JsonElement discovery = original.Values.Select(x => new VersionedJson(x).Value)
-            .Single(x => x.GetProperty("kind").GetString() == "Discovery");
-        Assert.Equal(8, discovery.GetProperty("files").GetArrayLength());
+            .Single(x => x.GetProperty("kind").GetString() == "FileInventory");
+        Assert.Equal(9, discovery.GetProperty("files").GetArrayLength());
         Assert.All(
             discovery.GetProperty("files").EnumerateArray(),
             file =>
             {
-                Assert.Equal(ClassicPageFixture.SiteId, file.GetProperty("SiteCollectionId").GetGuid());
+                Assert.Equal(ClassicContentFixture.SiteCollectionId, file.GetProperty("SiteCollectionId").GetGuid());
                 Assert.NotEqual(Guid.Empty, file.GetProperty("FileUniqueId").GetGuid());
             });
         Assert.Contains(await db.AnalysisResults.ToListAsync(), x => x.Outcome == AnalysisOutcome.Failed);
@@ -273,12 +278,13 @@ public sealed class ClassicPageRuntimeTests
     public async Task Production_collection_pause_reuses_committed_discovery_receipts()
     {
         using StoreCase? data = new StoreCase("classicpage-resume");
-        ClassicPageFixture? source = new ClassicPageFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
+        ClassicContentFixture? source =
+            new ClassicContentFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
         PipelineCoordinator? coordinator = new PipelineCoordinator(
             data.Store,
             ClassicPageModule.Registry(source.OpenAsync),
             new ForbiddenOnlineEnvironment());
-        PhaseReply? ticket = await coordinator.CollectAsync(ClassicPageFixture.Request());
+        PhaseReply? ticket = await coordinator.CollectAsync(ClassicContentFixture.Request());
         Guid id = Guid.Parse(ticket.AssessmentId);
         await source.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
         await coordinator.PauseAsync(id, false);
@@ -312,7 +318,7 @@ public sealed class ClassicPageRuntimeTests
             .ToArray();
         AspxSourceObservation? acquired = await AspxSourceReader.ReadStreamAsync(new MemoryStream(bytes), default);
         Assert.Equal(bytes, acquired.Bytes);
-        SPFileSource? file = new SPFileSource
+        PhysicalFileFacts? file = new PhysicalFileFacts
         {
             SiteCollectionId = Guid.NewGuid(),
             FileUniqueId = Guid.NewGuid(),
@@ -343,11 +349,11 @@ public sealed class ClassicPageRuntimeTests
             null,
             AcquisitionStatus.Complete,
             VersionedJson.From(new { kind = "PhysicalFile" }),
-            ClassicPageSourceJson.Bytes(file));
+            CollectionJson.Bytes(file));
         (Guid Assessment, Guid Snapshot, Guid Run, ISnapshotWriter Writer) seed =
             await data.UnsealedAsync([observation]);
         await seed.Writer.SealAsync(default);
-        SPFileSource? saved = ClassicPageSourceJson.Read<SPFileSource>(
+        PhysicalFileFacts? saved = CollectionJson.Read<PhysicalFileFacts>(
             (await data.Store.SnapshotReader(seed.Assessment, seed.Snapshot)
                 .ReadAsync(observation.ObservationId, default)).Artifact.GetBytes());
         Assert.Equal(bytes, JsonSerializer.Deserialize<AspxPageEvidence>(saved.AspxEvidenceJson!)!.OriginalBytes);
