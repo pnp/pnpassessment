@@ -39,8 +39,8 @@ internal static class ClassicAspxExportClassifier
 
             string pageType = ClassicPageRules.GetPageType(fields);
             if (pageType is ClassicPageRules.ASPXPage or ClassicPageRules.WikiPage &&
-                (!fields.TryGetValue(WikiField, out object wiki) || wiki == null) &&
-                fields.TryGetValue(FileTypeField, out object fileType) && string.Equals(
+                (!fields.TryGetValue(WikiField, out object? wiki) || wiki == null) &&
+                fields.TryGetValue(FileTypeField, out object? fileType) && string.Equals(
                     Convert.ToString(fileType, System.Globalization.CultureInfo.InvariantCulture),
                     "pointpub",
                     StringComparison.InvariantCultureIgnoreCase))
@@ -58,9 +58,9 @@ internal static class ClassicAspxExportClassifier
     }
 
     /// <summary>Restores omitted, explicit-null and value states using the original field names, without retaining or inventing page-source content.</summary>
-    private static bool TryRestoreFields(SPFile file, out IDictionary<string, object> fields)
+    private static bool TryRestoreFields(SPFile file, out IDictionary<string, object?> fields)
     {
-        fields = new Dictionary<string, object>(StringComparer.Ordinal);
+        fields = new Dictionary<string, object?>(StringComparer.Ordinal);
         try
         {
             using var document = JsonDocument.Parse(file.ItemMetadataFieldStatesJson);
@@ -98,7 +98,7 @@ internal static class ClassicAspxExportClassifier
 
     /// <summary>Reconstructs a single field exactly as observed; a missing or omitted field is never synthesized from a nullable column.</summary>
     private static bool RestoreField(
-        IDictionary<string, object> fields,
+        IDictionary<string, object?> fields,
         IReadOnlyDictionary<string, string> states,
         string name,
         string? value,
@@ -111,13 +111,13 @@ internal static class ClassicAspxExportClassifier
 
         if (state == Null)
         {
-            fields.Add(name, null!);
+            fields.Add(name, null);
             return true;
         }
 
         if (state == Value && (value != null || valueIsKnownNull))
         {
-            fields.Add(name, value!);
+            fields.Add(name, value);
             return true;
         }
 

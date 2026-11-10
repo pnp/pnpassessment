@@ -17,7 +17,7 @@ public sealed class ClassicAspxExportClassifierTests
     private const string ModernContentType = "0x0101009D1CB255DA76424F860D91F20E6C411800";
 
     /// <summary>Creates available item observations with the exact field-state contract used by acquisition.</summary>
-    private static SPFile ItemFile(Dictionary<string, object> fields)
+    private static SPFile ItemFile(Dictionary<string, object?> fields)
     {
         return new SPFile
         {
@@ -45,11 +45,11 @@ public sealed class ClassicAspxExportClassifierTests
         bool wiki,
         string expected)
     {
-        var fields = new Dictionary<string, object>
+        Dictionary<string, object?> fields = new Dictionary<string, object?>
         {
-            ["HTML_x0020_File_x0020_Type"] = htmlType!,
-            ["ClientSideApplicationId"] = application!,
-            ["WikiField"] = wiki ? string.Empty : null!
+            ["HTML_x0020_File_x0020_Type"] = htmlType,
+            ["ClientSideApplicationId"] = application,
+            ["WikiField"] = wiki ? string.Empty : null
         };
         var result = ClassicAspxExportClassifier.Classify(ItemFile(fields));
         result.PageType.Should().Be(ClassicPageRules.GetPageType(fields)).And.Be(expected);
@@ -60,7 +60,7 @@ public sealed class ClassicAspxExportClassifierTests
     [Fact]
     public void PublishingOverrideStillPrecedesExistingFieldMethod()
     {
-        var file = ItemFile(new Dictionary<string, object> { ["ClientSideApplicationId"] = ModernApplication });
+        SPFile file = ItemFile(new Dictionary<string, object?> { ["ClientSideApplicationId"] = ModernApplication });
         file.ContentTypeId = PublishingContentType;
         ClassicPageRules.IsPublishingContentType(file.ContentTypeId).Should().BeTrue();
         var result = ClassicAspxExportClassifier.Classify(file);
@@ -72,7 +72,7 @@ public sealed class ClassicAspxExportClassifierTests
     [Fact]
     public void AvailableItemDoesNotAcquireNewContentTypePrecedence()
     {
-        var file = ItemFile(new Dictionary<string, object> { ["BSN"] = "" });
+        SPFile file = ItemFile(new Dictionary<string, object?> { ["BSN"] = "" });
         file.ContentTypeId = ModernContentType;
         var result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("WikiPage");
@@ -123,7 +123,7 @@ public sealed class ClassicAspxExportClassifierTests
     [Fact]
     public void DelveMarkerStillUsesExistingFieldClassification()
     {
-        var fields = new Dictionary<string, object> { ["File_x0020_Type"] = "pointpub" };
+        Dictionary<string, object?> fields = new Dictionary<string, object?> { ["File_x0020_Type"] = "pointpub" };
         ClassicAspxExportClassifier.Classify(ItemFile(fields)).PageType.Should().Be("DelveBlogPage");
         ClassicPageRules.GetPageType(fields).Should().NotBe("DelveBlogPage");
     }

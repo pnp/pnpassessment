@@ -203,7 +203,7 @@ public sealed class NativePipelineTests
         Assert.Equal("Classic", (await db.Scans.SingleAsync()).CLIMode);
         Assert.True(await db.ClassicPages.AnyAsync(x => x.PageType == "BlogPage"));
         Assert.False(await db.ClassicPages.AnyAsync(x => x.PageType == "DelveBlogPage"));
-        Assert.True(await db.SPFiles.AnyAsync(x => x.FileName.EndsWith(".pointpub")));
+        Assert.True(await db.SPFiles.AnyAsync(x => x.FileName != null && x.FileName.EndsWith(".pointpub")));
         Assert.Equal(mixed ? 1 : 0, await db.ClassicLists.CountAsync());
         Assert.Single(await db.SourceSnapshots.ToListAsync());
         Assert.Single(await db.AnalysisRuns.ToListAsync());

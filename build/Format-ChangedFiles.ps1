@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $repositoryRoot
 try {
-    $files = @(git diff --name-only --diff-filter=ACM "$BaseRef...HEAD" -- '*.cs')
+    $files = @(git diff --name-only --diff-filter=ACMR "$BaseRef...HEAD" -- '*.cs')
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to resolve the changed C# file list.'
     }

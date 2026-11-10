@@ -672,7 +672,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     {
         foreach (var name in names)
         {
-            if (response.Headers.TryGetValues(name, out IEnumerable<string>? values))
+            if (response.Headers.TryGetValues(name, out IEnumerable<string> values))
                 return BoundedHeader(values.FirstOrDefault());
             if (response.Content.Headers.TryGetValues(name, out values)) return BoundedHeader(values.FirstOrDefault());
         }
