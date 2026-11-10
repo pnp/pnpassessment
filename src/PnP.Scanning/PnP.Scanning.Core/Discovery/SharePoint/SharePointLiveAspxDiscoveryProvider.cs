@@ -1681,7 +1681,6 @@ internal sealed class SharePointLiveAspxDiscoveryProvider : IAspxDiscoveryProvid
             }
         }
 
-        /// <summary>Validates retained paging receipts and records terminal coverage without hiding cancellation or missing identity.</summary>
         LiveCollectionEvidence RecordCompletion()
         {
             AspxPaginationValidation validation = AspxPaginationContract.Validate(receipts, providerOutcome);

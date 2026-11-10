@@ -1530,7 +1530,6 @@ namespace PnP.Scanning.Core.Storage
             {
             }
 
-            /// <summary>Converts a matching tenant URL to a server-relative path while preserving foreign origins.</summary>
             string Rel(string abs)
             {
                 if (tenantOrigin == null || !abs.StartsWith(tenantOrigin, StringComparison.OrdinalIgnoreCase))

@@ -144,7 +144,6 @@ internal sealed record ClassicPagePublication(
         ClassicContentIndex index,
         Dictionary<(string Site, string Web, string RecordKey), DiscoveryEvidence> evidence)
     {
-        /// <summary>Retains one incomplete content-acquisition scope as native gap evidence without creating a Page.</summary>
         void Add(
             string siteUrl,
             string webUrl,
