@@ -449,7 +449,6 @@ namespace PnP.Scanning.Core.Services
             string exportPath,
             CsvConfiguration config)
         {
-            await ClassicAspxReportProjection.ExportCsvAsync(dbContext, scanId, exportPath, config);
             // Physical inventory, scope coverage, references, pagination, gaps and the final verdict
             // share the assessment-owned discovery.csv report.
             using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))

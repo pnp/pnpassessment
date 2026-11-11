@@ -214,6 +214,21 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.Throws<SnapshotIntegrityException>(() => ClassicReportCsvProjection.SelectPages(source));
     }
 
+    /// <summary>Preserves the shared nullable-text wire contract used by the physical ASPX inventory.</summary>
+    [Theory]
+    [InlineData(null, @"\N")]
+    [InlineData("", "")]
+    [InlineData(@"\N", @"\\N")]
+    [InlineData(@"\\N", @"\\\N")]
+    [InlineData(@"\leading", @"\\leading")]
+    [InlineData(@"inside\path", @"inside\path")]
+    [InlineData("quoted,\"value\"\r\nline", "quoted,\"value\"\r\nline")]
+    public void Aspx_nullable_text_encoding_is_reversible(string? value, string encoded)
+    {
+        Assert.Equal(encoded, ClassicAspxNullableStringConverter.Encode(value));
+        Assert.Equal(value, ClassicAspxNullableStringConverter.Decode(encoded));
+    }
+
     /// <summary>Raw export streams every SQL ASPX fact, including modern/blocked/unknown/denied/catalog files, preserving literal bytes and null strings.</summary>
     [Fact]
     public async Task Raw_Aspx_CSV_is_unfiltered_SQL_inventory_with_reversible_nulls_and_matching_counts()
@@ -325,6 +340,12 @@ public sealed class ClassicReportCsvProjectionTests
             assessment,
             directory,
             new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = "," });
+        Assert.False(System.IO.File.Exists(Path.Combine(directory, "classicaspx.csv")));
+        Assert.False(System.IO.File.Exists(Path.Combine(directory, "classicaspxsummary.json")));
+        Assert.True(System.IO.File.Exists(Path.Combine(directory, "aspx.csv")));
+        Assert.True(System.IO.File.Exists(Path.Combine(directory, "aspxsummary.json")));
+        Assert.True(System.IO.File.Exists(Path.Combine(directory, "classicpagessummary.json")));
+        Assert.True(System.IO.File.Exists(Path.Combine(directory, "discovery.csv")));
         Assert.False(System.IO.File.Exists(Path.Combine(directory, "classicpageauditusage.csv")));
         Assert.Equal(canonicalPages, await context.ClassicPages.CountAsync());
         Assert.Equal(capturedParts, await context.ClassicPageWebParts.CountAsync());

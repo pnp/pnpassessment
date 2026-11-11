@@ -103,6 +103,23 @@ namespace PnP.Scanning.Core.Tests.Storage
             ReadDataModelSchema(authoringCopy).Should().Be(ReadDataModelSchema(embedded));
         }
 
+        /// <summary>Both shipped Classic templates use the supported page CSV independently of the retired projection.</summary>
+        [Fact]
+        public void ClassicTemplates_UseSupportedPageCsv()
+        {
+            const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
+            using Stream embedded = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
+            embedded.Should().NotBeNull();
+            string authoringCopy = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ClassicAssessmentReport.pbit");
+            string[] schemas = { ReadDataModelSchema(embedded), ReadDataModelSchema(authoringCopy) };
+            foreach (string schema in schemas)
+            {
+                schema.Should().Contain("classicpages.csv")
+                    .And.NotContain("classicaspx.csv")
+                    .And.NotContain("classicaspxsummary.json");
+            }
+        }
+
         [Fact]
         public void RewriteDataLocationsInPbit_NewCsvSources_PathsRewritten()
         {

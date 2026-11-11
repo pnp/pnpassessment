@@ -517,6 +517,68 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
+        /// <summary>Exports physical facts and historical pages through the dispatcher using only the supported CSV outputs.</summary>
+        [Fact]
+        public async Task Csv_Dispatch_ExportsPhysicalInventoryAndLegacyPages()
+        {
+            Guid scanId = Guid.NewGuid();
+            Guid fileId = Guid.NewGuid();
+            using (ScanContext context = fixture.CreateContext())
+            {
+                context.SPFiles.Add(new SPFile
+                {
+                    ScanId = scanId,
+                    SiteCollectionId = Guid.NewGuid(),
+                    FileUniqueId = fileId,
+                    SiteUrl = "https://example.invalid/sites/report",
+                    WebUrl = "/",
+                    ServerRelativeUrl = "/sites/report/Home.aspx",
+                    FileName = "Home.aspx",
+                    FileReadState = "Denied",
+                    CoverageState = "Incomplete",
+                    FirstObservedAtUtc = DateTime.UnixEpoch,
+                    ObservedAtUtc = DateTime.UnixEpoch,
+                    ProvenanceJson = "[]"
+                });
+                context.ClassicPages.Add(new ClassicPage
+                {
+                    ScanId = scanId,
+                    SiteUrl = "https://example.invalid/sites/report",
+                    WebUrl = "/",
+                    PageUrl = "/Home.aspx",
+                    CustomizedPageStatus = "Uncustomized"
+                });
+                await context.SaveChangesAsync();
+            }
+
+            string exportDir = NewTempDir();
+            try
+            {
+                await ExportAsync(scanId, exportDir);
+                Directory.GetFiles(exportDir).Select(Path.GetFileName).Should()
+                    .Contain(new[]
+                    {
+                        "aspx.csv", "aspxsummary.json", "classicpages.csv", "classicpagessummary.json", "discovery.csv"
+                    })
+                    .And.NotContain(new[] { "classicaspx.csv", "classicaspxsummary.json" });
+                ReadHeader(Path.Join(exportDir, "aspx.csv")).Should().HaveCount(47);
+                using StreamReader reader = new(Path.Join(exportDir, "aspx.csv"));
+                using CsvReader csv = new(reader, CultureInfo.InvariantCulture);
+                csv.Read();
+                csv.ReadHeader();
+                csv.Read().Should().BeTrue();
+                csv.GetField<Guid>("FileUniqueId").Should().Be(fileId);
+                csv.GetField("FileReadState").Should().Be("Denied");
+                csv.Read().Should().BeFalse();
+                ReadRecords<ClassicPage>(Path.Join(exportDir, "classicpages.csv"))
+                    .Should().ContainSingle().Which.PageUrl.Should().Be("/Home.aspx");
+            }
+            finally
+            {
+                DeleteTempDir(exportDir);
+            }
+        }
+
         private async Task ExportAsync(Guid scanId, string exportDir)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = "," };
