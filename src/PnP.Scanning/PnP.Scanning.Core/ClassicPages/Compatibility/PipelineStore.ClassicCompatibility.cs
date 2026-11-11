@@ -100,11 +100,15 @@ internal sealed partial class PipelineStore
                 {
                     List<Core.ClassicPages.Contracts.Audit.ClassicPageAuditChunkSource>? chunks =
                         new List<PnP.Scanning.Core.ClassicPages.Contracts.Audit.ClassicPageAuditChunkSource>();
-                    foreach (ManifestMember? member in manifest.Members.Values)
+                    SourceSnapshotRow snapshot = await db.SourceSnapshots.AsNoTracking()
+                        .SingleAsync(x => x.SnapshotId == phase.SnapshotId, token);
+                    // Full manifest validation above already verified every member, including non-audit content.
+                    foreach (ManifestMember member in manifest.Members.Values.Where(member =>
+                                 new VersionedJson(member.MetadataJson).Value.GetProperty("kind").GetString() == "AuditChunk"))
                     {
                         SourceRecord? source = await ReadSelectedObservationAsync(
                             db,
-                            await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == phase.SnapshotId, token),
+                            snapshot,
                             member.ObservationId,
                             manifest,
                             token);
