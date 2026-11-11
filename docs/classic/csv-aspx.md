@@ -30,6 +30,8 @@ Captured bytes take precedence over older flattened handler/declaration values. 
 
 Nullable text uses the existing `BackslashNullV1` encoding: after normal CSV unquoting, `\N` is null, an empty field is a known empty string, and a leading backslash in a real value is escaped with one extra backslash. Nullable Boolean, integer and GUID fields use empty values.
 
+Within captured typed item-field JSON, an omitted optional user/lookup property means it was not acquired; an explicit JSON null or text remains distinct. The SDK's unavailable display properties do not erase other returned item fields. Missing lookup IDs are not replaced with the SDK's `-1` sentinel. Unrelated SDK errors still remain acquisition failures.
+
 `aspxsummary.json` counts the rows actually written and their true/false/unknown NoExecute distribution. It does not substitute the selected Pages count or assert tenant completeness.
 
 ## Other outputs and Power BI

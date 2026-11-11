@@ -182,8 +182,8 @@ internal static class ListItemContentReader
         value switch
         {
             null => SourceField.Of("Null", null),
-            IFieldUserValue user => SourceField.Of("User", new { user.Email, user.LookupValue, user.LookupId }),
-            IFieldLookupValue lookup => SourceField.Of("Lookup", new { lookup.LookupValue, lookup.LookupId }),
+            IFieldUserValue user => LookupField(user),
+            IFieldLookupValue lookup => LookupField(lookup),
             Microsoft.SharePoint.Client.FieldUserValue user => SourceField.Of(
                 "User",
                 new { Email = user.Email, user.LookupValue, user.LookupId }),
@@ -192,12 +192,38 @@ internal static class ListItemContentReader
             DateTime date => SourceField.Of("DateTime", date),
             Guid guid => SourceField.Of("Guid", guid),
             int number => SourceField.Of("Int32", number),
+            uint number => SourceField.Of("Int64", (long)number),
             long number => SourceField.Of("Int64", number),
             double number => SourceField.Of("Double", number),
             decimal number => SourceField.Of("Decimal", number),
             bool boolean => SourceField.Of("Boolean", boolean),
             string text => SourceField.Of("String", text),
+            List<string> values => SourceField.Of("Json", values),
             System.Text.Json.JsonElement json => SourceField.Of("Json", json),
             _ => throw new NotSupportedException($"Unsupported source field type '{value.GetType().FullName}'."),
         };
+
+    /// <summary>Detaches available lookup/user properties without treating an omitted SDK display value as failure of the acquired item.</summary>
+    private static SourceField LookupField(IFieldLookupValue lookup)
+    {
+        Dictionary<string, object?> values = new();
+        if (lookup is IFieldUserValue user) CaptureProperty(values, nameof(user.Email), () => user.Email);
+        CaptureProperty(values, nameof(lookup.LookupValue), () => lookup.LookupValue);
+        // The SDK returns -1 when LookupId was not loaded; it is not an observed native identity.
+        if (lookup.LookupId >= 0) values[nameof(lookup.LookupId)] = lookup.LookupId;
+        return SourceField.Of(lookup is IFieldUserValue ? "User" : "Lookup", values);
+    }
+
+    /// <summary>Retains explicit null or text and omits only a specifically unacquired SDK property; other getter errors remain failures.</summary>
+    private static void CaptureProperty(Dictionary<string, object?> values, string name, Func<string?> read)
+    {
+        try
+        {
+            values.Add(name, read());
+        }
+        catch (PnP.Core.ClientException error) when (error.Error.Type == PnP.Core.ErrorType.PropertyNotLoaded)
+        {
+            Serilog.Log.Debug("Captured list-field property {Property} was not returned by the SDK", name);
+        }
+    }
 }
