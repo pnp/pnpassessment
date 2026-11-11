@@ -30,9 +30,10 @@ namespace PnP.Scanning.Core.Storage
 
         internal static string DbName => "assessment.db";
 
+        /// <summary>Persists the queued assessment, fixed options and site scope before native scanner execution.</summary>
         internal async Task LaunchNewScanAsync(Guid scanId, StartRequest start, List<string> siteCollectionList)
         {
-            using (var dbContext = new ScanContext(scanId))
+            using (ScanContext dbContext = new ScanContext(scanId))
             {
                 //Ensure the database is created
                 await dbContext.Database.MigrateAsync();
@@ -79,7 +80,7 @@ namespace PnP.Scanning.Core.Storage
 
                 if (start.Properties.Count > 0)
                 {
-                    foreach (var property in start.Properties)
+                    foreach (PropertyRequest property in start.Properties)
                     {
                         dbContext.Properties.Add(
                             new Property
@@ -95,10 +96,10 @@ namespace PnP.Scanning.Core.Storage
                 await dbContext.SaveChangesAsync();
 
                 // Perform bulk insert to increase performance
-                var siteCollectionsToAdd = new List<SiteCollection>();
+                List<SiteCollection> siteCollectionsToAdd = new List<SiteCollection>();
 
                 // Persist the site collections to scan
-                foreach (var site in siteCollectionList)
+                foreach (string site in siteCollectionList)
                 {
                     siteCollectionsToAdd.Add(
                         new SiteCollection { ScanId = scanId, SiteUrl = site, Status = SiteWebStatus.Queued, });

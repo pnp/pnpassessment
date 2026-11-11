@@ -29,6 +29,7 @@ internal sealed partial class PipelineStore
         return Path.Combine(RootDirectory, assessmentId.ToString(), StorageManager.DbName);
     }
 
+    /// <summary>Creates an assessment-bound SQLite context with local timing records attributed to the caller.</summary>
     internal ScanContext
         CreateContext(
             Guid assessmentId,
@@ -49,6 +50,7 @@ internal sealed partial class PipelineStore
                     .Options,
                 new SqlLifecycleLogger(operation, file, operation, line));
 
+    /// <summary>Times the caller's serialized write and commits its existing atomic transaction after successful cancellation checks.</summary>
     private async Task<T> WriteAsync<T>(
         Guid assessmentId,
         Func<ScanContext, Task<T>> action,

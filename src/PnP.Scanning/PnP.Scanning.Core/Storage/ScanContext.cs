@@ -146,7 +146,7 @@ namespace PnP.Scanning.Core.Storage
             [CallerLineNumber] int line = 0)
         {
             sqlLifecycle = new SqlLifecycleLogger(member, file, member, line);
-            var path = StorageManager.GetScanDataFolder(scanId);
+            string path = StorageManager.GetScanDataFolder(scanId);
 
             // Ensure path exists
             Directory.CreateDirectory(path);
