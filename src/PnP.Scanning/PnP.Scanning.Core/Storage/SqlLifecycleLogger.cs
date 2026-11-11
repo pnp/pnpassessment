@@ -12,7 +12,12 @@ internal sealed class SqlLifecycleLogger : IDisposable
     private readonly Dictionary<Guid, long> transactions = new();
 
     /// <summary>Captures the context creation call site without installing a new asynchronous scope.</summary>
-    internal SqlLifecycleLogger(string operation, string file, string member, int line, Action<SqlLogRecord>? write = null) =>
+    internal SqlLifecycleLogger(
+        string operation,
+        string file,
+        string member,
+        int line,
+        Action<SqlLogRecord>? write = null) =>
         context = new SqlOperationScope(operation, null, file, member, line, "context", write: write);
 
     /// <summary>Selects only timing payloads; EF-formatted SQL and parameter messages are never generated here.</summary>
@@ -30,22 +35,31 @@ internal sealed class SqlLifecycleLogger : IDisposable
         switch (data)
         {
             case CommandErrorEventData error:
-                scope.Record("command", error.Exception is OperationCanceledException ? "canceled" : "error",
-                    error.Duration.TotalMilliseconds, error.Exception.GetType().Name);
+                scope.Record(
+                    "command",
+                    error.Exception is OperationCanceledException ? "canceled" : "error",
+                    error.Duration.TotalMilliseconds,
+                    error.Exception.GetType().Name);
                 break;
             case CommandExecutedEventData command:
-                scope.Record("command", command.ExecuteMethod == DbCommandMethod.ExecuteReader ? "readerReturned" : "success",
+                scope.Record(
+                    "command",
+                    command.ExecuteMethod == DbCommandMethod.ExecuteReader ? "readerReturned" : "success",
                     command.Duration.TotalMilliseconds);
                 break;
             case CommandEndEventData canceled when data.EventId == RelationalEventId.CommandCanceled:
                 scope.Record("command", "canceled", canceled.Duration.TotalMilliseconds);
                 break;
             case TransactionErrorEventData error:
-                scope.Record("transactionOperation", error.Exception is OperationCanceledException ? "canceled" : "error",
-                    error.Duration.TotalMilliseconds, error.Exception.GetType().Name);
+                scope.Record(
+                    "transactionOperation",
+                    error.Exception is OperationCanceledException ? "canceled" : "error",
+                    error.Duration.TotalMilliseconds,
+                    error.Exception.GetType().Name);
                 break;
             case TransactionEventData transaction:
-                if (data.EventId == RelationalEventId.TransactionStarted || data.EventId == RelationalEventId.TransactionUsed)
+                if (data.EventId == RelationalEventId.TransactionStarted ||
+                    data.EventId == RelationalEventId.TransactionUsed)
                     transactions[transaction.TransactionId] = Stopwatch.GetTimestamp();
                 else if (data.EventId == RelationalEventId.TransactionDisposed)
                 {
@@ -54,11 +68,14 @@ internal sealed class SqlLifecycleLogger : IDisposable
                 }
                 else if (data is TransactionEndEventData end)
                 {
-                    string outcome = data.EventId == RelationalEventId.TransactionCommitted ? "committed" : "rolledBack";
+                    string outcome = data.EventId == RelationalEventId.TransactionCommitted
+                        ? "committed"
+                        : "rolledBack";
                     scope.Record("transactionOperation", outcome, end.Duration.TotalMilliseconds);
                     if (transactions.Remove(transaction.TransactionId, out long started))
                         scope.Record("transaction", outcome, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                 }
+
                 break;
         }
     }

@@ -32,7 +32,8 @@ public sealed class ClassicMaterializationPerformanceTests
         {
             string[] metadata = await db.SourceObservations.Select(row => row.MetadataJson).ToArrayAsync();
             members = metadata.Length;
-            chunks = metadata.Count(json => new VersionedJson(json).Value.GetProperty("kind").GetString() == "AuditChunk");
+            chunks = metadata.Count(json =>
+                new VersionedJson(json).Value.GetProperty("kind").GetString() == "AuditChunk");
             if (usage)
                 Assert.Contains(await db.ClassicPageAuditUsages.ToListAsync(), row => row.QueryStatus == "partial");
         }
@@ -69,27 +70,29 @@ public sealed class ClassicMaterializationPerformanceTests
                 (await db.SourceSnapshots.SingleAsync()).ManifestDigest = new string('0', 64);
             else
             {
-                SourceObservationRow row = (await db.SourceObservations.ToListAsync())
-                    .First(row => new VersionedJson(row.MetadataJson).Value.GetProperty("kind").GetString() != "AuditChunk");
+                SourceObservationRow row = (await db.SourceObservations.ToListAsync()).First(row =>
+                    new VersionedJson(row.MetadataJson).Value.GetProperty("kind").GetString() != "AuditChunk");
                 if (mutation == "content") row.RawBytes = [1, 2, 3];
                 if (mutation == "digest") row.Sha256 = new string('0', 64);
                 if (mutation == "metadata") row.MetadataJson = VersionedJson.From(new { kind = "AuditChunk" }).Json;
                 if (mutation == "identity") row.SourceIdentity = "Foreign:synthetic";
                 if (mutation == "membership")
-                    db.SourceObservations.Add(new SourceObservationRow
-                    {
-                        ObservationId = Guid.NewGuid(),
-                        SnapshotId = row.SnapshotId,
-                        SourceIdentity = "Unexpected:synthetic",
-                        SourceRevision = row.SourceRevision,
-                        AcquisitionStatus = row.AcquisitionStatus,
-                        MetadataJson = row.MetadataJson,
-                        AcquisitionError = row.AcquisitionError,
-                        RawBytes = row.RawBytes,
-                        Length = row.Length,
-                        Sha256 = row.Sha256,
-                    });
+                    db.SourceObservations.Add(
+                        new SourceObservationRow
+                        {
+                            ObservationId = Guid.NewGuid(),
+                            SnapshotId = row.SnapshotId,
+                            SourceIdentity = "Unexpected:synthetic",
+                            SourceRevision = row.SourceRevision,
+                            AcquisitionStatus = row.AcquisitionStatus,
+                            MetadataJson = row.MetadataJson,
+                            AcquisitionError = row.AcquisitionError,
+                            RawBytes = row.RawBytes,
+                            Length = row.Length,
+                            Sha256 = row.Sha256,
+                        });
             }
+
             await db.SaveChangesAsync();
         }
 
@@ -117,6 +120,7 @@ public sealed class ClassicMaterializationPerformanceTests
                     cancellation.Cancel();
                     cancellation.Token.ThrowIfCancellationRequested();
                 }
+
                 throw new IOException("Synthetic audit restoration read failure.");
             },
         };
@@ -140,11 +144,11 @@ public sealed class ClassicMaterializationPerformanceTests
     {
         ClassicContentFixture source = new() { IncludeBlog = true, IncludeSecondBlog = true, PartialAudit = true };
         PipelineCoordinator coordinator = new(
-            data.Store, ClassicPageModule.Registry(source.OpenAsync), new ForbiddenOnlineEnvironment());
-        Core.Services.PhaseReply ticket = await coordinator.StartPipelineAsync(new()
-        {
-            Collection = ClassicContentFixture.Request(usage),
-        });
+            data.Store,
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        Core.Services.PhaseReply ticket =
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request(usage), });
         Guid assessment = Guid.Parse(ticket.AssessmentId);
         Assert.Equal(ScanStatus.Finished, await coordinator.WaitForCompletionAsync(assessment));
         using ScanContext db = data.Store.CreateContext(assessment, readOnly: true);
@@ -154,9 +158,13 @@ public sealed class ClassicMaterializationPerformanceTests
 
     /// <summary>Attaches read instrumentation only to the materialization write context.</summary>
     private static PipelineStore Instrumented(StoreCase data, SourceReads reads) =>
-        new(data.DirectoryPath, id => new ScanContext(new DbContextOptionsBuilder<ScanContext>()
-            .UseSqlite($"Data Source={data.Store.DatabasePath(id)};Pooling=False")
-            .AddInterceptors(reads).Options));
+        new(
+            data.DirectoryPath,
+            id => new ScanContext(
+                new DbContextOptionsBuilder<ScanContext>()
+                    .UseSqlite($"Data Source={data.Store.DatabasePath(id)};Pooling=False")
+                    .AddInterceptors(reads)
+                    .Options));
 
     /// <summary>Captures every persisted compatibility row including physical identities, audit coverage and rollups.</summary>
     private static async Task<string[]> ReportRowsAsync(PipelineStore store, Guid assessment)
@@ -166,7 +174,9 @@ public sealed class ClassicMaterializationPerformanceTests
         List<string> rows = [];
         foreach (string table in db.Model.GetEntityTypes()
                      .Where(entity => entity.FindProperty("ScanId") != null)
-                     .Select(entity => entity.GetTableName()!).Distinct().Order())
+                     .Select(entity => entity.GetTableName()!)
+                     .Distinct()
+                     .Order())
         {
             using DbCommand command = db.Database.GetDbConnection().CreateCommand();
             command.CommandText = $"SELECT * FROM \"{table}\" WHERE \"ScanId\" = $scan";
@@ -182,6 +192,7 @@ public sealed class ClassicMaterializationPerformanceTests
                 rows.Add(table + ":" + JsonSerializer.Serialize(values));
             }
         }
+
         return rows.Order(StringComparer.Ordinal).ToArray();
     }
 
@@ -195,7 +206,9 @@ public sealed class ClassicMaterializationPerformanceTests
 
         /// <summary>Counts source reads before execution and optionally fails inside the materialization transaction.</summary>
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
             CancellationToken cancellationToken = default)
         {
             if (command.CommandText.Contains("FROM \"SourceSnapshots\"", StringComparison.Ordinal)) SnapshotReads++;
@@ -206,8 +219,10 @@ public sealed class ClassicMaterializationPerformanceTests
                     SelectedObservationReads++;
                     BeforeSelectedRead?.Invoke();
                 }
-                else FullObservationReads++;
+                else
+                    FullObservationReads++;
             }
+
             return ValueTask.FromResult(result);
         }
     }

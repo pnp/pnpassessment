@@ -21,8 +21,15 @@ internal sealed class SqlOperationScope : IDisposable
     private string? errorType;
 
     /// <summary>Captures a static code location and optionally installs this operation as the asynchronous parent.</summary>
-    internal SqlOperationScope(string operation, string? phase, string file, string member, int line,
-        string kind = "operation", bool install = false, Action<SqlLogRecord>? write = null)
+    internal SqlOperationScope(
+        string operation,
+        string? phase,
+        string file,
+        string member,
+        int line,
+        string kind = "operation",
+        bool install = false,
+        Action<SqlLogRecord>? write = null)
     {
         parent = CurrentScope.Value;
         Operation = operation;
@@ -45,21 +52,45 @@ internal sealed class SqlOperationScope : IDisposable
     internal Guid OperationId { get; }
 
     /// <summary>Times a scope with an observed finish, without inferring success from disposal.</summary>
-    internal static IDisposable Begin(string operation, string? phase = null,
-        [CallerFilePath] string file = "", [CallerMemberName] string member = "", [CallerLineNumber] int line = 0) =>
+    internal static IDisposable Begin(
+        string operation,
+        string? phase = null,
+        [CallerFilePath] string file = "",
+        [CallerMemberName] string member = "",
+        [CallerLineNumber] int line = 0) =>
         new SqlOperationScope(operation, phase, file, member, line, install: true);
 
     /// <summary>Times a database batch and preserves its exception and cancellation behavior.</summary>
-    internal static async Task RunAsync(Func<Task> action, string? operation = null, string? phase = null,
-        [CallerFilePath] string file = "", [CallerMemberName] string member = "", [CallerLineNumber] int line = 0)
+    internal static async Task RunAsync(
+        Func<Task> action,
+        string? operation = null,
+        string? phase = null,
+        [CallerFilePath] string file = "",
+        [CallerMemberName] string member = "",
+        [CallerLineNumber] int line = 0)
     {
-        await RunAsync(async () => { await action().ConfigureAwait(false); return true; },
-            operation, phase, file, member, line).ConfigureAwait(false);
+        await RunAsync(
+                async () =>
+                {
+                    await action().ConfigureAwait(false);
+                    return true;
+                },
+                operation,
+                phase,
+                file,
+                member,
+                line)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Times a complete asynchronous operation, including result consumption inside the supplied action.</summary>
-    internal static async Task<T> RunAsync<T>(Func<Task<T>> action, string? operation = null, string? phase = null,
-        [CallerFilePath] string file = "", [CallerMemberName] string member = "", [CallerLineNumber] int line = 0)
+    internal static async Task<T> RunAsync<T>(
+        Func<Task<T>> action,
+        string? operation = null,
+        string? phase = null,
+        [CallerFilePath] string file = "",
+        [CallerMemberName] string member = "",
+        [CallerLineNumber] int line = 0)
     {
         using SqlOperationScope scope = new(operation ?? member, phase, file, member, line, install: true);
         try
@@ -78,8 +109,20 @@ internal sealed class SqlOperationScope : IDisposable
 
     /// <summary>Writes an EF operation through the same local record format as timed database batches.</summary>
     internal void Record(string operationKind, string result, double elapsedMs, string? exceptionType = null) =>
-        write(new SqlLogRecord(DateTimeOffset.UtcNow, Operation, OperationId, parent?.OperationId, Phase,
-            operationKind, member, file, line, elapsedMs, result, exceptionType));
+        write(
+            new SqlLogRecord(
+                DateTimeOffset.UtcNow,
+                Operation,
+                OperationId,
+                parent?.OperationId,
+                Phase,
+                operationKind,
+                member,
+                file,
+                line,
+                elapsedMs,
+                result,
+                exceptionType));
 
     /// <summary>Emits one duration and restores the parent when this scope installed it.</summary>
     public void Dispose()

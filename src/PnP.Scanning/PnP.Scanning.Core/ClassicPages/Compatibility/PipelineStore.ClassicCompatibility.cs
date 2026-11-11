@@ -104,7 +104,8 @@ internal sealed partial class PipelineStore
                         .SingleAsync(x => x.SnapshotId == phase.SnapshotId, token);
                     // Full manifest validation above already verified every member, including non-audit content.
                     foreach (ManifestMember member in manifest.Members.Values.Where(member =>
-                                 new VersionedJson(member.MetadataJson).Value.GetProperty("kind").GetString() == "AuditChunk"))
+                                 new VersionedJson(member.MetadataJson).Value.GetProperty("kind").GetString() ==
+                                 "AuditChunk"))
                     {
                         SourceRecord? source = await ReadSelectedObservationAsync(
                             db,

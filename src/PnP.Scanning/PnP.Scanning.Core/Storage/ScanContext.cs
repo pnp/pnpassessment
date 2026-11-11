@@ -93,7 +93,11 @@ namespace PnP.Scanning.Core.Storage
 
         internal DbSet<ClassicACSPrincipalSiteScopedPermissions> ClassicACSPrincipalSiteScopedPermissions { get; set; }
 
-        internal DbSet<ClassicACSPrincipalTenantScopedPermissions> ClassicACSPrincipalTenantScopedPermissions { get; set; }
+        internal DbSet<ClassicACSPrincipalTenantScopedPermissions> ClassicACSPrincipalTenantScopedPermissions
+        {
+            get;
+            set;
+        }
 
         internal DbSet<TempClassicACSPrincipal> TempClassicACSPrincipals { get; set; }
 
@@ -119,8 +123,11 @@ namespace PnP.Scanning.Core.Storage
         /// context against an in-memory SQLite connection. When options are supplied here they
         /// already configure the provider, so <see cref="OnConfiguring"/> retains it and adds local SQL observation.
         /// </summary>
-        internal ScanContext(DbContextOptions<ScanContext> options, [CallerFilePath] string file = "",
-            [CallerMemberName] string member = "", [CallerLineNumber] int line = 0) : base(options)
+        internal ScanContext(
+            DbContextOptions<ScanContext> options,
+            [CallerFilePath] string file = "",
+            [CallerMemberName] string member = "",
+            [CallerLineNumber] int line = 0) : base(options)
         {
             sqlLifecycle = new SqlLifecycleLogger(member, file, member, line);
         }
@@ -132,8 +139,11 @@ namespace PnP.Scanning.Core.Storage
         }
 
         /// <summary>Targets the assessment database under its scan-owned data directory, creating that directory when needed.</summary>
-        internal ScanContext(Guid scanId, [CallerFilePath] string file = "",
-            [CallerMemberName] string member = "", [CallerLineNumber] int line = 0)
+        internal ScanContext(
+            Guid scanId,
+            [CallerFilePath] string file = "",
+            [CallerMemberName] string member = "",
+            [CallerLineNumber] int line = 0)
         {
             sqlLifecycle = new SqlLifecycleLogger(member, file, member, line);
             var path = StorageManager.GetScanDataFolder(scanId);
@@ -151,13 +161,13 @@ namespace PnP.Scanning.Core.Storage
             // connection in unit tests) the provider is already configured - don't override it.
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseSqlite($"Data Source={DbPath}", options =>
-                {
-                    options.MigrationsAssembly(Assembly.GetExecutingAssembly().FullName);
-                });
+                optionsBuilder.UseSqlite(
+                    $"Data Source={DbPath}",
+                    options => { options.MigrationsAssembly(Assembly.GetExecutingAssembly().FullName); });
             }
 
-            IDbContextLogger configuredLogger = optionsBuilder.Options.FindExtension<CoreOptionsExtension>()?.DbContextLogger;
+            IDbContextLogger configuredLogger =
+                optionsBuilder.Options.FindExtension<CoreOptionsExtension>()?.DbContextLogger;
             optionsBuilder.LogTo(
                 (id, level) => SqlLifecycleLogger.Includes(id, level) || configuredLogger?.ShouldLog(id, level) == true,
                 data =>
@@ -171,15 +181,27 @@ namespace PnP.Scanning.Core.Storage
         /// <summary>Records the full observed context lifetime, including synchronous result consumption.</summary>
         public override void Dispose()
         {
-            try { base.Dispose(); }
-            finally { sqlLifecycle.Dispose(); }
+            try
+            {
+                base.Dispose();
+            }
+            finally
+            {
+                sqlLifecycle.Dispose();
+            }
         }
 
         /// <summary>Records the full observed context lifetime without changing asynchronous disposal.</summary>
         public override async ValueTask DisposeAsync()
         {
-            try { await base.DisposeAsync().ConfigureAwait(false); }
-            finally { sqlLifecycle.Dispose(); }
+            try
+            {
+                await base.DisposeAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                sqlLifecycle.Dispose();
+            }
         }
 
         /// <summary>Configures existing compound keys and real SharePoint-file identity constraints without deriving observations or classification from migration.</summary>
@@ -189,28 +211,18 @@ namespace PnP.Scanning.Core.Storage
 
             // Extend the model defined via annotations, typically used for defining compound keys
 
-            modelBuilder.Entity<Property>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.Name });
-            });
+            modelBuilder.Entity<Property>(entity => { entity.HasKey(e => new { e.ScanId, e.Name }); });
 
-            modelBuilder.Entity<Cache>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.Key });
-            });
+            modelBuilder.Entity<Cache>(entity => { entity.HasKey(e => new { e.ScanId, e.Key }); });
 
-            modelBuilder.Entity<SiteCollection>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl });
-            });
+            modelBuilder.Entity<SiteCollection>(entity => { entity.HasKey(e => new { e.ScanId, e.SiteUrl }); });
 
-            modelBuilder.Entity<Web>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
-            });
+            modelBuilder.Entity<Web>(entity => { entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl }); });
 
             // PER SCAN COMPONENT: define needed tables here
+
             #region Syntex scanner
+
             modelBuilder.Entity<SyntexList>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
@@ -218,7 +230,14 @@ namespace PnP.Scanning.Core.Storage
 
             modelBuilder.Entity<SyntexContentType>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.ContentTypeId });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.ListId,
+                    e.ContentTypeId
+                });
             });
 
             modelBuilder.Entity<SyntexContentTypeSummary>(entity =>
@@ -228,45 +247,86 @@ namespace PnP.Scanning.Core.Storage
 
             modelBuilder.Entity<SyntexContentTypeField>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.ContentTypeId, e.FieldId });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.ListId,
+                    e.ContentTypeId,
+                    e.FieldId
+                });
             });
 
             modelBuilder.Entity<SyntexField>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FieldId });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.ListId,
+                    e.FieldId
+                });
             });
 
             modelBuilder.Entity<SyntexModelUsage>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.Classifier, e.TargetSiteId, e.TargetWebId, e.TargetListId });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.Classifier,
+                    e.TargetSiteId,
+                    e.TargetWebId,
+                    e.TargetListId
+                });
             });
 
             modelBuilder.Entity<SyntexFileType>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId, e.FileType });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.ListId,
+                    e.FileType
+                });
             });
 
-            modelBuilder.Entity<SyntexTermSet>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.TermSetId });
-            });
+            modelBuilder.Entity<SyntexTermSet>(entity => { entity.HasKey(e => new { e.ScanId, e.TermSetId }); });
+
             #endregion
 
             #region Workflow scanner
+
             modelBuilder.Entity<Workflow>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.DefinitionId, e.SubscriptionId });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.DefinitionId,
+                    e.SubscriptionId
+                });
             });
+
             #endregion
 
             #region InfoPath scanner
+
             modelBuilder.Entity<ClassicInfoPath>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.ListId });
             });
+
             #endregion
 
             #region Classic scanner
+
             modelBuilder.Entity<ClassicPageDiscovery>(entity =>
             {
                 entity.HasKey(e => new { e.ScanId, e.RecordKey });
@@ -277,10 +337,12 @@ namespace PnP.Scanning.Core.Storage
 
             modelBuilder.Entity<SPFile>(entity =>
             {
-                entity.ToTable("SPFile", table => table.HasCheckConstraint(
-                    "CK_SPFile_RealFile",
-                    "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND " +
-                    "\"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'"));
+                entity.ToTable(
+                    "SPFile",
+                    table => table.HasCheckConstraint(
+                        "CK_SPFile_RealFile",
+                        "\"SiteCollectionId\" <> '00000000-0000-0000-0000-000000000000' AND " +
+                        "\"FileUniqueId\" <> '00000000-0000-0000-0000-000000000000'"));
                 entity.HasKey(e => new { e.SiteCollectionId, e.FileUniqueId });
                 entity.Property(e => e.FileReadState).IsRequired();
                 entity.Property(e => e.CoverageState).IsRequired();
@@ -297,7 +359,14 @@ namespace PnP.Scanning.Core.Storage
 
             modelBuilder.Entity<ClassicPageWebPart>(entity =>
             {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.PageUrl, e.WebPartIndex });
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.SiteUrl,
+                    e.WebUrl,
+                    e.PageUrl,
+                    e.WebPartIndex
+                });
             });
 
             modelBuilder.Entity<ClassicWebPartUnique>(entity =>
@@ -320,10 +389,7 @@ namespace PnP.Scanning.Core.Storage
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
             });
 
-            modelBuilder.Entity<ClassicSiteSummary>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl });
-            });
+            modelBuilder.Entity<ClassicSiteSummary>(entity => { entity.HasKey(e => new { e.ScanId, e.SiteUrl }); });
 
             modelBuilder.Entity<ClassicWebSummary>(entity =>
             {
@@ -339,6 +405,7 @@ namespace PnP.Scanning.Core.Storage
             {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.PageUrl });
             });
+
             #endregion
 
             #region AddIn and ACS scanner
@@ -348,41 +415,65 @@ namespace PnP.Scanning.Core.Storage
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.AppInstanceId });
             });
 
-            modelBuilder.Entity<TempClassicACSPrincipal>(entity => {
+            modelBuilder.Entity<TempClassicACSPrincipal>(entity =>
+            {
                 entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ServerRelativeUrl });
             });
 
-            modelBuilder.Entity<ClassicACSPrincipal>(entity => {
+            modelBuilder.Entity<ClassicACSPrincipal>(entity =>
+            {
                 entity.HasKey(e => new { e.ScanId, e.AppIdentifier });
             });
 
-            modelBuilder.Entity<ClassicACSPrincipalSite>(entity => {
+            modelBuilder.Entity<ClassicACSPrincipalSite>(entity =>
+            {
                 entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ServerRelativeUrl });
             });
 
-            modelBuilder.Entity<ClassicACSPrincipalSiteScopedPermissions>(entity => {
-                entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ServerRelativeUrl, e.SiteId, e.WebId, e.ListId, e.Right });
+            modelBuilder.Entity<ClassicACSPrincipalSiteScopedPermissions>(entity =>
+            {
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.AppIdentifier,
+                    e.ServerRelativeUrl,
+                    e.SiteId,
+                    e.WebId,
+                    e.ListId,
+                    e.Right
+                });
             });
 
-            modelBuilder.Entity<ClassicACSPrincipalTenantScopedPermissions>(entity => {
-                entity.HasKey(e => new { e.ScanId, e.AppIdentifier, e.ProductFeature, e.Scope, e.Right, e.ResourceId });
+            modelBuilder.Entity<ClassicACSPrincipalTenantScopedPermissions>(entity =>
+            {
+                entity.HasKey(e => new
+                {
+                    e.ScanId,
+                    e.AppIdentifier,
+                    e.ProductFeature,
+                    e.Scope,
+                    e.Right,
+                    e.ResourceId
+                });
             });
 
-            modelBuilder.Entity<TempClassicACSPrincipalValidUntil>(entity => {
+            modelBuilder.Entity<TempClassicACSPrincipalValidUntil>(entity =>
+            {
                 entity.HasKey(e => new { e.ScanId, e.AppIdentifier });
             });
+
             #endregion
 
             #region Alerts scanner
-            modelBuilder.Entity<Alerts>(entity => {
+
+            modelBuilder.Entity<Alerts>(entity =>
+            {
                 entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl, e.AlertId });
             });
+
             #endregion
 
-            modelBuilder.Entity<TestDelay>(entity =>
-            {
-                entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl });
-            });
+            modelBuilder.Entity<TestDelay>(entity => { entity.HasKey(e => new { e.ScanId, e.SiteUrl, e.WebUrl }); });
 
             base.OnModelCreating(modelBuilder);
         }

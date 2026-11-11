@@ -164,16 +164,19 @@ namespace PnP.Scanning.Process
                 .Enrich.FromLogContext()
                 .WriteTo.Logger(sql => sql
                     .Filter.ByIncludingOnly(e => e.Properties.ContainsKey("SqlLifecycle"))
-                    .WriteTo.File(new JsonFormatter(), Path.Combine(logFolder, $"sql_{timestamp}.jsonl"),
-                        buffered: true, flushToDiskInterval: TimeSpan.FromSeconds(1)))
-                .WriteTo.Logger(standard => standard
-                    .Filter.ByExcluding(e => e.Properties.ContainsKey("SqlLifecycle"))
+                    .WriteTo.File(
+                        new JsonFormatter(),
+                        Path.Combine(logFolder, $"sql_{timestamp}.jsonl"),
+                        buffered: true,
+                        flushToDiskInterval: TimeSpan.FromSeconds(1)))
+                .WriteTo.Logger(standard => standard.Filter.ByExcluding(e => e.Properties.ContainsKey("SqlLifecycle"))
 #if DEBUG
                     .WriteTo.Console()
 #endif
                     .WriteTo.File(Path.Combine(logFolder, $"log_{timestamp}.txt"))
                     // Retain the existing per-assessment routing for ordinary events.
-                    .WriteTo.Map("ScanId",
+                    .WriteTo.Map(
+                        "ScanId",
                         (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt"))))
                 .CreateLogger();
 
