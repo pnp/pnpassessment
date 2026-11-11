@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Globalization;
+using System.Buffers;
 
 namespace PnP.Scanning.Core.Pipeline.Contracts.Module;
 
@@ -42,11 +43,26 @@ internal static class AnalysisReportDigest
             .ToLowerInvariant();
     }
 
-    /// <summary>Uses the default JSON encoder's bounded writer path, retaining escaping and surrogate handling without a single-token allocation.</summary>
+    /// <summary>Encodes the remaining complete input through a fixed destination buffer, preserving surrogate pairs and default JSON escaping.</summary>
     private static void WriteString(TextWriter output, string value)
     {
         output.Write('"');
-        JavaScriptEncoder.Default.Encode(output, value);
+        Span<char> buffer = stackalloc char[4096];
+        ReadOnlySpan<char> remaining = value.AsSpan();
+        while (!remaining.IsEmpty)
+        {
+            OperationStatus status = JavaScriptEncoder.Default.Encode(
+                remaining,
+                buffer,
+                out int consumed,
+                out int written,
+                isFinalBlock: true);
+            if (consumed == 0 || status is not (OperationStatus.Done or OperationStatus.DestinationTooSmall))
+                throw new InvalidDataException("The default report JSON encoder could not advance.");
+            output.Write(buffer[..written]);
+            remaining = remaining[consumed..];
+        }
+
         output.Write('"');
     }
 }

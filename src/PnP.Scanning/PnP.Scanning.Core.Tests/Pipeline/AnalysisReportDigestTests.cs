@@ -23,6 +23,7 @@ public sealed class AnalysisReportDigestTests
             new("a<&", "\"key\\\n", 0, VersionedJson.From(new { text = new string('a', 8191) + "\ud83d\ude00" })),
             new("a<&", "second", 2, VersionedJson.From(new { text = "\ud800\udfff\ud800\u0000\u2028\u2029" })),
             new(characters, "raw", 1, new VersionedJson("{\"schemaVersion\":1,\"value\":\"\u00e9\ud83d\ude00\"}")),
+            new(new string('a', 4095) + "\ud83d\ude00\ud800\u0000", "boundary", 3, VersionedJson.Empty),
         ];
         foreach (AnalysisReportRow[] publication in new[]
                  {
@@ -61,9 +62,11 @@ public sealed class AnalysisReportDigestTests
         for (int remaining = textLength; remaining > 0; remaining -= block.Length)
             expected.AppendData(block.AsSpan(0, Math.Min(remaining, block.Length)));
         expected.AppendData(Encoding.UTF8.GetBytes("\\u0022}\"}]"));
-        Assert.Equal(
-            Convert.ToHexString(expected.GetHashAndReset()).ToLowerInvariant(),
-            AnalysisReportDigest.Compute(rows));
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        string actual = AnalysisReportDigest.Compute(rows);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.InRange(allocated, 0, 1_048_576);
+        Assert.Equal(Convert.ToHexString(expected.GetHashAndReset()).ToLowerInvariant(), actual);
         Assert.Equal(payloadLength, payload.Json.Length);
     }
 
