@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
@@ -27,39 +28,44 @@ internal sealed partial class PipelineStore
         return Path.Combine(RootDirectory, assessmentId.ToString(), StorageManager.DbName);
     }
 
-    internal ScanContext CreateContext(Guid assessmentId, bool readOnly = false) =>
+    internal ScanContext CreateContext(Guid assessmentId, bool readOnly = false,
+        [CallerMemberName] string operation = "", [CallerFilePath] string file = "", [CallerLineNumber] int line = 0) =>
         !readOnly && writeContextFactory != null ? writeContextFactory(assessmentId) :
         new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(new SqliteConnectionStringBuilder
         {
             DataSource = DatabasePath(assessmentId),
             Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate,
             Pooling = false,
-        }.ToString()).Options);
+        }.ToString()).Options, new SqlLifecycleLogger(operation, file, operation, line));
 
     private async Task<T> WriteAsync<T>(Guid assessmentId, Func<ScanContext, Task<T>> action,
-        CancellationToken token, bool create = false)
+        CancellationToken token, bool create = false, [CallerMemberName] string operation = "",
+        [CallerFilePath] string file = "", [CallerLineNumber] int line = 0)
     {
-        var path = DatabasePath(assessmentId);
-        var gate = Gates.GetOrAdd(path, _ => new(1, 1));
-        await gate.WaitAsync(token);
-        try
+        return await SqlOperationScope.RunAsync(async () =>
         {
-            if (!create && !File.Exists(path)) throw new KeyNotFoundException($"Assessment '{assessmentId}' is unknown.");
-            if (create) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            using var db = CreateContext(assessmentId);
-            if (!migrated.ContainsKey(assessmentId))
+            string path = DatabasePath(assessmentId);
+            SemaphoreSlim gate = Gates.GetOrAdd(path, _ => new(1, 1));
+            await gate.WaitAsync(token);
+            try
             {
-                await db.Database.MigrateAsync(token);
-                migrated.TryAdd(assessmentId, true);
+                if (!create && !File.Exists(path)) throw new KeyNotFoundException($"Assessment '{assessmentId}' is unknown.");
+                if (create) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                using ScanContext db = CreateContext(assessmentId);
+                if (!migrated.ContainsKey(assessmentId))
+                {
+                    await db.Database.MigrateAsync(token);
+                    migrated.TryAdd(assessmentId, true);
+                }
+                await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(token);
+                T result = await action(db);
+                await db.SaveChangesAsync(token);
+                token.ThrowIfCancellationRequested();
+                await transaction.CommitAsync(token);
+                return result;
             }
-            await using var transaction = await db.Database.BeginTransactionAsync(token);
-            var result = await action(db);
-            await db.SaveChangesAsync(token);
-            token.ThrowIfCancellationRequested();
-            await transaction.CommitAsync(token);
-            return result;
-        }
-        finally { gate.Release(); }
+            finally { gate.Release(); }
+        }, operation, "pipelineWrite", file, operation, line);
     }
 
     internal async Task<IReadOnlyList<PhaseRunRow>> GetRunsAsync(Guid assessmentId, CancellationToken token = default)

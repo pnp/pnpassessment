@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using PnP.Scanning.Core.Storage.Pipeline;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace PnP.Scanning.Core.Storage
 {
@@ -11,6 +14,7 @@ namespace PnP.Scanning.Core.Storage
     /// </summary>
     internal class ScanContext : DbContext
     {
+        private readonly SqlLifecycleLogger sqlLifecycle;
 
         internal DbSet<Scan> Scans { get; set; }
 
@@ -107,20 +111,31 @@ namespace PnP.Scanning.Core.Storage
         /// </summary>
         public ScanContext()
         {
+            sqlLifecycle = new SqlLifecycleLogger(nameof(ScanContext), "", nameof(ScanContext), 0);
         }
 
         /// <summary>
         /// Constructor accepting externally supplied options. Used by unit tests to run the
         /// context against an in-memory SQLite connection. When options are supplied here they
-        /// already configure the provider, so <see cref="OnConfiguring"/> leaves them untouched.
+        /// already configure the provider, so <see cref="OnConfiguring"/> retains it and adds local SQL observation.
         /// </summary>
-        internal ScanContext(DbContextOptions<ScanContext> options) : base(options)
+        internal ScanContext(DbContextOptions<ScanContext> options, [CallerFilePath] string file = "",
+            [CallerMemberName] string member = "", [CallerLineNumber] int line = 0) : base(options)
         {
+            sqlLifecycle = new SqlLifecycleLogger(member, file, member, line);
+        }
+
+        /// <summary>Accepts a synthetic SQL recorder while retaining the same interception as product contexts.</summary>
+        internal ScanContext(DbContextOptions<ScanContext> options, SqlLifecycleLogger sqlLifecycle) : base(options)
+        {
+            this.sqlLifecycle = sqlLifecycle;
         }
 
         /// <summary>Targets the assessment database under its scan-owned data directory, creating that directory when needed.</summary>
-        internal ScanContext(Guid scanId)
+        internal ScanContext(Guid scanId, [CallerFilePath] string file = "",
+            [CallerMemberName] string member = "", [CallerLineNumber] int line = 0)
         {
+            sqlLifecycle = new SqlLifecycleLogger(member, file, member, line);
             var path = StorageManager.GetScanDataFolder(scanId);
 
             // Ensure path exists
@@ -129,7 +144,7 @@ namespace PnP.Scanning.Core.Storage
             DbPath = Path.Join(path, StorageManager.DbName);
         }
 
-        /// <summary>Configures the scan-owned SQLite database only when externally supplied options have not selected a provider.</summary>
+        /// <summary>Adds local SQL observation and configures SQLite only when options have not selected a provider.</summary>
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             // When options were supplied through the constructor (e.g. an in-memory SQLite
@@ -142,7 +157,29 @@ namespace PnP.Scanning.Core.Storage
                 });
             }
 
+            IDbContextLogger configuredLogger = optionsBuilder.Options.FindExtension<CoreOptionsExtension>()?.DbContextLogger;
+            optionsBuilder.LogTo(
+                (id, level) => SqlLifecycleLogger.Includes(id, level) || configuredLogger?.ShouldLog(id, level) == true,
+                data =>
+                {
+                    if (SqlLifecycleLogger.Includes(data.EventId, data.LogLevel)) sqlLifecycle.Observe(data);
+                    if (configuredLogger?.ShouldLog(data.EventId, data.LogLevel) == true) configuredLogger.Log(data);
+                });
             base.OnConfiguring(optionsBuilder);
+        }
+
+        /// <summary>Records the full observed context lifetime, including synchronous result consumption.</summary>
+        public override void Dispose()
+        {
+            try { base.Dispose(); }
+            finally { sqlLifecycle.Dispose(); }
+        }
+
+        /// <summary>Records the full observed context lifetime without changing asynchronous disposal.</summary>
+        public override async ValueTask DisposeAsync()
+        {
+            try { await base.DisposeAsync().ConfigureAwait(false); }
+            finally { sqlLifecycle.Dispose(); }
         }
 
         /// <summary>Configures existing compound keys and real SharePoint-file identity constraints without deriving observations or classification from migration.</summary>

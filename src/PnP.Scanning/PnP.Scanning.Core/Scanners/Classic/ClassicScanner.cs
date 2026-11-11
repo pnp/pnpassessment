@@ -656,7 +656,8 @@ namespace PnP.Scanning.Core.Scanners
                                             $"{ex.GetType().Name}: {ex.Message[..Math.Min(200, ex.Message.Length)]}",
                                     })
                                 .ToList();
-                            if (errorRecords.Count > 0) await dbContext.BulkInsertAsync(errorRecords);
+                            if (errorRecords.Count > 0)
+                                await SqlOperationScope.RunAsync(() => dbContext.BulkInsertAsync(errorRecords), "BulkInsert");
                         }
                         catch (Exception writeEx)
                         {

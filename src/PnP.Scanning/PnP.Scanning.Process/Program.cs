@@ -19,6 +19,7 @@ using PnP.Scanning.Process.Commands;
 using PnP.Scanning.Process.Services;
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Json;
 using Spectre.Console;
 using System.CommandLine;
 using System.CommandLine.Builder;
@@ -119,18 +120,7 @@ namespace PnP.Scanning.Process
                 // Use fully qualified paths as otherwise on MacOS the files end up in the wrong location
                 string logFolder = Path.GetDirectoryName(Environment.ProcessPath);
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
-                Log.Logger = new LoggerConfiguration().MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-                    .Enrich.FromLogContext()
-#if DEBUG
-                           .WriteTo.Console()
-#endif
-                    .WriteTo.File(Path.Combine(logFolder, $"log_{timestamp}.txt"))
-                    // Duplicate all log entries generated for an actual scan component
-                    // to a separate log file in the folder per scan
-                    .WriteTo.Map(
-                        "ScanId",
-                        (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt")))
-                    .CreateLogger();
+                Log.Logger = CreateLocalLogger(logFolder, timestamp);
 
 
                 try
@@ -167,6 +157,25 @@ namespace PnP.Scanning.Process
 
             return 0;
         }
+
+        /// <summary>Routes SQL facts to one buffered local file without duplicating them into normal logs or the console.</summary>
+        internal static Serilog.Core.Logger CreateLocalLogger(string logFolder, string timestamp) =>
+            new LoggerConfiguration().MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .Enrich.FromLogContext()
+                .WriteTo.Logger(sql => sql
+                    .Filter.ByIncludingOnly(e => e.Properties.ContainsKey("SqlLifecycle"))
+                    .WriteTo.File(new JsonFormatter(), Path.Combine(logFolder, $"sql_{timestamp}.jsonl"),
+                        buffered: true, flushToDiskInterval: TimeSpan.FromSeconds(1)))
+                .WriteTo.Logger(standard => standard
+                    .Filter.ByExcluding(e => e.Properties.ContainsKey("SqlLifecycle"))
+#if DEBUG
+                    .WriteTo.Console()
+#endif
+                    .WriteTo.File(Path.Combine(logFolder, $"log_{timestamp}.txt"))
+                    // Retain the existing per-assessment routing for ordinary events.
+                    .WriteTo.Map("ScanId",
+                        (scanId, wt) => wt.File(Path.Combine(logFolder, scanId, $"log_{scanId}.txt"))))
+                .CreateLogger();
 
         private static IHost ConfigureCliHost(string[] args)
         {

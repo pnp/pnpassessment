@@ -104,7 +104,7 @@ namespace PnP.Scanning.Core.Storage
                         new SiteCollection { ScanId = scanId, SiteUrl = site, Status = SiteWebStatus.Queued, });
                 }
 
-                await dbContext.BulkInsertAsync(siteCollectionsToAdd);
+                await SqlOperationScope.RunAsync(() => dbContext.BulkInsertAsync(siteCollectionsToAdd), "BulkInsert");
             }
         }
 
@@ -1361,7 +1361,7 @@ namespace PnP.Scanning.Core.Storage
                         windowEnd,
                         "skipped",
                         "SovereignCloud");
-                await dbContext.BulkInsertAsync(skipRecords);
+                await SqlOperationScope.RunAsync(() => dbContext.BulkInsertAsync(skipRecords), "BulkInsert");
                 return;
             }
 
@@ -1394,7 +1394,7 @@ namespace PnP.Scanning.Core.Storage
                         windowEnd,
                         "skipped",
                         $"TokenError: {ex.Message}");
-                await dbContext.BulkInsertAsync(skipRecords);
+                await SqlOperationScope.RunAsync(() => dbContext.BulkInsertAsync(skipRecords), "BulkInsert");
                 return;
             }
 
@@ -1505,7 +1505,7 @@ namespace PnP.Scanning.Core.Storage
                     skipReason);
             }
 
-            await dbContext.BulkInsertAsync(allRecords);
+            await SqlOperationScope.RunAsync(() => dbContext.BulkInsertAsync(allRecords), "BulkInsert");
         }
 
         /// <summary>Projects retained audit counts and query coverage into existing report rows.</summary>

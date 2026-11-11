@@ -82,6 +82,18 @@ If the log file is not showing any meaningful updates for a long time then the a
 - Stop all assessment processes `microsoft365-assessment.exe stop`. See [here](assess-stop.md) for details
 - Restart the assessment via `microsoft365-assessment.exe restart --id <assessment id>`. See next chapters for details
 
+## Local database timing logs
+
+The scanner host writes `sql_yyyyMMdd_HHmm.jsonl` beside the executable, separately from the normal process and assessment logs. Each line is a Serilog JSON event with `Properties.SqlLifecycle = true` and a structured `Properties.Sql` timing record. These records are local only, are not sent to Application Insights, and are excluded from the normal logs and Debug console. Writes are buffered with a one-second flush interval and flushed on normal host shutdown; abrupt termination can lose buffered records.
+
+Records contain `TimestampUtc`, `Operation`, `OperationId`, `ParentOperationId`, `Phase`, `Kind`, `Member`, repository-relative `File`, `Line`, `ElapsedMs`, `Outcome` and optional `ErrorType`. They identify the operation and static code location, not individual SQL text or input data. SQL, parameter values, connection strings, exception messages and assessment payloads are not recorded.
+
+`Kind = operation` measures a complete wrapped operation: pipeline writes include gate waiting, migration when needed, query consumption, writes and commit; bulk inserts are timed as whole batches without changing their algorithm. Outcomes are `success`, `error` or `canceled`; the original exceptions still propagate. A manually scoped operation records `finished`, which does not imply success.
+
+EF accesses on `ScanContext` also record command execution and observed context lifetime. `Kind = command` with `readerReturned` measures only `ExecuteReader`, not full query consumption; `Kind = context` with `finished` includes the observed lifetime through disposal, including result consumption. `Kind = transaction` measures the observed lifetime from EF starting/adopting a transaction until commit, rollback or disposal; `transactionOperation` measures the separate provider commit/rollback operation. A disposal or context finish is not reported as a successful commit or business operation.
+
+All existing database entry paths are timed: synchronous/asynchronous EF and EF raw SQL through `ScanContext`, pipeline write operations, and the five direct-provider `BulkInsertAsync` call sites in `StorageManager` and `ClassicScanner`. Bulk internals and SQLite-internal statements are intentionally not traced individually. Group records by `Kind`, `Operation`, `Member`, `File` and `Line` to find long or repeated access patterns. Operation/context/command/transaction timings can overlap, so do not sum different kinds as independent elapsed time. The static location is the wrapper call or context creation site, not a captured stack trace.
+
 ## Pausing a running assessment
 
 Sometimes you need to pause a running assessment because you need to shutdown the computer running the assessment or the assessment is very heavily throttled. This is possible using the `pause` action.
