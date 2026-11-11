@@ -20,6 +20,7 @@ internal static class AspxPageClassifier
 {
     internal const string RuleVersion = "aspx-page-policy/v4";
     internal const string MessageCenterUrl = "https://msmessagecenter.com/MC1464926/";
+    internal const string ListFamily = "List";
     private const string WebPartPageHandler = "Microsoft.SharePoint.WebPartPages.WebPartPage";
     private const string DeprecatedMobileHandler = "Microsoft.SharePoint.MobileControls.SPMobilePage";
 
@@ -59,8 +60,8 @@ internal static class AspxPageClassifier
             null => "Unknown",
             _ => "Other",
         };
-        if (listView == true || listForm == true)
-            return new(type, "List", "Inapplicable", "Excluded", null, "RegisteredListViewOrForm");
+        if (IsListFamily(listView, listForm))
+            return new(type, ListFamily, "Inapplicable", "Excluded", null, "RegisteredListViewOrForm");
         if (catalog == true)
         {
             bool modern = handler != null && ModernHandlers.Contains(handler);
@@ -89,6 +90,12 @@ internal static class AspxPageClassifier
         if (type is "Unknown" or "Other") return new(type, "Unknown", "Unknown", "Unknown", null, "UnmappedHandler");
         return new(type, "User", "Classic", "Included", MessageCenterUrl, "ClassicUserPage;MC1464926");
     }
+
+    /// <summary>
+    /// Identifies the List product family: a registered list view or list form.
+    /// Unknown role evidence stays outside this family.
+    /// </summary>
+    internal static bool IsListFamily(bool? listView, bool? listForm) => listView == true || listForm == true;
 
     /// <summary>
     /// Maps an observed Web-relative catalog root to its specific family or catalog_other.

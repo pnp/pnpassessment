@@ -39,7 +39,10 @@ public sealed class ClassicReportCsvProjectionTests
         "Microsoft.SharePoint.Publishing.TemplateRedirectionPage", "System.Web.UI.Page",
     ];
 
-    /// <summary>Proves null/false inclusion and true exclusion against an independent SQL predicate without extra role or taxonomy filters.</summary>
+    /// <summary>
+    /// Proves the selection against an independent SQL predicate: NoExecute null/false is selected and true is excluded,
+    /// a registered list view or form is excluded while unknown list role is selected, and catalog role has no effect.
+    /// </summary>
     [Fact]
     public async Task Native_pages_equal_the_SQL_predicate_for_every_handler_NoExecute_and_role_combination()
     {
@@ -48,20 +51,23 @@ public sealed class ClassicReportCsvProjectionTests
         foreach (string handler in Handlers.Append("Contoso.WikiEditPage")
                      .Append("Microsoft.SharePoint.WebControls.ClientSidePage"))
         foreach (bool? blocked in new bool?[] { true, false, null })
-        foreach (bool? role in new bool?[] { true, false, null })
-            files.Add(File(assessment, files.Count + 1, handler, blocked, role));
+        foreach (bool? catalog in new bool?[] { true, false, null })
+        foreach (bool? view in new bool?[] { true, false, null })
+        foreach (bool? form in new bool?[] { true, false, null })
+            files.Add(File(assessment, files.Count + 1, handler, blocked, catalog, view, form));
         ClassicReportSource source = Source(files.ToArray());
         ClassicPageCsvRow[] actual = ClassicReportCsvProjection.SelectPages(source);
         using SqliteConnection connection = new("Data Source=:memory:");
         await connection.OpenAsync();
         using SqliteCommand create = connection.CreateCommand();
-        create.CommandText = "CREATE TABLE CapturedAspx(FileUniqueId TEXT, PageHandler TEXT, NoExecute INTEGER)";
+        create.CommandText = "CREATE TABLE CapturedAspx(FileUniqueId TEXT, PageHandler TEXT, NoExecute INTEGER, " +
+                             "IsListView INTEGER, IsListForm INTEGER)";
         await create.ExecuteNonQueryAsync();
         foreach (SPFile file in files)
         {
             AspxCsvRow raw = new(file);
             using SqliteCommand insert = connection.CreateCommand();
-            insert.CommandText = "INSERT INTO CapturedAspx VALUES ($id,$handler,$blocked)";
+            insert.CommandText = "INSERT INTO CapturedAspx VALUES ($id,$handler,$blocked,$view,$form)";
             insert.Parameters.AddWithValue("$id", file.FileUniqueId.ToString());
             insert.Parameters.AddWithValue("$handler", raw.PageHandler);
             insert.Parameters.AddWithValue(
@@ -72,11 +78,28 @@ public sealed class ClassicReportCsvProjectionTests
                     false => 0,
                     null => DBNull.Value
                 });
+            insert.Parameters.AddWithValue(
+                "$view",
+                raw.IsListView switch
+                {
+                    true => 1,
+                    false => 0,
+                    null => DBNull.Value
+                });
+            insert.Parameters.AddWithValue(
+                "$form",
+                raw.IsListForm switch
+                {
+                    true => 1,
+                    false => 0,
+                    null => DBNull.Value
+                });
             await insert.ExecuteNonQueryAsync();
         }
 
         using SqliteCommand query = connection.CreateCommand();
-        query.CommandText = "SELECT FileUniqueId FROM CapturedAspx WHERE NoExecute IS NOT 1 AND PageHandler IN (" +
+        query.CommandText = "SELECT FileUniqueId FROM CapturedAspx WHERE NoExecute IS NOT 1 " +
+                            "AND IsListView IS NOT 1 AND IsListForm IS NOT 1 AND PageHandler IN (" +
                             "'Microsoft.SharePoint.WebPartPages.WikiEditPage'," +
                             "'Microsoft.SharePoint.WebPartPages.WebPartPage'," +
                             "'Microsoft.SharePoint.Publishing.TemplateRedirectionPage'," +
@@ -85,13 +108,63 @@ public sealed class ClassicReportCsvProjectionTests
         using SqliteDataReader reader = await query.ExecuteReaderAsync();
         while (await reader.ReadAsync()) expected.Add(Guid.Parse(reader.GetString(0)));
         Assert.Equal(expected.Order(), actual.Select(page => page.FileUniqueId!.Value).Order());
-        Assert.Equal(24, actual.Length);
-        Assert.Contains(actual, page => page.NoExecute == null && page.IsCatalog == true && page.IsListForm == true);
+        Assert.Equal(96, actual.Length);
+        Assert.DoesNotContain(actual, page => page.IsListView == true || page.IsListForm == true);
+        Assert.Contains(
+            actual,
+            page => page.NoExecute == null && page.IsCatalog == true && page.IsListView == null &&
+                    page.IsListForm == null);
         Assert.Contains(actual, page => page.NoExecute == false && page.RoleReadState == "Partial");
         Assert.All(actual, page => Assert.Equal("MetadataAssessmentType", page.AssessmentPageType));
         Assert.All(actual, page => Assert.Null(page.Official));
         Assert.All(actual, page => Assert.Null(page.WebPartCount));
         Assert.Equal(files.Count, source.Publication.Files.Length);
+    }
+
+    /// <summary>
+    /// A registered list view or form is the List product family and stays in aspx.csv only; unknown list role is selected.
+    /// The selection agrees with the classifier's own List family verdict.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, null, false)]
+    [InlineData(null, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(null, null, true)]
+    [InlineData(null, false, true)]
+    [InlineData(false, null, true)]
+    public void List_product_family_files_stay_outside_the_page_selection(bool? view, bool? form, bool selected)
+    {
+        ClassicReportSource source = Source([File(Guid.NewGuid(), 1, Handlers[1], false, false, view, form)]);
+        Assert.Equal(selected ? 1 : 0, ClassicReportCsvProjection.SelectPages(source).Length);
+        string family = PnP.Scanning.Core.ClassicPages.Analysis.Page.AspxPageClassifier.Classify(
+                Handlers[1],
+                119,
+                view,
+                form,
+                false)
+            .ProductFamily;
+        Assert.Equal(!selected, family == "List");
+    }
+
+    /// <summary>A source with no Inherits declaration resolves to System.Web.UI.Page and is selected as an ASPXPage.</summary>
+    [Fact]
+    public void A_page_without_an_Inherits_declaration_is_selected_as_System_Web_UI_Page()
+    {
+        SPFile file = File(Guid.NewGuid(), 1, Handlers[3], false, false);
+        AspxPageEvidence evidence = JsonSerializer.Deserialize<AspxPageEvidence>(file.AspxEvidenceJson!)!;
+        file.AspxEvidenceJson = JsonSerializer.Serialize(
+            evidence with
+            {
+                PageHandler = null,
+                OriginalBytes = Encoding.UTF8.GetBytes("<%@ Page Language=\"C#\" %>")
+            });
+        ClassicPageCsvRow row = Assert.Single(ClassicReportCsvProjection.SelectPages(Source([file])));
+        Assert.Equal("System.Web.UI.Page", row.PageHandler);
+        Assert.Equal("DefaultAssumed", row.HandlerResolution);
+        Assert.Equal("ASPXPage", row.PageType);
     }
 
     /// <summary>Requires exact FQN handlers and never admits short aliases, suffixes, legacy labels or unavailable source.</summary>
@@ -398,8 +471,19 @@ public sealed class ClassicReportCsvProjectionTests
             PipelineStore.ReadClassicReportSourceAsync(context, assessment, default));
     }
 
-    /// <summary>Seeds genuine native keys and original source bytes without assigning catalog or list-role admission rules.</summary>
+    /// <summary>Seeds one file whose catalog, list-view and list-form evidence all share the same state.</summary>
     private static SPFile File(Guid assessment, int ordinal, string? handler, bool? blocked, bool? role) =>
+        File(assessment, ordinal, handler, blocked, role, role, role);
+
+    /// <summary>Seeds genuine native keys, original source bytes and independent catalog, list-view and list-form evidence.</summary>
+    private static SPFile File(
+        Guid assessment,
+        int ordinal,
+        string? handler,
+        bool? blocked,
+        bool? catalog,
+        bool? view,
+        bool? form) =>
         new()
         {
             ScanId = assessment,
@@ -436,10 +520,10 @@ public sealed class ClassicReportCsvProjectionTests
                         null,
                         null,
                         119,
-                        role,
-                        role,
-                        role,
-                        role.HasValue ? "Complete" : "Partial",
+                        catalog,
+                        view,
+                        form,
+                        catalog.HasValue && view.HasValue && form.HasValue ? "Complete" : "Partial",
                         DateTime.UnixEpoch,
                         Encoding.UTF8.GetBytes("<%@ Page Inherits=\"" + handler + "\" %>"))),
         };

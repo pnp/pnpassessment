@@ -16,6 +16,9 @@ internal sealed class AspxCsvRow
     [Ignore] internal AspxPageEvidence? Evidence { get; }
     [Ignore] internal AspxSourceFacts? Source { get; }
 
+    /// <summary>True for a registered list view or list form, the List product family; unknown role evidence is false.</summary>
+    [Ignore] internal bool IsListFamily => AspxPageClassifier.IsListFamily(IsListView, IsListForm);
+
     /// <summary>
     /// Reads only the supplied SQL row and its stored original bytes, preserving unknown or conflicting NoExecute as null.
     /// </summary>

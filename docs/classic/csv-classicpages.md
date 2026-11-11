@@ -4,10 +4,13 @@
 
 For a native pipeline assessment this CSV comes from the digest-verified immutable analysis publication, not just the legacy URL-keyed table. It contains the following union:
 
-- Physical ASPX files with **NoExecute not equal to true** (both null and false are included) and an exact source handler in `Microsoft.SharePoint.WebPartPages.WikiEditPage`, `Microsoft.SharePoint.WebPartPages.WebPartPage`, `Microsoft.SharePoint.Publishing.TemplateRedirectionPage`, or `System.Web.UI.Page`.
+- Physical ASPX files that meet all three conditions:
+  - **NoExecute not equal to true** (both null and false are included).
+  - An exact source handler in `Microsoft.SharePoint.WebPartPages.WikiEditPage`, `Microsoft.SharePoint.WebPartPages.WebPartPage`, `Microsoft.SharePoint.Publishing.TemplateRedirectionPage`, or `System.Web.UI.Page`. A source with no `Inherits` declaration resolves to `System.Web.UI.Page`.
+  - **Outside the List product family.** A file registered as a list view or list form (`IsListView` or `IsListForm` is true) belongs to the List product family and is reported in [aspx.csv](csv-aspx.md) only. Files with unknown (empty) list-role evidence are included.
 - Actual independent list items from the observed Posts template **301**. They are not subject to the ASPX handler/NoExecute gate.
 
-No product-family, experience, official, catalog, registered-list-role or backing-item requirement is added to that predicate. Unknown handlers are not guessed from metadata or short names. [aspx.csv](csv-aspx.md) independently retains **all** physical ASPX facts, including those excluded here.
+The List product family is the only product-family condition. Experience, official state, catalog role and backing-item availability are reported as columns and leave the selection unchanged. Unknown handlers are not guessed from metadata or short names. [aspx.csv](csv-aspx.md) independently retains **all** physical ASPX facts, including those excluded here.
 
 File identity is `(SiteCollectionId, FileUniqueId)`; Posts identity is `(SiteCollectionId, ListId, ListItemId)`, inside the assessment. A shared display-form renderer is not item identity and does not donate its usage to every post. Equal hashes do not merge different native files. Distinct native objects colliding on the historical report URL key fail explicitly; no URL `Distinct` silently drops them.
 
@@ -57,7 +60,7 @@ ObjectKind / ContentKey | Discriminated native file/item identity, not a URL/has
 AnalysisRunId / SnapshotId | Exact immutable publication and source selected for this export.
 PageHandler / SourceSha256 / SourceReadState / HandlerResolution | Exact captured source evidence. Empty for independent items or unavailable source.
 NoExecute / NoExecuteRaw / NoExecuteReadState | Nullable trusted Boolean plus the original server text and read outcome. True excludes only the file branch; unknown remains unknown and is included when the handler qualifies.
-IsCatalog / IsListView / IsListForm / RoleReadState | Captured role evidence, not additional Page-admission filters.
+IsCatalog / IsListView / IsListForm / RoleReadState | Captured role evidence. Every file row here has `IsListView` and `IsListForm` either false or empty, because a true value places the file in the List product family. `IsCatalog` and `RoleReadState` are informational.
 Official / OfficialReadState | Unknown/NotAcquired when no independent authoritative official-file observation exists. No inference from path or role.
 AuditViewsCount / AuditCreatesCount / AuditEditsCount / AuditUniqueUsers | Exact content-locator usage including the Posts item query. Unknown/skipped/failed counts stay empty; partial counts are labelled partial.
 UsageQueryStatus / AuditWindowStart / AuditWindowEnd | Fixed audit-window coverage. A successful fully covered query with no matching events can report zero; an unavailable query cannot.

@@ -95,7 +95,7 @@ internal static class ClassicReportCsvProjection
             new PageExportSummary(
                 "classic-pages-csv/v1",
                 assessmentId,
-                "NativePublication;NoExecuteIsNotTrueAndExactHandlerUnionPosts301",
+                "NativePublication;NoExecuteIsNotTrueAndExactHandlerAndNotListFamilyUnionPosts301",
                 source.AnalysisRunId,
                 source.SnapshotId,
                 rows.LongLength,
@@ -317,8 +317,10 @@ internal static class ClassicReportCsvProjection
     }
 
     /// <summary>
-    /// Applies only NoExecute is not true and the exact four source handlers to file Pages, then unions actual Posts items.
-    /// No role, product family, experience, official status, item availability or URL-based deduplication is added.
+    /// Selects file Pages whose NoExecute is not true, whose source handler is one of the exact four, and which are
+    /// outside the List product family (a registered list view or form); then unions actual Posts items.
+    /// Unknown NoExecute and unknown list-role evidence are selected. Catalog role, experience, official status and
+    /// item availability stay outside the predicate, and distinct native objects are never merged by URL.
     /// </summary>
     internal static ClassicPageCsvRow[] SelectPages(ClassicReportSource source)
     {
@@ -332,7 +334,7 @@ internal static class ClassicReportCsvProjection
         {
             AspxCsvRow file = new(facts);
             string? type = PageTypeForHandler(file.PageHandler);
-            if (file.NoExecute == true || type == null) continue;
+            if (file.NoExecute == true || type == null || file.IsListFamily) continue;
             PageIdentity identity = PageIdentity.File(facts.SiteCollectionId, facts.FileUniqueId);
             if (!pages.TryGetValue(identity, out ClassicPageRow? page))
                 throw new SnapshotIntegrityException(
