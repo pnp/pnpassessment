@@ -525,29 +525,31 @@ namespace PnP.Scanning.Core.Tests.Storage
             Guid fileId = Guid.NewGuid();
             using (ScanContext context = fixture.CreateContext())
             {
-                context.SPFiles.Add(new SPFile
-                {
-                    ScanId = scanId,
-                    SiteCollectionId = Guid.NewGuid(),
-                    FileUniqueId = fileId,
-                    SiteUrl = "https://example.invalid/sites/report",
-                    WebUrl = "/",
-                    ServerRelativeUrl = "/sites/report/Home.aspx",
-                    FileName = "Home.aspx",
-                    FileReadState = "Denied",
-                    CoverageState = "Incomplete",
-                    FirstObservedAtUtc = DateTime.UnixEpoch,
-                    ObservedAtUtc = DateTime.UnixEpoch,
-                    ProvenanceJson = "[]"
-                });
-                context.ClassicPages.Add(new ClassicPage
-                {
-                    ScanId = scanId,
-                    SiteUrl = "https://example.invalid/sites/report",
-                    WebUrl = "/",
-                    PageUrl = "/Home.aspx",
-                    CustomizedPageStatus = "Uncustomized"
-                });
+                context.SPFiles.Add(
+                    new SPFile
+                    {
+                        ScanId = scanId,
+                        SiteCollectionId = Guid.NewGuid(),
+                        FileUniqueId = fileId,
+                        SiteUrl = "https://example.invalid/sites/report",
+                        WebUrl = "/",
+                        ServerRelativeUrl = "/sites/report/Home.aspx",
+                        FileName = "Home.aspx",
+                        FileReadState = "Denied",
+                        CoverageState = "Incomplete",
+                        FirstObservedAtUtc = DateTime.UnixEpoch,
+                        ObservedAtUtc = DateTime.UnixEpoch,
+                        ProvenanceJson = "[]"
+                    });
+                context.ClassicPages.Add(
+                    new ClassicPage
+                    {
+                        ScanId = scanId,
+                        SiteUrl = "https://example.invalid/sites/report",
+                        WebUrl = "/",
+                        PageUrl = "/Home.aspx",
+                        CustomizedPageStatus = "Uncustomized"
+                    });
                 await context.SaveChangesAsync();
             }
 
@@ -555,11 +557,15 @@ namespace PnP.Scanning.Core.Tests.Storage
             try
             {
                 await ExportAsync(scanId, exportDir);
-                Directory.GetFiles(exportDir).Select(Path.GetFileName).Should()
-                    .Contain(new[]
-                    {
-                        "aspx.csv", "aspxsummary.json", "classicpages.csv", "classicpagessummary.json", "discovery.csv"
-                    })
+                Directory.GetFiles(exportDir)
+                    .Select(Path.GetFileName)
+                    .Should()
+                    .Contain(
+                        new[]
+                        {
+                            "aspx.csv", "aspxsummary.json", "classicpages.csv", "classicpagessummary.json",
+                            "discovery.csv"
+                        })
                     .And.NotContain(new[] { "classicaspx.csv", "classicaspxsummary.json" });
                 ReadHeader(Path.Join(exportDir, "aspx.csv")).Should().HaveCount(47);
                 using StreamReader reader = new(Path.Join(exportDir, "aspx.csv"));
@@ -571,7 +577,10 @@ namespace PnP.Scanning.Core.Tests.Storage
                 csv.GetField("FileReadState").Should().Be("Denied");
                 csv.Read().Should().BeFalse();
                 ReadRecords<ClassicPage>(Path.Join(exportDir, "classicpages.csv"))
-                    .Should().ContainSingle().Which.PageUrl.Should().Be("/Home.aspx");
+                    .Should()
+                    .ContainSingle()
+                    .Which.PageUrl.Should()
+                    .Be("/Home.aspx");
             }
             finally
             {
