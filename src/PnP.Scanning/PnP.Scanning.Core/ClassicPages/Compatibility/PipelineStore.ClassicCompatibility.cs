@@ -49,6 +49,14 @@ internal sealed partial class PipelineStore
                                                 value.GetProperty("WebUrl").GetString() != component.WebUrl))
                         throw new SnapshotIntegrityException("Classic component rows have foreign ownership.");
 
+                // A Web whose retained components were denied or failed stays reportable but is not shown as finished.
+                Dictionary<(string SiteUrl, string WebUrl), string> componentFailures = payload.Components
+                    .Where(component => !component.State.Succeeded && component.State.Status != "NotAttempted")
+                    .GroupBy(component => (component.SiteUrl, component.WebUrl))
+                    .ToDictionary(
+                        group => group.Key,
+                        group => "Classic components " + group.First().State.Status + ": " + group.First().State.Error);
+
                 T[] Components<T>() =>
                     payload.Components.SelectMany(x => x.Rows.GetValueOrDefault(typeof(T).Name) ?? [])
                         .Select(value => value.Deserialize<T>()!)
@@ -88,8 +96,10 @@ internal sealed partial class PipelineStore
                         WebUrl = web.WebUrl,
                         WebUrlAbsolute = web.SiteUrl.TrimEnd('/') + (web.WebUrl == "/" ? "" : web.WebUrl),
                         Template = web.WebTemplate,
-                        Status = web.State.Succeeded ? SiteWebStatus.Finished : SiteWebStatus.Failed,
-                        Error = web.State.Error,
+                        Status = web.State.Succeeded && !componentFailures.ContainsKey((web.SiteUrl, web.WebUrl))
+                            ? SiteWebStatus.Finished
+                            : SiteWebStatus.Failed,
+                        Error = web.State.Error ?? componentFailures.GetValueOrDefault((web.SiteUrl, web.WebUrl)),
                     }));
                 await db.SaveChangesAsync(token);
                 await db.ClassicWebPartUniques.Where(x => x.ScanId == assessment).ExecuteDeleteAsync(token);

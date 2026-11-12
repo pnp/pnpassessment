@@ -371,9 +371,10 @@ internal static class ClassicReportCsvProjection
             locators.Add(key, identity);
         }
 
+        UsageIndex usage = UsageIndex.Create(source);
         foreach (ClassicPageCsvRow row in selected)
         {
-            ApplyUsage(row, source);
+            ApplyUsage(row, source, usage);
             Contracts.Web.WebFacts? web = source.Publication.Webs.SingleOrDefault(web =>
                 web.SiteCollectionId == row.SiteCollectionId && web.WebId == row.WebId);
             row.CanModernizeReadState = web?.CanModernizeState.Status ?? "NotAcquired";
@@ -411,39 +412,25 @@ internal static class ClassicReportCsvProjection
     /// Joins usage to the exact content locator including the Posts item query, never to its shared renderer.
     /// Failed, skipped and uncollected queries retain null counts; partial counts remain explicitly labelled partial.
     /// </summary>
-    private static void ApplyUsage(ClassicPageCsvRow row, ClassicReportSource source)
+    private static void ApplyUsage(ClassicPageCsvRow row, ClassicReportSource source, UsageIndex usage)
     {
         row.AuditWindowStart = source.Publication.Scope.AuditWindowStart;
         row.AuditWindowEnd = source.Publication.Scope.AuditWindowEnd;
-        if (source.Publication.Scope.Options.SkipUsageInformation)
-        {
-            row.UsageQueryStatus = "skipped";
-            return;
-        }
-
-        if (source.AuditChunks.Length == 0)
-        {
-            row.UsageQueryStatus = "notcollected";
-            return;
-        }
-
-        int succeeded = source.AuditChunks.Count(chunk => chunk.Status == "succeeded");
-        row.UsageQueryStatus = succeeded == source.AuditChunks.Length
-            ? "succeeded"
-            : succeeded > 0
-                ? "partial"
-                : source.AuditChunks.All(chunk => chunk.Status == "skipped")
-                    ? "skipped"
-                    : "failed";
-        if (succeeded == 0) return;
+        row.UsageQueryStatus = usage.QueryStatus;
+        if (usage.Stats == null) return;
         string? locator = row.PageUrl == null
             ? null
             : new Uri(row.SiteUrl).GetLeftPart(UriPartial.Authority) + row.PageUrl;
         if (row.PageUrl?.StartsWith("https://", StringComparison.OrdinalIgnoreCase) == true) locator = row.PageUrl;
-        ClassicAuditPageStats[] stats = source.Publication.Audit.Where(stat =>
-                ClassicPageAuditAnalysis.LocatorEquals(stat.PageUrl, locator) || row.PageUrl?.StartsWith('/') == true &&
-                ClassicPageAuditAnalysis.LocatorEquals(stat.PageUrl, row.PageUrl))
-            .ToArray();
+        // The absolute and server-relative locators are tried independently; a statistic is never counted twice.
+        IEnumerable<ClassicAuditPageStats> absolute = locator == null
+            ? Enumerable.Empty<ClassicAuditPageStats>()
+            : usage.Stats[ClassicPageAuditAnalysis.LocatorKey(locator)];
+        IEnumerable<ClassicAuditPageStats> relative =
+            row.PageUrl?.StartsWith('/') == true && !string.Equals(row.PageUrl, locator, StringComparison.Ordinal)
+                ? usage.Stats[ClassicPageAuditAnalysis.LocatorKey(row.PageUrl)]
+                : Enumerable.Empty<ClassicAuditPageStats>();
+        ClassicAuditPageStats[] stats = absolute.Concat(relative).ToArray();
         if (row.ObjectKind == nameof(PageObjectKind.ListItem) && stats.Length == 0)
         {
             row.UsageAttributionState = "ItemLocatorNotObserved";
@@ -454,7 +441,39 @@ internal static class ClassicReportCsvProjection
         row.AuditViewsCount = stats.Sum(stat => stat.Views);
         row.AuditCreatesCount = stats.Sum(stat => stat.Creates);
         row.AuditEditsCount = stats.Sum(stat => stat.Edits);
-        row.AuditUniqueUsers = stats.SelectMany(stat => stat.UserHashes).Distinct(StringComparer.Ordinal).Count();
+        row.AuditUniqueUsers = stats.Length == 1
+            ? stats[0].UserHashes.Distinct(StringComparer.Ordinal).Count()
+            : stats.SelectMany(stat => stat.UserHashes).Distinct(StringComparer.Ordinal).Count();
+    }
+
+    /// <summary>
+    /// Holds the export-wide usage state and the audit statistics grouped once by their full-locator comparison key,
+    /// so each Page is a keyed lookup instead of a scan of every audit row.
+    /// </summary>
+    private sealed record UsageIndex(string QueryStatus, ILookup<string, ClassicAuditPageStats>? Stats)
+    {
+        /// <summary>Derives the shared query status once and indexes statistics only when a succeeded chunk exists.</summary>
+        internal static UsageIndex Create(ClassicReportSource source)
+        {
+            if (source.Publication.Scope.Options.SkipUsageInformation) return new("skipped", null);
+            if (source.AuditChunks.Length == 0) return new("notcollected", null);
+            int succeeded = source.AuditChunks.Count(chunk => chunk.Status == "succeeded");
+            string status = succeeded == source.AuditChunks.Length
+                ? "succeeded"
+                : succeeded > 0
+                    ? "partial"
+                    : source.AuditChunks.All(chunk => chunk.Status == "skipped")
+                        ? "skipped"
+                        : "failed";
+            return new(
+                status,
+                succeeded == 0
+                    ? null
+                    : source.Publication.Audit.Where(stat => stat.PageUrl != null)
+                        .ToLookup(
+                            stat => ClassicPageAuditAnalysis.LocatorKey(stat.PageUrl),
+                            StringComparer.Ordinal));
+        }
     }
 
     /// <summary>Writes counts from the exact selected/written CSV set rather than legacy-table or raw-inventory denominators.</summary>

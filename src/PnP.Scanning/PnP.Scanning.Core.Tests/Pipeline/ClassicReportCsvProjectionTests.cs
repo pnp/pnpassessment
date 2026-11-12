@@ -272,6 +272,41 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.Null(row.AuditViewsCount);
     }
 
+    /// <summary>The indexed usage join keeps path-case, absolute/server-relative and exact query-suffix semantics.</summary>
+    [Fact]
+    public void Indexed_usage_join_preserves_full_locator_semantics_and_unique_users()
+    {
+        Guid assessment = Guid.NewGuid();
+        ClassicReportSource source = Source(
+            [File(assessment, 1, Handlers[0], false, false), File(assessment, 2, Handlers[0], false, false)],
+            usage: true);
+        source = source with
+        {
+            Publication = source.Publication with
+            {
+                Audit =
+                [
+                    new("https://contoso.invalid/sites/csv/1.aspx", 2, 0, 1, ["one", "two"]),
+                    new("HTTPS://CONTOSO.INVALID/SITES/CSV/1.ASPX", 1, 1, 0, ["two", "three"]),
+                    new("/sites/csv/1.aspx", 4, 0, 0, ["three", "four"]),
+                    new("https://contoso.invalid/sites/csv/1.aspx?ID=7", 50, 0, 0, ["query-user"]),
+                    new("https://other.invalid/sites/csv/1.aspx", 60, 0, 0, ["foreign-user"])
+                ]
+            },
+        };
+        ClassicPageCsvRow[] rows = ClassicReportCsvProjection.SelectPages(source);
+        ClassicPageCsvRow matched = Assert.Single(rows, row => row.AuditViewsCount == 7);
+        Assert.Equal(1, matched.AuditCreatesCount);
+        Assert.Equal(1, matched.AuditEditsCount);
+        Assert.Equal(4, matched.AuditUniqueUsers);
+        Assert.Equal("ExactContentLocator", matched.UsageAttributionState);
+        ClassicPageCsvRow silent = Assert.Single(rows, row => row != matched);
+        Assert.Equal(0, silent.AuditViewsCount);
+        Assert.Equal(0, silent.AuditUniqueUsers);
+        Assert.Equal("CoveredFileNoEvents", silent.UsageAttributionState);
+        Assert.All(rows, row => Assert.Equal("succeeded", row.UsageQueryStatus));
+    }
+
     /// <summary>Distinct native identities and identical source hashes remain separate; legacy URL collisions still fail explicitly.</summary>
     [Fact]
     public void Native_identity_is_not_URL_or_hash_deduplication()

@@ -158,7 +158,18 @@ internal sealed class ClassicContentCollectionModule(
             await journal.ReadOrAcquireAsync(
                 "ClassicComponents",
                 webKey,
-                () => reader.ReadClassicComponentsAsync(web, cancellationToken),
+                async () =>
+                {
+                    if (!web.State.Succeeded) return UnavailableComponents(web, web.State);
+                    try
+                    {
+                        return await reader.ReadClassicComponentsAsync(web, cancellationToken);
+                    }
+                    catch (Exception error) when (IsAcquisitionFailure(error, cancellationToken))
+                    {
+                        return UnavailableComponents(web, ClassicContentReader.Failure(error));
+                    }
+                },
                 cancellationToken,
                 value => AcquisitionJournal.Status(value.State),
                 value => value.State.Error);
@@ -266,6 +277,26 @@ internal sealed class ClassicContentCollectionModule(
             } while (continuation != null);
         }
     }
+
+    /// <summary>
+    /// Limits the retained-component boundary to source acquisition faults; cancellation, local storage and
+    /// snapshot-integrity errors still stop the assessment.
+    /// </summary>
+    private static bool IsAcquisitionFailure(Exception error, CancellationToken cancellationToken)
+    {
+        if (error is OperationCanceledException || cancellationToken.IsCancellationRequested) return false;
+        for (Exception? current = error; current != null; current = current.InnerException)
+            if (current is SnapshotIntegrityException or System.Data.Common.DbException
+                or Microsoft.EntityFrameworkCore.DbUpdateException)
+                return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Retains an explicit failed or denied component receipt for one Web without fabricating component rows.
+    /// </summary>
+    private static ClassicComponentSource UnavailableComponents(WebFacts web, SourceReadState state) =>
+        new(web.SiteUrl, web.WebUrl, state, new Dictionary<string, System.Text.Json.JsonElement[]>());
 
     /// <summary>Retains failed metadata and partial web-part acquisition without implying unread page content is complete.</summary>
     private static AcquisitionStatus FileEnrichmentStatus(FilePageEvidence source)
