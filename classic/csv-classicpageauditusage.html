@@ -76,6 +76,8 @@
                     <h1 id="classicpageauditusagecsv-file-details">classicpageauditusage.csv file details</h1>
 
 <h2 id="summary">Summary</h2>
+<p>For native pipeline reports, this file has one row per <strong>selected</strong> <a href="csv-classicpages.html">classicpages.csv</a> object when usage was requested. It retains the full Posts locator including <code>?ID=...</code>, never the shared renderer's usage. Failed, unsupported and uncollected queries have <strong>empty counts</strong>, not successful zeroes; partial counts remain labelled <code>partial</code>. Intentionally specifying <code>--skipusageinformation</code> keeps the existing no-usage-file behavior; <code>classicpages.csv</code> still carries <code>UsageQueryStatus=skipped</code> and nullable counts. Legacy assessments retain the historical behavior described below.</p>
+<p>The reducer checks the event URI's <strong>path</strong> for the ASPX extension and preserves the complete original absolute or server-relative locator, including its query, as the aggregation key. <code>UsageAttributionState</code> is independent of query coverage: a Posts item with no actual item-specific record has <code>ItemLocatorNotObserved</code> and null counts, even when the query succeeded. It is not assigned the renderer's events or asserted to have zero activity.</p>
 <p>This csv file contains one row per classic page for which audit log activity was collected, plus (when a
 site's audit data could not be fully collected) a site-level summary row that surfaces the coverage gap.
 It reports how often each classic page was <strong>viewed, created and edited</strong> during the queried audit window,

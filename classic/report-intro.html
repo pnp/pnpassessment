@@ -84,6 +84,7 @@
 </ul>
 <p>The report is driven by the exported CSV files. Even if you do not use Power BI, the CSV files contain the full assessment data — use the left navigation to learn more about each one:</p>
 <ul>
+<li><a href="csv-aspx.html">aspx.csv</a> — all observed physical ASPX SQL facts, without business admission filters; includes blocked, modern, catalog, role and unknown observations.</li>
 <li><a href="csv-classicpages.html">classicpages.csv</a> — one row per classic page, including its modernization-readiness columns.</li>
 <li><a href="csv-classicpagewebparts.html">classicpagewebparts.csv</a> — one row per web part found on a classic page.</li>
 <li><a href="csv-classicwebpartunique.html">classicwebpartunique.csv</a> — one row per unique web part type encountered across the assessment.</li>
@@ -91,6 +92,7 @@
 <li><a href="csv-classicsitesummaries.html">classicsitesummaries.csv</a> — per-site-collection readiness roll-up.</li>
 <li><a href="csv-classicpublishingsitesummaries.html">classicpublishingsitesummaries.csv</a> — per-publishing-portal roll-up of master pages and page layouts.</li>
 </ul>
+<p>The updated native Pages CSV applies the exact handler/NoExecute predicate described in <a href="csv-classicpages.html">classicpages.csv</a>, while its related exported summaries use the same selected Page set. The new Power BI ASPX tab is intended to show all raw ASPX rows. A corresponding replacement PBIT/layout has <strong>not</strong> been promoted here: the user's authoritative unsaved layout was not available, so the existing PBIT binaries remain unchanged. CSV implementation is not evidence that the old visuals, measures and filters were already updated.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

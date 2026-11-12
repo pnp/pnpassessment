@@ -76,7 +76,22 @@
                     <h1 id="classicpagescsv-file-details">classicpages.csv file details</h1>
 
 <h2 id="summary">Summary</h2>
-<p>This csv file contains one row for every classic page (wiki, web part, publishing, blog or ASPX page) that was discovered and assessed, including its page-modernization-readiness columns.</p>
+<p>For a native pipeline assessment this CSV comes from the digest-verified immutable analysis publication, not just the legacy URL-keyed table. It contains the following union:</p>
+<ul>
+<li>Physical ASPX files that meet all three conditions:
+<ul>
+<li><strong>NoExecute not equal to true</strong> (both null and false are included).</li>
+<li>An exact source handler in <code>Microsoft.SharePoint.WebPartPages.WikiEditPage</code>, <code>Microsoft.SharePoint.WebPartPages.WebPartPage</code>, <code>Microsoft.SharePoint.Publishing.TemplateRedirectionPage</code>, or <code>System.Web.UI.Page</code>. A source with no <code>Inherits</code> declaration resolves to <code>System.Web.UI.Page</code>.</li>
+<li><strong>Outside the List product family.</strong> A file registered as a list view or list form (<code>IsListView</code> or <code>IsListForm</code> is true) belongs to the List product family and is reported in <a href="csv-aspx.html">aspx.csv</a> only. Files with unknown (empty) list-role evidence are included.</li>
+</ul>
+</li>
+<li>Actual independent list items from the observed Posts template <strong>301</strong>. They are not subject to the ASPX handler/NoExecute gate.</li>
+</ul>
+<p>The List product family is the only product-family condition. Experience, official state, catalog role and backing-item availability are reported as columns and leave the selection unchanged. Unknown handlers are not guessed from metadata or short names. <a href="csv-aspx.html">aspx.csv</a> independently retains <strong>all</strong> physical ASPX facts, including those excluded here.</p>
+<p>File identity is <code>(SiteCollectionId, FileUniqueId)</code>; Posts identity is <code>(SiteCollectionId, ListId, ListItemId)</code>, inside the assessment. A shared display-form renderer is not item identity and does not donate its usage to every post. Equal hashes do not merge different native files. Distinct native objects colliding on the historical report URL key fail explicitly; no URL <code>Distinct</code> silently drops them.</p>
+<p><code>classicpagessummary.json</code> records the same written Page count, file/Posts counts, the physical ASPX denominator, and true/false/unknown NoExecute counts for the file branch. Exported page-dependent Web/site/publishing summaries, web-part inventories and usage rows are recomputed from this same selected set, without changing SQL assessment tables. Retained non-page component counts are unchanged.</p>
+<p>These related CSVs are selected-Page views, not deletion of captured evidence. The complete original parts, native file facts, component rows, immutable source/analysis publication and existing SQL tables remain intact. Discovery coverage remains a separate observed-acquisition denominator rather than being rewritten to claim that filtered-out files were absent.</p>
+<p>Historical assessments with no native pipeline keep their existing legacy CSV contract. Their summary explicitly says <code>LegacyContract;NativeSourceUnavailable</code>; it does not claim that missing original source was acquired or that the native predicate was proved. An incomplete newer native analysis cannot fall back to older report rows.</p>
 <p>A page whose list item could not be read — a web's root <code>default.aspx</code> and other files that have no backing list item at all — is still assessed from its file alone: its web parts are read through the file's web part manager. The columns that come from the list item (<code>ListUrl</code>, <code>ListTitle</code>, <code>ListId</code>, <code>ListItemId</code>, <code>ModifiedAt</code>, <code>ModifiedBy</code>) are then empty rather than filled with a stand-in, and <a href="csv-discovery.html">discovery.csv</a> records why in <code>ErrorCodes</code>.</p>
 <h2 id="columns">Columns</h2>
 <p>The following columns are included:</p>
@@ -98,7 +113,11 @@
 </tr>
 <tr>
 <td>PageType</td>
-<td>The detected classic page type: <code>WikiPage</code>, <code>WebPartPage</code>, <code>PublishingPage</code>, <code>BlogPage</code>, <code>ASPXPage</code> or <code>DelveBlogPage</code></td>
+<td>Canonical type from the admitted exact handler: <code>WikiPage</code>, <code>WebPartPage</code>, <code>PublishingPage</code> or <code>ASPXPage</code>; actual independent Posts are <code>BlogPage</code>. The native pipeline does not admit pointpub as Pages.</td>
+</tr>
+<tr>
+<td>AssessmentPageType</td>
+<td>Original readiness-assessment type, retained independently of the exact source-handler export label.</td>
 </tr>
 <tr>
 <td>ListUrl</td>
@@ -162,7 +181,7 @@
 </tr>
 <tr>
 <td>UncustomizedHomePage</td>
-<td>True when this home page is still the default, uncustomized home page (only meaningful when <code>HomePage</code> is true)</td>
+<td>Nullable authoritative primary API result, or the canonical true/false result when both sealed Web/file fallback receipts establish a completed fallback. Failed/unacquired fallback is empty, not false.</td>
 </tr>
 <tr>
 <td>ModifiedBy</td>
@@ -170,11 +189,11 @@
 </tr>
 <tr>
 <td>WebPartCount</td>
-<td>Number of web parts found on the page</td>
+<td>Actual part count when sealed acquisition and analysis provenance establish a successful read; a genuine empty read is 0. Unacquired/inapplicable values, including Posts, are empty.</td>
 </tr>
 <tr>
 <td>MappingPercentage</td>
-<td>Percentage (0-100) of the page's web parts that have a known modern mapping. A page with no web parts is reported as 100%, except for a page assessed from its file alone: only its web part zones were read, so an empty result is left uncomputed rather than scored as fully mappable. An uncomputed value is written as 0 — read it together with <code>WebPartCount</code>: <code>WebPartCount</code> 0 with 0% means the rollup was withheld, while any <code>WebPartCount</code> above 0 with 0% means the page's web parts genuinely have no known modern mapping</td>
+<td>Measured readiness percentage only when actually calculated. File-only pages with a successful empty part read retain WebPartCount=0 but have an empty percentage and MappingReadState=WithheldFileOnlyEmpty. Real computed 0% and 100% remain numeric.</td>
 </tr>
 <tr>
 <td>UnmappedWebParts</td>
@@ -196,8 +215,53 @@
 <td>WebUrl</td>
 <td>Relative URL of this web</td>
 </tr>
+<tr>
+<td>ObjectKind / ContentKey</td>
+<td>Discriminated native file/item identity, not a URL/hash key.</td>
+</tr>
+<tr>
+<td>AnalysisRunId / SnapshotId</td>
+<td>Exact immutable publication and source selected for this export.</td>
+</tr>
+<tr>
+<td>PageHandler / SourceSha256 / SourceReadState / HandlerResolution</td>
+<td>Exact captured source evidence. Empty for independent items or unavailable source.</td>
+</tr>
+<tr>
+<td>NoExecute / NoExecuteRaw / NoExecuteReadState</td>
+<td>Nullable trusted Boolean plus the original server text and read outcome. True excludes only the file branch; unknown remains unknown and is included when the handler qualifies.</td>
+</tr>
+<tr>
+<td>IsCatalog / IsListView / IsListForm / RoleReadState</td>
+<td>Captured role evidence. Every file row here has <code>IsListView</code> and <code>IsListForm</code> either false or empty, because a true value places the file in the List product family. <code>IsCatalog</code> and <code>RoleReadState</code> are informational.</td>
+</tr>
+<tr>
+<td>Official / OfficialReadState</td>
+<td>Unknown/NotAcquired when no independent authoritative official-file observation exists. No inference from path or role.</td>
+</tr>
+<tr>
+<td>AuditViewsCount / AuditCreatesCount / AuditEditsCount / AuditUniqueUsers</td>
+<td>Exact content-locator usage including the Posts item query. Unknown/skipped/failed counts stay empty; partial counts are labelled partial.</td>
+</tr>
+<tr>
+<td>UsageQueryStatus / AuditWindowStart / AuditWindowEnd</td>
+<td>Fixed audit-window coverage. A successful fully covered query with no matching events can report zero; an unavailable query cannot.</td>
+</tr>
+<tr>
+<td>UsageAttributionState</td>
+<td>ExactContentLocator when events carry the actual content locator; Posts with no item-specific record stay ItemLocatorNotObserved with empty counts even if query coverage succeeded. Renderer activity is never assigned to Posts.</td>
+</tr>
+<tr>
+<td>WebPartsReadState / MappingReadState</td>
+<td>Sealed part acquisition and explicit computed/withheld/unavailable readiness state, independently of the broad page AssessmentStatus.</td>
+</tr>
+<tr>
+<td>CanModernizeReadState / WebHomeFallbackReadState / HomeFallbackReadState</td>
+<td>Primary API, Web fallback and file fallback acquisition states used to establish nullable home-page readiness.</td>
+</tr>
 </tbody>
 </table>
+<p>Audit statistics are reduced with <code>classic-pages-v5</code> rules while the acquisition shape remains <code>classic-objects-v4</code>. This fixes query-addressed Posts events without changing sealed source bytes. Previously published v4 statistics are not silently reinterpreted or rewritten; a new explicit analysis run is required to produce corrected results.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">
