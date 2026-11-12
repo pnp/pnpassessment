@@ -1,5 +1,5 @@
-﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using FluentAssertions;
 using PnP.Scanning.Core.Scanners.WebPartMapping;
 using Xunit;
 
@@ -13,8 +13,8 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
     /// </summary>
     public class PageLayoutDetectorTests
     {
+        /// <summary>Verifies layout wiki layouts data span detects family.</summary>
         // --- Wiki layout: from the layoutsdata span (the primary path) -----------------------------------
-
         [Theory]
         // OneColumn needs no width hint.
         [InlineData("false,false,1", null, PageLayout.Wiki_OneColumn)]
@@ -26,7 +26,10 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
         [InlineData("false,false,3", null, PageLayout.Wiki_ThreeColumns)]
         [InlineData("true,false,3", null, PageLayout.Wiki_ThreeColumnsWithHeader)]
         [InlineData("true,true,3", null, PageLayout.Wiki_ThreeColumnsWithHeaderAndFooter)]
-        public void Layout_WikiLayoutsDataSpan_DetectsFamily(string layoutsData, string firstTdStyle, PageLayout expected)
+        public void Layout_WikiLayoutsDataSpan_DetectsFamily(
+            string layoutsData,
+            string firstTdStyle,
+            PageLayout expected)
         {
             var html = WikiWithLayoutsData(layoutsData, firstTdStyle);
 
@@ -42,12 +45,14 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             PageLayoutDetector.DetectWikiLayout(html).Should().Be(PageLayout.Wiki_OneColumn);
         }
 
+        /// <summary>Verifies layout wiki no layouts data is custom.</summary>
         [Fact]
         public void Layout_WikiNoLayoutsData_IsCustom()
         {
             // No recognizable layout markup at all → custom layout.
             PageLayoutDetector.DetectWikiLayout("<div><p>free standing wiki content</p></div>")
-                .Should().Be(PageLayout.Wiki_Custom);
+                .Should()
+                .Be(PageLayout.Wiki_Custom);
         }
 
         [Fact]
@@ -102,13 +107,13 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages
             PageLayoutDetector.ToLayoutString(layout).Should().Be(expected);
         }
 
+        /// <summary>Verifies wiki with layouts data.</summary>
+
         // Builds a minimal wiki HTML page carrying a layoutsdata span and an optional set of styled
         // columns (only the first td's style matters to the detector, but the fallback counts all of them).
         private static string WikiWithLayoutsData(string layoutsData, params string[] tdStyles)
         {
-            var tds = string.Concat(tdStyles
-                .Where(s => s != null)
-                .Select(s => $"<td style=\"{s}\">&#160;</td>"));
+            string tds = string.Concat(tdStyles.Where(s => s != null).Select(s => $"<td style=\"{s}\">&#160;</td>"));
 
             return $@"<div class=""ExternalClassABC"">
                         <span id=""layoutsdata"">{layoutsData}</span>

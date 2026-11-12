@@ -19,7 +19,8 @@ namespace PnP.Scanning.Core.Tests.Storage
         // The literal directory prefix the Classic template references at authoring time, exactly as
         // passed by ReportManager.CreatePowerBiReportAsync. Inside the DataModelSchema's JSON-escaped M
         // code the backslashes are doubled, so the runtime string value carries doubled backslashes too.
-        private const string OldLocation = "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\";
+        private const string OldLocation =
+            "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\";
 
         [Fact]
         public void ClassicTemplate_PropertiesValue_IsText()
@@ -33,15 +34,20 @@ namespace PnP.Scanning.Core.Tests.Storage
             var tables = document.RootElement.GetProperty("model").GetProperty("tables");
             var properties = tables.EnumerateArray()
                 .Single(table => table.GetProperty("name").GetString() == "properties");
-            var value = properties.GetProperty("columns").EnumerateArray()
+            var value = properties.GetProperty("columns")
+                .EnumerateArray()
                 .Single(column => column.GetProperty("name").GetString() == "Value");
 
             value.GetProperty("dataType").GetString().Should().Be("string");
             value.TryGetProperty("formatString", out _).Should().BeFalse();
 
-            var expression = string.Join("\n", properties.GetProperty("partitions")[0]
-                .GetProperty("source").GetProperty("expression").EnumerateArray()
-                .Select(line => line.GetString()));
+            var expression = string.Join(
+                "\n",
+                properties.GetProperty("partitions")[0]
+                    .GetProperty("source")
+                    .GetProperty("expression")
+                    .EnumerateArray()
+                    .Select(line => line.GetString()));
             expression.Should().Contain("{\"Value\", type text}");
             expression.Should().NotContain("{\"Value\", type logical}");
         }
@@ -52,8 +58,11 @@ namespace PnP.Scanning.Core.Tests.Storage
             using var document = ReadEmbeddedClassicTemplate();
 
             // ReportManager exports CSV values using InvariantCulture (MM/dd/yyyy dates).
-            document.RootElement.GetProperty("model").GetProperty("sourceQueryCulture")
-                .GetString().Should().Be("en-US");
+            document.RootElement.GetProperty("model")
+                .GetProperty("sourceQueryCulture")
+                .GetString()
+                .Should()
+                .Be("en-US");
         }
 
         [Theory]
@@ -68,7 +77,8 @@ namespace PnP.Scanning.Core.Tests.Storage
         {
             using var document = ReadEmbeddedClassicTemplate();
             var table = GetClassicTable(document, tableName);
-            var column = table.GetProperty("columns").EnumerateArray()
+            var column = table.GetProperty("columns")
+                .EnumerateArray()
                 .Single(value => value.GetProperty("name").GetString() == columnName);
 
             column.GetProperty("dataType").GetString().Should().Be("dateTime");
@@ -103,6 +113,24 @@ namespace PnP.Scanning.Core.Tests.Storage
             ReadDataModelSchema(authoringCopy).Should().Be(ReadDataModelSchema(embedded));
         }
 
+        /// <summary>Both shipped Classic templates use the supported page CSV independently of the retired projection.</summary>
+        [Fact]
+        public void ClassicTemplates_UseSupportedPageCsv()
+        {
+            const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
+            using Stream embedded = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
+            embedded.Should().NotBeNull();
+            string authoringCopy = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ClassicAssessmentReport.pbit");
+            string[] schemas = { ReadDataModelSchema(embedded), ReadDataModelSchema(authoringCopy) };
+            foreach (string schema in schemas)
+            {
+                schema.Should()
+                    .Contain("classicpages.csv")
+                    .And.NotContain("classicaspx.csv")
+                    .And.NotContain("classicaspxsummary.json");
+            }
+        }
+
         [Fact]
         public void RewriteDataLocationsInPbit_NewCsvSources_PathsRewritten()
         {
@@ -111,12 +139,13 @@ namespace PnP.Scanning.Core.Tests.Storage
             {
                 // A fixture DataModelSchema referencing the existing page CSV plus the two new
                 // T11 page-scan sources, all under the authoring-time directory prefix.
-                var schema = string.Join("\r\n", new[]
-                {
-                    SourceLine("classicpages.csv", "11"),
-                    SourceLine("classicpagewebparts.csv", "15"),
-                    SourceLine("classicwebpartunique.csv", "4"),
-                });
+                var schema = string.Join(
+                    "\r\n",
+                    new[]
+                    {
+                        SourceLine("classicpages.csv", "11"), SourceLine("classicpagewebparts.csv", "15"),
+                        SourceLine("classicwebpartunique.csv", "4"),
+                    });
 
                 var pbit = BuildFixturePbit(dir, schema);
 
@@ -201,14 +230,19 @@ namespace PnP.Scanning.Core.Tests.Storage
 
         private static JsonElement GetClassicTable(JsonDocument document, string name)
         {
-            return document.RootElement.GetProperty("model").GetProperty("tables").EnumerateArray()
+            return document.RootElement.GetProperty("model")
+                .GetProperty("tables")
+                .EnumerateArray()
                 .Single(table => table.GetProperty("name").GetString() == name);
         }
 
         private static IEnumerable<string> GetQueryLines(JsonElement table)
         {
-            return table.GetProperty("partitions")[0].GetProperty("source").GetProperty("expression")
-                .EnumerateArray().Select(line => line.GetString());
+            return table.GetProperty("partitions")[0]
+                .GetProperty("source")
+                .GetProperty("expression")
+                .EnumerateArray()
+                .Select(line => line.GetString());
         }
 
         private static string ReadDataModelSchema(string pbit)

@@ -39,6 +39,15 @@ message ScanStatusReply {
 	int32 RequestsThrottled = 8;
 	int32 RequestsRetriedDueToNetworkError = 9;
 	google.protobuf.Timestamp RetryingRequestAt = 10;
+    string ExecutionPath = 11;
+    string Phase = 12;
+    string SnapshotId = 13;
+    string RunId = 14;
+    string AnalysisRunId = 15;
+    int32 RecordsCompleted = 16;
+    int32 RecordsTotal = 17;
+    int32 ErrorCount = 18;
+    string ErrorSummary = 19;
 }
 
 // Start
@@ -102,6 +111,15 @@ message ListScanResponse {
 	int32 SiteCollectionsScanned = 5;
 	google.protobuf.Timestamp ScanStarted = 6;
 	google.protobuf.Timestamp ScanEnded = 7;
+    string ExecutionPath = 8;
+    string Phase = 9;
+    string SnapshotId = 10;
+    string RunId = 11;
+    string AnalysisRunId = 12;
+    int32 RecordsCompleted = 13;
+    int32 RecordsTotal = 14;
+    int32 ErrorCount = 15;
+    string ErrorSummary = 16;
 }
 
 // Pause

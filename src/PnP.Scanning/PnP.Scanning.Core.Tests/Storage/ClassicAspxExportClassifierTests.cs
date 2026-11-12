@@ -1,10 +1,9 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 #nullable enable
 using System.Text.Json;
 using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Discovery;
-using PnP.Scanning.Core.Scanners.Classic;
-using PnP.Scanning.Core.Scanners.Classic.Pages;
 using PnP.Scanning.Core.Storage;
 using Xunit;
 
@@ -18,18 +17,19 @@ public sealed class ClassicAspxExportClassifierTests
     private const string ModernContentType = "0x0101009D1CB255DA76424F860D91F20E6C411800";
 
     /// <summary>Creates available item observations with the exact field-state contract used by acquisition.</summary>
-    private static SPFile ItemFile(Dictionary<string, object> fields)
+    private static SPFile ItemFile(Dictionary<string, object?> fields)
     {
         return new SPFile
         {
             ItemMetadataReadState = "Available",
-            ItemMetadataFieldStatesJson = JsonSerializer.Serialize(fields.ToDictionary(
-                field => field.Key, field => field.Value == null ? "null" : "value")),
+            ItemMetadataFieldStatesJson =
+                JsonSerializer.Serialize(
+                    fields.ToDictionary(field => field.Key, field => field.Value == null ? "null" : "value")),
             ClientSideApplicationId = fields.GetValueOrDefault("ClientSideApplicationId") as string,
             HtmlFileType = fields.GetValueOrDefault("HTML_x0020_File_x0020_Type") as string,
             FileType = fields.GetValueOrDefault("File_x0020_Type") as string,
             BSN = fields.GetValueOrDefault("BSN") as string,
-            WikiFieldHasValue = fields.TryGetValue("WikiField", out var wiki) ? wiki != null : null
+            WikiFieldHasValue = fields.TryGetValue("WikiField", out object? wiki) ? wiki != null : null
         };
     }
 
@@ -39,16 +39,20 @@ public sealed class ClassicAspxExportClassifierTests
     [InlineData(null, ModernApplication, true, "ModernPage")]
     [InlineData(null, null, true, "WikiPage")]
     [InlineData(null, null, false, "ASPXPage")]
-    public void AvailableFieldsDelegateToCurrentAssessmentMethod(string? htmlType, string? application, bool wiki, string expected)
+    public void AvailableFieldsDelegateToCurrentAssessmentMethod(
+        string? htmlType,
+        string? application,
+        bool wiki,
+        string expected)
     {
-        var fields = new Dictionary<string, object>
+        Dictionary<string, object?> fields = new Dictionary<string, object?>
         {
-            ["HTML_x0020_File_x0020_Type"] = htmlType!,
-            ["ClientSideApplicationId"] = application!,
-            ["WikiField"] = wiki ? string.Empty : null!
+            ["HTML_x0020_File_x0020_Type"] = htmlType,
+            ["ClientSideApplicationId"] = application,
+            ["WikiField"] = wiki ? string.Empty : null
         };
-        var result = ClassicAspxExportClassifier.Classify(ItemFile(fields));
-        result.PageType.Should().Be(PageScanComponent.GetPageType(fields)).And.Be(expected);
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(ItemFile(fields));
+        result.PageType.Should().Be(ClassicPageRules.GetPageType(fields)).And.Be(expected);
         result.State.Should().Be("ItemMetadata");
     }
 
@@ -56,10 +60,10 @@ public sealed class ClassicAspxExportClassifierTests
     [Fact]
     public void PublishingOverrideStillPrecedesExistingFieldMethod()
     {
-        var file = ItemFile(new Dictionary<string, object> { ["ClientSideApplicationId"] = ModernApplication });
+        SPFile file = ItemFile(new Dictionary<string, object?> { ["ClientSideApplicationId"] = ModernApplication });
         file.ContentTypeId = PublishingContentType;
-        SharePointLiveAspxDiscoveryProvider.IsPublishingPageContentType(file.ContentTypeId).Should().BeTrue();
-        var result = ClassicAspxExportClassifier.Classify(file);
+        ClassicPageRules.IsPublishingContentType(file.ContentTypeId).Should().BeTrue();
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("PublishingPage");
         result.IsModern.Should().BeFalse();
     }
@@ -68,9 +72,9 @@ public sealed class ClassicAspxExportClassifierTests
     [Fact]
     public void AvailableItemDoesNotAcquireNewContentTypePrecedence()
     {
-        var file = ItemFile(new Dictionary<string, object> { ["BSN"] = "" });
+        SPFile file = ItemFile(new Dictionary<string, object?> { ["BSN"] = "" });
         file.ContentTypeId = ModernContentType;
-        var result = ClassicAspxExportClassifier.Classify(file);
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("WikiPage");
         result.IsModern.Should().BeFalse();
     }
@@ -86,7 +90,8 @@ public sealed class ClassicAspxExportClassifierTests
         var file = new SPFile
         {
             ItemMetadataReadState = "Available",
-            ItemMetadataFieldStatesJson = JsonSerializer.Serialize(new Dictionary<string, string> { ["BSN"] = state }),
+            ItemMetadataFieldStatesJson =
+                JsonSerializer.Serialize(new Dictionary<string, string> { ["BSN"] = state }),
             BSN = bsn,
             ClientSideApplicationId = ModernApplication,
             HtmlFileType = "SharePoint.WebPartPage.Document"
@@ -105,7 +110,8 @@ public sealed class ClassicAspxExportClassifierTests
         var file = new SPFile
         {
             ItemMetadataReadState = "Available",
-            ItemMetadataFieldStatesJson = JsonSerializer.Serialize(new Dictionary<string, string> { ["WikiField"] = state }),
+            ItemMetadataFieldStatesJson =
+                JsonSerializer.Serialize(new Dictionary<string, string> { ["WikiField"] = state }),
             WikiFieldHasValue = hasValue
         };
         var result = ClassicAspxExportClassifier.Classify(file);
@@ -113,12 +119,13 @@ public sealed class ClassicAspxExportClassifierTests
         result.State.Should().Be("ItemMetadata");
     }
 
-    /// <summary>Leaves the existing Delve-blog marker to the original field classifier rather than encoding a second rule in the adapter.</summary>
+    /// <summary>Retains the historical Delve CSV label without admitting retired files into current Page analysis.</summary>
     [Fact]
     public void DelveMarkerStillUsesExistingFieldClassification()
     {
-        var fields = new Dictionary<string, object> { ["File_x0020_Type"] = "pointpub" };
-        ClassicAspxExportClassifier.Classify(ItemFile(fields)).PageType.Should().Be(PageScanComponent.GetPageType(fields)).And.Be("DelveBlogPage");
+        Dictionary<string, object?> fields = new Dictionary<string, object?> { ["File_x0020_Type"] = "pointpub" };
+        ClassicAspxExportClassifier.Classify(ItemFile(fields)).PageType.Should().Be("DelveBlogPage");
+        ClassicPageRules.GetPageType(fields).Should().NotBe("DelveBlogPage");
     }
 
     /// <summary>Uses the unchanged provider content-type method when item metadata was not acquired, including its unknown and modern outcomes.</summary>
@@ -149,8 +156,11 @@ public sealed class ClassicAspxExportClassifierTests
     [InlineData("{\"BSN\":\"unknown\"}")]
     public void UnrestorableSnapshotDoesNotDropTheFile(string states)
     {
-        var file = new SPFile { ItemMetadataReadState = "Available", ItemMetadataFieldStatesJson = states, ContentTypeId = "0x010109" };
-        var result = ClassicAspxExportClassifier.Classify(file);
+        SPFile? file = new SPFile
+        {
+            ItemMetadataReadState = "Available", ItemMetadataFieldStatesJson = states, ContentTypeId = "0x010109"
+        };
+        ClassicAspxExportClassifier.Classification? result = ClassicAspxExportClassifier.Classify(file);
         result.PageType.Should().Be("BasicPage");
         result.State.Should().Be("FileOnlyFallback");
     }
@@ -201,7 +211,11 @@ public sealed class ClassicAspxExportClassifierTests
     [InlineData("0", "Available", "OtherSource", false)]
     [InlineData("1", "Available", "NoExecute", false)]
     [InlineData("1", "Available", "SPO.ListItem.NoExecute", true)]
-    public void UnavailableOrUntrustedNoExecuteEvidenceIsUnknown(string raw, string state, string? source, bool conflict)
+    public void UnavailableOrUntrustedNoExecuteEvidenceIsUnknown(
+        string raw,
+        string state,
+        string? source,
+        bool conflict)
     {
         var result = ClassicAspxPoisonAnalysis.AnalyzeRaw(raw, state, source, conflict);
         result.IsPoisoned.Should().BeNull();
@@ -216,7 +230,11 @@ public sealed class ClassicAspxExportClassifierTests
     [InlineData("01", "Available", "SPO.ListItem.NoExecute", null)]
     [InlineData("1", "Unavailable", "SPO.ListItem.NoExecute", null)]
     [InlineData("1", "Available", null, null)]
-    public void EntityAnalysisNeverRewritesOriginalNoExecuteText(string raw, string state, string? source, bool? expected)
+    public void EntityAnalysisNeverRewritesOriginalNoExecuteText(
+        string raw,
+        string state,
+        string? source,
+        bool? expected)
     {
         var file = new SPFile { NoExecuteRaw = raw, NoExecuteReadState = state, NoExecuteSource = source };
         ClassicAspxPoisonAnalysis.Analyze(file).IsPoisoned.Should().Be(expected);
@@ -233,8 +251,11 @@ public sealed class ClassicAspxExportClassifierTests
     {
         var file = new SPFile
         {
-            NoExecuteRaw = "1", NoExecuteReadState = "Available", NoExecuteSource = "SPO.ListItem.NoExecute",
-            ProvenanceJson = JsonSerializer.Serialize(new[] { new { observation = "metadata_changed", field, before = "0", after = "1" } })
+            NoExecuteRaw = "1",
+            NoExecuteReadState = "Available",
+            NoExecuteSource = "SPO.ListItem.NoExecute",
+            ProvenanceJson = JsonSerializer.Serialize(
+                new[] { new { observation = "metadata_changed", field, before = "0", after = "1" } })
         };
         ClassicAspxPoisonAnalysis.Analyze(file).IsPoisoned.Should().Be(unknown ? null : true);
     }

@@ -6,6 +6,9 @@ using System.CommandLine;
 
 namespace PnP.Scanning.Process.Commands
 {
+    /// <summary>
+    /// Displays running assessment status and phase progress through the existing command.
+    /// </summary>
     internal sealed class StatusCommandHandler
     {
         private readonly ScannerManager processManager;
@@ -26,27 +29,33 @@ namespace PnP.Scanning.Process.Commands
             return cmd;
         }
 
+        /// <summary>
+        /// Reads and displays current assessment and internal phase progress.
+        /// </summary>
         private async Task HandleStatusAsync()
         {
-            var client = await processManager.GetScannerClientAsync();
+            PnPScanner.PnPScannerClient client = await processManager.GetScannerClientAsync();
 
-            var table = new Table().BorderColor(Color.Grey);
+            Table table = new Table().BorderColor(Color.Grey);
 
             // Add some columns
             table.AddColumn(new TableColumn("Id").Centered());
             table.AddColumn(new TableColumn("Mode").Centered());
+            table.AddColumn("Path / phase");
             table.AddColumn(new TableColumn("Status").Centered());
             table.AddColumn(new TableColumn("Progress").Centered());
             table.AddColumn(new TableColumn("Retries").Centered());
             table.AddColumn(new TableColumn("Session start").Centered());
             table.AddColumn(new TableColumn("Session duration").Centered());
+            table.AddColumn("Snapshot / run / analysis");
+            table.AddColumn("Errors");
 
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Live running Microsoft 365 Assessment status. Press [yellow]ESC[/] to exit");
             AnsiConsole.WriteLine();
 
             await AnsiConsole.Live(table)
-                .AutoClear(false)   // Do not remove when done
+                .AutoClear(false) // Do not remove when done
                 .Overflow(VerticalOverflow.Ellipsis) // Show ellipsis when overflowing
                 .Cropping(VerticalOverflowCropping.Top) // Crop overflow at top
                 .StartAsync(async ctx =>
@@ -55,38 +64,47 @@ namespace PnP.Scanning.Process.Commands
                     {
                         while (!Console.KeyAvailable)
                         {
-                            var statusInformation = await client.StatusAsync(new StatusRequest() { Message = "bla" });
+                            StatusReply statusInformation =
+                                await client.StatusAsync(new StatusRequest() { Message = "bla" });
 
                             table.Rows.Clear();
 
                             if (statusInformation.Status.Count > 0)
                             {
-                                foreach (var item in statusInformation.Status)
+                                foreach (ScanStatusReply item in statusInformation.Status)
                                 {
-                                    double procentDone = Math.Round((double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
+                                    double procentDone = Math.Round(
+                                        (double)item.SiteCollectionsScanned / item.SiteCollectionsToScan * 100);
                                     Markup status;
                                     Markup procent;
                                     Markup throttling = null;
                                     if (item.Status == ScanStatus.Running.ToString() || item.Status == "Finalizing")
                                     {
                                         status = new Markup($"[orange3]{item.Status}[/]");
-                                        procent = new Markup($"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");
+                                        procent = new Markup(
+                                            $"[orange3]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([orange3]{procentDone}%[/])");
                                     }
                                     else if (item.Status == ScanStatus.Finished.ToString())
                                     {
                                         status = new Markup($"[green]{item.Status}[/]");
-                                        procent = new Markup($"[green]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([green]{procentDone}%[/])");
+                                        procent = new Markup(
+                                            $"[green]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([green]{procentDone}%[/])");
                                     }
                                     else if (item.Status == ScanStatus.Terminated.ToString())
                                     {
                                         status = new Markup($"[maroon]{item.Status}[/]");
-                                        procent = new Markup($"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
+                                        procent = new Markup(
+                                            $"[maroon]{item.SiteCollectionsScanned}[/]/[green]{item.SiteCollectionsToScan}[/] ([maroon]{procentDone}%[/])");
                                     }
                                     else
                                     {
                                         status = new Markup($"{item.Status}");
-                                        procent = new Markup($"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
+                                        procent = new Markup(
+                                            $"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
                                     }
+
+                                    if (item.ExecutionPath == "pipeline")
+                                        procent = new Markup($"{item.RecordsCompleted}/{item.RecordsTotal} records");
 
                                     //if (item.RetryingRequestAt.ToDateTime() != DateTime.MinValue)
                                     //{
@@ -99,16 +117,25 @@ namespace PnP.Scanning.Process.Commands
 
                                     //if (throttling == null)
                                     //{
-                                    throttling = new Markup($"{item.RequestsThrottled} / {item.RequestsRetriedDueToNetworkError}");
+                                    throttling = new Markup(
+                                        $"{item.RequestsThrottled} / {item.RequestsRetriedDueToNetworkError}");
                                     //}
 
-                                    table.AddRow(new Markup($"{item.Id}"),
-                                                 new Markup($"{item.Mode}"),
-                                                 status,
-                                                 procent,
-                                                 throttling,
-                                                 new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
-                                                 new Markup(item.Duration.ToTimeSpan().ToString(@"dd\:hh\:mm\:ss")));
+                                    table.AddRow(
+                                        new Markup($"{item.Id}"),
+                                        new Markup($"{item.Mode}"),
+                                        new Markup(
+                                            Markup.Escape(
+                                                $"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
+                                        status,
+                                        procent,
+                                        throttling,
+                                        new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
+                                        new Markup(item.Duration.ToTimeSpan().ToString(@"dd\:hh\:mm\:ss")),
+                                        new Markup(
+                                            Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
+                                        new Markup(
+                                            Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}")));
                                 }
                             }
                             else
@@ -120,10 +147,8 @@ namespace PnP.Scanning.Process.Commands
 
                             await Task.Delay(TimeSpan.FromSeconds(1));
                         }
-                    }
-                    while (Console.ReadKey(true).Key != ConsoleKey.Escape);
+                    } while (Console.ReadKey(true).Key != ConsoleKey.Escape);
                 });
-
         }
     }
 }

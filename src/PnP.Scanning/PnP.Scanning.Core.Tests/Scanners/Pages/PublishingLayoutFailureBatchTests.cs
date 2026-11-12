@@ -1,10 +1,11 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using System.Data.Common;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using PnP.Scanning.Core.Scanners;
 using PnP.Scanning.Core.Storage;
 using Xunit;
 using Xunit.Abstractions;
@@ -20,68 +21,90 @@ public class PublishingLayoutFailureBatchTests
 
     public PublishingLayoutFailureBatchTests(ITestOutputHelper output) => this.output = output;
 
+    /// <summary>Verifies shared layout failure scans identities once and fetches bounded indexed batches.</summary>
     [Theory]
     [InlineData(100)]
     [InlineData(1000)]
     [InlineData(5000)]
     public async Task Shared_layout_failure_scans_identities_once_and_fetches_bounded_indexed_batches(int pageCount)
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        var reads = new DiscoveryReads();
-        using var db = CreateContext(connection, reads);
+        DiscoveryReads reads = new DiscoveryReads();
+        using ScanContext db = CreateContext(connection, reads);
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, pageCount);
+        Guid scan = await SeedAsync(db, pageCount);
         db.ChangeTracker.Clear();
         reads.Commands.Clear();
-        var requests = 0;
-        var failures = 0;
+        int requests = 0;
+        int failures = 0;
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl, _ =>
-        {
-            requests++;
-            throw new UnauthorizedAccessException("Shared layout denied");
-        }, (_, _) => failures++);
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ =>
+            {
+                requests++;
+                throw new UnauthorizedAccessException("Shared layout denied");
+            },
+            (_, _) => failures++);
 
         requests.Should().Be(1, "all pages share the same cached terminal failure");
         failures.Should().Be(pageCount);
-        var identityReads = reads.Commands.Where(command => !command.Sql.Contains("json_each", StringComparison.Ordinal)).ToArray();
+        RecordedCommand[] identityReads = reads.Commands
+            .Where(command => !command.Sql.Contains("json_each", StringComparison.Ordinal))
+            .ToArray();
         identityReads.Length.Should().Be(1, "failure identities must be scanned once, not once per page");
         identityReads[0].Sql.Should().NotContain("COLLATE");
-        var batches = reads.Commands.Where(command => command.Sql.Contains("\"RecordKey\" IN", StringComparison.Ordinal)).ToArray();
+        RecordedCommand[] batches = reads.Commands
+            .Where(command => command.Sql.Contains("\"RecordKey\" IN", StringComparison.Ordinal))
+            .ToArray();
         batches.Should().HaveCount((pageCount + MaximumKeysPerQuery - 1) / MaximumKeysPerQuery);
-        foreach (var batch in batches)
+        foreach (RecordedCommand batch in batches)
         {
-            var keys = batch.Parameters.Where(parameter => parameter.Value is string text && text.StartsWith('['))
-                .Select(parameter => JsonSerializer.Deserialize<string[]>((string)parameter.Value)).Single();
+            string[] keys = batch.Parameters.Where(parameter => parameter.Value is string text && text.StartsWith('['))
+                .Select(parameter => JsonSerializer.Deserialize<string[]>((string)parameter.Value))
+                .Single();
             keys.Should().NotBeEmpty().And.HaveCountLessThanOrEqualTo(MaximumKeysPerQuery);
             batch.Sql.Should().NotContain("COLLATE");
         }
 
         // Check the actual EF-generated query against this product's migrated SQLite schema.
-        using (var explain = connection.CreateCommand())
+        using (SqliteCommand explain = connection.CreateCommand())
         {
             explain.CommandText = "EXPLAIN QUERY PLAN " + batches[0].Sql;
-            foreach (var parameter in batches[0].Parameters)
+            foreach ((string Name, object Value) parameter in batches[0].Parameters)
                 explain.Parameters.AddWithValue(parameter.Name, parameter.Value);
-            var plan = new List<string>();
-            using var result = await explain.ExecuteReaderAsync();
+            List<string> plan = new List<string>();
+            using SqliteDataReader result = await explain.ExecuteReaderAsync();
             while (await result.ReadAsync()) plan.Add(result.GetString(3));
-            plan.Should().Contain(detail => detail.Contains("SEARCH", StringComparison.Ordinal) &&
-                detail.Contains("ScanId=?", StringComparison.Ordinal) && detail.Contains("RecordKey=?", StringComparison.Ordinal));
+            plan.Should()
+                .Contain(detail =>
+                    detail.Contains("SEARCH", StringComparison.Ordinal) &&
+                    detail.Contains("ScanId=?", StringComparison.Ordinal) &&
+                    detail.Contains("RecordKey=?", StringComparison.Ordinal));
         }
 
         output.WriteLine($"pages={pageCount} identityScans={identityReads.Length} keyBatches={batches.Length}");
         db.ChangeTracker.Clear();
-        var rows = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
-        rows.Should().HaveCount(pageCount).And.OnlyContain(row => row.ErrorStage.Contains("PageLayoutMetadata") &&
-            row.ErrorStage.Contains("ExistingStage") && row.ErrorDetail.Contains("Shared layout denied") &&
-            row.ErrorDetail.Contains("Existing detail") && row.AssessmentStatus == "Complete");
-        var pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
-        pages.Should().HaveCount(pageCount).And.OnlyContain(page => page.LayoutCustomizedPageStatus == null &&
-            page.AssessmentStatus == "Complete" && page.WebPartCount == 3 && page.MappingPercentage == 50 && page.RemediationCode == "CP3");
+        List<ClassicPageDiscovery>
+            rows = await db.ClassicPageDiscoveries.Where(row => row.ScanId == scan).ToListAsync();
+        rows.Should()
+            .HaveCount(pageCount)
+            .And.OnlyContain(row => row.ErrorStage.Contains("PageLayoutMetadata") &&
+                                    row.ErrorStage.Contains("ExistingStage") &&
+                                    row.ErrorDetail.Contains("Shared layout denied") &&
+                                    row.ErrorDetail.Contains("Existing detail") && row.AssessmentStatus == "Complete");
+        List<ClassicPage> pages = await db.ClassicPages.Where(page => page.ScanId == scan).ToListAsync();
+        pages.Should()
+            .HaveCount(pageCount)
+            .And.OnlyContain(page =>
+                page.LayoutCustomizedPageStatus == null && page.AssessmentStatus == "Complete" &&
+                page.WebPartCount == 3 && page.MappingPercentage == 50 && page.RemediationCode == "CP3");
     }
 
+    /// <summary>Verifies failure batches track only matching rows and preserve scan site web and row type scope.</summary>
     [Fact]
     public async Task Failure_batches_track_only_matching_rows_and_preserve_scan_site_web_and_row_type_scope()
     {
@@ -100,22 +123,32 @@ public class PublishingLayoutFailureBatchTests
         var scope = Discovery(scan, "scope", url);
         scope.RowType = "Scope";
         db.ClassicPageDiscoveries.AddRange(duplicate, otherWeb, otherSite, otherScan, scope);
-        db.ClassicPageDiscoveries.AddRange(Enumerable.Range(0, 2000)
-            .Select(index => Discovery(scan, "healthy:" + index, "/sites/a/unrelated/" + index + ".aspx")));
+        db.ClassicPageDiscoveries.AddRange(
+            Enumerable.Range(0, 2000)
+                .Select(index => Discovery(scan, "healthy:" + index, "/sites/a/unrelated/" + index + ".aspx")));
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            _ => throw new UnauthorizedAccessException("Layout denied"), (_, _) => { });
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ => throw new UnauthorizedAccessException("Layout denied"),
+            (_, _) => { });
 
-        db.ChangeTracker.Entries<ClassicPageDiscovery>().Select(entry => entry.Entity.RecordKey)
-            .Should().BeEquivalentTo(new[] { "page:000000", "duplicate" });
+        db.ChangeTracker.Entries<ClassicPageDiscovery>()
+            .Select(entry => entry.Entity.RecordKey)
+            .Should()
+            .BeEquivalentTo(new[] { "page:000000", "duplicate" });
         db.ChangeTracker.Clear();
         var rows = await db.ClassicPageDiscoveries.ToListAsync();
-        rows.Where(row => row.ErrorStage.Contains("PageLayoutMetadata")).Select(row => row.RecordKey)
-            .Should().BeEquivalentTo(new[] { "page:000000", "duplicate" });
+        rows.Where(row => row.ErrorStage.Contains("PageLayoutMetadata"))
+            .Select(row => row.RecordKey)
+            .Should()
+            .BeEquivalentTo(new[] { "page:000000", "duplicate" });
     }
 
+    /// <summary>Verifies failure identity matching uses ordinal ignore case.</summary>
     [Theory]
     [InlineData("/WEB", "/web")]
     [InlineData("/Équipe", "/équipe")]
@@ -136,13 +169,18 @@ public class PublishingLayoutFailureBatchTests
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            _ => throw new UnauthorizedAccessException("Layout denied"), (_, _) => { });
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ => throw new UnauthorizedAccessException("Layout denied"),
+            (_, _) => { });
 
         db.ChangeTracker.Clear();
         (await db.ClassicPageDiscoveries.SingleAsync()).ErrorStage.Should().Contain("PageLayoutMetadata");
     }
 
+    /// <summary>Verifies multiple failures for one identity are all retained.</summary>
     [Fact]
     public async Task Multiple_failures_for_one_identity_are_all_retained()
     {
@@ -158,14 +196,22 @@ public class PublishingLayoutFailureBatchTests
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            url => throw new UnauthorizedAccessException(url == LayoutUrl ? "First failure" : "Second failure"), (_, _) => { });
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            url => throw new UnauthorizedAccessException(url == LayoutUrl ? "First failure" : "Second failure"),
+            (_, _) => { });
 
         db.ChangeTracker.Clear();
         var saved = await db.ClassicPageDiscoveries.SingleAsync();
-        saved.ErrorDetail.Should().Contain("First failure").And.Contain("Second failure").And.Contain("Existing detail");
+        saved.ErrorDetail.Should()
+            .Contain("First failure")
+            .And.Contain("Second failure")
+            .And.Contain("Existing detail");
     }
 
+    /// <summary>Verifies failure batches reuse tracked layout rows without losing pending conflict errors.</summary>
     [Fact]
     public async Task Failure_batches_reuse_tracked_layout_rows_without_losing_pending_conflict_errors()
     {
@@ -188,38 +234,51 @@ public class PublishingLayoutFailureBatchTests
         db.ChangeTracker.Clear();
         var failures = 0;
 
-        await PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            _ => throw new InvalidOperationException("Discovery must satisfy the layout read"), (_, _) => failures++);
+        await PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ => throw new InvalidOperationException("Discovery must satisfy the layout read"),
+            (_, _) => failures++);
 
         failures.Should().Be(1, "the latest discovery value is not a recognized customization status");
         db.ChangeTracker.Clear();
         var saved = await db.ClassicPageDiscoveries.FindAsync(scan, "latest-layout");
-        saved.ErrorStage.Should().Contain("DiscoveryMetadata").And.Contain("PageLayoutMetadata").And.Contain("ExistingStage");
+        saved.ErrorStage.Should()
+            .Contain("DiscoveryMetadata")
+            .And.Contain("PageLayoutMetadata")
+            .And.Contain("ExistingStage");
         saved.ErrorDetail.Should().Contain("changed customization status").And.Contain("Existing detail");
     }
 
+    /// <summary>Verifies failure lookup database errors propagate without partially saving errors.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Failure_lookup_database_errors_propagate_without_partially_saving_errors(bool duringKeyBatch)
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        var reads = new DiscoveryReads();
-        using var db = CreateContext(connection, reads);
+        DiscoveryReads reads = new DiscoveryReads();
+        using ScanContext db = CreateContext(connection, reads);
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, 300);
+        Guid scan = await SeedAsync(db, 300);
         db.ChangeTracker.Clear();
-        var keyBatches = 0;
+        int keyBatches = 0;
         reads.OnRead = command =>
         {
-            if (duringKeyBatch ? command.CommandText.Contains("\"RecordKey\" IN", StringComparison.Ordinal) && ++keyBatches == 2
-                : !command.CommandText.Contains("json_each", StringComparison.Ordinal))
+            if (duringKeyBatch
+                    ? command.CommandText.Contains("\"RecordKey\" IN", StringComparison.Ordinal) && ++keyBatches == 2
+                    : !command.CommandText.Contains("json_each", StringComparison.Ordinal))
                 throw new InvalidOperationException("Failure metadata store unavailable");
         };
 
-        var enrich = () => PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            _ => throw new UnauthorizedAccessException("Layout denied"), (_, _) => { });
+        Func<Task> enrich = () => PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ => throw new UnauthorizedAccessException("Layout denied"),
+            (_, _) => { });
         await enrich.Should().ThrowAsync<InvalidOperationException>().WithMessage("Failure metadata store unavailable");
 
         db.ChangeTracker.Clear();
@@ -228,27 +287,35 @@ public class PublishingLayoutFailureBatchTests
             .OnlyContain(row => row.ErrorStage == "ExistingStage" && row.ErrorDetail == "Existing detail");
     }
 
+    /// <summary>Verifies cancellation during failure lookup propagates without persisting errors.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Cancellation_during_failure_lookup_propagates_without_persisting_errors(bool duringKeyBatch)
     {
-        using var connection = new SqliteConnection("Filename=:memory:");
+        using SqliteConnection connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
-        using var cancellation = new CancellationTokenSource();
-        var reads = new DiscoveryReads();
-        using var db = CreateContext(connection, reads);
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        DiscoveryReads reads = new DiscoveryReads();
+        using ScanContext db = CreateContext(connection, reads);
         await db.Database.MigrateAsync();
-        var scan = await SeedAsync(db, 2);
+        Guid scan = await SeedAsync(db, 2);
         db.ChangeTracker.Clear();
         reads.OnRead = command =>
         {
-            if (duringKeyBatch ? command.CommandText.Contains("\"RecordKey\" IN", StringComparison.Ordinal)
-                : !command.CommandText.Contains("json_each", StringComparison.Ordinal)) cancellation.Cancel();
+            if (duringKeyBatch
+                    ? command.CommandText.Contains("\"RecordKey\" IN", StringComparison.Ordinal)
+                    : !command.CommandText.Contains("json_each", StringComparison.Ordinal))
+                cancellation.Cancel();
         };
 
-        var enrich = () => PublishingLayoutStatusReader.EnrichSiteAsync(db, scan, SiteUrl,
-            _ => throw new UnauthorizedAccessException("Layout denied"), (_, _) => { }, cancellation.Token);
+        Func<Task> enrich = () => PublishingLayoutStatusReader.EnrichSiteAsync(
+            db,
+            scan,
+            SiteUrl,
+            _ => throw new UnauthorizedAccessException("Layout denied"),
+            (_, _) => { },
+            cancellation.Token);
         await enrich.Should().ThrowAsync<OperationCanceledException>();
 
         db.ChangeTracker.Clear();
@@ -257,11 +324,16 @@ public class PublishingLayoutFailureBatchTests
             .OnlyContain(row => row.ErrorStage == "ExistingStage" && row.ErrorDetail == "Existing detail");
     }
 
-    private static ScanContext CreateContext(SqliteConnection connection, DiscoveryReads reads) => new(
-        new DbContextOptionsBuilder<ScanContext>()
-            .UseSqlite(connection, sqlite => sqlite.MigrationsAssembly(typeof(ScanContext).Assembly.FullName))
-            .AddInterceptors(reads).Options);
+    /// <summary>Verifies create context.</summary>
+    private static ScanContext CreateContext(SqliteConnection connection, DiscoveryReads reads) =>
+        new(
+            new DbContextOptionsBuilder<ScanContext>().UseSqlite(
+                    connection,
+                    sqlite => sqlite.MigrationsAssembly(typeof(ScanContext).Assembly.FullName))
+                .AddInterceptors(reads)
+                .Options);
 
+    /// <summary>Seeds synthetic publishing pages and layout observations for the scale regression.</summary>
     private static async Task<Guid> SeedAsync(ScanContext db, int count)
     {
         var scan = Guid.NewGuid();
@@ -270,25 +342,45 @@ public class PublishingLayoutFailureBatchTests
             db.ClassicPages.Add(Page(scan, index));
             db.ClassicPageDiscoveries.Add(Discovery(scan, $"page:{index:D6}", PageUrl(index)));
         }
+
         await db.SaveChangesAsync();
         return scan;
     }
 
     private static string PageUrl(int index) => $"/sites/a/Pages/page-{index}.aspx";
 
-    private static ClassicPage Page(Guid scan, int index) => new()
-    {
-        ScanId = scan, SiteUrl = SiteUrl, WebUrl = "/", PageUrl = PageUrl(index),
-        PageType = PageScanComponent.PublishingPage, LayoutUrl = LayoutUrl, AssessmentStatus = "Complete",
-        WebPartCount = 3, MappingPercentage = 50, RemediationCode = "CP3",
-    };
+    /// <summary>Builds a synthetic stored publishing page for the layout compatibility fixture.</summary>
+    private static ClassicPage Page(Guid scan, int index) =>
+        new()
+        {
+            ScanId = scan,
+            SiteUrl = SiteUrl,
+            WebUrl = "/",
+            PageUrl = PageUrl(index),
+            PageType = ClassicPageRules.PublishingPage,
+            LayoutUrl = LayoutUrl,
+            AssessmentStatus = "Complete",
+            WebPartCount = 3,
+            MappingPercentage = 50,
+            RemediationCode = "CP3",
+        };
 
-    private static ClassicPageDiscovery Discovery(Guid scan, string key, string url) => new()
-    {
-        ScanId = scan, SiteUrl = SiteUrl, WebUrl = "/", RecordKey = key, RowType = "Page", Url = url,
-        DiscoveryStatus = "Discovered", AssessmentStatus = "Complete", ErrorStage = "ExistingStage",
-        ErrorCodes = "ExistingCode", ErrorDetail = "Existing detail",
-    };
+    /// <summary>Verifies discovery.</summary>
+    private static ClassicPageDiscovery Discovery(Guid scan, string key, string url) =>
+        new()
+        {
+            ScanId = scan,
+            SiteUrl = SiteUrl,
+            WebUrl = "/",
+            RecordKey = key,
+            RowType = "Page",
+            Url = url,
+            DiscoveryStatus = "Discovered",
+            AssessmentStatus = "Complete",
+            ErrorStage = "ExistingStage",
+            ErrorCodes = "ExistingCode",
+            ErrorDetail = "Existing detail",
+        };
 
     private sealed record RecordedCommand(string Sql, (string Name, object Value)[] Parameters);
 
@@ -297,16 +389,25 @@ public class PublishingLayoutFailureBatchTests
         internal List<RecordedCommand> Commands { get; } = new();
         internal Action<DbCommand> OnRead { get; set; }
 
-        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
-            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        /// <summary>Verifies reader executing async.</summary>
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
         {
             if (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.Ordinal) &&
                 command.CommandText.Contains("FROM \"ClassicPageDiscoveries\"", StringComparison.Ordinal))
             {
-                Commands.Add(new RecordedCommand(command.CommandText, command.Parameters.Cast<DbParameter>()
-                    .Select(parameter => (parameter.ParameterName, parameter.Value)).ToArray()));
+                Commands.Add(
+                    new RecordedCommand(
+                        command.CommandText,
+                        command.Parameters.Cast<DbParameter>()
+                            .Select(parameter => (parameter.ParameterName, parameter.Value))
+                            .ToArray()));
                 OnRead?.Invoke(command);
             }
+
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
         }
     }

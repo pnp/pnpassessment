@@ -7,6 +7,9 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace PnP.Scanning.Core.Authentication
 {
+    /// <summary>
+    /// Creates authentication providers and supplies resource tokens for assessment collection.
+    /// </summary>
     internal sealed class AuthenticationManager
     {
         private IClientApplicationBase clientApplication;
@@ -19,9 +22,18 @@ namespace PnP.Scanning.Core.Authentication
             DataProtectionProvider = provider;
         }
 
-        internal static HttpClient HttpClient { get => httpClient; }
+        internal static HttpClient HttpClient
+        {
+            get => httpClient;
+        }
 
         internal IDataProtectionProvider DataProtectionProvider { get; private set; }
+
+        /// <summary>
+        /// Assigns the device-login notification callback used when a collector initializes interactive authentication.
+        /// </summary>
+        internal void SetCollectionDeviceCodeCallback(Func<DeviceCodeResult, Task> callback) =>
+            deviceCodeCallback = callback;
 
         internal static AuthenticationManager Create(StartRequest request, IDataProtectionProvider provider)
         {
@@ -31,18 +43,32 @@ namespace PnP.Scanning.Core.Authentication
             authenticationManager.InitializeAuthentication(request);
 
             return authenticationManager;
-        }        
+        }
 
         private IClientApplicationBase InitializeAuthentication(StartRequest request)
         {
-            return InitializedAuthentication(request.Tenant, request.AuthMode, Enum.Parse<Microsoft365Environment>(request.Environment), Guid.Parse(request.ApplicationId), request.TenantId,
-                                             request.CertPath, request.CertFile, request.CertPassword);
+            return InitializedAuthentication(
+                request.Tenant,
+                request.AuthMode,
+                Enum.Parse<Microsoft365Environment>(request.Environment),
+                Guid.Parse(request.ApplicationId),
+                request.TenantId,
+                request.CertPath,
+                request.CertFile,
+                request.CertPassword);
         }
 
 
-        private IClientApplicationBase InitializedAuthentication(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
-                                                                  string certPath, string certFile, string certPassword)
-        {            
+        private IClientApplicationBase InitializedAuthentication(
+            string tenantName,
+            string authMode,
+            Microsoft365Environment environment,
+            Guid applicationId,
+            string tenantId,
+            string certPath,
+            string certFile,
+            string certPassword)
+        {
             if (!Enum.TryParse<AuthenticationMode>(authMode, out var authenticationMode))
             {
                 throw new Exception($"Authentication type {authMode} is unknown");
@@ -77,7 +103,10 @@ namespace PnP.Scanning.Core.Authentication
                 clientApplication = builder.Build();
 
                 // Setup a local encrypted cache
-                TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
+                TokenCacheManager.EnableSerialization(
+                    clientApplication.UserTokenCache,
+                    DataProtectionProvider,
+                    StorageManager.GetScannerFolder());
             }
             else if (authenticationMode == AuthenticationMode.Device)
             {
@@ -88,16 +117,21 @@ namespace PnP.Scanning.Core.Authentication
                 {
                     builder = builder.WithTenantId(tenantId);
                 }
+
                 clientApplication = builder.Build();
 
                 // Setup a local encrypted cache
-                TokenCacheManager.EnableSerialization(clientApplication.UserTokenCache, DataProtectionProvider, StorageManager.GetScannerFolder());
+                TokenCacheManager.EnableSerialization(
+                    clientApplication.UserTokenCache,
+                    DataProtectionProvider,
+                    StorageManager.GetScannerFolder());
             }
             else if (authenticationMode == AuthenticationMode.Application)
             {
                 var certificate = LoadCertificate(certPath, certFile, certPassword);
 
-                var builder = ConfidentialClientApplicationBuilder.Create(applicationId.ToString()).WithCertificate(certificate);
+                var builder = ConfidentialClientApplicationBuilder.Create(applicationId.ToString())
+                    .WithCertificate(certificate);
                 builder = GetBuilderWithAuthority(builder, environment, tenantId);
 
                 clientApplication = builder.Build();
@@ -110,17 +144,30 @@ namespace PnP.Scanning.Core.Authentication
         }
 
         // This method is the only one called from the scanner clients (CLI)
-        internal async Task VerifyAuthenticationAsync(string tenantName, string authMode, Microsoft365Environment environment, Guid applicationId, string tenantId,
-                                                      string certPath, FileInfo certFile, string certPassword,
-                                                      Func<DeviceCodeResult, Task> deviceCodeCallbackInstance)
+        internal async Task VerifyAuthenticationAsync(
+            string tenantName,
+            string authMode,
+            Microsoft365Environment environment,
+            Guid applicationId,
+            string tenantId,
+            string certPath,
+            FileInfo certFile,
+            string certPassword,
+            Func<DeviceCodeResult, Task> deviceCodeCallbackInstance)
         {
-
-            clientApplication = InitializedAuthentication(tenantName, authMode, environment, applicationId, tenantId, certPath, certFile?.FullName, certPassword);
+            clientApplication = InitializedAuthentication(
+                tenantName,
+                authMode,
+                environment,
+                applicationId,
+                tenantId,
+                certPath,
+                certFile?.FullName,
+                certPassword);
             deviceCodeCallback = deviceCodeCallbackInstance;
 
             if (clientApplication != null)
             {
-
                 // Getting SharePoint access token
                 var uri = new Uri(GetSiteFromTenant(tenantName));
                 var scopes = new[] { $"{uri.Scheme}://{uri.Authority}/.default" };
@@ -171,7 +218,8 @@ namespace PnP.Scanning.Core.Authentication
                 else
                 {
                     var accounts = (await clientApplication.GetAccountsAsync()).ToList();
-                    AuthenticationResult result = await clientApplication.AcquireTokenSilent(scopes, accounts.FirstOrDefault())
+                    AuthenticationResult result = await clientApplication
+                        .AcquireTokenSilent(scopes, accounts.FirstOrDefault())
                         .ExecuteAsync()
                         .ConfigureAwait(false);
                     return result.AccessToken;
@@ -206,9 +254,11 @@ namespace PnP.Scanning.Core.Authentication
             }
 
             return null;
-        }        
+        }
 
-        private PublicClientApplicationBuilder GetBuilderWithAuthority(PublicClientApplicationBuilder builder, Microsoft365Environment azureEnvironment)
+        private PublicClientApplicationBuilder GetBuilderWithAuthority(
+            PublicClientApplicationBuilder builder,
+            Microsoft365Environment azureEnvironment)
         {
             if (azureEnvironment == Microsoft365Environment.Production)
             {
@@ -222,34 +272,43 @@ namespace PnP.Scanning.Core.Authentication
                     case Microsoft365Environment.USGovernment:
                     case Microsoft365Environment.USGovernmentDoD:
                     case Microsoft365Environment.USGovernmentHigh:
-                        {
-                            builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, AadAuthorityAudience.AzureAdMyOrg);
-                            break;
-                        }
+                    {
+                        builder = builder.WithAuthority(
+                            AzureCloudInstance.AzureUsGovernment,
+                            AadAuthorityAudience.AzureAdMyOrg);
+                        break;
+                    }
                     case Microsoft365Environment.DelosCloud:
-                        {
-                            var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
-                            builder = builder.WithAuthority($"{azureADEndPoint}/organizations");
-                            break;
-                        }
+                    {
+                        var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
+                        builder = builder.WithAuthority($"{azureADEndPoint}/organizations");
+                        break;
+                    }
                     case Microsoft365Environment.China:
-                        {
-                            builder = builder.WithAuthority(AzureCloudInstance.AzureChina, AadAuthorityAudience.AzureAdMyOrg);
-                            break;
-                        }
+                    {
+                        builder = builder.WithAuthority(
+                            AzureCloudInstance.AzureChina,
+                            AadAuthorityAudience.AzureAdMyOrg);
+                        break;
+                    }
                 }
             }
+
             return builder;
         }
 
-        private ConfidentialClientApplicationBuilder GetBuilderWithAuthority(ConfidentialClientApplicationBuilder builder, Microsoft365Environment azureEnvironment, string tenantId = "")
+        private ConfidentialClientApplicationBuilder GetBuilderWithAuthority(
+            ConfidentialClientApplicationBuilder builder,
+            Microsoft365Environment azureEnvironment,
+            string tenantId = "")
         {
             if (azureEnvironment == Microsoft365Environment.Production)
             {
                 var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
                 if (!string.IsNullOrEmpty(tenantId))
                 {
-                    builder = builder.WithTenantId(tenantId).WithAuthority($"{azureADEndPoint}/organizations", tenantId);
+                    builder = builder.WithTenantId(tenantId)
+                        .WithAuthority($"{azureADEndPoint}/organizations", tenantId);
                 }
                 else
                 {
@@ -263,44 +322,52 @@ namespace PnP.Scanning.Core.Authentication
                     case Microsoft365Environment.USGovernment:
                     case Microsoft365Environment.USGovernmentDoD:
                     case Microsoft365Environment.USGovernmentHigh:
+                    {
+                        if (string.IsNullOrEmpty(tenantId))
                         {
-                            if (string.IsNullOrEmpty(tenantId))
-                            {
-                                builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, AadAuthorityAudience.AzureAdMyOrg);
-                            }
-                            else
-                            {
-                                builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, tenantId);
-                            }
-                            break;
+                            builder = builder.WithAuthority(
+                                AzureCloudInstance.AzureUsGovernment,
+                                AadAuthorityAudience.AzureAdMyOrg);
                         }
+                        else
+                        {
+                            builder = builder.WithAuthority(AzureCloudInstance.AzureUsGovernment, tenantId);
+                        }
+
+                        break;
+                    }
                     case Microsoft365Environment.DelosCloud:
+                    {
+                        var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
+                        if (string.IsNullOrEmpty(tenantId))
                         {
-                            var azureADEndPoint = $"https://{CloudManager.GetAzureADLoginAuthority(azureEnvironment)}";
-                            if (string.IsNullOrEmpty(tenantId))
-                            {
-                                builder = builder.WithAuthority($"{azureADEndPoint}/organizations");
-                            }
-                            else
-                            {
-                                builder = builder.WithAuthority(azureADEndPoint, tenantId, true);
-                            }
-                            break;
+                            builder = builder.WithAuthority($"{azureADEndPoint}/organizations");
                         }
+                        else
+                        {
+                            builder = builder.WithAuthority(azureADEndPoint, tenantId, true);
+                        }
+
+                        break;
+                    }
                     case Microsoft365Environment.China:
+                    {
+                        if (string.IsNullOrEmpty(tenantId))
                         {
-                            if (string.IsNullOrEmpty(tenantId))
-                            {
-                                builder = builder.WithAuthority(AzureCloudInstance.AzureChina, AadAuthorityAudience.AzureAdMyOrg);
-                            }
-                            else
-                            {
-                                builder = builder.WithAuthority(AzureCloudInstance.AzureChina, tenantId);
-                            }
-                            break;
+                            builder = builder.WithAuthority(
+                                AzureCloudInstance.AzureChina,
+                                AadAuthorityAudience.AzureAdMyOrg);
                         }
+                        else
+                        {
+                            builder = builder.WithAuthority(AzureCloudInstance.AzureChina, tenantId);
+                        }
+
+                        break;
+                    }
                 }
             }
+
             return builder;
         }
 
@@ -310,7 +377,9 @@ namespace PnP.Scanning.Core.Authentication
             {
                 // Did we get a three part certificate path (= local stored cert)
                 var certPath = certPathLocation.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries);
-                if (certPath.Length == 3 && (certPath[1].Equals("CurrentUser", StringComparison.InvariantCultureIgnoreCase) || certPath[1].Equals("LocalMachine", StringComparison.InvariantCultureIgnoreCase)))
+                if (certPath.Length == 3 &&
+                    (certPath[1].Equals("CurrentUser", StringComparison.InvariantCultureIgnoreCase) ||
+                     certPath[1].Equals("LocalMachine", StringComparison.InvariantCultureIgnoreCase)))
                 {
                     // Load the Cert based upon this
                     string certThumbPrint = certPath[2].ToUpper();
@@ -320,7 +389,10 @@ namespace PnP.Scanning.Core.Authentication
 
                     var store = new X509Store(storeName, storeLocation);
                     store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
-                    var certificateCollection = store.Certificates.Find(X509FindType.FindByThumbprint, certThumbPrint, false);
+                    var certificateCollection = store.Certificates.Find(
+                        X509FindType.FindByThumbprint,
+                        certThumbPrint,
+                        false);
 
                     store.Close();
 
@@ -347,11 +419,11 @@ namespace PnP.Scanning.Core.Authentication
                     var certificateBytes = new byte[certfile.Length];
                     certfile.Read(certificateBytes, 0, (int)certfile.Length);
                     // Don't dispose the cert as that will lead to "m_safeCertContext is an invalid handle" errors when the confidential client actually uses the cert
-                    return new X509Certificate2(certificateBytes,
-                                                certPassword,
-                                                X509KeyStorageFlags.Exportable |
-                                                X509KeyStorageFlags.MachineKeySet |
-                                                X509KeyStorageFlags.PersistKeySet);
+                    return new X509Certificate2(
+                        certificateBytes,
+                        certPassword,
+                        X509KeyStorageFlags.Exportable | X509KeyStorageFlags.MachineKeySet |
+                        X509KeyStorageFlags.PersistKeySet);
                 }
             }
         }
@@ -382,8 +454,6 @@ namespace PnP.Scanning.Core.Authentication
             }
 
             return Guid.Empty;
-
         }
-
     }
 }

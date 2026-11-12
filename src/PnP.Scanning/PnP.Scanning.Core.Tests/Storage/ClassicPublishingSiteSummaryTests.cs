@@ -1,5 +1,5 @@
-﻿using FluentAssertions;
-using PnP.Scanning.Core.Scanners;
+﻿using PnP.Scanning.Core.ClassicPages.Analysis.Page;
+using FluentAssertions;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Tests.Fixtures;
 using Xunit;
@@ -20,6 +20,7 @@ namespace PnP.Scanning.Core.Tests.Storage
             this.fixture = fixture;
         }
 
+        /// <summary>Verifies publishing rollup seeded portal matches hand computed.</summary>
         [Fact]
         public async Task PublishingRollup_SeededPortal_MatchesHandComputed()
         {
@@ -32,7 +33,13 @@ namespace PnP.Scanning.Core.Tests.Storage
             // team site has no publishing webs and must NOT produce a row.
             var webSummaries = new List<ClassicWebSummary>
             {
-                NewWebSummary(scanId, portal, "/", "BLANKINTERNETCONTAINER#0", isPublishing: true, publishingPages: 2),
+                NewWebSummary(
+                    scanId,
+                    portal,
+                    "/",
+                    "BLANKINTERNETCONTAINER#0",
+                    isPublishing: true,
+                    publishingPages: 2),
                 NewWebSummary(scanId, portal, "/sub", "STS#0", isPublishing: false, publishingPages: 1),
                 NewWebSummary(scanId, team, "/", "STS#0", isPublishing: false, publishingPages: 0),
             };
@@ -40,23 +47,53 @@ namespace PnP.Scanning.Core.Tests.Storage
             var extensibilities = new List<ClassicExtensibility>
             {
                 // Root: a custom site master + a custom system master.
-                NewExtensibility(scanId, portal, "/", masterPage: "/_catalogs/masterpage/seattle.master",
-                                 customMasterPage: "/_catalogs/masterpage/custom.master"),
+                NewExtensibility(
+                    scanId,
+                    portal,
+                    "/",
+                    masterPage: "/_catalogs/masterpage/seattle.master",
+                    customMasterPage: "/_catalogs/masterpage/custom.master"),
                 // Subweb: same system master (must dedupe), no custom master.
-                NewExtensibility(scanId, portal, "/sub", masterPage: "/_catalogs/masterpage/seattle.master",
-                                 customMasterPage: null),
+                NewExtensibility(
+                    scanId,
+                    portal,
+                    "/sub",
+                    masterPage: "/_catalogs/masterpage/seattle.master",
+                    customMasterPage: null),
                 // Team site master data must be ignored (no publishing web there).
-                NewExtensibility(scanId, team, "/", masterPage: "/_catalogs/masterpage/oslo.master",
-                                 customMasterPage: "/_catalogs/masterpage/teamcustom.master"),
+                NewExtensibility(
+                    scanId,
+                    team,
+                    "/",
+                    masterPage: "/_catalogs/masterpage/oslo.master",
+                    customMasterPage: "/_catalogs/masterpage/teamcustom.master"),
             };
 
             var pages = new List<ClassicPage>
             {
                 NewPublishingPage(scanId, portal, "/", "/Pages/a.aspx", "ArticleLeft", new DateTime(2026, 1, 1)),
-                NewPublishingPage(scanId, portal, "/", "/Pages/b.aspx", "ArticleRight", new DateTime(2026, 3, 15)), // latest
-                NewPublishingPage(scanId, portal, "/sub", "/sub/Pages/c.aspx", "ArticleLeft", new DateTime(2026, 2, 1)), // dup layout
+                NewPublishingPage(
+                    scanId,
+                    portal,
+                    "/",
+                    "/Pages/b.aspx",
+                    "ArticleRight",
+                    new DateTime(2026, 3, 15)), // latest
+                NewPublishingPage(
+                    scanId,
+                    portal,
+                    "/sub",
+                    "/sub/Pages/c.aspx",
+                    "ArticleLeft",
+                    new DateTime(2026, 2, 1)), // dup layout
                 // A non-publishing page on the portal root must be ignored by the publishing rollup.
-                NewNonPublishingPage(scanId, portal, "/", "/SitePages/Home.aspx", "OneColumn", new DateTime(2026, 5, 1)),
+                NewNonPublishingPage(
+                    scanId,
+                    portal,
+                    "/",
+                    "/SitePages/Home.aspx",
+                    "OneColumn",
+                    new DateTime(2026, 5, 1)),
                 // A page on the team site (non-publishing) must be ignored.
                 NewNonPublishingPage(scanId, team, "/", "/SitePages/Home.aspx", "OneColumn", new DateTime(2026, 4, 1)),
             };
@@ -80,12 +117,13 @@ namespace PnP.Scanning.Core.Tests.Storage
 
                 var portalRow = rows.Single();
                 portalRow.SiteUrl.Should().Be(portal);
-                portalRow.NumberOfWebs.Should().Be(2);                 // root + sub
-                portalRow.NumberOfPages.Should().Be(3);                // 2 + 1
+                portalRow.NumberOfWebs.Should().Be(2); // root + sub
+                portalRow.NumberOfPages.Should().Be(3); // 2 + 1
                 portalRow.UsedSiteMasterPages.Should().Be("/_catalogs/masterpage/custom.master");
-                portalRow.UsedSystemMasterPages.Should().Be("/_catalogs/masterpage/seattle.master"); // deduped across webs
-                portalRow.UsedPageLayouts.Should().Be("ArticleLeft,ArticleRight");                    // deduped, sorted
-                portalRow.LastPageUpdateDate.Should().Be(new DateTime(2026, 3, 15));                  // max over publishing pages
+                portalRow.UsedSystemMasterPages.Should()
+                    .Be("/_catalogs/masterpage/seattle.master"); // deduped across webs
+                portalRow.UsedPageLayouts.Should().Be("ArticleLeft,ArticleRight"); // deduped, sorted
+                portalRow.LastPageUpdateDate.Should().Be(new DateTime(2026, 3, 15)); // max over publishing pages
 
                 // The plain team site produced no publishing-portal row.
                 rows.Should().NotContain(r => r.SiteUrl == team);
@@ -114,8 +152,14 @@ namespace PnP.Scanning.Core.Tests.Storage
             }
         }
 
-        private static ClassicWebSummary NewWebSummary(Guid scanId, string siteUrl, string webUrl, string template,
-                                                       bool isPublishing, int publishingPages)
+        /// <summary>Verifies new web summary.</summary>
+        private static ClassicWebSummary NewWebSummary(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string template,
+            bool isPublishing,
+            int publishingPages)
         {
             return new ClassicWebSummary
             {
@@ -128,8 +172,13 @@ namespace PnP.Scanning.Core.Tests.Storage
             };
         }
 
-        private static ClassicExtensibility NewExtensibility(Guid scanId, string siteUrl, string webUrl,
-                                                             string masterPage, string customMasterPage)
+        /// <summary>Verifies new extensibility.</summary>
+        private static ClassicExtensibility NewExtensibility(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string masterPage,
+            string customMasterPage)
         {
             return new ClassicExtensibility
             {
@@ -141,8 +190,14 @@ namespace PnP.Scanning.Core.Tests.Storage
             };
         }
 
-        private static ClassicPage NewPublishingPage(Guid scanId, string siteUrl, string webUrl, string pageUrl,
-                                                     string layout, DateTime modifiedAt)
+        /// <summary>Builds a synthetic publishing page for the stored site-summary fixture.</summary>
+        private static ClassicPage NewPublishingPage(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string pageUrl,
+            string layout,
+            DateTime modifiedAt)
         {
             return new ClassicPage
             {
@@ -151,14 +206,20 @@ namespace PnP.Scanning.Core.Tests.Storage
                 WebUrl = webUrl,
                 PageUrl = pageUrl,
                 PageName = Path.GetFileName(pageUrl),
-                PageType = PageScanComponent.PublishingPage,
+                PageType = ClassicPageRules.PublishingPage,
                 Layout = layout,
                 ModifiedAt = modifiedAt,
             };
         }
 
-        private static ClassicPage NewNonPublishingPage(Guid scanId, string siteUrl, string webUrl, string pageUrl,
-                                                        string layout, DateTime modifiedAt)
+        /// <summary>Builds a synthetic non-publishing page to verify summary exclusions.</summary>
+        private static ClassicPage NewNonPublishingPage(
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string pageUrl,
+            string layout,
+            DateTime modifiedAt)
         {
             return new ClassicPage
             {
@@ -167,7 +228,7 @@ namespace PnP.Scanning.Core.Tests.Storage
                 WebUrl = webUrl,
                 PageUrl = pageUrl,
                 PageName = Path.GetFileName(pageUrl),
-                PageType = PageScanComponent.WikiPage,
+                PageType = ClassicPageRules.WikiPage,
                 Layout = layout,
                 ModifiedAt = modifiedAt,
             };

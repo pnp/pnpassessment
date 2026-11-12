@@ -1,3 +1,4 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
 using FluentAssertions;
 using PnP.Core.Model;
 using PnP.Core.Model.SharePoint;
@@ -22,10 +23,12 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
     private readonly ScanContextFixture database;
     public ClassicAssessmentMetadataTests(ScanContextFixture database) => this.database = database;
 
+    /// <summary>Verifies rich metadata uses one logical list projection in existing context and restores hooks.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Rich_metadata_uses_one_logical_list_projection_in_existing_context_and_restores_hooks(bool graphFirst)
+    public async Task Rich_metadata_uses_one_logical_list_projection_in_existing_context_and_restores_hooks(
+        bool graphFirst)
     {
         using var sdk = new OfflineSdk();
         var context = await sdk.CreateAsync();
@@ -43,14 +46,25 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
 
         snapshot.Should().NotBeNull();
         snapshot.WebUrl.Should().Be(new Uri(Site));
-        snapshot.Items.Should().ContainSingle().Which.GetProperty("Id").GetGuid()
-            .Should().Be(SharedDiscoveryContextTests.ListId);
-        snapshot.Items[0].TryGetProperty("Fields", out _).Should().BeFalse("discovery must not retain rich assessment payloads");
+        snapshot.Items.Should()
+            .ContainSingle()
+            .Which.GetProperty("Id")
+            .GetGuid()
+            .Should()
+            .Be(SharedDiscoveryContextTests.ListId);
+        snapshot.Items[0]
+            .TryGetProperty("Fields", out _)
+            .Should()
+            .BeFalse("discovery must not retain rich assessment payloads");
         var contentType = snapshot.Items[0].GetProperty("ContentTypes").EnumerateArray().Should().ContainSingle().Which;
         contentType.GetProperty("Id").GetProperty("StringValue").GetString().Should().Be("0x0101");
         contentType.GetProperty("DisplayFormUrl").GetString().Should().Be("/sites/reuse/Documents/Forms/DispForm.aspx");
         contentType.TryGetProperty("Name", out _).Should().BeFalse();
-        snapshot.Items[0].GetProperty("DefaultDisplayFormUrl").GetString().Should().Be("/sites/reuse/Documents/Forms/DispForm.aspx");
+        snapshot.Items[0]
+            .GetProperty("DefaultDisplayFormUrl")
+            .GetString()
+            .Should()
+            .Be("/sites/reuse/Documents/Forms/DispForm.aspx");
         var list = context.Web.Lists.AsRequested().Should().ContainSingle().Which;
         list.Id.Should().Be(SharedDiscoveryContextTests.ListId);
         list.Title.Should().Be("Documents");
@@ -63,8 +77,10 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         var metadataRequests = sdk.Transport.LogicalRequests.Skip(initializationRequests.Length).ToArray();
         metadataRequests.Should().HaveCount(2).And.OnlyContain(entry => entry.InBatch);
         metadataRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
-        Uri.UnescapeDataString(metadataRequests.Single(entry => OfflineTransport.HasListProjection(entry.Uri)).Uri.Query)
-            .Should().Contain("StringId", "the SDK content-type key must be part of the real projection, not only the fixture");
+        Uri.UnescapeDataString(
+                metadataRequests.Single(entry => OfflineTransport.HasListProjection(entry.Uri)).Uri.Query)
+            .Should()
+            .Contain("StringId", "the SDK content-type key must be part of the real projection, not only the fixture");
         sdk.Transport.BatchRequests.Should().Be(priorBatchCount + 1, "Site and rich Web metadata share one SDK batch");
         observed.Should().ContainSingle(json => json.Contains("\"Lists\""));
         mapping.PostMappingHandler.Should().BeSameAs(original);
@@ -78,37 +94,62 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
     [Fact]
     public async Task Real_sdk_shared_projection_preserves_content_type_form_declarations_without_item_requests()
     {
-        using var sdk = new OfflineSdk();
-        var context = await sdk.CreateAsync();
+        using OfflineSdk sdk = new OfflineSdk();
+        PnPContext context = await sdk.CreateAsync();
         sdk.Transport.ListResponse = "displayForm";
-        var snapshot = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
+        SharePointListMetadataSnapshot snapshot =
+            await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
         snapshot.Should().NotBeNull();
-        using var factory = new PnPContextSharePointAspxRestClientFactory(sdk.Factory, sdk.Authentication,
-            sharedContext: context, jsonTransportFactory: ctx => ctx.RestClient.Client);
-        using var provider = new SharePointLiveAspxDiscoveryProvider(
+        using PnPContextSharePointAspxRestClientFactory factory = new PnPContextSharePointAspxRestClientFactory(
+            sdk.Factory,
+            sdk.Authentication,
+            sharedContext: context,
+            jsonTransportFactory: ctx => ctx.RestClient.Client);
+        using SharePointLiveAspxDiscoveryProvider provider = new SharePointLiveAspxDiscoveryProvider(
             new SharePointLiveAspxDiscoveryOptions("test", "sdk-shared-web", "shared-sdk-v1", new string('a', 64)),
-            factory, new AspxWebAcquisitionContext(Guid.Parse(OfflineTransport.SiteId), new Uri(Site),
-                Guid.Parse(OfflineTransport.WebId), new Uri(Site), "/sites/reuse", "STS#0"), snapshot);
-        var list = (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren
-            .Single(scope => scope.Metadata["role"] == "list");
-        (await provider.EnumerateChildrenAsync(list)).ObservedChildren
-            .Should().NotContain(scope => scope.Locator.Contains("Items REST objects", StringComparison.Ordinal));
-        var reference = provider.ReferenceCollector.ReadReferenceEvidence().Should().ContainSingle(value =>
-            value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm).Which;
+            factory,
+            new AspxWebAcquisitionContext(
+                Guid.Parse(OfflineTransport.SiteId),
+                new Uri(Site),
+                Guid.Parse(OfflineTransport.WebId),
+                new Uri(Site),
+                "/sites/reuse",
+                "STS#0"),
+            snapshot);
+        DiscoveryScopeRegistration list =
+            (await provider.EnumerateChildrenAsync(provider.RootScope)).ObservedChildren.Single(scope =>
+                scope.Metadata["role"] == "list");
+        (await provider.EnumerateChildrenAsync(list)).ObservedChildren.Should()
+            .NotContain(scope => scope.Locator.Contains("Items REST objects", StringComparison.Ordinal));
+        AspxReferenceCandidate reference = provider.ReferenceCollector.ReadReferenceEvidence()
+            .Should()
+            .ContainSingle(value => value.SourceKind == AspxReferenceSourceKinds.ContentTypeDisplayForm)
+            .Which;
         reference.RawLocator.Should().Be("/sites/reuse/Lists/Posts/Post.aspx");
         reference.ContentTypeId.Should().Be("0x0110");
         reference.Disposition.Should().Be(AspxReferenceDispositions.Declared);
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
-        sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/web/lists", StringComparison.OrdinalIgnoreCase));
-        sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
-        provider.ReferenceCollector.ReadSurfaceEvidence().Single(row => row.RequiredAdapter == "AllListsAuthority")
-            .ActualMethod.Should().Be("MODEL");
-        context.Web.Lists.AsRequested().Should().ContainSingle().Which.ContentTypes.AsRequested()
-            .Should().ContainSingle().Which.StringId.Should().Be("0x0110");
+        sdk.Transport.LogicalRequests.Should()
+            .NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/web/lists", StringComparison.OrdinalIgnoreCase));
+        sdk.Transport.LogicalRequests.Should()
+            .NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/items", StringComparison.OrdinalIgnoreCase));
+        provider.ReferenceCollector.ReadSurfaceEvidence()
+            .Single(row => row.RequiredAdapter == "AllListsAuthority")
+            .ActualMethod.Should()
+            .Be("MODEL");
+        context.Web.Lists.AsRequested()
+            .Should()
+            .ContainSingle()
+            .Which.ContentTypes.AsRequested()
+            .Should()
+            .ContainSingle()
+            .Which.StringId.Should()
+            .Be("0x0110");
         sdk.Created.Should().ContainSingle().Which.Should().BeSameAs(context);
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies actual sdk responses only produce shared authority when complete.</summary>
     [Theory]
     [InlineData("empty", true)]
     [InlineData("missing", false)]
@@ -140,11 +181,24 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
             }
             else
             {
-                snapshot.Items.Should().ContainSingle().Which.GetProperty("ContentTypes").EnumerateArray().Should().BeEmpty();
-                context.Web.Lists.AsRequested().Should().ContainSingle().Which.ContentTypes.AsRequested().Should().BeEmpty();
+                snapshot.Items.Should()
+                    .ContainSingle()
+                    .Which.GetProperty("ContentTypes")
+                    .EnumerateArray()
+                    .Should()
+                    .BeEmpty();
+                context.Web.Lists.AsRequested()
+                    .Should()
+                    .ContainSingle()
+                    .Which.ContentTypes.AsRequested()
+                    .Should()
+                    .BeEmpty();
             }
         }
-        else snapshot.Should().BeNull("missing rows, partial discovery metadata, or a continuation cannot prove completeness");
+        else
+            snapshot.Should()
+                .BeNull("missing rows, partial discovery metadata, or a continuation cannot prove completeness");
+
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
         sdk.Created.Should().ContainSingle();
         mapping.PostMappingHandler.Should().BeSameAs(original);
@@ -152,6 +206,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies repeated full then empty load on same context replaces modeled rows and snapshot.</summary>
     [Fact]
     public async Task Repeated_full_then_empty_load_on_same_context_replaces_modeled_rows_and_snapshot()
     {
@@ -173,7 +228,9 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
 
         second.Should().NotBeNull().And.NotBeSameAs(first);
         second.Items.Should().BeEmpty();
-        context.Web.Lists.AsRequested().Should().BeEmpty("an empty authoritative response must not leave stale assessment lists");
+        context.Web.Lists.AsRequested()
+            .Should()
+            .BeEmpty("an empty authoritative response must not leave stale assessment lists");
         first.Items.Should().ContainSingle("the first immutable snapshot must not alias the mutable SDK collection");
         observed.Count(json => json.Contains("\"Lists\"")).Should().Be(2);
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(2);
@@ -183,6 +240,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies failed sdk metadata read restores existing handler and graph preference.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -203,7 +261,8 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         context.GraphFirst.Should().Be(graphFirst);
         sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
         sdk.Created.Should().ContainSingle();
-        sdk.Transport.Unexpected.Should().BeEmpty("a deliberate offline 403, not an unexpected endpoint, causes the failure");
+        sdk.Transport.Unexpected.Should()
+            .BeEmpty("a deliberate offline 403, not an unexpected endpoint, causes the failure");
     }
 
     [Fact]
@@ -225,92 +284,7 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         context.GraphFirst.Should().BeTrue();
     }
 
-    /// <summary>Proves full inventory reuses the exact single metadata snapshot when invoking page discovery.</summary>
-    [Fact]
-    public async Task Full_acquisition_loads_once_then_passes_identical_snapshot_to_discovery()
-    {
-        using var sdk = new OfflineSdk();
-        var context = await sdk.CreateAsync();
-        var order = new List<string>();
-        var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        order.Add("metadata");
-        var loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-        var result = await ClassicScanner.DiscoverPagesAsync(false, loaded,
-            () => throw new InvalidOperationException("full inventory already loaded metadata"), snapshot =>
-        {
-            order.Add("discovery");
-            snapshot.Should().BeSameAs(loaded).And.NotBeNull();
-            snapshot.Items.Should().ContainSingle();
-            context.Web.Lists.AsRequested().Should().ContainSingle();
-            sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
-            return Task.FromResult(pages);
-        });
-        order.Should().Equal("metadata", "discovery");
-        result.Should().BeSameAs(pages);
-        sdk.Created.Should().ContainSingle();
-        sdk.Transport.Unexpected.Should().BeEmpty();
-    }
-
-    /// <summary>Requires incomplete metadata to reach fallback discovery as unknown rather than suppressing physical acquisition.</summary>
-    [Theory]
-    [InlineData("missing")]
-    [InlineData("nextLink")]
-    public async Task Full_acquisition_passes_null_for_incomplete_http_snapshot_instead_of_skipping_discovery(string response)
-    {
-        using var sdk = new OfflineSdk();
-        var context = await sdk.CreateAsync();
-        sdk.Transport.ListResponse = response;
-        var order = new List<string>();
-        var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        order.Add("metadata");
-        var loaded = await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-        var result = await ClassicScanner.DiscoverPagesAsync(false, loaded,
-            () => throw new InvalidOperationException("full inventory already loaded metadata"), snapshot =>
-        {
-            order.Add("fallback-discovery");
-            snapshot.Should().BeNull();
-            return Task.FromResult(pages);
-        });
-        order.Should().Equal("metadata", "fallback-discovery");
-        result.Should().BeSameAs(pages);
-        sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1);
-        sdk.Transport.Unexpected.Should().BeEmpty();
-    }
-
-    /// <summary>Proves homepage discovery precedes the single rich metadata load and does not receive an all-list authority.</summary>
-    [Fact]
-    public async Task Home_acquisition_discovers_target_first_then_loads_normal_rich_lists_once()
-    {
-        using var sdk = new OfflineSdk();
-        var context = await sdk.CreateAsync();
-        var order = new List<string>();
-        var pages = new List<ClassicPageDiscovery> { Page(Guid.NewGuid()) };
-        var result = await ClassicScanner.DiscoverPagesAsync(true, null, async () =>
-        {
-            order.Add("metadata");
-            return await ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None);
-        }, async snapshot =>
-        {
-            order.Add("targeted-discovery");
-            snapshot.Should().BeNull("HOME must not receive an all-lists authority");
-            sdk.Transport.LogicalRequests.Should().NotContain(entry => OfflineTransport.HasListProjection(entry.Uri));
-            using var client = new PnPContextSharePointAspxRestClient(context, ownsContext: false);
-            var welcome = await client.ReadWelcomePageAsync();
-            welcome.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
-            welcome.Value.Should().Be("SitePages/Home.aspx");
-            sdk.Transport.LogicalRequests.Should().NotContain(entry => OfflineTransport.HasListProjection(entry.Uri));
-            return pages;
-        });
-        order.Should().Equal("targeted-discovery", "metadata");
-        result.Should().BeSameAs(pages);
-        sdk.Transport.LogicalRequests.Count(entry => OfflineTransport.HasListProjection(entry.Uri)).Should().Be(1,
-            "normal rich assessment metadata still loads once after targeted HOME discovery");
-        sdk.Transport.LogicalRequests.Should().NotContain(entry => entry.Uri.AbsolutePath.EndsWith("/Lists",
-            StringComparison.OrdinalIgnoreCase));
-        sdk.Created.Should().ContainSingle();
-        sdk.Transport.Unexpected.Should().BeEmpty();
-    }
-
+    /// <summary>Verifies failed http metadata runs discovery before page failure finalization and rethrows original.</summary>
     [Fact]
     public async Task Failed_http_metadata_runs_discovery_before_page_failure_finalization_and_rethrows_original()
     {
@@ -323,13 +297,21 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         var fallbackCalls = 0;
         var run = () => ClassicAssessmentInitialization.ExecuteAsync(
             () => ClassicAssessmentMetadata.LoadAsync(context, Projection(), CancellationToken.None),
-            writer, scan, Site, "/", CancellationToken.None, beforeFailureFinalization: async error =>
+            writer,
+            scan,
+            Site,
+            "/",
+            CancellationToken.None,
+            beforeFailureFinalization: async error =>
             {
                 original = error;
                 fallbackCalls++;
                 (await writer.ReadPagesAsync(scan, Site, "/")).Should().BeEmpty();
                 await writer.WriteAsync(new[] { Page(scan) });
-                (await writer.ReadPagesAsync(scan, Site, "/")).Should().ContainSingle().Which.AssessmentStatus.Should().BeNull();
+                (await writer.ReadPagesAsync(scan, Site, "/")).Should()
+                    .ContainSingle()
+                    .Which.AssessmentStatus.Should()
+                    .BeNull();
             });
         var thrown = await run.Should().ThrowAsync<Exception>();
         thrown.Which.Should().BeSameAs(original);
@@ -343,18 +325,26 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         sdk.Transport.Unexpected.Should().BeEmpty();
     }
 
+    /// <summary>Verifies exhausted response body retries run fallback only after last attempt.</summary>
     [Fact]
     public async Task Exhausted_response_body_retries_run_fallback_only_after_last_attempt()
     {
-        var scan = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
-        var order = new List<string>();
-        var failure = new HttpRequestException(HttpRequestError.ResponseEnded, "response ended");
-        var run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(() =>
-        {
-            order.Add("attempt");
-            return Task.FromException<object>(failure);
-        }, writer, scan, Site, "/", CancellationToken.None, delay: (_, _) => Task.CompletedTask,
+        Guid scan = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        List<string> order = new List<string>();
+        HttpRequestException failure = new HttpRequestException(HttpRequestError.ResponseEnded, "response ended");
+        Func<Task<object>> run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
+            () =>
+            {
+                order.Add("attempt");
+                return Task.FromException<object>(failure);
+            },
+            writer,
+            scan,
+            Site,
+            "/",
+            CancellationToken.None,
+            delay: (_, _) => Task.CompletedTask,
             beforeFailureFinalization: async error =>
             {
                 order.Should().Equal("attempt", "attempt", "attempt");
@@ -364,37 +354,52 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
             });
         (await run.Should().ThrowAsync<HttpRequestException>()).Which.Should().BeSameAs(failure);
         order.Should().Equal("attempt", "attempt", "attempt", "fallback");
-        (await writer.ReadPagesAsync(scan, Site, "/")).Should().ContainSingle().Which.AssessmentStatus.Should().Be("Failed");
+        (await writer.ReadPagesAsync(scan, Site, "/")).Should()
+            .ContainSingle()
+            .Which.AssessmentStatus.Should()
+            .Be("Failed");
     }
 
+    /// <summary>Verifies genuine cancellation never runs fallback or marks existing pages failed.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Genuine_cancellation_never_runs_fallback_or_marks_existing_pages_failed(bool cancelDuringLoad)
     {
-        var scan = Guid.NewGuid();
-        var writer = new AssessmentDiscoveryWriter(database.CreateContext);
+        Guid scan = Guid.NewGuid();
+        AssessmentDiscoveryWriter writer = new AssessmentDiscoveryWriter(database.CreateContext);
         await writer.WriteAsync(new[] { Page(scan) });
-        using var cancel = new CancellationTokenSource();
+        using CancellationTokenSource cancel = new CancellationTokenSource();
         if (!cancelDuringLoad) cancel.Cancel();
-        var attempts = 0;
-        var fallbacks = 0;
-        var run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(() =>
-        {
-            attempts++;
-            cancel.Cancel();
-            return Task.FromCanceled<object>(cancel.Token);
-        }, writer, scan, Site, "/", cancel.Token, beforeFailureFinalization: _ =>
-        {
-            fallbacks++;
-            return Task.CompletedTask;
-        });
+        int attempts = 0;
+        int fallbacks = 0;
+        Func<Task<object>> run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
+            () =>
+            {
+                attempts++;
+                cancel.Cancel();
+                return Task.FromCanceled<object>(cancel.Token);
+            },
+            writer,
+            scan,
+            Site,
+            "/",
+            cancel.Token,
+            beforeFailureFinalization: _ =>
+            {
+                fallbacks++;
+                return Task.CompletedTask;
+            });
         await run.Should().ThrowAsync<OperationCanceledException>();
         attempts.Should().Be(cancelDuringLoad ? 1 : 0);
         fallbacks.Should().Be(0);
-        (await writer.ReadPagesAsync(scan, Site, "/")).Should().ContainSingle().Which.AssessmentStatus.Should().BeNull();
+        (await writer.ReadPagesAsync(scan, Site, "/")).Should()
+            .ContainSingle()
+            .Which.AssessmentStatus.Should()
+            .BeNull();
     }
 
+    /// <summary>Verifies cancellation during raw fallback does not finalize discovered pages as failed.</summary>
     [Fact]
     public async Task Cancellation_during_raw_fallback_does_not_finalize_discovered_pages_as_failed()
     {
@@ -403,7 +408,12 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         using var cancel = new CancellationTokenSource();
         var run = () => ClassicAssessmentInitialization.ExecuteAsync<object>(
             () => Task.FromException<object>(new IOException("metadata unavailable")),
-            writer, scan, Site, "/", cancel.Token, beforeFailureFinalization: async _ =>
+            writer,
+            scan,
+            Site,
+            "/",
+            cancel.Token,
+            beforeFailureFinalization: async _ =>
             {
                 await writer.WriteAsync(new[] { Page(scan) });
                 cancel.Cancel();
@@ -415,32 +425,59 @@ public sealed class ClassicAssessmentMetadataTests : IClassFixture<ScanContextFi
         stored.AssessmentStatus.Should().BeNull("cancellation during fallback must leave the page resumable");
     }
 
-    private static PnPContextOptions Projection() => new()
-    {
-        AdditionalSitePropertiesOnCreate = new Expression<Func<ISite, object>>[]
+    /// <summary>Verifies projection.</summary>
+    private static PnPContextOptions Projection() =>
+        new()
         {
-            site => site.Features.QueryProperties(feature => feature.DefinitionId)
-        },
-        AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
-        {
-            web => web.LastItemUserModifiedDate,
-            web => web.Lists.QueryProperties(list => list.Title, list => list.Hidden, list => list.IsCatalog,
-                list => list.BaseType, list => list.TemplateType, list => list.DefaultViewUrl, list => list.DefaultDisplayFormUrl,
-                list => list.RootFolder.QueryProperties(folder => folder.ServerRelativeUrl, folder => folder.UniqueId),
-                list => list.ItemCount,
-                list => list.Fields.QueryProperties(field => field.InternalName, field => field.Title,
-                    field => field.FieldTypeKind, field => field.TypeAsString),
-                list => list.ContentTypes.QueryProperties(contentType => contentType.Id, contentType => contentType.StringId,
-                    contentType => contentType.Name, contentType => contentType.DisplayFormUrl))
-        }
-    };
+            AdditionalSitePropertiesOnCreate =
+                new Expression<Func<ISite, object>>[]
+                {
+                    site => site.Features.QueryProperties(feature => feature.DefinitionId)
+                },
+            AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
+            {
+                web => web.LastItemUserModifiedDate,
+                web => web.Lists.QueryProperties(
+                    list => list.Title,
+                    list => list.Hidden,
+                    list => list.IsCatalog,
+                    list => list.BaseType,
+                    list => list.TemplateType,
+                    list => list.DefaultViewUrl,
+                    list => list.DefaultDisplayFormUrl,
+                    list => list.RootFolder.QueryProperties(
+                        folder => folder.ServerRelativeUrl,
+                        folder => folder.UniqueId),
+                    list => list.ItemCount,
+                    list => list.Fields.QueryProperties(
+                        field => field.InternalName,
+                        field => field.Title,
+                        field => field.FieldTypeKind,
+                        field => field.TypeAsString),
+                    list => list.ContentTypes.QueryProperties(
+                        contentType => contentType.Id,
+                        contentType => contentType.StringId,
+                        contentType => contentType.Name,
+                        contentType => contentType.DisplayFormUrl))
+            }
+        };
 
-    private static ClassicPageDiscovery Page(Guid scan) => new()
-    {
-        ScanId = scan, SiteUrl = Site, WebUrl = "/", RecordKey = "page:offline",
-        RowType = "Page", ScopeType = "File", Url = "/sites/reuse/SitePages/Home.aspx", FileName = "Home.aspx",
-        SiteCollectionId = Guid.Parse(OfflineTransport.SiteId), WebId = Guid.Parse(OfflineTransport.WebId),
-        FileUniqueId = SharedDiscoveryContextTests.FolderId, DiscoveryStatus = "Discovered",
-        ObservedAtUtc = new DateTime(2026, 10, 20, 0, 0, 0, DateTimeKind.Utc)
-    };
+    /// <summary>Builds a synthetic stored publishing page for the layout compatibility fixture.</summary>
+    private static ClassicPageDiscovery Page(Guid scan) =>
+        new()
+        {
+            ScanId = scan,
+            SiteUrl = Site,
+            WebUrl = "/",
+            RecordKey = "page:offline",
+            RowType = "Page",
+            ScopeType = "File",
+            Url = "/sites/reuse/SitePages/Home.aspx",
+            FileName = "Home.aspx",
+            SiteCollectionId = Guid.Parse(OfflineTransport.SiteId),
+            WebId = Guid.Parse(OfflineTransport.WebId),
+            FileUniqueId = SharedDiscoveryContextTests.FolderId,
+            DiscoveryStatus = "Discovered",
+            ObservedAtUtc = new DateTime(2026, 10, 20, 0, 0, 0, DateTimeKind.Utc)
+        };
 }

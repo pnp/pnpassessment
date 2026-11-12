@@ -1,4 +1,4 @@
-using PnP.Core.Model;
+using PnP.Scanning.Core.ClassicPages.Collection.Discovery;
 using PnP.Core.Model.SharePoint;
 using PnP.Core.QueryModel;
 using PnP.Core.Services;
@@ -49,17 +49,17 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     private readonly bool ownsContext;
     private readonly HttpClient jsonTransport;
     private readonly SharePointRestThrottlePolicy throttlePolicy;
-    private readonly HttpClient ownedJsonTransport = new(new HttpClientHandler
-    {
-        AllowAutoRedirect = false,
-        UseCookies = false,
-        UseDefaultCredentials = false
-    });
+
+    private readonly HttpClient ownedJsonTransport = new(
+        new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseDefaultCredentials = false });
 
     // Optional transport is explicitly borrowed; its owner (for example an offline SDK fixture)
     // retains its lifetime. Production defaults to our owned no-redirect/no-cookie client.
     /// <summary>Creates a bounded SDK-authenticated JSON reader while retaining explicit context and borrowed transport ownership.</summary>
-    internal PnPContextSharePointAspxRestClient(PnPContext context, bool ownsContext = true, HttpClient jsonTransport = null,
+    internal PnPContextSharePointAspxRestClient(
+        PnPContext context,
+        bool ownsContext = true,
+        HttpClient jsonTransport = null,
         SharePointRestThrottlePolicy throttlePolicy = null)
     {
         this.context = context ?? throw new ArgumentNullException(nameof(context));
@@ -71,37 +71,58 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     public Uri WebUrl => context.Uri;
 
     /// <summary>Requests one bounded JSON page using context authentication and a shared deadline across safe throttle retries.</summary>
-    public Task<SharePointRestPage> GetPageAsync(Uri requestUri,
-        CancellationToken cancellationToken = default) => ReadBoundedPageAsync(jsonTransport, context.Uri,
-            requestUri, (request, token) => context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request),
-            cancellationToken: cancellationToken, throttlePolicy: throttlePolicy);
+    public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default) =>
+        ReadBoundedPageAsync(
+            jsonTransport,
+            context.Uri,
+            requestUri,
+            (request, token) => context.AuthenticationProvider.AuthenticateRequestAsync(context.Uri, request),
+            cancellationToken: cancellationToken,
+            throttlePolicy: throttlePolicy);
 
     // Thin fake-HTTP seam; production defaults to the owned no-redirect/no-cookie client above.
     /// <summary>Enforces authenticated web-API scope, a default sixteen-MiB byte cap, and one deadline across fresh 429/503 attempts and server-directed delays.</summary>
-    internal static async Task<SharePointRestPage> ReadBoundedPageAsync(HttpClient client, Uri web, Uri uri,
-        Func<HttpRequestMessage, CancellationToken, Task> authenticate, int maxBytes = MaximumJsonResponseBytes,
-        TimeSpan? timeout = null, CancellationToken cancellationToken = default,
+    internal static async Task<SharePointRestPage> ReadBoundedPageAsync(
+        HttpClient client,
+        Uri web,
+        Uri uri,
+        Func<HttpRequestMessage, CancellationToken, Task> authenticate,
+        int maxBytes = MaximumJsonResponseBytes,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default,
         SharePointRestThrottlePolicy throttlePolicy = null)
     {
         SharePointAspxUrlPolicy.ValidateWeb(web);
         if (uri == null || !uri.IsAbsoluteUri || uri.Scheme != "https" || !uri.IsDefaultPort ||
             !string.Equals(uri.Authority, web.Authority, StringComparison.OrdinalIgnoreCase) ||
-            uri.UserInfo.Length != 0 || uri.Fragment.Length != 0 ||
-            !uri.AbsolutePath.StartsWith(web.AbsolutePath.TrimEnd('/') + "/_api/", StringComparison.OrdinalIgnoreCase))
+            uri.UserInfo.Length != 0 || uri.Fragment.Length != 0 || !uri.AbsolutePath.StartsWith(
+                web.AbsolutePath.TrimEnd('/') + "/_api/",
+                StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("JSON requests must stay in the authenticated web API.");
         }
-        var budget = timeout ?? TimeSpan.FromSeconds(20);
-        if (maxBytes is < 1 or > MaximumJsonResponseBytes || budget <= TimeSpan.Zero || budget > TimeSpan.FromMinutes(5))
+
+        TimeSpan budget = timeout ?? TimeSpan.FromSeconds(20);
+        if (maxBytes is < 1 or > MaximumJsonResponseBytes || budget <= TimeSpan.Zero ||
+            budget > TimeSpan.FromMinutes(5))
         {
             throw new ArgumentOutOfRangeException(nameof(maxBytes));
         }
-        var policy = throttlePolicy ?? SharePointRestThrottlePolicy.Default;
-        var started = policy.Clock.GetTimestamp();
-        var evidence = new SharePointRestPage(uri, 0, Array.Empty<JsonElement>(), null, null,
-            BoundedJsonErrorSchema, DiscoveryTerminalOutcome.Unknown, ReceivedAtUtc: policy.Clock.GetUtcNow(),
-            AttemptCount: 0, AttemptLimit: policy.AttemptLimit);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        SharePointRestThrottlePolicy policy = throttlePolicy ?? SharePointRestThrottlePolicy.Default;
+        long started = policy.Clock.GetTimestamp();
+        SharePointRestPage evidence = new SharePointRestPage(
+            uri,
+            0,
+            Array.Empty<JsonElement>(),
+            null,
+            null,
+            BoundedJsonErrorSchema,
+            DiscoveryTerminalOutcome.Unknown,
+            ReceivedAtUtc: policy.Clock.GetUtcNow(),
+            AttemptCount: 0,
+            AttemptLimit: policy.AttemptLimit);
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(budget);
         try
         {
@@ -110,8 +131,13 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 deadline.Token.ThrowIfCancellationRequested();
                 if (policy.Clock.GetElapsedTime(started) >= budget)
                 {
-                    return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                    return JsonFailure(
+                        evidence,
+                        DiscoveryTerminalOutcome.Truncated,
+                        JsonReadErrors.Timeout,
+                        policy.Clock);
                 }
+
                 evidence = evidence with
                 {
                     AttemptCount = evidence.AttemptCount + 1,
@@ -122,44 +148,78 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 };
                 TimeSpan retryDelay;
                 // The failed response, its content/stream, and the request leave scope before any retry delay.
-                using (var request = CreateGetRequest(uri))
+                using (HttpRequestMessage request = CreateGetRequest(uri))
                 {
                     await authenticate(request, deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
                     deadline.Token.ThrowIfCancellationRequested();
                     if (policy.Clock.GetElapsedTime(started) >= budget)
                     {
-                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                        return JsonFailure(
+                            evidence,
+                            DiscoveryTerminalOutcome.Truncated,
+                            JsonReadErrors.Timeout,
+                            policy.Clock);
                     }
-                    using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
-                        deadline.Token).ConfigureAwait(false);
+
+                    using HttpResponseMessage response = await client.SendAsync(
+                            request,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            deadline.Token)
+                        .ConfigureAwait(false);
                     evidence = evidence with
                     {
                         StatusCode = response.StatusCode,
                         ReceivedAtUtc = policy.Clock.GetUtcNow(),
                         RequestId = Header(response, "SPRequestGuid", "request-id", "x-ms-request-id"),
-                        CorrelationId = Header(response, "x-ms-correlation-id", "x-ms-correlation-request-id", "client-request-id")
+                        CorrelationId = Header(
+                            response,
+                            "x-ms-correlation-id",
+                            "x-ms-correlation-request-id",
+                            "client-request-id")
                     };
                     deadline.Token.ThrowIfCancellationRequested();
                     if ((int)response.StatusCode is >= 300 and <= 399 || response.RequestMessage?.RequestUri == null ||
-                        !response.RequestMessage.RequestUri.IsAbsoluteUri ||
-                        !string.Equals(response.RequestMessage.RequestUri.AbsoluteUri, uri.AbsoluteUri, StringComparison.Ordinal))
+                        !response.RequestMessage.RequestUri.IsAbsoluteUri || !string.Equals(
+                            response.RequestMessage.RequestUri.AbsoluteUri,
+                            uri.AbsoluteUri,
+                            StringComparison.Ordinal))
                     {
-                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Unknown, JsonReadErrors.RedirectOrUriDrift, policy.Clock);
+                        return JsonFailure(
+                            evidence,
+                            DiscoveryTerminalOutcome.Unknown,
+                            JsonReadErrors.RedirectOrUriDrift,
+                            policy.Clock);
                     }
+
                     if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
                     {
-                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Denied, JsonReadErrors.Denied, policy.Clock);
+                        return JsonFailure(
+                            evidence,
+                            DiscoveryTerminalOutcome.Denied,
+                            JsonReadErrors.Denied,
+                            policy.Clock);
                     }
+
                     if (response.StatusCode == HttpStatusCode.PartialContent)
                     {
-                        return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.PartialContent, policy.Clock);
+                        return JsonFailure(
+                            evidence,
+                            DiscoveryTerminalOutcome.Truncated,
+                            JsonReadErrors.PartialContent,
+                            policy.Clock);
                     }
+
                     if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
                     {
                         if (evidence.AttemptCount >= policy.AttemptLimit)
                         {
-                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.ThrottleExhausted, policy.Clock);
+                            return JsonFailure(
+                                evidence,
+                                DiscoveryTerminalOutcome.Failed,
+                                JsonReadErrors.ThrottleExhausted,
+                                policy.Clock);
                         }
+
                         // No need to read or persist an error body before disposing the throttled response.
                         retryDelay = policy.GetRetryDelay(response, evidence.ReceivedAtUtc, evidence.AttemptCount);
                     }
@@ -168,53 +228,99 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                         long? length = response.Content.Headers.ContentLength;
                         if (length > maxBytes)
                         {
-                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeLimit, policy.Clock);
+                            return JsonFailure(
+                                evidence,
+                                DiscoveryTerminalOutcome.Truncated,
+                                JsonReadErrors.SizeLimit,
+                                policy.Clock);
                         }
-                        using var buffer = new MemoryStream();
-                        using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
+
+                        using MemoryStream buffer = new MemoryStream();
+                        using Stream stream =
+                            await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
                         byte[] chunk = new byte[Math.Min(maxBytes + 1, 8192)];
                         while (true)
                         {
                             deadline.Token.ThrowIfCancellationRequested();
                             if (policy.Clock.GetElapsedTime(started) >= budget)
                             {
-                                return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                                return JsonFailure(
+                                    evidence,
+                                    DiscoveryTerminalOutcome.Truncated,
+                                    JsonReadErrors.Timeout,
+                                    policy.Clock);
                             }
-                            int count = await stream.ReadAsync(chunk.AsMemory(0,
-                                Math.Min(chunk.Length, maxBytes + 1 - (int)buffer.Length)), deadline.Token).ConfigureAwait(false);
+
+                            int count = await stream.ReadAsync(
+                                    chunk.AsMemory(0, Math.Min(chunk.Length, maxBytes + 1 - (int)buffer.Length)),
+                                    deadline.Token)
+                                .ConfigureAwait(false);
                             if (count == 0)
                             {
                                 break;
                             }
+
                             buffer.Write(chunk, 0, count);
                             if (buffer.Length > maxBytes)
                             {
-                                return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.SizeLimit, policy.Clock);
+                                return JsonFailure(
+                                    evidence,
+                                    DiscoveryTerminalOutcome.Truncated,
+                                    JsonReadErrors.SizeLimit,
+                                    policy.Clock);
                             }
                         }
+
                         deadline.Token.ThrowIfCancellationRequested();
                         if (policy.Clock.GetElapsedTime(started) >= budget)
                         {
-                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock);
+                            return JsonFailure(
+                                evidence,
+                                DiscoveryTerminalOutcome.Truncated,
+                                JsonReadErrors.Timeout,
+                                policy.Clock);
                         }
+
                         if (length.HasValue && length.Value != buffer.Length)
                         {
-                            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.IncompleteBody, policy.Clock);
+                            return JsonFailure(
+                                evidence,
+                                DiscoveryTerminalOutcome.Truncated,
+                                JsonReadErrors.IncompleteBody,
+                                policy.Clock);
                         }
-                        var page = SharePointRestResponseParser.Parse(uri, response.StatusCode, buffer.ToArray(),
-                            response.Content.Headers.ContentType?.MediaType, evidence.RequestId, evidence.CorrelationId,
-                            evidence.ReceivedAtUtc, evidence.AttemptCount, evidence.AttemptLimit);
+
+                        SharePointRestPage page = SharePointRestResponseParser.Parse(
+                            uri,
+                            response.StatusCode,
+                            buffer.ToArray(),
+                            response.Content.Headers.ContentType?.MediaType,
+                            evidence.RequestId,
+                            evidence.CorrelationId,
+                            evidence.ReceivedAtUtc,
+                            evidence.AttemptCount,
+                            evidence.AttemptLimit);
                         deadline.Token.ThrowIfCancellationRequested();
                         return policy.Clock.GetElapsedTime(started) >= budget
-                            ? JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.Timeout, policy.Clock)
+                            ? JsonFailure(
+                                evidence,
+                                DiscoveryTerminalOutcome.Truncated,
+                                JsonReadErrors.Timeout,
+                                policy.Clock)
                             : page;
                     }
                 }
+
                 deadline.Token.ThrowIfCancellationRequested();
                 if (retryDelay >= budget - policy.Clock.GetElapsedTime(started))
                 {
-                    return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.ThrottleBudget, policy.Clock);
+                    return JsonFailure(
+                        evidence,
+                        DiscoveryTerminalOutcome.Failed,
+                        JsonReadErrors.ThrottleBudget,
+                        policy.Clock);
                 }
+
                 await policy.DelayAsync(retryDelay, deadline.Token).ConfigureAwait(false);
             }
         }
@@ -228,11 +334,19 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         }
         catch (IOException)
         {
-            return JsonFailure(evidence, DiscoveryTerminalOutcome.Truncated, JsonReadErrors.IncompleteStream, policy.Clock);
+            return JsonFailure(
+                evidence,
+                DiscoveryTerminalOutcome.Truncated,
+                JsonReadErrors.IncompleteStream,
+                policy.Clock);
         }
         catch (HttpRequestException)
         {
-            return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, JsonReadErrors.TransportFailure, policy.Clock);
+            return JsonFailure(
+                evidence,
+                DiscoveryTerminalOutcome.Failed,
+                JsonReadErrors.TransportFailure,
+                policy.Clock);
         }
     }
 
@@ -241,8 +355,12 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         page is { Outcome: DiscoveryTerminalOutcome.Truncated, ErrorCode: JsonReadErrors.SizeLimit };
 
     /// <summary>Preserves the final response receipt, or timestamps a response-free failure, without retaining source bytes.</summary>
-    private static SharePointRestPage JsonFailure(SharePointRestPage evidence, DiscoveryTerminalOutcome outcome, string code,
-        TimeProvider clock) => evidence with
+    private static SharePointRestPage JsonFailure(
+        SharePointRestPage evidence,
+        DiscoveryTerminalOutcome outcome,
+        string code,
+        TimeProvider clock) =>
+        evidence with
         {
             ResponseDigest = DiscoveryHash.Of(code),
             Outcome = outcome,
@@ -259,33 +377,50 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     }
 
     /// <summary>Resolves SDK file metadata and owning-item availability, preserving denial or projection failures as locator evidence.</summary>
-    public async Task<SharePointResolvedFile> ResolveFileAsync(string serverRelativeUrl,
+    public async Task<SharePointResolvedFile> ResolveFileAsync(
+        string serverRelativeUrl,
         CancellationToken cancellationToken = default)
     {
-        var stage = "FileRequest";
+        string stage = "FileRequest";
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var file = await context.Web.GetFileByServerRelativeUrlOrDefaultAsync(serverRelativeUrl,
-                item => item.UniqueId, item => item.Name, item => item.ServerRelativeUrl,
-                item => item.CustomizedPageStatus, item => item.ListId,
-                item => item.ListItemAllFields)
+            IFile file = await context.Web.GetFileByServerRelativeUrlOrDefaultAsync(
+                    serverRelativeUrl,
+                    item => item.UniqueId,
+                    item => item.Name,
+                    item => item.ServerRelativeUrl,
+                    item => item.CustomizedPageStatus,
+                    item => item.ListId,
+                    item => item.ListItemAllFields)
                 .ConfigureAwait(false);
             if (file == null)
-                return new(DiscoveryTerminalOutcome.Failed, null, null, serverRelativeUrl, null,
-                    FileResolutionProvider, "locator_not_found",
-                    ErrorStage: stage, ErrorDetail: "The SDK returned no physical file.");
+                return new(
+                    DiscoveryTerminalOutcome.Failed,
+                    null,
+                    null,
+                    serverRelativeUrl,
+                    null,
+                    FileResolutionProvider,
+                    "locator_not_found",
+                    ErrorStage: stage,
+                    ErrorDetail: "The SDK returned no physical file.");
             stage = "FileMetadataProjection";
             return MapResolvedFile(file);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var denied = AssessmentWebDiscovery.Classify(ex) == DiscoveryTerminalOutcome.Denied || IsDenied(ex);
-            return new(denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
-                null, null, serverRelativeUrl, null,
+            bool denied = AssessmentWebDiscovery.Classify(ex) == DiscoveryTerminalOutcome.Denied || IsDenied(ex);
+            return new(
+                denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
+                null,
+                null,
+                serverRelativeUrl,
+                null,
                 FileResolutionProvider,
                 denied ? "locator_denied" : "locator_resolution_failed",
-                ErrorStage: stage, ErrorDetail: ResolutionErrorDetail(ex));
+                ErrorStage: stage,
+                ErrorDetail: ResolutionErrorDetail(ex));
         }
     }
 
@@ -293,10 +428,15 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     private static string ResolutionErrorDetail(Exception error)
     {
         // Persist the failure, not authentication objects, response headers, or stack traces.
-        var detail = $"{error.GetType().FullName}: {AssessmentWebDiscovery.ErrorCode(error)}; {AssessmentWebDiscovery.ErrorDetail(error)}";
+        string detail =
+            $"{error.GetType().FullName}: {AssessmentWebDiscovery.ErrorCode(error)}; {AssessmentWebDiscovery.ErrorDetail(error)}";
         detail = Regex.Replace(detail, @"\bBearer\s+\S+", "Bearer [redacted]", RegexOptions.IgnoreCase);
         detail = Regex.Replace(detail, @"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[redacted-token]");
-        detail = Regex.Replace(detail, @"(access_token|refresh_token|client_secret|password)\s*[:=]\s*[^&\s;]+", "$1=[redacted]", RegexOptions.IgnoreCase);
+        detail = Regex.Replace(
+            detail,
+            @"(access_token|refresh_token|client_secret|password)\s*[:=]\s*[^&\s;]+",
+            "$1=[redacted]",
+            RegexOptions.IgnoreCase);
         detail = detail.Replace('\r', ' ').Replace('\n', ' ');
         return detail.Length > 1024 ? detail[..1024] : detail;
     }
@@ -315,18 +455,25 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         // A physical form/view can exist without a backing list item. The SDK returns an
         // unloaded model for that missing expansion, so ?.Id is not an availability check.
         Guid? listId = file.IsPropertyAvailable(value => value.ListId) && file.ListId != Guid.Empty
-            ? file.ListId : null;
+            ? file.ListId
+            : null;
         var item = file.IsPropertyAvailable(value => value.ListItemAllFields) ? file.ListItemAllFields : null;
-        int? itemId = item != null && item.IsPropertyAvailable(value => value.Id) && item.Id > 0
-            ? item.Id : null;
-        return new(DiscoveryTerminalOutcome.Complete, file.UniqueId.ToString("D"), file.Name,
-            file.ServerRelativeUrl, file.CustomizedPageStatus.ToString(),
-            FileResolutionProvider, null, listId, itemId, null);
+        int? itemId = item != null && item.IsPropertyAvailable(value => value.Id) && item.Id > 0 ? item.Id : null;
+        return new(
+            DiscoveryTerminalOutcome.Complete,
+            file.UniqueId.ToString("D"),
+            file.Name,
+            file.ServerRelativeUrl,
+            file.CustomizedPageStatus.ToString(),
+            FileResolutionProvider,
+            null,
+            listId,
+            itemId,
+            null);
     }
 
     /// <summary>Reads the SDK welcome-page property, preserving caller cancellation and explicit denial or failure provenance.</summary>
-    public async Task<SharePointModeledValue> ReadWelcomePageAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<SharePointModeledValue> ReadWelcomePageAsync(CancellationToken cancellationToken = default)
     {
         const string provider = "PnP.Core.Model.SharePoint:IWeb";
         const string operation = "GetAsync(WelcomePage)";
@@ -334,47 +481,13 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         {
             cancellationToken.ThrowIfCancellationRequested();
             var web = await context.Web.GetAsync(item => item.WelcomePage).ConfigureAwait(false);
-            return new(DiscoveryTerminalOutcome.Complete, web.WelcomePage, provider, operation, null,
-                provider + ":" + operation, DateTimeOffset.UtcNow);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            var denied = IsDenied(ex);
-            return new(denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
-                null, provider, operation, denied ? "welcome_page_denied" : "welcome_page_failed",
-                provider + ":" + operation + ":" + ex.GetType().Name, DateTimeOffset.UtcNow);
-        }
-    }
-
-    /// <summary>Reads only physical folder identity through the SDK; child inventory must use byte-bounded REST pagination rather than unbounded expansions.</summary>
-    public async Task<SharePointModeledFolderResult> ReadFolderAsync(string serverRelativeUrl,
-        CancellationToken cancellationToken = default)
-    {
-        const string provider = "PnP.Core.Model.SharePoint:IFolder";
-        const string operation = "GetFolderByServerRelativeUrlAsync(UniqueId,ServerRelativeUrl)";
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var folder = await context.Web.GetFolderByServerRelativeUrlAsync(serverRelativeUrl,
-                item => item.UniqueId, item => item.ServerRelativeUrl).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (folder == null)
-            {
-                return new(DiscoveryTerminalOutcome.Failed, null, serverRelativeUrl,
-                    Array.Empty<SharePointModeledFolder>(), Array.Empty<SharePointModeledFile>(),
-                    provider, operation, "folder_not_found", provider + ":" + operation,
-                    DateTimeOffset.UtcNow);
-            }
-            // Metadata alone cannot prove an empty or complete child census. The provider reads
-            // Files and Folders separately through the bounded REST transport and page policy.
-            return new(DiscoveryTerminalOutcome.Unknown, folder.UniqueId.ToString("D"),
-                folder.ServerRelativeUrl, Array.Empty<SharePointModeledFolder>(),
-                Array.Empty<SharePointModeledFile>(), provider, operation,
-                "folder_children_require_bounded_rest", provider + ":" + operation,
+            return new(
+                DiscoveryTerminalOutcome.Complete,
+                web.WelcomePage,
+                provider,
+                operation,
+                null,
+                provider + ":" + operation,
                 DateTimeOffset.UtcNow);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -384,11 +497,80 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
         catch (Exception ex)
         {
             var denied = IsDenied(ex);
-            return new(denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
-                null, serverRelativeUrl, Array.Empty<SharePointModeledFolder>(),
-                Array.Empty<SharePointModeledFile>(), provider, operation,
+            return new(
+                denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
+                null,
+                provider,
+                operation,
+                denied ? "welcome_page_denied" : "welcome_page_failed",
+                provider + ":" + operation + ":" + ex.GetType().Name,
+                DateTimeOffset.UtcNow);
+        }
+    }
+
+    /// <summary>Reads only physical folder identity through the SDK; child inventory must use byte-bounded REST pagination rather than unbounded expansions.</summary>
+    public async Task<SharePointModeledFolderResult> ReadFolderAsync(
+        string serverRelativeUrl,
+        CancellationToken cancellationToken = default)
+    {
+        const string provider = "PnP.Core.Model.SharePoint:IFolder";
+        const string operation = "GetFolderByServerRelativeUrlAsync(UniqueId,ServerRelativeUrl)";
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IFolder folder = await context.Web.GetFolderByServerRelativeUrlAsync(
+                    serverRelativeUrl,
+                    item => item.UniqueId,
+                    item => item.ServerRelativeUrl)
+                .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (folder == null)
+            {
+                return new(
+                    DiscoveryTerminalOutcome.Failed,
+                    null,
+                    serverRelativeUrl,
+                    Array.Empty<SharePointModeledFolder>(),
+                    Array.Empty<SharePointModeledFile>(),
+                    provider,
+                    operation,
+                    "folder_not_found",
+                    provider + ":" + operation,
+                    DateTimeOffset.UtcNow);
+            }
+
+            // Metadata alone cannot prove an empty or complete child census. The provider reads
+            // Files and Folders separately through the bounded REST transport and page policy.
+            return new(
+                DiscoveryTerminalOutcome.Unknown,
+                folder.UniqueId.ToString("D"),
+                folder.ServerRelativeUrl,
+                Array.Empty<SharePointModeledFolder>(),
+                Array.Empty<SharePointModeledFile>(),
+                provider,
+                operation,
+                "folder_children_require_bounded_rest",
+                provider + ":" + operation,
+                DateTimeOffset.UtcNow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            bool denied = IsDenied(ex);
+            return new(
+                denied ? DiscoveryTerminalOutcome.Denied : DiscoveryTerminalOutcome.Failed,
+                null,
+                serverRelativeUrl,
+                Array.Empty<SharePointModeledFolder>(),
+                Array.Empty<SharePointModeledFile>(),
+                provider,
+                operation,
                 denied ? "web_root_folder_denied" : "web_root_folder_failed",
-                provider + ":" + operation + ":" + ex.GetType().Name, DateTimeOffset.UtcNow);
+                provider + ":" + operation + ":" + ex.GetType().Name,
+                DateTimeOffset.UtcNow);
         }
     }
 
@@ -398,14 +580,23 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     // the items the expand already returned, keeping the projection in memory.
     /// <summary>Projects only already-requested folder models in memory, avoiding unsupported SDK IQueryable projections.</summary>
     internal static IReadOnlyList<SharePointModeledFolder> MapFolders(IFolderCollection folders) =>
-        folders.AsRequested().Select(child => new SharePointModeledFolder(
-            child.UniqueId.ToString("D"), child.Name, child.ServerRelativeUrl)).ToArray();
+        folders.AsRequested()
+            .Select(child => new SharePointModeledFolder(
+                child.UniqueId.ToString("D"),
+                child.Name,
+                child.ServerRelativeUrl))
+            .ToArray();
 
     /// <summary>Projects already-requested file models and available setup-path metadata without issuing another SDK query.</summary>
     internal static IReadOnlyList<SharePointModeledFile> MapFiles(IFileCollection files) =>
-        files.AsRequested().Select(file => new SharePointModeledFile(
-            file.UniqueId.ToString("D"), file.Name, file.ServerRelativeUrl,
-            file.CustomizedPageStatus.ToString(), SetupPath(file))).ToArray();
+        files.AsRequested()
+            .Select(file => new SharePointModeledFile(
+                file.UniqueId.ToString("D"),
+                file.Name,
+                file.ServerRelativeUrl,
+                file.CustomizedPageStatus.ToString(),
+                SetupPath(file)))
+            .ToArray();
 
     /// <summary>Disposes the owned HTTP client and, only when ownership was granted, its SDK context.</summary>
     public void Dispose()
@@ -421,8 +612,7 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     // so the modeled surface exposes the setup path under its unescaped vti_setuppath name.
     /// <summary>Reads the SDK-normalized setup-path property only when the file property bag was actually loaded.</summary>
     private static string SetupPath(IFile file) =>
-        file.IsPropertyAvailable(item => item.Properties)
-            ? file.Properties.GetString(SetupPathProperty, null) : null;
+        file.IsPropertyAvailable(item => item.Properties) ? file.Properties.GetString(SetupPathProperty, null) : null;
 
     /// <summary>Recognizes the existing SDK denial-message signals without converting unrelated failures to access-denied outcomes.</summary>
     private static bool IsDenied(Exception ex) =>
@@ -436,18 +626,23 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
     {
         if (TryProperty(root, JsonEnvelope.Value, out var value) && value.ValueKind == JsonValueKind.Array)
             return (value.EnumerateArray().Select(item => item.Clone()).ToArray(),
-                String(root, JsonEnvelope.NextLink) ?? String(root, JsonEnvelope.LegacyNextLink), JsonEnvelope.NoMetadataFlavor);
+                String(root, JsonEnvelope.NextLink) ?? String(root, JsonEnvelope.LegacyNextLink),
+                JsonEnvelope.NoMetadataFlavor);
         if (TryProperty(root, JsonEnvelope.VerboseData, out var verbose))
         {
             if (TryProperty(verbose, JsonEnvelope.Results, out var results) && results.ValueKind == JsonValueKind.Array)
                 return (results.EnumerateArray().Select(item => item.Clone()).ToArray(),
                     String(verbose, JsonEnvelope.VerboseNext), JsonEnvelope.VerboseFlavor);
-            return (new[] { verbose.Clone() }, String(verbose, JsonEnvelope.VerboseNext), JsonEnvelope.VerboseObjectFlavor);
+            return (new[] { verbose.Clone() }, String(verbose, JsonEnvelope.VerboseNext),
+                JsonEnvelope.VerboseObjectFlavor);
         }
+
         if (root.ValueKind == JsonValueKind.Array)
             return (root.EnumerateArray().Select(item => item.Clone()).ToArray(), null, JsonEnvelope.ArrayFlavor);
-        return (new[] { root.Clone() }, String(root, JsonEnvelope.NextLink) ?? String(root, JsonEnvelope.LegacyNextLink) ??
-            String(root, JsonEnvelope.VerboseNext), JsonEnvelope.ObjectFlavor);
+        return (new[] { root.Clone() },
+            String(root, JsonEnvelope.NextLink) ??
+            String(root, JsonEnvelope.LegacyNextLink) ?? String(root, JsonEnvelope.VerboseNext),
+            JsonEnvelope.ObjectFlavor);
     }
 
     /// <summary>Finds an object property by ordinal case-insensitive name without assuming every JSON value is an object.</summary>
@@ -460,25 +655,28 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                     value = property.Value;
                     return true;
                 }
+
         value = default;
         return false;
     }
 
     /// <summary>Reads a non-null JSON property as text while preserving missing and null values as absent.</summary>
     internal static string String(JsonElement element, string name) =>
-        TryProperty(element, name, out var value) && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
-            ? value.ToString() : null;
+        TryProperty(element, name, out JsonElement value) &&
+        value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
+            ? value.ToString()
+            : null;
 
     /// <summary>Returns the first supported response or content-header value in the supplied precedence order.</summary>
     private static string Header(HttpResponseMessage response, params string[] names)
     {
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            if (response.Headers.TryGetValues(name, out var values))
+            if (response.Headers.TryGetValues(name, out IEnumerable<string> values))
                 return BoundedHeader(values.FirstOrDefault());
-            if (response.Content.Headers.TryGetValues(name, out values))
-                return BoundedHeader(values.FirstOrDefault());
+            if (response.Content.Headers.TryGetValues(name, out values)) return BoundedHeader(values.FirstOrDefault());
         }
+
         return null;
     }
 

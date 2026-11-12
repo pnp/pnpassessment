@@ -9,6 +9,7 @@ using System.Text;
 
 namespace PnP.Scanning.Core.Services
 {
+    /// <summary>Exports assessment data and prepares the embedded report template without acquiring additional tenant evidence.</summary>
     internal sealed class ReportManager
     {
         private const string ReportFolder = "report";
@@ -31,7 +32,6 @@ namespace PnP.Scanning.Core.Services
         private const string WorkflowsCsv = "workflows.csv";
 
         private const string ClassicInfoPathCsv = "classicinfopath.csv";
-        private const string ClassicPagesCsv = "classicpages.csv";
         private const string ClassicPageWebPartsCsv = "classicpagewebparts.csv";
         private const string ClassicWebPartUniqueCsv = "classicwebpartunique.csv";
         private const string ClassicListsCsv = "classiclists.csv";
@@ -45,8 +45,12 @@ namespace PnP.Scanning.Core.Services
         private const string ClassicAddInsCsv = "classicaddins.csv";
         private const string ClassicACSPrincipalsCsv = "classicacsprincipals.csv";
         private const string ClassicACSPrincipalSitesCsv = "classicacsprincipalsites.csv";
-        private const string ClassicACSPrincipalSiteScopedPermissionsCsv = "classicacsprincipalsitescopedpermissions.csv";
-        private const string ClassicACSPrincipalTenantScopedPermissionsCsv = "classicacsprincipaltenantcopedpermissions.csv";
+
+        private const string ClassicACSPrincipalSiteScopedPermissionsCsv =
+            "classicacsprincipalsitescopedpermissions.csv";
+
+        private const string ClassicACSPrincipalTenantScopedPermissionsCsv =
+            "classicacsprincipaltenantcopedpermissions.csv";
 
         private const string AlertsCsv = "alerts.csv";
 
@@ -58,7 +62,10 @@ namespace PnP.Scanning.Core.Services
         {
         }
 
-        internal async Task<string> CreatePowerBiReportAsync(Guid scanId, string exportPath = null, string delimiter = null)
+        internal async Task<string> CreatePowerBiReportAsync(
+            Guid scanId,
+            string exportPath = null,
+            string delimiter = null)
         {
             string reportFile = "";
             exportPath = EnsureReportPath(scanId, exportPath);
@@ -89,40 +96,62 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Workflow\\\\", ",");
+                    RewriteDataLocationsInPbit(
+                        pbitFile,
+                        delimiter,
+                        "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Workflow\\\\",
+                        ",");
                 }
                 else if (scan.CLIMode == Mode.Classic.ToString())
                 {
                     reportFile = "ClassicAssessmentReport.pbit";
                     // Put the report file in the report folder
                     string pbitFile = Path.Combine(exportPath, reportFile);
-                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit", pbitFile);
+                    PersistPBitFromResource(
+                        "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit",
+                        pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\", ",");
+                    RewriteDataLocationsInPbit(
+                        pbitFile,
+                        delimiter,
+                        "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Classic\\\\",
+                        ",");
                 }
                 else if (scan.CLIMode == Mode.InfoPath.ToString())
                 {
                     reportFile = "InfoPathAssessmentReport.pbit";
                     // Put the report file in the report folder
                     string pbitFile = Path.Combine(exportPath, reportFile);
-                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.InfoPath.InfoPathAssessmentReport.pbit", pbitFile);
+                    PersistPBitFromResource(
+                        "PnP.Scanning.Core.Scanners.InfoPath.InfoPathAssessmentReport.pbit",
+                        pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\InfoPath\\\\", ",");
+                    RewriteDataLocationsInPbit(
+                        pbitFile,
+                        delimiter,
+                        "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\InfoPath\\\\",
+                        ",");
                 }
                 else if (scan.CLIMode == Mode.AddInsACS.ToString())
                 {
                     reportFile = "AddInsACSAssessmentReport.pbit";
                     // Put the report file in the report folder
                     string pbitFile = Path.Combine(exportPath, reportFile);
-                    PersistPBitFromResource("PnP.Scanning.Core.Scanners.AddInsACS.AddInsACSAssessmentReport.pbit", pbitFile);
+                    PersistPBitFromResource(
+                        "PnP.Scanning.Core.Scanners.AddInsACS.AddInsACSAssessmentReport.pbit",
+                        pbitFile);
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\AddInsACS\\\\", ",");
+                    RewriteDataLocationsInPbit(
+                        pbitFile,
+                        delimiter,
+                        "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\AddInsACS\\\\",
+                        ",");
                 }
                 else if (scan.CLIMode == Mode.Alerts.ToString())
                 {
@@ -133,7 +162,11 @@ namespace PnP.Scanning.Core.Services
 
                     // Update the report file to pick up the exported CSV files in the report folder
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
-                    RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Alerts\\\\", ",");
+                    RewriteDataLocationsInPbit(
+                        pbitFile,
+                        delimiter,
+                        "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Alerts\\\\",
+                        ",");
                 }
 #if DEBUG
                 else if (scan.CLIMode == Mode.Test.ToString())
@@ -147,22 +180,22 @@ namespace PnP.Scanning.Core.Services
                     // Below are the hardcoded values used for path and delimiter when the template PowerBi was created
                     RewriteDataLocationsInPbit(pbitFile, delimiter, "q:\\\\github\\\\pnpassessment\\\\src\\\\PnP.Scanning\\\\Reports\\\\Test\\\\", ";");
                 }
-#endif               
+#endif
 
                 return Path.Combine(exportPath, reportFile);
             }
         }
 
-        internal async Task<string> ExportReportDataAsync(Guid scanId, string exportPath = null, string delimiter = null)
+        internal async Task<string> ExportReportDataAsync(
+            Guid scanId,
+            string exportPath = null,
+            string delimiter = null)
         {
             exportPath = EnsureReportPath(scanId, exportPath);
 
             using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
             {
-                var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    Delimiter = delimiter,
-                };
+                var config = new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = delimiter, };
 
                 var scan = await dbContext.Scans.Where(p => p.ScanId == scanId).FirstOrDefaultAsync();
                 if (scan == null)
@@ -189,7 +222,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     using (var csv = new CsvWriter(writer, config))
                     {
-                        await csv.WriteRecordsAsync(dbContext.Properties.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        await csv.WriteRecordsAsync(
+                            dbContext.Properties.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                     }
                 }
 
@@ -197,7 +231,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     using (var csv = new CsvWriter(writer, config))
                     {
-                        await csv.WriteRecordsAsync(dbContext.History.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        await csv.WriteRecordsAsync(
+                            dbContext.History.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                     }
                 }
 
@@ -205,7 +240,8 @@ namespace PnP.Scanning.Core.Services
                 {
                     using (var csv = new CsvWriter(writer, config))
                     {
-                        await csv.WriteRecordsAsync(dbContext.SiteCollections.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        await csv.WriteRecordsAsync(
+                            dbContext.SiteCollections.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                     }
                 }
 
@@ -218,6 +254,7 @@ namespace PnP.Scanning.Core.Services
                 }
 
                 #region Scanner specific export
+
                 // PER SCAN COMPONENT: define export for the scan specific tables
 
                 //if (scan.CLIMode == Mode.Syntex.ToString())
@@ -293,7 +330,8 @@ namespace PnP.Scanning.Core.Services
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
                 }
@@ -309,7 +347,8 @@ namespace PnP.Scanning.Core.Services
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
                 }
@@ -320,7 +359,8 @@ namespace PnP.Scanning.Core.Services
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.ClassicAddIns.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.ClassicAddIns.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
 
@@ -328,7 +368,8 @@ namespace PnP.Scanning.Core.Services
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.ClassicACSPrincipals.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
 
@@ -336,23 +377,30 @@ namespace PnP.Scanning.Core.Services
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipalSites.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.ClassicACSPrincipalSites.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicACSPrincipalSiteScopedPermissionsCsv)))
+                    using (var writer = new StreamWriter(
+                               Path.Join(exportPath, ClassicACSPrincipalSiteScopedPermissionsCsv)))
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipalSiteScopedPermissions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.ClassicACSPrincipalSiteScopedPermissions.Where(p => p.ScanId == scanId)
+                                    .AsAsyncEnumerable());
                         }
                     }
 
-                    using (var writer = new StreamWriter(Path.Join(exportPath, ClassicACSPrincipalTenantScopedPermissionsCsv)))
+                    using (var writer = new StreamWriter(
+                               Path.Join(exportPath, ClassicACSPrincipalTenantScopedPermissionsCsv)))
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.ClassicACSPrincipalTenantScopedPermissions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.ClassicACSPrincipalTenantScopedPermissions.Where(p => p.ScanId == scanId)
+                                    .AsAsyncEnumerable());
                         }
                     }
                 }
@@ -363,7 +411,8 @@ namespace PnP.Scanning.Core.Services
                     {
                         using (var csv = new CsvWriter(writer, config))
                         {
-                            await csv.WriteRecordsAsync(dbContext.Alerts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                            await csv.WriteRecordsAsync(
+                                dbContext.Alerts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                         }
                     }
                 }
@@ -381,7 +430,7 @@ namespace PnP.Scanning.Core.Services
                 }
 #endif
 
-#endregion
+                #endregion
             }
 
             return exportPath;
@@ -394,104 +443,111 @@ namespace PnP.Scanning.Core.Services
         /// the enriched <c>classicpages.csv</c> — can be exercised against a seeded in-memory SQLite
         /// <see cref="ScanContext"/> without opening an on-disk scan database.
         /// </summary>
-        internal static async Task ExportClassicReportDataAsync(ScanContext dbContext, Guid scanId, string exportPath, CsvConfiguration config)
+        internal static async Task ExportClassicReportDataAsync(
+            ScanContext dbContext,
+            Guid scanId,
+            string exportPath,
+            CsvConfiguration config)
         {
-            await ClassicAspxReportProjection.ExportCsvAsync(dbContext, scanId, exportPath, config);
             // Physical inventory, scope coverage, references, pagination, gaps and the final verdict
             // share the assessment-owned discovery.csv report.
-            using (var writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))
-            using (var csv = new CsvWriter(writer, config))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, "discovery.csv")))
+            using (CsvWriter csv = new CsvWriter(writer, config))
             {
-                await csv.WriteRecordsAsync(dbContext.ClassicPageDiscoveries.AsNoTracking()
-                    .Where(row => row.ScanId == scanId).OrderBy(row => row.RowType).ThenBy(row => row.RecordKey)
-                    .AsAsyncEnumerable());
+                await csv.WriteRecordsAsync(
+                    dbContext.ClassicPageDiscoveries.AsNoTracking()
+                        .Where(row => row.ScanId == scanId)
+                        .OrderBy(row => row.RowType)
+                        .ThenBy(row => row.RecordKey)
+                        .AsAsyncEnumerable());
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, WorkflowsCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
                     await csv.WriteRecordsAsync(dbContext.Workflows.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicExtensibilitiesCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicExtensibilitiesCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicExtensibilities.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicInfoPathCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicInfoPathCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicInfoPath.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicListsCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicListsCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicLists.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPagesCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicPageWebPartsCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicPages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicPageWebParts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPageWebPartsCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicWebPartUniqueCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicPageWebParts.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicWebPartUniques.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebPartUniqueCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicUserCustomActionsCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicWebPartUniques.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicUserCustomActionsCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicSiteSummariesCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicUserCustomActions.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicSiteSummariesCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicWebSummariesCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicWebSummariesCsv)))
+            using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicPublishingSiteSummariesCsv)))
             {
-                using (var csv = new CsvWriter(writer, config))
+                using (CsvWriter csv = new CsvWriter(writer, config))
                 {
-                    await csv.WriteRecordsAsync(dbContext.ClassicWebSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
-                }
-            }
-
-            using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPublishingSiteSummariesCsv)))
-            {
-                using (var csv = new CsvWriter(writer, config))
-                {
-                    await csv.WriteRecordsAsync(dbContext.ClassicPublishingSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                    await csv.WriteRecordsAsync(
+                        dbContext.ClassicPublishingSiteSummaries.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                 }
             }
 
@@ -499,15 +555,22 @@ namespace PnP.Scanning.Core.Services
             // produces zero rows; in that case no file is created).
             if (await dbContext.ClassicPageAuditUsages.AnyAsync(p => p.ScanId == scanId))
             {
-                using (var writer = new StreamWriter(Path.Join(exportPath, ClassicPageAuditUsageCsv)))
+                using (StreamWriter writer = new StreamWriter(Path.Join(exportPath, ClassicPageAuditUsageCsv)))
                 {
-                    using (var csv = new CsvWriter(writer, config))
+                    using (CsvWriter csv = new CsvWriter(writer, config))
                     {
                         csv.Context.RegisterClassMap<ClassicPageAuditUsageMap>();
-                        await csv.WriteRecordsAsync(dbContext.ClassicPageAuditUsages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
+                        await csv.WriteRecordsAsync(
+                            dbContext.ClassicPageAuditUsages.Where(p => p.ScanId == scanId).AsAsyncEnumerable());
                     }
                 }
             }
+
+            await PnP.Scanning.Core.ClassicPages.Compatibility.ClassicReportCsvProjection.ExportAsync(
+                dbContext,
+                scanId,
+                exportPath,
+                config);
         }
 
         private static string EnsureReportPath(Guid scanId, string exportPath)
@@ -540,7 +603,11 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        internal static void RewriteDataLocationsInPbit(string pbitFile, string newDelimiter, string oldLocation, string oldDelimiter)
+        internal static void RewriteDataLocationsInPbit(
+            string pbitFile,
+            string newDelimiter,
+            string oldLocation,
+            string oldDelimiter)
         {
             string destinationPath = "";
             string copiedFile = "";
@@ -605,7 +672,9 @@ namespace PnP.Scanning.Core.Services
 
                         if (newDelimiter != null && newDelimiter != oldDelimiter)
                         {
-                            newLine = newLine.Replace($"Delimiter=\\\"{oldDelimiter}\\\"", $"Delimiter=\\\"{newDelimiter}\\\"");
+                            newLine = newLine.Replace(
+                                $"Delimiter=\\\"{oldDelimiter}\\\"",
+                                $"Delimiter=\\\"{newDelimiter}\\\"");
                         }
 
                         sw.WriteLine(newLine);

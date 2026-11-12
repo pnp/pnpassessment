@@ -1,7 +1,8 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using PnP.Scanning.Core.Discovery;
 using PnP.Scanning.Core.Storage;
 using System.Text.Json;
 using Xunit;
@@ -34,21 +35,22 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     public Task DisposeAsync() => connection.DisposeAsync().AsTask();
 
     /// <summary>Creates a metadata observation with a stable real physical identity and independent owner slots.</summary>
-    private SPFile File(Guid? file = null) => new()
-    {
-        ScanId = scan,
-        SiteCollectionId = site,
-        FileUniqueId = file ?? fileId,
-        WebId = web,
-        ListId = list,
-        FolderUniqueId = folder,
-        ServerRelativeUrl = "/sites/test/renderer.aspx",
-        FileName = "renderer.aspx",
-        FileReadState = "Available",
-        ProvenanceJson = "[\"file-listing\"]",
-        CoverageState = "Observed",
-        ObservedAtUtc = observed
-    };
+    private SPFile File(Guid? file = null) =>
+        new()
+        {
+            ScanId = scan,
+            SiteCollectionId = site,
+            FileUniqueId = file ?? fileId,
+            WebId = web,
+            ListId = list,
+            FolderUniqueId = folder,
+            ServerRelativeUrl = "/sites/test/renderer.aspx",
+            FileName = "renderer.aspx",
+            FileReadState = "Available",
+            ProvenanceJson = "[\"file-listing\"]",
+            CoverageState = "Observed",
+            ObservedAtUtc = observed
+        };
 
     /// <summary>Replays the same physical observation without multiplying files or changing the earliest and latest observation bounds.</summary>
     [Fact]
@@ -146,9 +148,13 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         row.CoverageState.Should().Be("ChangedDuringScan");
         row.ListId.Should().Be(next.ListId);
         row.FolderUniqueId.Should().Be(next.FolderUniqueId);
-        row.ProvenanceJson.Should().Contain("0x0101").And.Contain("0x010109")
-            .And.Contain("renderer.aspx").And.Contain("renamed.aspx")
-            .And.Contain(list.ToString()).And.Contain(next.ListId!.Value.ToString());
+        row.ProvenanceJson.Should()
+            .Contain("0x0101")
+            .And.Contain("0x010109")
+            .And.Contain("renderer.aspx")
+            .And.Contain("renamed.aspx")
+            .And.Contain(list.ToString())
+            .And.Contain(next.ListId!.Value.ToString());
         row.FirstObservedAtUtc.Should().Be(observed);
         row.ObservedAtUtc.Should().Be(observed.AddMinutes(2));
     }
@@ -255,7 +261,10 @@ public sealed class SPFileWriterTests : IAsyncLifetime
                 invalid.ProvenanceJson = "{}";
                 break;
         }
-        await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), invalid })).Should().ThrowAsync<ArgumentException>();
+
+        await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), invalid }))
+            .Should()
+            .ThrowAsync<ArgumentException>();
         using var db = new ScanContext(options);
         (await db.SPFiles.CountAsync()).Should().Be(0);
     }
@@ -266,7 +275,9 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     {
         var other = File(Guid.NewGuid());
         other.ScanId = Guid.NewGuid();
-        await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), other })).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), other }))
+            .Should()
+            .ThrowAsync<ArgumentException>();
         using var db = new ScanContext(options);
         (await db.SPFiles.CountAsync()).Should().Be(0);
     }
@@ -277,7 +288,9 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     {
         var invalid = File(Guid.NewGuid());
         invalid.FileReadState = null;
-        await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), invalid })).Should().ThrowAsync<DbUpdateException>();
+        await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), invalid }))
+            .Should()
+            .ThrowAsync<DbUpdateException>();
         using var db = new ScanContext(options);
         (await db.SPFiles.CountAsync()).Should().Be(0);
     }
@@ -302,6 +315,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         {
             (await db.SPFiles.SingleAsync()).ServerRelativeUrl.Should().Be(first.ServerRelativeUrl);
         }
+
         var next = File();
         next.ServerRelativeUrl = "/sites/test/100%?# Page.aspx";
         await Writer.WriteAsync(new[] { next });
@@ -317,24 +331,27 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     public async Task PhysicalStreamReleasesReadersBeforePublishing()
     {
         var source = new AssessmentDiscoveryWriter(() => new ScanContext(options));
-        await source.WriteAsync(Enumerable.Range(1, 300).Select(id => new ClassicPageDiscovery
-        {
-            ScanId = scan,
-            RecordKey = "page:" + id.ToString("D8"),
-            RowType = "Page",
-            ScopeType = "File",
-            SiteUrl = "https://example.invalid/sites/test",
-            WebUrl = "/",
-            Url = "/sites/test/renderer.aspx",
-            DiscoveryStatus = "Discovered",
-            ObservedAtUtc = observed
-        }));
+        await source.WriteAsync(
+            Enumerable.Range(1, 300)
+                .Select(id => new ClassicPageDiscovery
+                {
+                    ScanId = scan,
+                    RecordKey = "page:" + id.ToString("D8"),
+                    RowType = "Page",
+                    ScopeType = "File",
+                    SiteUrl = "https://example.invalid/sites/test",
+                    WebUrl = "/",
+                    Url = "/sites/test/renderer.aspx",
+                    DiscoveryStatus = "Discovered",
+                    ObservedAtUtc = observed
+                }));
         var count = 0;
         await foreach (var _ in source.ReadPageStreamAsync(scan, "https://example.invalid/sites/test", "/"))
         {
             await Writer.WriteAsync(new[] { File() });
             count++;
         }
+
         count.Should().Be(300);
         using var db = new ScanContext(options);
         (await db.SPFiles.CountAsync()).Should().Be(1);
@@ -344,13 +361,15 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [Fact]
     public async Task OversizedBatchStopsEnumerationBeforeContextCreation()
     {
-        var enumerated = 0;
-        var writer = new SPFileWriter(() => throw new InvalidOperationException("No context should be opened."));
-        var rows = Enumerable.Range(1, 1000).Select(_ =>
-        {
-            enumerated++;
-            return File(Guid.NewGuid());
-        });
+        int enumerated = 0;
+        SPFileWriter writer =
+            new SPFileWriter(() => throw new InvalidOperationException("No context should be opened."));
+        IEnumerable<SPFile> rows = Enumerable.Range(1, 1000)
+            .Select(_ =>
+            {
+                enumerated++;
+                return File(Guid.NewGuid());
+            });
         await FluentActions.Awaiting(() => writer.WriteAsync(rows)).Should().ThrowAsync<ArgumentException>();
         enumerated.Should().Be(257);
     }
@@ -372,7 +391,9 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         await writer.WriteAsync(Array.Empty<SPFile>());
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        await FluentActions.Awaiting(() => writer.WriteAsync(new[] { File() }, cancellation.Token)).Should().ThrowAsync<OperationCanceledException>();
+        await FluentActions.Awaiting(() => writer.WriteAsync(new[] { File() }, cancellation.Token))
+            .Should()
+            .ThrowAsync<OperationCanceledException>();
     }
 
     /// <summary>Retains incomplete and changed coverage precedence without interpreting observed inventory as complete tenant coverage.</summary>
@@ -383,7 +404,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [InlineData("ChangedDuringScan", "Incomplete", "ChangedDuringScan")]
     public void CoverageMergePreservesEvidenceLimitations(string left, string right, string expected)
     {
-        SPFileWriter.MergeCoverage(left, right).Should().Be(expected);
+        PhysicalFileConsolidator.MergeCoverage(left, right).Should().Be(expected);
     }
 
     /// <summary>Fails closed on a previously owned physical identity and rolls back a valid prefix from the other scan.</summary>
@@ -400,7 +421,8 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         collision.FileName = "reassigned.aspx";
         collision.ProvenanceJson = "[\"must-not-commit\"]";
         await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { prefix, collision }))
-            .Should().ThrowAsync<InvalidOperationException>();
+            .Should()
+            .ThrowAsync<InvalidOperationException>();
         using var db = new ScanContext(options);
         var saved = await db.SPFiles.SingleAsync();
         saved.ScanId.Should().Be(scan);
@@ -499,7 +521,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [Fact]
     public async Task NewRawMetadataConflictsRetainBothValues()
     {
-        var first = File();
+        SPFile first = File();
         first.ListItemId = 42;
         first.Length = 100;
         first.WikiFieldHasValue = false;
@@ -511,7 +533,7 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         first.FileType = "file-one";
         first.BSN = "bsn-one";
         first.ItemMetadataFieldStatesJson = "{\"WikiField\":\"value\",\"other-field\":\"value\"}";
-        var next = File();
+        SPFile next = File();
         next.ListItemId = 84;
         next.Length = 200;
         next.WikiFieldHasValue = true;
@@ -525,23 +547,30 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         next.ItemMetadataFieldStatesJson = "{\"WikiField\":\"value\",\"other-field\":\"null\"}";
         await Writer.WriteAsync(new[] { first, next });
         await Writer.WriteAsync(new[] { next });
-        using var db = new ScanContext(options);
-        var saved = await db.SPFiles.SingleAsync();
+        using ScanContext db = new ScanContext(options);
+        SPFile saved = await db.SPFiles.SingleAsync();
         saved.ListItemId.Should().Be(84);
         saved.Length.Should().Be(200);
         saved.WikiFieldHasValue.Should().BeTrue();
         saved.NoExecuteRaw.Should().Be("1");
         saved.CoverageState.Should().Be("ChangedDuringScan");
-        foreach (var field in new[] { "ListItemId", "Length", "WikiFieldHasValue", "NoExecuteRaw", "NoExecuteSource", "ClientSideApplicationId", "HtmlFileType", "FileType", "BSN", "ItemMetadataFieldStatesJson.other-field" })
+        foreach (string field in new[]
+                 {
+                     "ListItemId", "Length", "WikiFieldHasValue", "NoExecuteRaw", "NoExecuteSource",
+                     "ClientSideApplicationId", "HtmlFileType", "FileType", "BSN",
+                     "ItemMetadataFieldStatesJson.other-field"
+                 })
         {
             saved.ProvenanceJson.Should().Contain(field);
         }
+
         saved.ProvenanceJson.Should().Contain("bsn-one").And.Contain("bsn-two");
-        using var evidence = JsonDocument.Parse(saved.ProvenanceJson);
+        using JsonDocument evidence = JsonDocument.Parse(saved.ProvenanceJson);
         evidence.RootElement.GetArrayLength().Should().Be(11);
-        var rawConflict = evidence.RootElement.EnumerateArray().Single(entry =>
-            entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("field", out var field) &&
-            field.GetString() == nameof(SPFile.NoExecuteRaw));
+        JsonElement rawConflict = evidence.RootElement.EnumerateArray()
+            .Single(entry => entry.ValueKind == JsonValueKind.Object &&
+                             entry.TryGetProperty("field", out JsonElement field) &&
+                             field.GetString() == nameof(SPFile.NoExecuteRaw));
         rawConflict.GetProperty("before").GetString().Should().Be("0");
         rawConflict.GetProperty("after").GetString().Should().Be("1");
     }
@@ -559,10 +588,12 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         var invalid = File(Guid.NewGuid());
         invalid.ItemMetadataFieldStatesJson = states;
         await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), invalid }))
-            .Should().ThrowAsync<ArgumentException>();
+            .Should()
+            .ThrowAsync<ArgumentException>();
         using var db = new ScanContext(options);
         (await db.SPFiles.CountAsync()).Should().Be(0);
     }
+
     /// <summary>Clears returned null text and records the former facts while treating an explicitly null wiki field as no wiki value.</summary>
     [Fact]
     public async Task ExplicitNullClearsKnownRawItemFactsAndPreservesConflicts()
@@ -574,9 +605,11 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         first.BSN = "raw-bsn";
         first.ContentTypeId = "0x0101";
         first.WikiFieldHasValue = true;
-        first.ItemMetadataFieldStatesJson = "{\"ClientSideApplicationId\":\"value\",\"HTML_x0020_File_x0020_Type\":\"value\",\"File_x0020_Type\":\"value\",\"BSN\":\"value\",\"ContentTypeId\":\"value\",\"WikiField\":\"value\"}";
+        first.ItemMetadataFieldStatesJson =
+            "{\"ClientSideApplicationId\":\"value\",\"HTML_x0020_File_x0020_Type\":\"value\",\"File_x0020_Type\":\"value\",\"BSN\":\"value\",\"ContentTypeId\":\"value\",\"WikiField\":\"value\"}";
         var next = File();
-        next.ItemMetadataFieldStatesJson = "{\"ClientSideApplicationId\":\"null\",\"HTML_x0020_File_x0020_Type\":\"null\",\"File_x0020_Type\":\"null\",\"BSN\":\"null\",\"ContentTypeId\":\"null\",\"WikiField\":\"null\"}";
+        next.ItemMetadataFieldStatesJson =
+            "{\"ClientSideApplicationId\":\"null\",\"HTML_x0020_File_x0020_Type\":\"null\",\"File_x0020_Type\":\"null\",\"BSN\":\"null\",\"ContentTypeId\":\"null\",\"WikiField\":\"null\"}";
         await Writer.WriteAsync(new[] { first, next });
         using var db = new ScanContext(options);
         var saved = await db.SPFiles.SingleAsync();
@@ -588,8 +621,15 @@ public sealed class SPFileWriterTests : IAsyncLifetime
         saved.WikiFieldHasValue.Should().BeFalse();
         saved.CoverageState.Should().Be("ChangedDuringScan");
         using var states = JsonDocument.Parse(saved.ItemMetadataFieldStatesJson);
-        states.RootElement.EnumerateObject().Select(field => field.Value.GetString()).Should().OnlyContain(value => value == "null");
-        saved.ProvenanceJson.Should().Contain("raw-bsn").And.Contain("html-type").And.Contain("0x0101").And.Contain("\"after\":null");
+        states.RootElement.EnumerateObject()
+            .Select(field => field.Value.GetString())
+            .Should()
+            .OnlyContain(value => value == "null");
+        saved.ProvenanceJson.Should()
+            .Contain("raw-bsn")
+            .And.Contain("html-type")
+            .And.Contain("0x0101")
+            .And.Contain("\"after\":null");
     }
 
     /// <summary>Does not trust a stale incoming raw value when the corresponding known field is explicitly marked as omitted.</summary>
@@ -639,9 +679,11 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     public async Task ReturnedValueStateRequiresTheKnownRawFact(string field)
     {
         var invalid = File(Guid.NewGuid());
-        invalid.ItemMetadataFieldStatesJson = JsonSerializer.Serialize(new Dictionary<string, string> { [field] = "value" });
+        invalid.ItemMetadataFieldStatesJson =
+            JsonSerializer.Serialize(new Dictionary<string, string> { [field] = "value" });
         await FluentActions.Awaiting(() => Writer.WriteAsync(new[] { File(), invalid }))
-            .Should().ThrowAsync<ArgumentException>();
+            .Should()
+            .ThrowAsync<ArgumentException>();
         using var db = new ScanContext(options);
         (await db.SPFiles.CountAsync()).Should().Be(0);
     }
@@ -669,34 +711,36 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [InlineData("1")]
     public async Task ExplicitNoExecuteNullClearsRawAndRetainsBeforeAfter(string raw)
     {
-        var first = File();
+        SPFile first = File();
         first.NoExecuteRaw = raw;
         first.NoExecuteSource = "SPO.ListItem.NoExecute";
         first.NoExecuteReadState = "Available";
         first.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"value\"}";
         await Writer.WriteAsync(new[] { first });
-        var next = File();
+        SPFile next = File();
         next.NoExecuteSource = "SPO.ListItem.NoExecute";
         next.NoExecuteReadState = "Null";
         next.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"null\"}";
         await Writer.WriteAsync(new[] { next });
         await Writer.WriteAsync(new[] { next });
-        using var db = new ScanContext(options);
-        var saved = await db.SPFiles.SingleAsync();
+        using ScanContext db = new ScanContext(options);
+        SPFile saved = await db.SPFiles.SingleAsync();
         saved.NoExecuteRaw.Should().BeNull();
         saved.NoExecuteSource.Should().Be("SPO.ListItem.NoExecute");
         saved.NoExecuteReadState.Should().Be("Null");
         saved.ItemMetadataFieldStatesJson.Should().Be("{\"NoExecute\":\"null\"}");
         saved.CoverageState.Should().Be("ChangedDuringScan");
-        using var evidence = JsonDocument.Parse(saved.ProvenanceJson);
-        var rawConflict = evidence.RootElement.EnumerateArray().Single(entry =>
-            entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("field", out var field) &&
-            field.GetString() == nameof(SPFile.NoExecuteRaw));
+        using JsonDocument evidence = JsonDocument.Parse(saved.ProvenanceJson);
+        JsonElement rawConflict = evidence.RootElement.EnumerateArray()
+            .Single(entry => entry.ValueKind == JsonValueKind.Object &&
+                             entry.TryGetProperty("field", out JsonElement field) &&
+                             field.GetString() == nameof(SPFile.NoExecuteRaw));
         rawConflict.GetProperty("before").GetString().Should().Be(raw);
         rawConflict.GetProperty("after").ValueKind.Should().Be(JsonValueKind.Null);
-        var stateConflict = evidence.RootElement.EnumerateArray().Single(entry =>
-            entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("field", out var field) &&
-            field.GetString() == nameof(SPFile.NoExecuteReadState));
+        JsonElement stateConflict = evidence.RootElement.EnumerateArray()
+            .Single(entry => entry.ValueKind == JsonValueKind.Object &&
+                             entry.TryGetProperty("field", out JsonElement field) &&
+                             field.GetString() == nameof(SPFile.NoExecuteReadState));
         stateConflict.GetProperty("before").GetString().Should().Be("Available");
         stateConflict.GetProperty("after").GetString().Should().Be("Null");
     }
@@ -752,26 +796,27 @@ public sealed class SPFileWriterTests : IAsyncLifetime
     [Fact]
     public async Task ReturnedNoExecuteValueSupersedesNullWithRawConflictEvidence()
     {
-        var first = File();
+        SPFile first = File();
         first.NoExecuteSource = "SPO.ListItem.NoExecute";
         first.NoExecuteReadState = "Null";
         first.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"null\"}";
         await Writer.WriteAsync(new[] { first });
-        var next = File();
+        SPFile next = File();
         next.NoExecuteRaw = "0";
         next.NoExecuteSource = "SPO.ListItem.NoExecute";
         next.NoExecuteReadState = "Available";
         next.ItemMetadataFieldStatesJson = "{\"NoExecute\":\"value\"}";
         await Writer.WriteAsync(new[] { next });
-        using var db = new ScanContext(options);
-        var saved = await db.SPFiles.SingleAsync();
+        using ScanContext db = new ScanContext(options);
+        SPFile saved = await db.SPFiles.SingleAsync();
         saved.NoExecuteRaw.Should().Be("0");
         saved.NoExecuteReadState.Should().Be("Available");
         saved.ItemMetadataFieldStatesJson.Should().Be("{\"NoExecute\":\"value\"}");
-        using var evidence = JsonDocument.Parse(saved.ProvenanceJson);
-        var rawConflict = evidence.RootElement.EnumerateArray().Single(entry =>
-            entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("field", out var field) &&
-            field.GetString() == nameof(SPFile.NoExecuteRaw));
+        using JsonDocument evidence = JsonDocument.Parse(saved.ProvenanceJson);
+        JsonElement rawConflict = evidence.RootElement.EnumerateArray()
+            .Single(entry => entry.ValueKind == JsonValueKind.Object &&
+                             entry.TryGetProperty("field", out JsonElement field) &&
+                             field.GetString() == nameof(SPFile.NoExecuteRaw));
         rawConflict.GetProperty("before").ValueKind.Should().Be(JsonValueKind.Null);
         rawConflict.GetProperty("after").GetString().Should().Be("0");
     }

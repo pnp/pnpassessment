@@ -1,3 +1,5 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SharePoint.Client;
@@ -14,6 +16,7 @@ namespace PnP.Scanning.Core.Tests.Scanners.Pages;
 
 public class PublishingLayoutTransportTests
 {
+    /// <summary>Verifies csom fallback retries transient responses before caching the result.</summary>
     [Theory]
     [InlineData(HttpStatusCode.TooManyRequests, true, 2)]
     [InlineData(HttpStatusCode.ServiceUnavailable, true, 2)]
@@ -22,37 +25,43 @@ public class PublishingLayoutTransportTests
     [InlineData(HttpStatusCode.Forbidden, false, 1)]
     [InlineData(HttpStatusCode.NotFound, false, 1)]
     public async Task Csom_fallback_retries_transient_responses_before_caching_the_result(
-        HttpStatusCode status, bool recover, int expectedRequests)
+        HttpStatusCode status,
+        bool recover,
+        int expectedRequests)
     {
-        using var transport = new LayoutResponseHandler(status, recover);
-        var services = new ServiceCollection();
-        services.AddPnPCore(options =>
-        {
-            options.DisableTelemetry = true;
-            options.HttpRequests.SharePointRest.MaxRetries = 2;
-            options.HttpRequests.SharePointRest.DelayInSeconds = 0;
-        }, configureSharePointRest: builder =>
-            builder.ConfigurePrimaryHttpMessageHandler(() => transport));
-        using var provider = services.BuildServiceProvider();
-        using var httpClient = provider.GetRequiredService<SharePointRestClient>().Client;
+        using LayoutResponseHandler transport = new LayoutResponseHandler(status, recover);
+        ServiceCollection services = new ServiceCollection();
+        services.AddPnPCore(
+            options =>
+            {
+                options.DisableTelemetry = true;
+                options.HttpRequests.SharePointRest.MaxRetries = 2;
+                options.HttpRequests.SharePointRest.DelayInSeconds = 0;
+            },
+            configureSharePointRest: builder => builder.ConfigurePrimaryHttpMessageHandler(() => transport));
+        using ServiceProvider provider = services.BuildServiceProvider();
+        using HttpClient httpClient = provider.GetRequiredService<SharePointRestClient>().Client;
         const string site = "https://contoso.sharepoint.com/sites/a";
-        using var context = new ClientContext(site)
+        using ClientContext context = new ClientContext(site)
         {
             WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(httpClient),
         };
-        var reader = new PublishingLayoutStatusReader(new Uri(site), async url =>
-        {
-            var file = context.Site.RootWeb.GetFileByServerRelativeUrl(url);
-            context.Load(file, value => value.CustomizedPageStatus);
-            await context.ExecuteQueryAsync();
-            return file.CustomizedPageStatus.ToString();
-        });
-
-        foreach (var web in new[] { "/first", "/second" })
-        {
-            var page = new ClassicPage
+        PublishingLayoutStatusReader reader = new PublishingLayoutStatusReader(
+            new Uri(site),
+            async url =>
             {
-                PageType = PageScanComponent.PublishingPage, WebUrl = web,
+                Microsoft.SharePoint.Client.File file = context.Site.RootWeb.GetFileByServerRelativeUrl(url);
+                context.Load(file, value => value.CustomizedPageStatus);
+                await context.ExecuteQueryAsync();
+                return file.CustomizedPageStatus.ToString();
+            });
+
+        foreach (string web in new[] { "/first", "/second" })
+        {
+            ClassicPage page = new ClassicPage
+            {
+                PageType = ClassicPageRules.PublishingPage,
+                WebUrl = web,
                 LayoutUrl = "/sites/a/_catalogs/masterpage/Basic.aspx",
             };
             if (recover)
@@ -62,7 +71,7 @@ public class PublishingLayoutTransportTests
             }
             else
             {
-                var error = await Assert.ThrowsAnyAsync<Exception>(() => reader.EnrichAsync(page));
+                Exception error = await Assert.ThrowsAnyAsync<Exception>(() => reader.EnrichAsync(page));
                 if (status is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
                     error.Should().BeOfType<ServiceException>();
                 else
@@ -71,21 +80,23 @@ public class PublishingLayoutTransportTests
             }
         }
 
-        transport.RequestCount.Should().Be(expectedRequests,
-            "shared layouts must not bypass SDK retries or restart an exhausted retry budget");
+        transport.RequestCount.Should()
+            .Be(expectedRequests, "shared layouts must not bypass SDK retries or restart an exhausted retry budget");
     }
 
     private sealed class LayoutResponseHandler(HttpStatusCode failure, bool recover) : HttpMessageHandler
     {
         internal int RequestCount { get; private set; }
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+        /// <summary>Returns a recorded fixture response without contacting SharePoint.</summary>
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             RequestCount++;
             if (!recover || RequestCount == 1)
             {
-                var response = new HttpResponseMessage(failure)
+                HttpResponseMessage response = new HttpResponseMessage(failure)
                 {
                     Content = new StringContent("Layout request failed"),
                 };
@@ -93,14 +104,14 @@ public class PublishingLayoutTransportTests
                 return response;
             }
 
-            var xml = XDocument.Parse(await request.Content.ReadAsStringAsync(cancellationToken));
-            var query = xml.Descendants().Single(element =>
-                element.Name.LocalName == "Query" && element.Attribute("Id") != null);
-            var body = $$"""
-                [{"SchemaVersion":"15.0.0.0","LibraryVersion":"16.0.0.0","ErrorInfo":null},
-                 {{query.Attribute("Id").Value}},
-                 {"_ObjectType_":"SP.File","_ObjectIdentity_":"layout-file","CustomizedPageStatus":1}]
-                """;
+            XDocument xml = XDocument.Parse(await request.Content.ReadAsStringAsync(cancellationToken));
+            XElement query = xml.Descendants()
+                .Single(element => element.Name.LocalName == "Query" && element.Attribute("Id") != null);
+            string body = $$"""
+                            [{"SchemaVersion":"15.0.0.0","LibraryVersion":"16.0.0.0","ErrorInfo":null},
+                             {{query.Attribute("Id").Value}},
+                             {"_ObjectType_":"SP.File","_ObjectIdentity_":"layout-file","CustomizedPageStatus":1}]
+                            """;
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),

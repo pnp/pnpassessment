@@ -1,3 +1,4 @@
+using PnP.Scanning.Core.ClassicPages.Contracts.Page;
 #nullable enable
 using System.Text.Json;
 
@@ -21,7 +22,10 @@ internal static class ClassicAspxPoisonAnalysis
     internal static Analysis Analyze(SPFile file)
     {
         ArgumentNullException.ThrowIfNull(file);
-        return AnalyzeRaw(file.NoExecuteRaw, file.NoExecuteReadState, file.NoExecuteSource,
+        return AnalyzeRaw(
+            file.NoExecuteRaw,
+            file.NoExecuteReadState,
+            file.NoExecuteSource,
             hasConflict: HasNoExecuteConflict(file.ProvenanceJson));
     }
 
@@ -33,8 +37,11 @@ internal static class ClassicAspxPoisonAnalysis
         {
             return new Analysis(null, Unknown, Unknown);
         }
+
         var poisoned = raw == BlockedValue;
-        return new Analysis(poisoned, poisoned ? Poisoned : NotPoisoned,
+        return new Analysis(
+            poisoned,
+            poisoned ? Poisoned : NotPoisoned,
             poisoned ? NoExecuteDownload : NotBlockedByNoExecute);
     }
 
@@ -48,17 +55,21 @@ internal static class ClassicAspxPoisonAnalysis
             {
                 return true;
             }
+
             foreach (var evidence in document.RootElement.EnumerateArray())
             {
                 if (evidence.ValueKind == JsonValueKind.Object &&
                     evidence.TryGetProperty("observation", out var observation) &&
-                    observation.ValueKind == JsonValueKind.String && observation.GetString() == MetadataChangedObservation &&
+                    observation.ValueKind == JsonValueKind.String &&
+                    observation.GetString() == MetadataChangedObservation &&
                     evidence.TryGetProperty("field", out var field) && field.ValueKind == JsonValueKind.String &&
-                    field.GetString() is nameof(SPFile.NoExecuteRaw) or nameof(SPFile.NoExecuteSource) or nameof(SPFile.NoExecuteReadState))
+                    field.GetString() is nameof(SPFile.NoExecuteRaw) or nameof(SPFile.NoExecuteSource)
+                        or nameof(SPFile.NoExecuteReadState))
                 {
                     return true;
                 }
             }
+
             return false;
         }
         catch (JsonException)

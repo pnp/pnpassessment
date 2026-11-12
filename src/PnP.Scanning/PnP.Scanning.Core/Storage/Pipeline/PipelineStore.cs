@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
@@ -23,50 +24,87 @@ internal sealed partial class PipelineStore
 
     internal string DatabasePath(Guid assessmentId)
     {
-        if (assessmentId == Guid.Empty) throw new ArgumentException("An assessment ID is required.", nameof(assessmentId));
+        if (assessmentId == Guid.Empty)
+            throw new ArgumentException("An assessment ID is required.", nameof(assessmentId));
         return Path.Combine(RootDirectory, assessmentId.ToString(), StorageManager.DbName);
     }
 
-    internal ScanContext CreateContext(Guid assessmentId, bool readOnly = false) =>
-        !readOnly && writeContextFactory != null ? writeContextFactory(assessmentId) :
-        new ScanContext(new DbContextOptionsBuilder<ScanContext>().UseSqlite(new SqliteConnectionStringBuilder
-        {
-            DataSource = DatabasePath(assessmentId),
-            Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate,
-            Pooling = false,
-        }.ToString()).Options);
+    /// <summary>Creates an assessment-bound SQLite context with local timing records attributed to the caller.</summary>
+    internal ScanContext
+        CreateContext(
+            Guid assessmentId,
+            bool readOnly = false,
+            [CallerMemberName] string operation = "",
+            [CallerFilePath] string file = "",
+            [CallerLineNumber] int line = 0) =>
+        !readOnly && writeContextFactory != null
+            ? writeContextFactory(assessmentId)
+            : new ScanContext(
+                new DbContextOptionsBuilder<ScanContext>().UseSqlite(
+                        new SqliteConnectionStringBuilder
+                        {
+                            DataSource = DatabasePath(assessmentId),
+                            Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate,
+                            Pooling = false,
+                        }.ToString())
+                    .Options,
+                new SqlLifecycleLogger(operation, file, operation, line));
 
-    private async Task<T> WriteAsync<T>(Guid assessmentId, Func<ScanContext, Task<T>> action,
-        CancellationToken token, bool create = false)
+    /// <summary>Times the caller's serialized write and commits its existing atomic transaction after successful cancellation checks.</summary>
+    private async Task<T> WriteAsync<T>(
+        Guid assessmentId,
+        Func<ScanContext, Task<T>> action,
+        CancellationToken token,
+        bool create = false,
+        [CallerMemberName] string operation = "",
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0)
     {
-        var path = DatabasePath(assessmentId);
-        var gate = Gates.GetOrAdd(path, _ => new(1, 1));
-        await gate.WaitAsync(token);
-        try
-        {
-            if (!create && !File.Exists(path)) throw new KeyNotFoundException($"Assessment '{assessmentId}' is unknown.");
-            if (create) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            using var db = CreateContext(assessmentId);
-            if (!migrated.ContainsKey(assessmentId))
+        return await SqlOperationScope.RunAsync(
+            async () =>
             {
-                await db.Database.MigrateAsync(token);
-                migrated.TryAdd(assessmentId, true);
-            }
-            await using var transaction = await db.Database.BeginTransactionAsync(token);
-            var result = await action(db);
-            await db.SaveChangesAsync(token);
-            token.ThrowIfCancellationRequested();
-            await transaction.CommitAsync(token);
-            return result;
-        }
-        finally { gate.Release(); }
+                string path = DatabasePath(assessmentId);
+                SemaphoreSlim gate = Gates.GetOrAdd(path, _ => new(1, 1));
+                await gate.WaitAsync(token);
+                try
+                {
+                    if (!create && !File.Exists(path))
+                        throw new KeyNotFoundException($"Assessment '{assessmentId}' is unknown.");
+                    if (create) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                    using ScanContext db = CreateContext(assessmentId);
+                    if (!migrated.ContainsKey(assessmentId))
+                    {
+                        await db.Database.MigrateAsync(token);
+                        migrated.TryAdd(assessmentId, true);
+                    }
+
+                    await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction =
+                        await db.Database.BeginTransactionAsync(token);
+                    T result = await action(db);
+                    await db.SaveChangesAsync(token);
+                    token.ThrowIfCancellationRequested();
+                    await transaction.CommitAsync(token);
+                    return result;
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            },
+            operation,
+            "pipelineWrite",
+            file,
+            operation,
+            line);
     }
 
     internal async Task<IReadOnlyList<PhaseRunRow>> GetRunsAsync(Guid assessmentId, CancellationToken token = default)
     {
         using var db = CreateContext(assessmentId, readOnly: true);
-        return await db.PhaseRuns.AsNoTracking().Where(x => x.AssessmentId == assessmentId)
-            .OrderBy(x => x.CreatedAtUtc).ToListAsync(token);
+        return await db.PhaseRuns.AsNoTracking()
+            .Where(x => x.AssessmentId == assessmentId)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync(token);
     }
 
     internal ISnapshotWriter SnapshotWriter(Guid assessmentId, Guid snapshotId, Guid collectionRunId) =>
@@ -78,15 +116,18 @@ internal sealed partial class PipelineStore
     internal IAnalysisResultWriter ResultWriter(Guid assessmentId, Guid analysisRunId) =>
         new AnalysisWriteCapability(this, assessmentId, analysisRunId);
 
-    private sealed class SnapshotWriteCapability(PipelineStore store, Guid assessmentId, Guid snapshotId, Guid runId) : ISnapshotWriter
+    private sealed class SnapshotWriteCapability(PipelineStore store, Guid assessmentId, Guid snapshotId, Guid runId)
+        : ISnapshotWriter
     {
         public Task CommitAsync(CollectionRecord record, CancellationToken cancellationToken) =>
             store.CommitObservationAsync(assessmentId, snapshotId, runId, record, cancellationToken);
+
         public Task<SnapshotInfo> SealAsync(CancellationToken cancellationToken) =>
             store.SealAsync(assessmentId, snapshotId, runId, cancellationToken);
     }
 
-    private sealed class SnapshotReadCapability(PipelineStore store, Guid assessmentId, Guid snapshotId) : ISnapshotReader
+    private sealed class SnapshotReadCapability(PipelineStore store, Guid assessmentId, Guid snapshotId)
+        : ISnapshotReader
     {
         private PinnedManifest? pinned;
 
@@ -110,7 +151,8 @@ internal sealed partial class PipelineStore
         }
     }
 
-    private sealed class AnalysisWriteCapability(PipelineStore store, Guid assessmentId, Guid runId) : IAnalysisResultWriter
+    private sealed class AnalysisWriteCapability(PipelineStore store, Guid assessmentId, Guid runId)
+        : IAnalysisResultWriter
     {
         private PinnedManifest? pinned;
 
@@ -133,8 +175,11 @@ internal sealed partial class PipelineStore
                 await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
                 pinned = await AnalysisManifestAsync(db, runId, cancellationToken);
             }
-            await store.WriteAsync(assessmentId, db =>
-                CommitResultAsync(db, runId, result, pinned, cancellationToken), cancellationToken);
+
+            await store.WriteAsync(
+                assessmentId,
+                db => CommitResultAsync(db, runId, result, pinned, cancellationToken),
+                cancellationToken);
         }
     }
 

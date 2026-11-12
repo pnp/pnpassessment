@@ -1,3 +1,6 @@
+using PnP.Scanning.Core.ClassicPages.Compatibility;
+using PnP.Scanning.Core.ClassicPages.Compatibility.Legacy;
+using PnP.Scanning.Core.ClassicPages.Analysis.Page;
 using EFCore.BulkExtensions;
 using EFQuery = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
 using Microsoft.SharePoint.Client;
@@ -9,15 +12,30 @@ using PnP.Scanning.Core.Services;
 using PnP.Scanning.Core.Storage;
 using PnP.Scanning.Core.Discovery;
 using System.Linq.Expressions;
-using System.Runtime.ExceptionServices;
 
 namespace PnP.Scanning.Core.Scanners
 {
+    /// <summary>
+    /// Runs retained non-page Classic components using the shared assessment metadata contract.
+    /// </summary>
     internal class ClassicScanner : ScannerBase
     {
-        public ClassicScanner(ScanManager scanManager, StorageManager storageManager, IPnPContextFactory pnpContextFactory,
-                               Guid scanId, string siteUrl, string webUrl, string webTemplate, ClassicOptions options) :
-                               base(scanManager, storageManager, pnpContextFactory, scanId, siteUrl, webUrl, webTemplate)
+        public ClassicScanner(
+            ScanManager scanManager,
+            StorageManager storageManager,
+            IPnPContextFactory pnpContextFactory,
+            Guid scanId,
+            string siteUrl,
+            string webUrl,
+            string webTemplate,
+            ClassicOptions options) : base(
+            scanManager,
+            storageManager,
+            pnpContextFactory,
+            scanId,
+            siteUrl,
+            webUrl,
+            webTemplate)
         {
             Options = options;
         }
@@ -27,169 +45,234 @@ namespace PnP.Scanning.Core.Scanners
         /// <summary>Runs selected Classic components against one shared web context.</summary>
         internal async override Task ExecuteAsync()
         {
+            if (Options.Pages)
+                throw new InvalidOperationException("Classic Pages must use the collection and analysis coordinator.");
             Logger.Information("Starting Classic assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
 
+            PnPContextOptions options = AssessmentContextOptions(Options);
+
+            using (PnPContext context = await CreateWebContextAsync())
+            using (ClientContext csomContext = GetClientContext(context))
+            {
+                await RetryLoadSharedMetadataAsync(
+                        context,
+                        options,
+                        ScanManager.GetCancellationTokenSource(ScanId).Token)
+                    .ConfigureAwait(false);
+
+                await ExecuteOtherComponentsAsync(
+                        this,
+                        context,
+                        csomContext,
+                        ScanManager.GetCancellationTokenSource(ScanId).Token)
+                    .ConfigureAwait(false);
+
+                // Store site summary
+                await StorageManager.StoreSiteSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context)
+                    .ConfigureAwait(false);
+            }
+
+            Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+        }
+
+        /// <summary>
+        /// Builds the shared rich metadata requests required by selected existing Classic components.
+        /// </summary>
+        internal static PnPContextOptions AssessmentContextOptions(ClassicOptions selected)
+        {
             // Define extra Web/Site data that we want to load when the context is inialized
             // This will not require extra server roundtrips
             PnPContextOptions options = new()
             {
-                AdditionalSitePropertiesOnCreate = new Expression<Func<ISite, object>>[]
-                {
-                    w => w.RootWeb.QueryProperties(p => p.ContentTypes.QueryProperties(p => p.StringId, p => p.Name))
-                },
+                AdditionalSitePropertiesOnCreate =
+                    new Expression<Func<ISite, object>>[]
+                    {
+                        w => w.RootWeb.QueryProperties(p =>
+                            p.ContentTypes.QueryProperties(p => p.StringId, p => p.Name))
+                    },
                 AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
-                {   
-                    w => w.LastItemUserModifiedDate,                 
-                    w => w.Lists.QueryProperties(r => r.Title, 
-                                                 r => r.Hidden,
-                                                 r => r.IsCatalog,
-                                                 r => r.DefaultViewUrl,
-                                                 r => r.TemplateType,
-                                                 r => r.TemplateFeatureId,
-                                                 r => r.ListExperience,
-                                                 r => r.ItemCount,
-                                                 r => r.LastItemUserModifiedDate,
-                                                 r => r.DocumentTemplate,
-                                                 // Capture list and registered content-type display-form declarations
-                                                 // with the shared metadata load, without reading list items.
-                                                 r => r.BaseType,
-                                                 r => r.DefaultDisplayFormUrl,
-                                                 r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl, p => p.UniqueId),
-                                                 r => r.ContentTypes.QueryProperties(p => p.Id, p => p.StringId, p => p.DocumentTemplateUrl, p => p.DisplayFormUrl),
-                                                 r => r.Fields.QueryProperties(p => p.InternalName, p => p.FieldTypeKind, p => p.TypeAsString, p => p.Title),
-                                                 r => r.UserCustomActions)
+                {
+                    w => w.LastItemUserModifiedDate, w => w.Lists.QueryProperties(
+                        r => r.Title,
+                        r => r.Hidden,
+                        r => r.IsCatalog,
+                        r => r.DefaultViewUrl,
+                        r => r.TemplateType,
+                        r => r.TemplateFeatureId,
+                        r => r.ListExperience,
+                        r => r.ItemCount,
+                        r => r.LastItemUserModifiedDate,
+                        r => r.DocumentTemplate,
+                        // Capture list and registered content-type display-form declarations
+                        // with the shared metadata load, without reading list items.
+                        r => r.BaseType,
+                        r => r.DefaultDisplayFormUrl,
+                        r => r.RootFolder.QueryProperties(p => p.ServerRelativeUrl, p => p.UniqueId),
+                        r => r.ContentTypes.QueryProperties(
+                            p => p.Id,
+                            p => p.StringId,
+                            p => p.DocumentTemplateUrl,
+                            p => p.DisplayFormUrl),
+                        r => r.Fields.QueryProperties(
+                            p => p.InternalName,
+                            p => p.FieldTypeKind,
+                            p => p.TypeAsString,
+                            p => p.Title),
+                        r => r.UserCustomActions)
                 }
             };
 
-            if (Options.Pages)
+            if (selected.Pages)
             {
                 // Also load site/web feature collections
-                options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
-                options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
+                options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(
+                    new Expression<Func<ISite, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
+                options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(
+                    new Expression<Func<IWeb, object>>[] { w => w.Features.QueryProperties(p => p.DefinitionId) });
             }
 
-            if (Options.Extensibility)
+            if (selected.Extensibility)
             {
-                options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(new Expression<Func<ISite, object>>[] { w => w.UserCustomActions });
-                options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(new Expression<Func<IWeb, object>>[] { w => w.UserCustomActions,
-                                                                                                                                               w => w.AlternateCssUrl,
-                                                                                                                                               w => w.CustomMasterUrl,
-                                                                                                                                               w => w.MasterUrl });
+                options.AdditionalSitePropertiesOnCreate = options.AdditionalSitePropertiesOnCreate.Union(
+                    new Expression<Func<ISite, object>>[] { w => w.UserCustomActions });
+                options.AdditionalWebPropertiesOnCreate = options.AdditionalWebPropertiesOnCreate.Union(
+                    new Expression<Func<IWeb, object>>[]
+                    {
+                        w => w.UserCustomActions, w => w.AlternateCssUrl, w => w.CustomMasterUrl, w => w.MasterUrl
+                    });
             }
 
-            using (var context = await CreateWebContextAsync())
-            using (var csomContext = GetClientContext(context))
+            return options;
+        }
+
+        /// <summary>
+        /// Runs selected retained non-page Classic components using the supplied shared contexts and cancellation.
+        /// </summary>
+        internal static async Task ExecuteOtherComponentsAsync(
+            ClassicScanner scanner,
+            PnPContext context,
+            ClientContext csomContext,
+            CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (scanner.Options.Workflow)
             {
-                SharePointListMetadataSnapshot sharedLists = null;
-                Exception metadataFailure = null;
-                if (!(Options.Pages && Options.HomePageOnly))
-                {
-                    // Load shared assessment metadata before the selected components consume it.
-                    // HOME defers this load until after its targeted page discovery.
-                    var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
-                    try
-                    {
-                        sharedLists = await RetryLoadSharedMetadataAsync(context, options, token).ConfigureAwait(false);
-                    }
-                    catch (Exception error) when (Options.Pages && !token.IsCancellationRequested)
-                    {
-                        // Defer page failure finalization until raw discovery has been retained.
-                        metadataFailure = error;
-                    }
-                }
+                scanner.Logger.Information(
+                    "Starting classic Workflow assessment of web {SiteUrl}{WebUrl}",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
 
-                if (Options.Pages && (Options.HomePageOnly || metadataFailure != null))
-                {
-                    // HOME must discover its target before the all-lists metadata request.
-                    // A failed full-inventory load also needs raw discovery before finalization.
-                    await ExecutePagesAsync(context, csomContext, options, sharedLists, metadataFailure)
-                        .ConfigureAwait(false);
-                }
+                // Call the workflow scan component
+                await WorkflowScanComponent.ExecuteAsync(
+                        new WorkflowOptions { Mode = Mode.Workflow.ToString(), Analyze = true },
+                        scanner,
+                        context,
+                        csomContext)
+                    .ConfigureAwait(false);
 
-                if (Options.Workflow)
-                {
-                    Logger.Information("Starting classic Workflow assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
+                // Store workflow summary data
+                HashSet<string> remediationCodes = new() { RemediationCodes.WF1.ToString() };
+                await scanner.StorageManager.StoreWorkflowSummaryAsync(
+                        scanner.ScanId,
+                        scanner.SiteUrl,
+                        scanner.WebUrl,
+                        scanner.WebTemplate,
+                        context,
+                        remediationCodes)
+                    .ConfigureAwait(false);
 
-                    // Call the workflow scan component
-                    await WorkflowScanComponent.ExecuteAsync(new WorkflowOptions { Mode = Mode.Workflow.ToString(), Analyze = true }, 
-                                                             this, context, csomContext).ConfigureAwait(false);
-
-                    // Store workflow summary data
-                    HashSet<string> remediationCodes = new()
-                    {
-                        RemediationCodes.WF1.ToString()
-                    };
-                    await StorageManager.StoreWorkflowSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context, remediationCodes).ConfigureAwait(false);
-
-                    Logger.Information("Classic Workflow assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.InfoPath)
-                {
-                    Logger.Information("Starting classic InfoPath assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the InfoPath scan component
-                    await InfoPathScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-                    
-                    Logger.Information("Classic InfoPath assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.Pages && !Options.HomePageOnly && metadataFailure == null)
-                {
-                    await ExecutePagesAsync(context, csomContext, options, sharedLists, null).ConfigureAwait(false);
-                }
-
-                if (Options.Lists)
-                {
-                    Logger.Information("Starting classic Lists assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the List scan component
-                    await ListScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-
-                    Logger.Information("Classic Lists assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.Extensibility)
-                {
-                    Logger.Information("Starting Extensibility assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // Call the UserCustomAction scan component
-                    Logger.Information("Starting Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-                    await UserCustomActionScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-                    Logger.Information("Classic Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                    
-                    // Call the Extensibility scan component
-                    Logger.Information("Starting Extensibility:Core assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-                    await ExtensibilityScanComponent.ExecuteAsync(this, context, csomContext).ConfigureAwait(false);
-                    Logger.Information("Classic Extensibility:Core assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-
-                    Logger.Information("Classic Extensibility assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                if (Options.AzureACS)
-                {
-                    //Logger.Information("Starting Azure ACS assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // TODO
-
-                    //Logger.Information("Classic Azure ACS assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-                
-                if (Options.SharePointAddIns)
-                {
-                    //Logger.Information("Starting SharePoint AddIns assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-                    // TODO
-
-                    //Logger.Information("Classic SharePoint AddIns assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
-                }
-
-                // Store site summary
-                await StorageManager.StoreSiteSummaryAsync(ScanId, SiteUrl, WebUrl, WebTemplate, context).ConfigureAwait(false);
-
+                scanner.Logger.Information(
+                    "Classic Workflow assessment of web {SiteUrl}{WebUrl} done",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
             }
 
-            Logger.Information("Classic assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+            if (scanner.Options.InfoPath)
+            {
+                scanner.Logger.Information(
+                    "Starting classic InfoPath assessment of web {SiteUrl}{WebUrl}",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+
+                // Call the InfoPath scan component
+                await InfoPathScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+
+                scanner.Logger.Information(
+                    "Classic InfoPath assessment of web {SiteUrl}{WebUrl} done",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+            }
+
+            if (scanner.Options.Lists)
+            {
+                scanner.Logger.Information(
+                    "Starting classic Lists assessment of web {SiteUrl}{WebUrl}",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+
+                // Call the List scan component
+                await ListScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+
+                scanner.Logger.Information(
+                    "Classic Lists assessment of web {SiteUrl}{WebUrl} done",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+            }
+
+            if (scanner.Options.Extensibility)
+            {
+                scanner.Logger.Information(
+                    "Starting Extensibility assessment of web {SiteUrl}{WebUrl}",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+
+                // Call the UserCustomAction scan component
+                scanner.Logger.Information(
+                    "Starting Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl}",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+                await UserCustomActionScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+                scanner.Logger.Information(
+                    "Classic Extensibility:UserCustomAction assessment of web {SiteUrl}{WebUrl} done",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+
+                // Call the Extensibility scan component
+                scanner.Logger.Information(
+                    "Starting Extensibility:Core assessment of web {SiteUrl}{WebUrl}",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+                await ExtensibilityScanComponent.ExecuteAsync(scanner, context, csomContext).ConfigureAwait(false);
+                scanner.Logger.Information(
+                    "Classic Extensibility:Core assessment of web {SiteUrl}{WebUrl} done",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+
+                scanner.Logger.Information(
+                    "Classic Extensibility assessment of web {SiteUrl}{WebUrl} done",
+                    scanner.SiteUrl,
+                    scanner.WebUrl);
+            }
+
+            if (scanner.Options.AzureACS)
+            {
+                //scanner.Logger.Information("Starting Azure ACS assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // TODO
+
+                //scanner.Logger.Information("Classic Azure ACS assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            if (scanner.Options.SharePointAddIns)
+            {
+                //scanner.Logger.Information("Starting SharePoint AddIns assessment of web {SiteUrl}{WebUrl}", scanner.SiteUrl, scanner.WebUrl);
+
+                // TODO
+
+                //scanner.Logger.Information("Classic SharePoint AddIns assessment of web {SiteUrl}{WebUrl} done", scanner.SiteUrl, scanner.WebUrl);
+            }
+
+            token.ThrowIfCancellationRequested();
         }
 
         /// <summary>Creates one identity context; the separate shared-metadata step controls when list metadata loads.</summary>
@@ -197,77 +280,39 @@ namespace PnP.Scanning.Core.Scanners
         {
             // Create one identity context. Shared assessment metadata is loaded into it once
             // before the selected components run, except HOME's targeted discovery runs first.
-            return GetPnPContextAsync(new PnPContextOptions
-            {
-                AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
+            return GetPnPContextAsync(
+                new PnPContextOptions
                 {
-                    web => web.ServerRelativeUrl,
-                },
-            });
-        }
-
-        /// <summary>Runs page discovery with the shared snapshot or targeted fallback, then finalizes retained initialization failures before assessment.</summary>
-        private async Task ExecutePagesAsync(PnPContext context, ClientContext csomContext,
-            PnPContextOptions assessmentOptions, SharePointListMetadataSnapshot sharedLists,
-            Exception metadataFailure)
-        {
-            Logger.Information("Starting classic Pages assessment of web {SiteUrl}{WebUrl}", SiteUrl, WebUrl);
-
-            var discoveredPages = await DiscoverPagesAsync(Options.HomePageOnly, sharedLists,
-                () => LoadSharedMetadataAfterHomeDiscoveryAsync(context, assessmentOptions),
-                snapshot => ClassicPageDiscoveryComponent.ExecuteAsync(this, context, snapshot)).ConfigureAwait(false);
-
-            if (metadataFailure != null)
-            {
-                ScanManager.GetCancellationTokenSource(ScanId).Token.ThrowIfCancellationRequested();
-                await new AssessmentDiscoveryWriter(ScanId).FailUnassessedPagesAsync(
-                    ScanId, SiteUrl, WebUrl, metadataFailure, "AssessmentInitialization").ConfigureAwait(false);
-                ExceptionDispatchInfo.Capture(metadataFailure).Throw();
-            }
-
-            await PageScanComponent.ExecuteAsync(this, context, csomContext, discoveredPages).ConfigureAwait(false);
-            Logger.Information("Classic Pages assessment of web {SiteUrl}{WebUrl} done", SiteUrl, WebUrl);
+                    AdditionalWebPropertiesOnCreate = new Expression<Func<IWeb, object>>[]
+                    {
+                        web => web.ServerRelativeUrl,
+                    },
+                });
         }
 
         /// <summary>Loads the Web metadata once through the existing bounded response-body retry policy.</summary>
-        private Task<SharePointListMetadataSnapshot> RetryLoadSharedMetadataAsync(PnPContext context,
-            PnPContextOptions assessmentOptions, CancellationToken token)
+        private Task<SharePointListMetadataSnapshot> RetryLoadSharedMetadataAsync(
+            PnPContext context,
+            PnPContextOptions assessmentOptions,
+            CancellationToken token)
         {
             return ClassicAssessmentInitialization.RetryAsync(
                 () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
-                token, LogMetadataRetry);
-        }
-
-        /// <summary>Loads rich shared assessment metadata only after targeted homepage discovery has completed.</summary>
-        private Task<SharePointListMetadataSnapshot> LoadSharedMetadataAfterHomeDiscoveryAsync(PnPContext context,
-            PnPContextOptions assessmentOptions)
-        {
-            var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
-            return ClassicAssessmentInitialization.ExecuteAsync(
-                () => ClassicAssessmentMetadata.LoadAsync(context, assessmentOptions, token),
-                new AssessmentDiscoveryWriter(ScanId), ScanId, SiteUrl, WebUrl, token, LogMetadataRetry);
+                token,
+                LogMetadataRetry);
         }
 
         /// <summary>Logs the eligible initialization retry without changing retry classification, attempt limits or exception ownership.</summary>
-        private void LogMetadataRetry(int attempt, Exception error) => Logger.Warning(error,
-            "Response ended while initializing classic assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
-            SiteUrl, WebUrl, attempt, ClassicAssessmentInitialization.MaxAttempts - 1);
+        private void LogMetadataRetry(int attempt, Exception error) =>
+            Logger.Warning(
+                error,
+                "Response ended while initializing classic assessment for {SiteUrl}{WebUrl}; retry {Attempt} of {MaxAttempts}",
+                SiteUrl,
+                WebUrl,
+                attempt,
+                ClassicAssessmentInitialization.MaxAttempts - 1);
 
-        /// <summary>Discovers pages after shared metadata, except HOME which discovers its target first.</summary>
-        internal static async Task<List<ClassicPageDiscovery>> DiscoverPagesAsync(bool homePageOnly,
-            SharePointListMetadataSnapshot sharedLists,
-            Func<Task<SharePointListMetadataSnapshot>> loadHomeMetadata,
-            Func<SharePointListMetadataSnapshot, Task<List<ClassicPageDiscovery>>> discover)
-        {
-            if (homePageOnly)
-            {
-                var pages = await discover(null).ConfigureAwait(false);
-                await loadHomeMetadata().ConfigureAwait(false);
-                return pages;
-            }
-            return await discover(sharedLists).ConfigureAwait(false);
-        }
-
+        /// <summary>Initializes retained Classic pre-scan work and records initialization failures.</summary>
         internal async override Task PreScanningAsync()
         {
             Logger.Information("Pre assessment work is starting");
@@ -276,11 +321,18 @@ namespace PnP.Scanning.Core.Scanners
             {
                 await SendRequestWithClientTagAsync();
             }
-            catch (Exception ex) when (Options.Pages && !ScanManager.GetCancellationTokenSource(ScanId).IsCancellationRequested)
+            catch (Exception ex) when (Options.Pages &&
+                                       !ScanManager.GetCancellationTokenSource(ScanId).IsCancellationRequested)
             {
                 // Client-tag telemetry against the first site is not an admission gate for
                 // other authorized sites. Each scheduled Web worker records its own result.
-                await ClassicPageDiscoveryComponent.RecordScopeAsync(ScanId, SiteUrl, WebUrl, "Web", "Failed", ex,
+                await LegacyScopeEvidence.RecordScopeAsync(
+                    ScanId,
+                    SiteUrl,
+                    WebUrl,
+                    "Web",
+                    "Failed",
+                    ex,
                     stage: "PreScanClientTag");
                 Logger.Warning(ex, "Client tag preflight failed; continuing full ASPX discovery");
             }
@@ -289,62 +341,93 @@ namespace PnP.Scanning.Core.Scanners
             {
                 WorkflowManager.Instance.LoadWorkflowDefaultActions();
             }
-            
+
             Logger.Information("Pre assessment work done");
         }
 
+        /// <summary>Enriches stored legacy publishing layouts for existing report compatibility.</summary>
         private async Task EnrichPublishingLayoutsAsync()
         {
-            var token = ScanManager.GetCancellationTokenSource(ScanId).Token;
+            CancellationToken token = ScanManager.GetCancellationTokenSource(ScanId).Token;
             List<string> sites;
-            using (var db = new ScanContext(ScanId))
+            using (ScanContext db = new ScanContext(ScanId))
             {
-                sites = await EFQuery.ToListAsync(db.ClassicPages.Where(page => page.ScanId == ScanId &&
-                    page.PageType == PageScanComponent.PublishingPage)
-                    .Select(page => page.SiteUrl).Distinct(), token).ConfigureAwait(false);
+                sites = await EFQuery.ToListAsync(
+                        db.ClassicPages
+                            .Where(page => page.ScanId == ScanId && page.PageType == ClassicPageRules.PublishingPage)
+                            .Select(page => page.SiteUrl)
+                            .Distinct(),
+                        token)
+                    .ConfigureAwait(false);
             }
 
-            var failedPages = 0;
-            var failedSites = await EnrichSitesAsync(sites, async siteUrl =>
-            {
-                using var db = new ScanContext(ScanId);
-                var siteScanner = new ClassicScanner(ScanManager, StorageManager, PnPContextFactory,
-                    ScanId, siteUrl, "/", null, Options);
-                PnPContext context = null;
-                ClientContext csomContext = null;
-                try
-                {
-                    await PublishingLayoutStatusReader.EnrichSiteAsync(db, ScanId, siteUrl, async url =>
+            int failedPages = 0;
+            int failedSites = await EnrichSitesAsync(
+                    sites,
+                    async siteUrl =>
                     {
-                        // Create network contexts only when discovery cannot supply the status.
-                        context ??= await siteScanner.GetPnPContextAsync().ConfigureAwait(false);
-                        csomContext ??= siteScanner.GetClientContext(context);
-                        var file = csomContext.Site.RootWeb.GetFileByServerRelativeUrl(url);
-                        csomContext.Load(file, value => value.CustomizedPageStatus);
-                        await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
-                        return file.CustomizedPageStatus.ToString();
-                    }, (error, page) =>
-                    {
-                        failedPages++;
-                        Logger.Warning(error,
-                            "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
-                            page.PageUrl, page.LayoutUrl);
-                    }, token).ConfigureAwait(false);
-                }
-                finally
-                {
-                    csomContext?.Dispose();
-                    context?.Dispose();
-                }
-            }, (error, siteUrl) => Logger.Warning(error,
-                "Publishing layout enrichment failed for site collection {SiteUrl}", siteUrl),
-                token).ConfigureAwait(false);
+                        using ScanContext db = new ScanContext(ScanId);
+                        ClassicScanner siteScanner = new ClassicScanner(
+                            ScanManager,
+                            StorageManager,
+                            PnPContextFactory,
+                            ScanId,
+                            siteUrl,
+                            "/",
+                            null,
+                            Options);
+                        PnPContext context = null;
+                        ClientContext csomContext = null;
+                        try
+                        {
+                            await PublishingLayoutStatusReader.EnrichSiteAsync(
+                                    db,
+                                    ScanId,
+                                    siteUrl,
+                                    async url =>
+                                    {
+                                        // Create network contexts only when discovery cannot supply the status.
+                                        context ??= await siteScanner.GetPnPContextAsync().ConfigureAwait(false);
+                                        csomContext ??= siteScanner.GetClientContext(context);
+                                        Microsoft.SharePoint.Client.File file =
+                                            csomContext.Site.RootWeb.GetFileByServerRelativeUrl(url);
+                                        csomContext.Load(file, value => value.CustomizedPageStatus);
+                                        await csomContext.ExecuteQueryAsync().ConfigureAwait(false);
+                                        return file.CustomizedPageStatus.ToString();
+                                    },
+                                    (error, page) =>
+                                    {
+                                        failedPages++;
+                                        Logger.Warning(
+                                            error,
+                                            "Failed to read publishing layout status for {PageUrl} using {LayoutUrl}",
+                                            page.PageUrl,
+                                            page.LayoutUrl);
+                                    },
+                                    token)
+                                .ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            csomContext?.Dispose();
+                            context?.Dispose();
+                        }
+                    },
+                    (error, siteUrl) => Logger.Warning(
+                        error,
+                        "Publishing layout enrichment failed for site collection {SiteUrl}",
+                        siteUrl),
+                    token)
+                .ConfigureAwait(false);
 
             if (failedSites > 0 || failedPages > 0)
             {
-                Logger.Warning("Publishing layout enrichment completed with {FailedPages} page failures; " +
+                Logger.Warning(
+                    "Publishing layout enrichment completed with {FailedPages} page failures; " +
                     "{FailedSites} of {SiteCount} site collections failed outright",
-                    failedPages, failedSites, sites.Count);
+                    failedPages,
+                    failedSites,
+                    sites.Count);
             }
         }
 
@@ -354,8 +437,10 @@ namespace PnP.Scanning.Core.Scanners
         /// sites their status nor the assessment its coverage verdict. Cancellation still propagates.
         /// </summary>
         /// <returns>The number of site collections that failed outright.</returns>
-        internal static async Task<int> EnrichSitesAsync(IReadOnlyList<string> sites,
-            Func<string, Task> enrichSite, Action<Exception, string> onSiteFailure,
+        internal static async Task<int> EnrichSitesAsync(
+            IReadOnlyList<string> sites,
+            Func<string, Task> enrichSite,
+            Action<Exception, string> onSiteFailure,
             CancellationToken cancellationToken = default)
         {
             var failedSites = 0;
@@ -367,12 +452,13 @@ namespace PnP.Scanning.Core.Scanners
                     await enrichSite(siteUrl).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException &&
-                    !cancellationToken.IsCancellationRequested)
+                                           !cancellationToken.IsCancellationRequested)
                 {
                     failedSites++;
                     onSiteFailure(ex, siteUrl);
                 }
             }
+
             return failedSites;
         }
 
@@ -382,7 +468,6 @@ namespace PnP.Scanning.Core.Scanners
         /// </summary>
         internal async override Task PostScanningAsync()
         {
-
             Logger.Information("Post assessment work is starting");
             if (Options.Pages)
             {
@@ -396,18 +481,22 @@ namespace PnP.Scanning.Core.Scanners
                     // assessment's contract and must still be computed and recorded.
                     Logger.Warning(ex, "Publishing layout enrichment did not complete for assessment {ScanId}", ScanId);
                 }
-                var verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
+
+                DiscoveryVerdict verdict = await new AssessmentDiscoveryWriter(ScanId).FinalizeScanAsync(ScanId)
                     .ConfigureAwait(false);
-                Logger.Information("ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",
-                    ScanId, verdict);
+                Logger.Information(
+                    "ASPX discovery for assessment {ScanId} finished with coverage verdict {Verdict}",
+                    ScanId,
+                    verdict);
             }
-            using (var dbContext = new ScanContext(ScanId))
+
+            using (ScanContext dbContext = new ScanContext(ScanId))
             {
                 // T9: before aggregating webs into site collections, roll each web's per-page
                 // transformation readiness up into its ClassicWebSummary and build the scan-wide unique
                 // web part inventory. The site loop below then reads the now-populated web columns.
                 await StorageManager.ComputeAndStoreWebPageRollupsAsync(dbContext, ScanId);
-                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, PageScanComponent.MappingManager);
+                await StorageManager.PopulateWebPartUniqueAsync(dbContext, ScanId, ClassicCompatibility.MappingManager);
 
                 // Roll the publishing webs + pages up into one per-site-collection publishing-portal line
                 // (parity with the legacy ModernizationPublishingSiteScanResults.csv). Reads the web summaries
@@ -419,8 +508,10 @@ namespace PnP.Scanning.Core.Scanners
                 HashSet<string> webTemplates = null;
                 HashSet<string> remediationCodes = null;
                 ClassicSiteSummary classicSiteCollection = null;
-                
-                foreach (var web in dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId).OrderBy(p => p.SiteUrl).ThenBy(p => p.WebUrl))
+
+                foreach (ClassicWebSummary web in dbContext.ClassicWebSummaries.Where(p => p.ScanId == ScanId)
+                             .OrderBy(p => p.SiteUrl)
+                             .ThenBy(p => p.WebUrl))
                 {
                     if (lastSiteUrl == null || lastSiteUrl != web.SiteUrl)
                     {
@@ -431,11 +522,7 @@ namespace PnP.Scanning.Core.Scanners
                         }
 
                         // Initialize variables for the new site collection
-                        classicSiteCollection = new ClassicSiteSummary
-                        {
-                            ScanId = ScanId,
-                            SiteUrl = web.SiteUrl,
-                        };
+                        classicSiteCollection = new ClassicSiteSummary { ScanId = ScanId, SiteUrl = web.SiteUrl, };
 
                         lastSiteUrl = web.SiteUrl;
                         webTemplates = new HashSet<string>();
@@ -470,7 +557,7 @@ namespace PnP.Scanning.Core.Scanners
 
                     classicSiteCollection.ClassicLists += web.ClassicLists;
                     classicSiteCollection.ModernLists += web.ModernLists;
-                    
+
                     classicSiteCollection.ClassicPages += web.ClassicPages;
                     classicSiteCollection.ModernPages += web.ModernPages;
                     classicSiteCollection.ClassicWikiPages += web.ClassicWikiPages;
@@ -511,18 +598,26 @@ namespace PnP.Scanning.Core.Scanners
                 // Skipped when --skipusageinformation is passed, matching the semantics of the old flag.
                 if (!Options.SkipUsageInformation)
                 {
-                    var authManager = ScanManager.GetScanAuthenticationManager(ScanId);
-                    var scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == ScanId);
-                    string environment = scan?.CLIEnvironment ?? PnP.Core.Services.Microsoft365Environment.Production.ToString();
+                    Authentication.AuthenticationManager authManager = ScanManager.GetScanAuthenticationManager(ScanId);
+                    Storage.Scan scan = dbContext.Scans.FirstOrDefault(p => p.ScanId == ScanId);
+                    string environment = scan?.CLIEnvironment ??
+                                         PnP.Core.Services.Microsoft365Environment.Production.ToString();
                     int windowDays = Options.AuditLogWindowDays;
                     DateTime windowEnd = DateTime.UtcNow;
                     DateTime windowStart = windowEnd.AddDays(-windowDays);
                     // Use the scan's live cancellation token so pause/abort is honoured during the
                     // potentially long audit log query (up to 45 min per chunk).
-                    var ct = ScanManager.GetCancellationTokenSource(ScanId).Token;
+                    CancellationToken ct = ScanManager.GetCancellationTokenSource(ScanId).Token;
                     try
                     {
-                        await StorageManager.CollectAndStoreAuditLogUsageAsync(dbContext, ScanId, authManager, environment, windowStart, windowEnd, ct);
+                        await StorageManager.CollectAndStoreAuditLogUsageAsync(
+                            dbContext,
+                            ScanId,
+                            authManager,
+                            environment,
+                            windowStart,
+                            windowEnd,
+                            ct);
                     }
                     catch (OperationCanceledException)
                     {
@@ -532,7 +627,11 @@ namespace PnP.Scanning.Core.Scanners
                     {
                         // Log and continue — a failure here (e.g. BulkInsert / OOM / Graph API error) must not
                         // fail the entire post-scan phase and discard site summaries already committed.
-                        Logger.Warning(ex, "Audit log collection failed for scan {ScanId}: {Error}", ScanId, ex.Message);
+                        Logger.Warning(
+                            ex,
+                            "Audit log collection failed for scan {ScanId}: {Error}",
+                            ScanId,
+                            ex.Message);
 
                         // Write a site-level error row per scanned site so classicpageauditusage.csv
                         // is generated and the customer can see what went wrong instead of finding a missing file.
@@ -540,23 +639,27 @@ namespace PnP.Scanning.Core.Scanners
                         {
                             // Reuse the outer dbContext — opening a second ScanContext while the outer
                             // connection is still alive causes "database is locked" in SQLite DELETE mode.
-                            var siteUrls = dbContext.ClassicSiteSummaries
-                                .Where(p => p.ScanId == ScanId)
+                            List<string> siteUrls = dbContext.ClassicSiteSummaries.Where(p => p.ScanId == ScanId)
                                 .Select(p => p.SiteUrl)
                                 .ToList();
-                            var errorRecords = siteUrls.Select(siteUrl => new PnP.Scanning.Core.Storage.ClassicPageAuditUsage
-                            {
-                                ScanId = ScanId,
-                                SiteUrl = siteUrl,
-                                WebUrl = "/",
-                                PageUrl = siteUrl,
-                                AuditWindowStart = windowStart,
-                                AuditWindowEnd = windowEnd,
-                                QueryStatus = "error",
-                                SkipReason = $"{ex.GetType().Name}: {ex.Message[..Math.Min(200, ex.Message.Length)]}",
-                            }).ToList();
+                            List<ClassicPageAuditUsage> errorRecords = siteUrls.Select(siteUrl =>
+                                    new PnP.Scanning.Core.Storage.ClassicPageAuditUsage
+                                    {
+                                        ScanId = ScanId,
+                                        SiteUrl = siteUrl,
+                                        WebUrl = "/",
+                                        PageUrl = siteUrl,
+                                        AuditWindowStart = windowStart,
+                                        AuditWindowEnd = windowEnd,
+                                        QueryStatus = "error",
+                                        SkipReason =
+                                            $"{ex.GetType().Name}: {ex.Message[..Math.Min(200, ex.Message.Length)]}",
+                                    })
+                                .ToList();
                             if (errorRecords.Count > 0)
-                                await dbContext.BulkInsertAsync(errorRecords);
+                                await SqlOperationScope.RunAsync(
+                                    () => dbContext.BulkInsertAsync(errorRecords),
+                                    "BulkInsert");
                         }
                         catch (Exception writeEx)
                         {
@@ -569,7 +672,11 @@ namespace PnP.Scanning.Core.Scanners
             Logger.Information("Post assessment work done");
         }
 
-        private static void AddClassicSiteCollection(ScanContext dbContext, HashSet<string> webTemplates, HashSet<string> remediationCodes, ClassicSiteSummary classicSiteCollection)
+        private static void AddClassicSiteCollection(
+            ScanContext dbContext,
+            HashSet<string> webTemplates,
+            HashSet<string> remediationCodes,
+            ClassicSiteSummary classicSiteCollection)
         {
             // All Webs can fail before producing summaries. Keep their discovery/error rows
             // reportable without a secondary NullReferenceException during post-scan rollup.
@@ -650,6 +757,7 @@ namespace PnP.Scanning.Core.Scanners
                     count++;
                 }
             }
+
             return count;
         }
     }

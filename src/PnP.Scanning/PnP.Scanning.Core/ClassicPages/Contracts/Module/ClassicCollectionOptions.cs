@@ -1,0 +1,14 @@
+#nullable enable
+
+namespace PnP.Scanning.Core.ClassicPages.Contracts.Module;
+
+/// <summary>
+/// Carries fixed page collection and enrichment options independently of CLI transport.
+/// </summary>
+internal sealed record ClassicCollectionOptions(
+    bool ExportWebPartProperties,
+    bool SkipUsageInformation,
+    bool SkipUserInformation,
+    bool HomePageOnly,
+    int AuditLogWindowDays,
+    string? ExcludeSiteTemplates = null);
