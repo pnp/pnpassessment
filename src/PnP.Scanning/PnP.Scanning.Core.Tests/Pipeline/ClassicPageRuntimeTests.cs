@@ -146,6 +146,32 @@ public sealed class ClassicPageRuntimeTests
     }
 
     /// <summary>
+    /// Verifies that a page hosting a hidden list view stays a content page and a list's own view page is a list view.
+    /// </summary>
+    [Fact]
+    public void A_page_hosting_a_hidden_list_view_stays_a_content_page_and_a_lists_own_view_page_is_a_list_view()
+    {
+        Guid library = Guid.NewGuid();
+        Guid other = Guid.NewGuid();
+        AspxPageEnricher.ViewRegistration Visible(Guid list) => new(list, false);
+        AspxPageEnricher.ViewRegistration Hidden(Guid list) => new(list, true);
+
+        // A wiki, web part or publishing page whose list view web parts show other lists.
+        Assert.False(AspxPageEnricher.IsListViewPage([Hidden(other), Hidden(other)], library, true));
+        // A page at the root of the web, outside every list.
+        Assert.False(AspxPageEnricher.IsListViewPage([Hidden(other)], null, false));
+        // A page stored as an item of a library that shows a view of that same library.
+        Assert.False(AspxPageEnricher.IsListViewPage([Hidden(library)], library, true));
+        // The list's own view pages, visible or hidden.
+        Assert.True(AspxPageEnricher.IsListViewPage([Visible(library)], library, false));
+        Assert.True(AspxPageEnricher.IsListViewPage([Hidden(library)], library, false));
+        // One visible view is enough, wherever its page is stored.
+        Assert.True(AspxPageEnricher.IsListViewPage([Visible(other)], library, true));
+        Assert.True(AspxPageEnricher.IsListViewPage([Hidden(other), Visible(other)], null, false));
+        Assert.False(AspxPageEnricher.IsListViewPage([], library, false));
+    }
+
+    /// <summary>
     /// Verifies that generic safety errors are not misclassified as the specific form identity failure.
     /// </summary>
     [Fact]

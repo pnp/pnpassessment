@@ -133,7 +133,8 @@ internal sealed partial class PipelineStore
 
         public async Task<SnapshotInfo> OpenAsync(CancellationToken cancellationToken)
         {
-            var next = new PinnedManifest(await store.OpenManifestAsync(assessmentId, snapshotId, cancellationToken));
+            var (manifest, sealedAtUtc) = await store.OpenSealedAsync(assessmentId, snapshotId, cancellationToken);
+            var next = new PinnedManifest(manifest, sealedAtUtc);
             if (pinned != null && pinned.Digest != next.Digest)
                 throw new SnapshotIntegrityException("The selected manifest changed during analysis.");
             pinned = next;
@@ -145,9 +146,8 @@ internal sealed partial class PipelineStore
             if (pinned == null) await OpenAsync(cancellationToken);
             using var db = store.CreateContext(assessmentId, readOnly: true);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            var snapshot = await db.SourceSnapshots.AsNoTracking()
-                .SingleAsync(x => x.SnapshotId == snapshotId && x.AssessmentId == assessmentId, cancellationToken);
-            return await ReadSelectedObservationAsync(db, snapshot, observationId, pinned!, cancellationToken);
+            var seal = await ReadSealAsync(db, snapshotId, cancellationToken);
+            return await ReadSelectedObservationAsync(db, seal, observationId, pinned!, cancellationToken);
         }
     }
 
@@ -185,9 +185,10 @@ internal sealed partial class PipelineStore
 
     private sealed class PinnedManifest
     {
-        internal PinnedManifest(SnapshotManifest manifest)
+        internal PinnedManifest(SnapshotManifest manifest, DateTime sealedAtUtc)
         {
             Manifest = manifest;
+            SealedAtUtc = sealedAtUtc;
             Json = manifest.Serialize();
             Digest = SnapshotManifest.Digest(Json);
             MemberIdsJson = manifest.MemberIds();
@@ -195,9 +196,37 @@ internal sealed partial class PipelineStore
         }
 
         internal SnapshotManifest Manifest { get; }
+        internal DateTime SealedAtUtc { get; }
         internal string Json { get; }
         internal string Digest { get; }
         internal string MemberIdsJson { get; }
         internal IReadOnlyDictionary<Guid, ManifestMember> Members { get; }
+    }
+
+    /// <summary>
+    /// Seal state and identity of a snapshot, read without its manifest text. A consumer that pinned the validated
+    /// manifest compares this row and one stored observation with its pinned copy.
+    /// </summary>
+    private sealed record SnapshotSeal(
+        Guid SnapshotId,
+        Guid AssessmentId,
+        string ModuleKey,
+        string InputVersion,
+        int FormatVersion,
+        string ScopeJson,
+        bool IsSealed,
+        DateTime? SealedAtUtc)
+    {
+        /// <summary>Returns the identity columns in the shape the manifest builder validates.</summary>
+        internal SourceSnapshotRow Identity() =>
+            new()
+            {
+                SnapshotId = SnapshotId,
+                AssessmentId = AssessmentId,
+                ModuleKey = ModuleKey,
+                InputVersion = InputVersion,
+                FormatVersion = FormatVersion,
+                ScopeJson = ScopeJson,
+            };
     }
 }

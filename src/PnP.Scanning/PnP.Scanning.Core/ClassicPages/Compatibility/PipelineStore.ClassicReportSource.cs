@@ -69,15 +69,19 @@ internal sealed partial class PipelineStore
                                               throw new SnapshotIntegrityException("Classic publication is missing.");
         List<ClassicPageAuditChunkSource> chunks = [];
         Dictionary<PageIdentity, ClassicPageMeasurements> measurements = [];
-        SourceSnapshotRow snapshot = await context.SourceSnapshots.AsNoTracking()
-            .SingleAsync(row => row.SnapshotId == phase.SnapshotId, token);
+        SnapshotSeal seal = await ReadSealAsync(context, phase.SnapshotId, token);
+        // Built on the first measured file so that the file loop looks each record up once.
+        ILookup<(string RecordKey, string SiteUrl, string WebUrl), ClassicPageDiscovery>? dispositions = null;
+        ILookup<PageIdentity?, ClassicPageRow>? pages = null;
+        ILookup<(Guid SiteCollectionId, Guid? WebId), WebFacts>? webs = null;
+        ILookup<(string SiteUrl, string WebUrl, string PageUrl), ClassicPageWebPart>? parts = null;
         foreach (ManifestMember member in manifest.Members.Values.Where(member =>
                      member.SourceIdentity.StartsWith("AuditChunk:", StringComparison.Ordinal) ||
                      member.SourceIdentity.StartsWith("FileEnrichment:", StringComparison.Ordinal)))
         {
             SourceRecord record = await ReadSelectedObservationAsync(
                 context,
-                snapshot,
+                seal,
                 member.ObservationId,
                 manifest,
                 token);
@@ -90,17 +94,23 @@ internal sealed partial class PipelineStore
             if (CollectionJson.Kind(record) != "FileEnrichment")
                 throw new SnapshotIntegrityException("Report measurement receipt has a different acquisition kind.");
             FilePageEvidence input = CollectionJson.Read<FilePageEvidence>(record.Artifact.GetBytes());
-            ClassicPageDiscovery? disposition = payload.Discovery.SingleOrDefault(row => row.RowType == "Page" &&
-                row.RecordKey == input.DiscoveryKey && row.SiteUrl == input.SiteUrl && row.WebUrl == input.WebUrl);
+            dispositions ??= payload.Discovery.Where(row => row.RowType == "Page")
+                .ToLookup(row => (row.RecordKey, row.SiteUrl, row.WebUrl));
+            ClassicPageDiscovery? disposition =
+                dispositions[(input.DiscoveryKey, input.SiteUrl, input.WebUrl)].SingleOrDefault();
             if (disposition?.SiteCollectionId is not Guid siteId || disposition.FileUniqueId is not Guid fileId)
                 continue;
             PageIdentity identity = PageIdentity.File(siteId, fileId);
-            ClassicPageRow? page = payload.Pages.SingleOrDefault(page => page.Identity == identity);
+            pages ??= payload.Pages.ToLookup(row => row.Identity);
+            ClassicPageRow? page = pages[identity].SingleOrDefault();
             if (page == null) continue;
-            WebFacts web = payload.Webs.Single(web => web.SiteCollectionId == siteId && web.WebId == page.WebId);
-            int parts = payload.Parts.Count(part =>
-                part.SiteUrl == page.SiteUrl && part.WebUrl == page.WebUrl && part.PageUrl == page.PageUrl);
-            measurements.Add(identity, ClassicPageMeasurements.FromCaptured(input, page, disposition, web, parts));
+            webs ??= payload.Webs.ToLookup(row => (row.SiteCollectionId, (Guid?)row.WebId));
+            WebFacts web = webs[(siteId, page.WebId)].Single();
+            parts ??= payload.Parts.ToLookup(row => (row.SiteUrl, row.WebUrl, row.PageUrl));
+            int partCount = parts[(page.SiteUrl, page.WebUrl, page.PageUrl)].Count();
+            measurements.Add(
+                identity,
+                ClassicPageMeasurements.FromCaptured(input, page, disposition, web, partCount));
         }
 
         return new(assessmentId, phase.RunId, phase.SnapshotId, payload, chunks.ToArray())

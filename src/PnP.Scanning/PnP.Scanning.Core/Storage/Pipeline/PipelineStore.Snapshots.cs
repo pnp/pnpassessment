@@ -142,7 +142,19 @@ internal sealed partial class PipelineStore
             },
             token);
 
-    private async Task<SnapshotManifest> OpenManifestAsync(Guid assessmentId, Guid snapshotId, CancellationToken token)
+    private async Task<SnapshotManifest> OpenManifestAsync(
+        Guid assessmentId,
+        Guid snapshotId,
+        CancellationToken token) =>
+        (await OpenSealedAsync(assessmentId, snapshotId, token)).Manifest;
+
+    /// <summary>
+    /// Validates the whole sealed snapshot and returns its manifest together with the time it was sealed.
+    /// </summary>
+    private async Task<(SnapshotManifest Manifest, DateTime SealedAtUtc)> OpenSealedAsync(
+        Guid assessmentId,
+        Guid snapshotId,
+        CancellationToken token)
     {
         using var db = CreateContext(assessmentId, readOnly: true);
         await using var transaction = await db.Database.BeginTransactionAsync(token);
@@ -150,7 +162,40 @@ internal sealed partial class PipelineStore
             await db.SourceSnapshots.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.SnapshotId == snapshotId && x.AssessmentId == assessmentId, token) ??
             throw new KeyNotFoundException("The selected source snapshot does not exist.");
-        return await ValidateSnapshotAsync(db, snapshot, token);
+        var manifest = await ValidateSnapshotAsync(db, snapshot, token);
+        return (manifest, snapshot.SealedAtUtc!.Value);
+    }
+
+    /// <summary>
+    /// Reads the seal state and identity columns of a snapshot. The manifest text stays in the database, so the cost
+    /// of this read is independent of the number of observations in the snapshot. Every selected column is stored
+    /// ahead of the manifest text in the row.
+    /// </summary>
+    private static async Task<SnapshotSeal> ReadSealAsync(ScanContext db, Guid snapshotId, CancellationToken token)
+    {
+        var row = await db.SourceSnapshots.AsNoTracking()
+            .Where(x => x.SnapshotId == snapshotId)
+            .Select(x => new
+            {
+                x.SnapshotId,
+                x.AssessmentId,
+                x.ModuleKey,
+                x.InputVersion,
+                x.FormatVersion,
+                x.ScopeJson,
+                x.IsSealed,
+                x.SealedAtUtc,
+            })
+            .SingleAsync(token);
+        return new(
+            row.SnapshotId,
+            row.AssessmentId,
+            row.ModuleKey,
+            row.InputVersion,
+            row.FormatVersion,
+            row.ScopeJson,
+            row.IsSealed,
+            row.SealedAtUtc);
     }
 
     private static async Task<SnapshotManifest> ValidateSnapshotAsync(
@@ -171,15 +216,22 @@ internal sealed partial class PipelineStore
         return actual;
     }
 
+    /// <summary>
+    /// Returns one observation after comparing the snapshot seal and the stored observation with the pinned manifest.
+    /// The stored manifest text is validated in full when the manifest is pinned and again before a phase finishes.
+    /// </summary>
     private static async Task<SourceRecord> ReadSelectedObservationAsync(
         ScanContext db,
-        SourceSnapshotRow snapshot,
+        SnapshotSeal seal,
         Guid observationId,
         PinnedManifest pinned,
         CancellationToken token)
     {
-        if (!snapshot.IsSealed || snapshot.SealedAtUtc == null || snapshot.ManifestJson != pinned.Json ||
-            snapshot.ManifestDigest != pinned.Digest || snapshot.MemberIdsJson != pinned.MemberIdsJson)
+        var manifest = pinned.Manifest;
+        if (!seal.IsSealed || seal.SealedAtUtc != pinned.SealedAtUtc || seal.SnapshotId != manifest.SnapshotId ||
+            seal.AssessmentId != manifest.AssessmentId || seal.FormatVersion != manifest.FormatVersion ||
+            seal.ModuleKey != manifest.ModuleKey || seal.InputVersion != manifest.InputVersion ||
+            seal.ScopeJson != manifest.ScopeJson)
             throw new SnapshotIntegrityException("The pinned snapshot seal or manifest changed.");
         if (!pinned.Members.TryGetValue(observationId, out var expected))
             throw new SnapshotIntegrityException("The requested observation is not a member of the selected snapshot.");
@@ -187,16 +239,12 @@ internal sealed partial class PipelineStore
             await db.SourceObservations.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.ObservationId == observationId, token) ??
             throw new SnapshotIntegrityException($"Missing source observation {observationId}.");
-        var actual = SnapshotManifest.Build(snapshot, [observation]);
-        var manifest = pinned.Manifest;
-        if (actual.FormatVersion != manifest.FormatVersion || actual.AssessmentId != manifest.AssessmentId ||
-            actual.SnapshotId != manifest.SnapshotId || actual.ModuleKey != manifest.ModuleKey ||
-            actual.InputVersion != manifest.InputVersion || actual.ScopeJson != manifest.ScopeJson ||
-            actual.Members.Single() != expected)
+        var actual = SnapshotManifest.Build(seal.Identity(), [observation]);
+        if (actual.Members.Single() != expected)
             throw new SnapshotIntegrityException($"Source observation differs from sealed input: {observationId}.");
         return new(
             observationId,
-            snapshot.SnapshotId,
+            seal.SnapshotId,
             observation.SourceIdentity,
             observation.SourceRevision,
             observation.AcquisitionStatus,
