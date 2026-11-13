@@ -245,7 +245,10 @@ namespace PnP.Scanning.Core.Tests.Storage
                 .And.NotContain("RemediationCode");
         }
 
-        /// <summary>The ASPX table tells how SharePoint serves each file; the customization status stays in the CSV.</summary>
+        /// <summary>
+        /// The ASPX table tells how SharePoint serves each file: a download for NoExecute true and rendered for every other
+        /// file, an empty NoExecute included. The customization status stays in the CSV.
+        /// </summary>
         [Fact]
         public void ClassicTemplate_Layout_AspxTableShowsServedAs()
         {
@@ -254,9 +257,9 @@ namespace PnP.Scanning.Core.Tests.Storage
                 .Single(line => line.Contains("\"ServedAs\"", StringComparison.Ordinal));
 
             served.Should()
-                .Contain("[NoExecute] = true then \"Download\"")
-                .And.Contain("[NoExecute] = false then \"May render\"")
-                .And.Contain("else \"Unknown\"");
+                .Contain("each if [NoExecute] = true then \"Download\" else \"Render\",")
+                .And.NotContain("May render")
+                .And.NotContain("Unknown");
             ReadEmbeddedClassicTabVisuals("ASPX").Should()
                 .Contain("aspx.ServedAs")
                 .And.NotContain("aspx.NoExecute")
