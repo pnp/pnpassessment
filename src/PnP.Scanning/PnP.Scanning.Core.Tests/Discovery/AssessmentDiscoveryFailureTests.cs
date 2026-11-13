@@ -291,6 +291,55 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
             .BeNull();
     }
 
+    /// <summary>
+    /// Counts incomplete locations by the rule of the coverage summary, and the listing requests throttling stopped.
+    /// </summary>
+    [Fact]
+    public async Task Incomplete_locations_and_throttled_listing_requests_are_counted_for_the_report_warning()
+    {
+        Guid scan = Guid.NewGuid();
+        ClassicPageDiscovery Row(string key, string type, string status, string codes = null) =>
+            new ClassicPageDiscovery
+            {
+                ScanId = scan,
+                SiteUrl = Site,
+                WebUrl = Web,
+                RecordKey = key,
+                RowType = type,
+                DiscoveryStatus = status,
+                ErrorCodes = codes
+            };
+        ClassicPageDiscovery anotherScan = Row("scope:another-assessment", "Scope", "Failed", "scope_failed");
+        anotherScan.ScanId = Guid.NewGuid();
+        await Writer()
+            .WriteAsync(
+                new[]
+                {
+                    Row("scope:complete", "Scope", "Complete"), Row("scope:empty", "Scope", "Empty"),
+                    Row("scope:excluded", "Scope", "PolicyExcluded"),
+                    Row("scope:failed", "Scope", "Failed", "scope_failed"), Row("scope:denied", "Scope", "Denied"),
+                    Row("gap:missing", "Gap", "Failed"),
+                    Row("pagination:budget", "Pagination", "Failed", "json_throttle_delay_exceeds_budget"),
+                    Row("pagination:exhausted", "Pagination", "Failed", "json_throttle_attempts_exhausted"),
+                    Row("pagination:server", "Pagination", "Failed", "-2146232832, Microsoft.SharePoint.SPException"),
+                    Row("pagination:complete", "Pagination", "Complete"), Row("page:one", "Page", "Discovered"),
+                    anotherScan
+                });
+        using ScanContext db = database.CreateContext();
+
+        ReportManager.IncompleteListings counted = await ReportManager.CountIncompleteListingsAsync(db, scan);
+
+        counted.Locations.Should().Be(3);
+        counted.ThrottledRequests.Should().Be(2);
+        counted.Message.Should()
+            .StartWith("3 location(s) could not be listed completely")
+            .And.Contain("Throttling stopped 2 listing request(s)");
+        ReportManager.IncompleteListings none = await ReportManager.CountIncompleteListingsAsync(db, Guid.NewGuid());
+        none.Locations.Should().Be(0);
+        none.ThrottledRequests.Should().Be(0);
+        none.Message.Should().BeNull();
+    }
+
     /// <summary>Verifies failure to persist finalization is not reported as success.</summary>
     [Fact]
     public async Task Failure_to_persist_finalization_is_not_reported_as_success()

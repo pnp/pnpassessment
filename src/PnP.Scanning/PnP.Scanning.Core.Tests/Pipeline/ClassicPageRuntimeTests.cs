@@ -395,6 +395,452 @@ public sealed class ClassicPageRuntimeTests
     }
 
     /// <summary>
+    /// Verifies that a source read sends one authenticated request addressed by the file id.
+    /// </summary>
+    [Fact]
+    public async Task A_source_read_sends_one_authenticated_request_addressed_by_the_file_id()
+    {
+        Guid fileId = Guid.Parse("00000000-0000-0000-0000-000000000042");
+        byte[] bytes = Encoding.UTF8.GetBytes(
+            "<%@ Page Inherits=\"Microsoft.SharePoint.WebPartPages.WikiEditPage\" %>");
+        SourceHandler handler = new(() =>
+            new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+        using HttpClient client = new HttpClient(handler);
+        int authenticated = 0;
+        AspxSourceObservation source = await AspxSourceReader.ReadAsync(
+            client,
+            request =>
+            {
+                authenticated++;
+                request.Headers.TryAddWithoutValidation("Authorization", "Bearer recorded");
+                return Task.CompletedTask;
+            },
+            new Uri("https://contoso.sharepoint.com/sites/a/sub"),
+            fileId,
+            bytes.Length,
+            default);
+        Assert.Equal("Available", source.State);
+        Assert.Equal(bytes, source.Bytes);
+        Assert.Equal(1, authenticated);
+        (HttpMethod method, string address, string? authorization) = Assert.Single(handler.Sent);
+        Assert.Equal(HttpMethod.Get, method);
+        Assert.Equal(
+            "https://contoso.sharepoint.com/sites/a/sub/_api/web/" +
+            "GetFileById('00000000-0000-0000-0000-000000000042')/$value",
+            address);
+        Assert.Equal("Bearer recorded", authorization);
+        Assert.Equal(
+            "https://contoso.sharepoint.com/_api/web/GetFileById('00000000-0000-0000-0000-000000000042')/$value",
+            AspxSourceReader.SourceUri(new Uri("https://contoso.sharepoint.com/"), fileId).AbsoluteUri);
+    }
+
+    /// <summary>
+    /// Verifies that a source read bounds the file before and after its request and reports a refused request.
+    /// </summary>
+    [Fact]
+    public async Task A_source_read_bounds_the_file_before_and_after_its_request_and_reports_a_refused_request()
+    {
+        Guid fileId = Guid.NewGuid();
+        Uri web = new Uri("https://contoso.sharepoint.com/sites/a");
+        Func<HttpRequestMessage, Task> authenticate = _ => Task.CompletedTask;
+        SourceHandler unsent = new(() => new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        using HttpClient first = new HttpClient(unsent);
+        AspxSourceObservation observedTooLarge = await AspxSourceReader.ReadAsync(
+            first,
+            authenticate,
+            web,
+            fileId,
+            AspxSourceParser.MaximumSourceBytes + 1L,
+            default);
+        Assert.Equal("TooLarge", observedTooLarge.State);
+        Assert.Empty(unsent.Sent);
+
+        SourceHandler large = new(() => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(new byte[AspxSourceParser.MaximumSourceBytes + 1])
+        });
+        using HttpClient second = new HttpClient(large);
+        AspxSourceObservation returnedTooLarge =
+            await AspxSourceReader.ReadAsync(second, authenticate, web, fileId, null, default);
+        Assert.Equal("TooLarge", returnedTooLarge.State);
+        Assert.Null(returnedTooLarge.Bytes);
+        Assert.Single(large.Sent);
+
+        using HttpClient denied = new HttpClient(
+            new SourceHandler(() => new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden)));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            AspxSourceReader.ReadAsync(denied, authenticate, web, fileId, 10, default));
+        using HttpClient failed = new HttpClient(
+            new SourceHandler(() => new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)));
+        HttpRequestException error = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            AspxSourceReader.ReadAsync(failed, authenticate, web, fileId, 10, default));
+        Assert.Equal(System.Net.HttpStatusCode.InternalServerError, error.StatusCode);
+    }
+
+    /// <summary>
+    /// Records each request a source read sends and answers it with a synthetic response.
+    /// </summary>
+    private sealed class SourceHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        internal List<(HttpMethod Method, string Address, string? Authorization)> Sent { get; } = [];
+
+        /// <summary>
+        /// Notes the request method, address and authorization, then returns the synthetic response.
+        /// </summary>
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Sent.Add(
+                (request.Method, request.RequestUri!.AbsoluteUri,
+                    request.Headers.TryGetValues("Authorization", out IEnumerable<string>? values)
+                        ? string.Join(",", values)
+                        : null));
+            return Task.FromResult(respond());
+        }
+    }
+
+    /// <summary>
+    /// Verifies that a registered list form is recorded and classified without its source.
+    /// </summary>
+    [Fact]
+    public void A_registered_list_form_is_recorded_and_classified_without_its_source()
+    {
+        AspxPageEvidence evidence =
+            AspxPageEnricher.SourceNotRequested(100, false, false, true, "Complete", DateTime.UnixEpoch);
+        Assert.Equal("NotRequested", evidence.SourceReadState);
+        Assert.Equal("NotRequested", evidence.HandlerResolution);
+        Assert.Null(evidence.OriginalBytes);
+        Assert.Null(evidence.SourceError);
+        Assert.True(evidence.IsListForm);
+        PhysicalFileAnalysis analysis = PhysicalFileAnalysisRules.Analyze(
+            new PhysicalFileFacts
+            {
+                SiteCollectionId = Guid.NewGuid(),
+                FileUniqueId = Guid.NewGuid(),
+                WebId = Guid.NewGuid(),
+                SiteUrl = "https://contoso.sharepoint.com/sites/a",
+                WebUrl = "/",
+                ServerRelativeUrl = "/sites/a/Lists/Tasks/NewForm.aspx",
+                AspxEvidenceJson = JsonSerializer.Serialize(evidence),
+            });
+        Assert.Equal("List", analysis.Classification!.ProductFamily);
+        Assert.Equal("Inapplicable", analysis.Classification.Experience);
+        Assert.Equal("Excluded", analysis.Classification.ImpactStatus);
+        Assert.Null(analysis.HandlerResolution);
+        Assert.Null(analysis.SourceSha256);
+    }
+
+    /// <summary>
+    /// Verifies that only a registered list view or form without an item skips its second read.
+    /// </summary>
+    [Fact]
+    public void Only_a_registered_list_view_or_form_without_an_item_skips_its_second_read()
+    {
+        DiscoveryEvidence[] rows = new ClassicContentFixture().DiscoveryRows();
+        DiscoveryEvidence withItem = rows[1];
+        DiscoveryEvidence withoutItem = rows[5];
+        Assert.NotNull(withItem.ListItemId);
+        Assert.Null(withoutItem.ListItemId);
+
+        static PhysicalFileFacts Facts(DiscoveryEvidence row, bool? view, bool? form, bool evidence = true) =>
+            new()
+            {
+                SiteCollectionId = row.SiteCollectionId!.Value,
+                FileUniqueId = row.FileUniqueId!.Value,
+                AspxEvidenceJson = evidence
+                    ? JsonSerializer.Serialize(
+                        AspxPageEnricher.SourceNotRequested(100, false, view, form, "Complete", DateTime.UnixEpoch))
+                    : null,
+            };
+
+        HashSet<(Guid SiteCollectionId, Guid FileUniqueId)> registered =
+            ClassicContentCollectionModule.ListViewsAndForms(
+                new WebFileInventory(
+                    ClassicContentFixture.Site,
+                    "/",
+                    rows,
+                    [Facts(withoutItem, false, true), Facts(withItem, true, false), Facts(rows[2], false, false)]));
+        Assert.Equal(2, registered.Count);
+        Assert.True(ClassicContentCollectionModule.IsListViewOrFormWithoutItem(withoutItem, registered));
+        Assert.False(ClassicContentCollectionModule.IsListViewOrFormWithoutItem(withItem, registered));
+        Assert.False(ClassicContentCollectionModule.IsListViewOrFormWithoutItem(withoutItem, []));
+        Assert.Empty(
+            ClassicContentCollectionModule.ListViewsAndForms(
+                new WebFileInventory(
+                    ClassicContentFixture.Site,
+                    "/",
+                    rows,
+                    [Facts(withoutItem, null, null), Facts(withItem, true, true, evidence: false)])));
+        Assert.Empty(
+            ClassicContentCollectionModule.ListViewsAndForms(
+                new WebFileInventory(ClassicContentFixture.Site, "/", rows)));
+    }
+
+    /// <summary>
+    /// Verifies that a registered list form without an item finishes the assessment without a second read.
+    /// </summary>
+    [Fact]
+    public async Task A_registered_list_form_without_an_item_finishes_the_assessment_without_a_second_read()
+    {
+        using StoreCase? data = new StoreCase("classicpage-list-form-unread");
+        ClassicContentFixture? source = new ClassicContentFixture
+        {
+            IncludePhysicalFacts = true,
+            TransformInventory = inventory =>
+            {
+                DiscoveryEvidence candidate = inventory.Evidence.Single(row => row.RecordKey == "page:6");
+                PhysicalFileFacts form =
+                    inventory.Files!.Single(facts => facts.FileUniqueId == candidate.FileUniqueId);
+                form.AspxEvidenceJson = JsonSerializer.Serialize(
+                    AspxPageEnricher.SourceNotRequested(100, false, false, true, "Complete", DateTime.UnixEpoch));
+                return inventory;
+            },
+        };
+        PipelineCoordinator? coordinator = new PipelineCoordinator(
+            data.Store,
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        PhaseReply? ticket =
+            await coordinator.StartPipelineAsync(new() { Collection = ClassicContentFixture.Request() });
+        Guid id = Guid.Parse(ticket.AssessmentId);
+        ScanStatus status = await coordinator.WaitForCompletionAsync(id);
+        Assert.True(status == ScanStatus.Finished, (await data.Store.LatestRootAsync(id))!.LastError);
+        Assert.DoesNotContain("page:6", source.Calls.Keys);
+        Assert.Contains("page:5", source.Calls.Keys);
+        using ScanContext? db = data.Store.CreateContext(id);
+        Core.Storage.Pipeline.SourceObservationRow receipt = Assert.Single(
+            await db.SourceObservations.AsNoTracking().ToListAsync(),
+            row => row.SourceIdentity.StartsWith("FileEnrichment:", StringComparison.Ordinal) &&
+                   row.SourceIdentity.EndsWith("|page:6", StringComparison.Ordinal));
+        FilePageEvidence saved = CollectionJson.Read<FilePageEvidence>(receipt.RawBytes);
+        Assert.Equal(AcquisitionStatus.Complete, receipt.AcquisitionStatus);
+        Assert.Null(receipt.AcquisitionError);
+        Assert.True(saved.FileLevelOnly);
+        Assert.Equal("NotRequested", saved.WebPartsState.Status);
+        Assert.Empty(saved.WebParts);
+        JsonElement output = Assert.Single(
+            (await db.AnalysisResults.AsNoTracking().ToListAsync())
+            .Select(row => new VersionedJson(row.PayloadJson).Value)
+            .Where(value => value.GetProperty("kind").GetString() == "FileEnrichment")
+            .Select(value => value.GetProperty("output")),
+            value => value.GetProperty("Discovery").ValueKind == JsonValueKind.Object &&
+                     value.GetProperty("Discovery").GetProperty("RecordKey").GetString() == "page:6");
+        Assert.Equal(JsonValueKind.Null, output.GetProperty("Page").ValueKind);
+        Assert.Equal("NotApplicable", output.GetProperty("Discovery").GetProperty("AssessmentStatus").GetString());
+        Assert.Equal(
+            FileLevelPageProjection.RegisteredListViewOrFormCode,
+            output.GetProperty("Discovery").GetProperty("ErrorCodes").GetString());
+    }
+
+    /// <summary>
+    /// Verifies that a web connection waits for one reader at a time and the longest waiting one closes first.
+    /// </summary>
+    [Fact]
+    public void A_web_connection_waits_for_one_reader_at_a_time_and_the_longest_waiting_one_closes_first()
+    {
+        WebSessionPool<TrackedSession> pool = new(2);
+        TrackedSession first = new();
+        TrackedSession second = new();
+        TrackedSession third = new();
+        TrackedSession repeated = new();
+        Assert.False(pool.TryTake("first", out _));
+        pool.Return("first", first);
+        Assert.True(pool.TryTake("first", out TrackedSession? taken));
+        Assert.Same(first, taken);
+        Assert.False(pool.TryTake("first", out _));
+        Assert.Equal(0, pool.Count);
+
+        pool.Return("first", first);
+        pool.Return("first", repeated);
+        Assert.True(repeated.Closed);
+        Assert.False(first.Closed);
+        pool.Return("second", second);
+        pool.Return("third", third);
+        Assert.True(first.Closed);
+        Assert.False(second.Closed);
+        Assert.False(third.Closed);
+        Assert.Equal(2, pool.Count);
+
+        pool.Dispose();
+        Assert.True(second.Closed);
+        Assert.True(third.Closed);
+        Assert.Equal(0, pool.Count);
+        TrackedSession late = new();
+        pool.Return("late", late);
+        Assert.True(late.Closed);
+        Assert.Equal(0, pool.Count);
+    }
+
+    /// <summary>
+    /// Verifies that an answer from a kept connection is returned only when accepted and is otherwise read again.
+    /// </summary>
+    [Fact]
+    public async Task An_answer_from_a_kept_connection_is_returned_only_when_accepted_and_is_otherwise_read_again()
+    {
+        WebSessionPool<TrackedSession> pool = new(2);
+        List<TrackedSession> opened = [];
+        List<TrackedSession> used = [];
+        Queue<string> answers = new();
+
+        Task<string> Read(CancellationToken token = default, bool usable = true) =>
+            pool.ReadAsync(
+                "web",
+                _ => usable,
+                () =>
+                {
+                    opened.Add(new TrackedSession());
+                    return Task.FromResult(opened[^1]);
+                },
+                session =>
+                {
+                    used.Add(session);
+                    string answer = answers.Dequeue();
+                    return answer == "throw"
+                        ? Task.FromException<string>(new InvalidOperationException("recorded failure"))
+                        : Task.FromResult(answer);
+                },
+                answer => answer != "not returned",
+                answer => answer == "clean",
+                token);
+
+        // A clean answer keeps the connection, and the next read uses it.
+        answers.Enqueue("clean");
+        answers.Enqueue("clean");
+        Assert.Equal("clean", await Read());
+        Assert.Equal("clean", await Read());
+        Assert.Single(opened);
+        Assert.Equal(2, used.Count);
+        Assert.All(used, session => Assert.Same(opened[0], session));
+        Assert.False(opened[0].Closed);
+
+        // An answer the caller rejects on the kept connection is read again on a new connection.
+        answers.Enqueue("not returned");
+        answers.Enqueue("clean");
+        Assert.Equal("clean", await Read());
+        Assert.Equal(2, opened.Count);
+        Assert.True(opened[0].Closed);
+        Assert.Same(opened[1], used[^1]);
+        Assert.False(opened[1].Closed);
+
+        // A failure on the kept connection is read again, and the new connection's answer is the outcome.
+        answers.Enqueue("throw");
+        answers.Enqueue("not returned");
+        Assert.Equal("not returned", await Read());
+        Assert.Equal(3, opened.Count);
+        Assert.True(opened[1].Closed);
+        Assert.True(opened[2].Closed);
+        Assert.Equal(0, pool.Count);
+
+        // A failure on a new connection, with no earlier answer, is the outcome and closes that connection.
+        answers.Enqueue("throw");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Read());
+        Assert.Equal(4, opened.Count);
+        Assert.True(opened[3].Closed);
+        Assert.Equal(0, pool.Count);
+
+        // An accepted answer that is not reusable is returned without a second read, and its connection closes.
+        answers.Enqueue("clean");
+        answers.Enqueue("layout failed");
+        Assert.Equal("clean", await Read());
+        Assert.Equal("layout failed", await Read());
+        Assert.Equal(5, opened.Count);
+        Assert.True(opened[4].Closed);
+        Assert.Equal(0, pool.Count);
+
+        // A rejected answer stands when the read on the new connection fails.
+        answers.Enqueue("clean");
+        answers.Enqueue("not returned");
+        answers.Enqueue("throw");
+        Assert.Equal("clean", await Read());
+        Assert.Equal("not returned", await Read());
+        Assert.Equal(7, opened.Count);
+        Assert.True(opened[5].Closed);
+        Assert.True(opened[6].Closed);
+        Assert.Equal(0, pool.Count);
+
+        // A cancelled run stops at the kept connection instead of reading again.
+        using CancellationTokenSource cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        answers.Enqueue("clean");
+        answers.Enqueue("throw");
+        Assert.Equal("clean", await Read());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Read(cancelled.Token));
+        Assert.Equal(8, opened.Count);
+        Assert.True(opened[7].Closed);
+        answers.Enqueue("clean");
+        answers.Enqueue("not returned");
+        Assert.Equal("clean", await Read());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Read(cancelled.Token));
+        Assert.Equal(9, opened.Count);
+        Assert.True(opened[8].Closed);
+        Assert.Empty(answers);
+
+        // A kept connection that is no longer usable is closed without being read.
+        answers.Enqueue("clean");
+        answers.Enqueue("clean");
+        Assert.Equal("clean", await Read());
+        Assert.Equal("clean", await Read(usable: false));
+        Assert.Equal(11, opened.Count);
+        Assert.True(opened[9].Closed);
+        Assert.Same(opened[10], used[^1]);
+        Assert.False(opened[10].Closed);
+        pool.Dispose();
+        Assert.True(opened[10].Closed);
+    }
+
+    /// <summary>
+    /// Notes whether a pooled connection was closed.
+    /// </summary>
+    private sealed class TrackedSession : IDisposable
+    {
+        internal bool Closed { get; private set; }
+
+        /// <summary>
+        /// Marks the connection closed.
+        /// </summary>
+        public void Dispose() => Closed = true;
+    }
+
+    /// <summary>
+    /// Verifies that a web connection is kept only after a read without a failure or denial.
+    /// </summary>
+    [Fact]
+    public void A_web_connection_is_kept_only_after_a_read_without_a_failure_or_denial()
+    {
+        ClassicContentFixture fixture = new();
+        DiscoveryEvidence candidate = fixture.DiscoveryRows()[5];
+        FilePageEvidence unread = FilePageSourceReader.UnavailableFileEnrichment(
+            fixture.Web(),
+            candidate,
+            SourceReadState.NotAttempted);
+        Assert.True(ClassicContentReader.IsReusableAfter(unread));
+        Assert.True(ClassicContentReader.IsReusableAfter(unread with { WebPartsState = SourceReadState.Complete }));
+        Assert.True(
+            ClassicContentReader.IsReusableAfter(
+                FilePageSourceReader.ListViewOrFormEnrichment(fixture.Web(), candidate)));
+        Assert.False(ClassicContentReader.IsReusableAfter(unread with { MetadataState = new("NotReturned", "none") }));
+        Assert.False(ClassicContentReader.IsReusableAfter(unread with { MetadataState = new("Denied", "403") }));
+        Assert.False(ClassicContentReader.IsReusableAfter(unread with { WebPartsState = new("Failed", "500") }));
+        Assert.Equal(
+            AcquisitionStatus.Complete,
+            ClassicContentCollectionModule.FileEnrichmentStatus(
+                FilePageSourceReader.ListViewOrFormEnrichment(fixture.Web(), candidate)));
+        Assert.Equal(AcquisitionStatus.NotAttempted, ClassicContentCollectionModule.FileEnrichmentStatus(unread));
+        Assert.False(ClassicContentReader.IsReusableAfter(unread with { HomeFallbackState = new("Failed", "500") }));
+        FilePageEvidence layoutFailed =
+            unread with { PublishingLayout = new("/layout.aspx", null, null, new("Failed", "500")) };
+        Assert.False(ClassicContentReader.IsReusableAfter(layoutFailed));
+        Assert.True(ClassicContentReader.IsAcceptedFromKeptConnection(layoutFailed));
+        Assert.True(ClassicContentReader.IsAcceptedFromKeptConnection(unread));
+        Assert.False(
+            ClassicContentReader.IsAcceptedFromKeptConnection(
+                unread with { MetadataState = new("NotReturned", "none") }));
+        Assert.False(
+            ClassicContentReader.IsAcceptedFromKeptConnection(unread with { WebPartsState = new("Denied", "403") }));
+    }
+
+    /// <summary>
     /// Verifies that source reader bounds content and observes cancellation.
     /// </summary>
     [Fact]

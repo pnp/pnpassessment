@@ -100,6 +100,9 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
 {
     private readonly PublishingLayoutReader layoutReader = new();
 
+    // One Web is read by one worker at a time, so one waiting connection per worker covers every Web in progress.
+    private readonly WebSessionPool<WebSession> sessions = new(context.Options.Threads);
+
     private readonly ExternalAuthenticationProvider auth = new((_, scopes) =>
         services.Authentication.GetAccessTokenAsync(scopes));
 
@@ -153,6 +156,64 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
         client.WebRequestExecutorFactory = new HttpClientWebRequestExecutorFactory(transport);
         return new CsomLease(client, transport);
     }
+
+    /// <summary>
+    /// Owns the SDK and CSOM contexts opened for one Web, bound to the collection run that opened them.
+    /// </summary>
+    internal sealed class WebSession(PnPContext pnp, CsomLease csom, CancellationToken token) : IDisposable
+    {
+        internal PnPContext Pnp { get; } = pnp;
+        internal CsomLease Csom { get; } = csom;
+        internal CancellationToken Token { get; } = token;
+
+        /// <summary>
+        /// Disposes the CSOM context before the SDK context whose transport it borrows.
+        /// </summary>
+        public void Dispose()
+        {
+            try
+            {
+                Csom.Dispose();
+            }
+            finally
+            {
+                Pnp.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Opens the SDK and CSOM contexts of a Web for the current collection run.
+    /// </summary>
+    private async Task<WebSession> OpenSessionAsync(WebFacts web, CancellationToken token)
+    {
+        PnPContext pnp = await OpenAsync(web.SiteUrl, web.WebUrl, token);
+        try
+        {
+            return new(pnp, Csom(pnp, services, token), token);
+        }
+        catch
+        {
+            pnp.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Tells whether the parts of a read that its own connection produced settled without a failure, a denial or an
+    /// item that was not returned. Only such a read is accepted from a kept connection. The publishing layout is
+    /// left out because its status is read once per site and shared by every connection.
+    /// </summary>
+    internal static bool IsAcceptedFromKeptConnection(FilePageEvidence evidence) =>
+        new[] { evidence.MetadataState, evidence.WebPartsState, evidence.HomeFallbackState }
+            .All(state => state.Status is not ("Failed" or "Denied" or "NotReturned"));
+
+    /// <summary>
+    /// Tells whether a connection is kept for the Web's next file: every part of its read, the publishing layout
+    /// included, settled without a failure, a denial or an item that was not returned.
+    /// </summary>
+    internal static bool IsReusableAfter(FilePageEvidence evidence) =>
+        IsAcceptedFromKeptConnection(evidence) && evidence.PublishingLayout?.State.Status is not ("Failed" or "Denied");
 
     /// <summary>
     /// Owns one CSOM context and its transport without owning the shared SDK HTTP client.
@@ -410,19 +471,38 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
         new FileInventoryReader(context, services, auth, layoutReader).ReadAsync(web, journal, token);
 
     /// <summary>
-    /// Acquires one discovered page's typed fields and optional web-part and layout evidence.
+    /// Acquires one discovered page's typed fields and optional web-part and layout evidence on the connection its
+    /// Web already has open, and keeps that connection for the Web's next file after a clean read. A read that is
+    /// not clean on a kept connection is repeated on a new connection.
     /// </summary>
-    public async Task<FilePageEvidence> ReadFileEnrichmentAsync(
+    public Task<FilePageEvidence> ReadFileEnrichmentAsync(
+        WebFacts web,
+        DiscoveryEvidence page,
+        bool skipUsers,
+        CancellationToken token) =>
+        sessions.ReadAsync(
+            PnP.Scanning.Core.Pipeline.Contracts.Shared.CollectionJson.WebKey(web.SiteUrl, web.WebUrl),
+            kept => kept.Token == token,
+            () => OpenSessionAsync(web, token),
+            session => ReadFileEnrichmentAsync(session, web, page, skipUsers, token),
+            IsAcceptedFromKeptConnection,
+            IsReusableAfter,
+            token);
+
+    /// <summary>
+    /// Reads one discovered page's typed fields and optional web-part and layout evidence on an opened connection.
+    /// </summary>
+    private async Task<FilePageEvidence> ReadFileEnrichmentAsync(
+        WebSession session,
         WebFacts web,
         DiscoveryEvidence page,
         bool skipUsers,
         CancellationToken token)
     {
-        using PnPContext? pnp = await OpenAsync(web.SiteUrl, web.WebUrl, token);
-        using CsomLease? csom = Csom(pnp, services, token);
+        ClientContext csom = session.Csom.Context;
         FilePageEvidence? input = await FilePageSourceReader.ReadFileEnrichmentInputsAsync(
-            pnp,
-            csom.Context,
+            session.Pnp,
+            csom,
             web,
             page,
             skipUsers,
@@ -435,9 +515,9 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
             layoutUrl,
             async path =>
             {
-                Microsoft.SharePoint.Client.File? file = csom.Context.Site.RootWeb.GetFileByServerRelativeUrl(path);
-                csom.Context.Load(file, value => value.CustomizedPageStatus);
-                await csom.Context.ExecuteQueryAsync();
+                Microsoft.SharePoint.Client.File? file = csom.Site.RootWeb.GetFileByServerRelativeUrl(path);
+                csom.Load(file, value => value.CustomizedPageStatus);
+                await csom.ExecuteQueryAsync();
                 return file.CustomizedPageStatus.ToString();
             },
             token);
@@ -498,7 +578,11 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
         new ClassicPageAuditCollector(context.Options, services.Authentication).CollectAsync(scope, journal, token);
 
     /// <summary>
-    /// Completes source disposal after each owned network context has settled.
+    /// Closes the connections kept between file reads after each owned network context has settled.
     /// </summary>
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        sessions.Dispose();
+        return ValueTask.CompletedTask;
+    }
 }

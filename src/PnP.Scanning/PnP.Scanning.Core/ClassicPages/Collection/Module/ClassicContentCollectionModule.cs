@@ -185,6 +185,7 @@ internal sealed class ClassicContentCollectionModule(
                 cancellationToken,
                 value => AcquisitionJournal.Status(value.State),
                 value => value.State.Error);
+        HashSet<(Guid SiteCollectionId, Guid FileUniqueId)> listViewsAndForms = ListViewsAndForms(inventory);
         foreach (DiscoveryEvidence candidate in inventory.Evidence.Where(evidence =>
                      evidence.RowType == DiscoveryRowType.Page))
             await journal.ReadOrAcquireAsync(
@@ -194,6 +195,8 @@ internal sealed class ClassicContentCollectionModule(
                 {
                     if (!web.State.Succeeded)
                         return FilePageSourceReader.UnavailableFileEnrichment(web, candidate, web.State);
+                    if (IsListViewOrFormWithoutItem(candidate, listViewsAndForms))
+                        return FilePageSourceReader.ListViewOrFormEnrichment(web, candidate);
                     try
                     {
                         return await reader.ReadFileEnrichmentAsync(
@@ -290,9 +293,49 @@ internal sealed class ClassicContentCollectionModule(
         }
     }
 
-    /// <summary>Retains failed metadata and partial web-part acquisition without implying unread page content is complete.</summary>
-    private static AcquisitionStatus FileEnrichmentStatus(FilePageEvidence source)
+    /// <summary>
+    /// Names the files of one Web that its inventory recorded as a registered list view or list form.
+    /// </summary>
+    internal static HashSet<(Guid SiteCollectionId, Guid FileUniqueId)> ListViewsAndForms(WebFileInventory inventory)
     {
+        HashSet<(Guid SiteCollectionId, Guid FileUniqueId)> files = [];
+        foreach (PhysicalFileFacts file in inventory.Files ?? [])
+        {
+            if (file.AspxEvidenceJson == null) continue;
+            // Only the two role flags are read, so the captured source bytes stay encoded.
+            using System.Text.Json.JsonDocument evidence = System.Text.Json.JsonDocument.Parse(file.AspxEvidenceJson);
+            if (IsTrue(evidence.RootElement, nameof(AspxPageEvidence.IsListView)) ||
+                IsTrue(evidence.RootElement, nameof(AspxPageEvidence.IsListForm)))
+                files.Add((file.SiteCollectionId, file.FileUniqueId));
+        }
+
+        return files;
+
+        static bool IsTrue(System.Text.Json.JsonElement root, string name) =>
+            root.ValueKind == System.Text.Json.JsonValueKind.Object &&
+            root.TryGetProperty(name, out System.Text.Json.JsonElement value) &&
+            value.ValueKind == System.Text.Json.JsonValueKind.True;
+    }
+
+    /// <summary>
+    /// Recognizes a registered list view or list form that has no backing list item. It has no item fields to read
+    /// and never becomes a Page, so its second read is recorded without contacting SharePoint. A view or form that
+    /// is a list item keeps its item read, which is where its NoExecute value comes from.
+    /// </summary>
+    internal static bool IsListViewOrFormWithoutItem(
+        DiscoveryEvidence candidate,
+        HashSet<(Guid SiteCollectionId, Guid FileUniqueId)> listViewsAndForms) =>
+        candidate.ListItemId == null && candidate.SiteCollectionId is Guid site &&
+        candidate.FileUniqueId is Guid file && listViewsAndForms.Contains((site, file));
+
+    /// <summary>
+    /// Retains failed metadata and partial web-part acquisition without implying unread page content is complete.
+    /// A registered list view or list form recorded without a second read is complete as recorded.
+    /// </summary>
+    internal static AcquisitionStatus FileEnrichmentStatus(FilePageEvidence source)
+    {
+        if (source.FileLevelOnly && source.WebPartsState.Status == ClassicAspxReadStates.NotRequested)
+            return AcquisitionStatus.Complete;
         if (!source.MetadataState.Succeeded) return AcquisitionJournal.Status(source.MetadataState);
         return source.WebPartsState.Status is "Failed" or "Denied"
             ? AcquisitionStatus.Partial

@@ -450,6 +450,19 @@ namespace PnP.Scanning.Core.Services
                         scanId);
                 }
 
+                ReportManager.IncompleteListings incomplete = await reportManager.CountIncompleteListingsAsync(scanId);
+                if (incomplete.Message != null)
+                {
+                    await responseStream.WriteAsync(
+                        new ReportStatus { Status = incomplete.Message, Type = Constants.MessageWarning });
+                    Log.Warning(
+                        "{Locations} location(s) stayed incompletely listed and throttling stopped {Requests} " +
+                        "listing request(s) for assessment {ScanId}",
+                        incomplete.Locations,
+                        incomplete.ThrottledRequests,
+                        scanId);
+                }
+
                 if (request.Mode == ReportMode.PowerBI.ToString())
                 {
                     await responseStream.WriteAsync(new ReportStatus { Status = $"Start Building Power BI report" });

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 
 namespace PnP.Scanning.Core.Discovery;
@@ -9,24 +10,79 @@ internal sealed class SharePointRestThrottlePolicy
     private const int MaximumAttemptLimit = 5;
     private const int InitialBackoffSeconds = 1;
 
-    internal static readonly SharePointRestThrottlePolicy Default = new();
-    private readonly Func<TimeSpan, CancellationToken, Task> delay;
+    /// <summary>Longest single wait a server may direct before a collection request is given up.</summary>
+    internal static readonly TimeSpan CollectionServerWaitLimit = TimeSpan.FromMinutes(10);
 
-    /// <summary>Creates a bounded retry policy; clock and delay injection allow deterministic offline transport coverage.</summary>
+    internal static readonly SharePointRestThrottlePolicy Default = new();
+
+    /// <summary>
+    /// Shared by every Web of a collection: a request waits as long as the server directs, up to
+    /// <see cref="CollectionServerWaitLimit"/> per wait, and every other request to that host holds meanwhile.
+    /// </summary>
+    internal static readonly SharePointRestThrottlePolicy Collection = new(
+        MaximumAttemptLimit,
+        serverWaitLimit: CollectionServerWaitLimit);
+
+    private readonly Func<TimeSpan, CancellationToken, Task> delay;
+    private readonly ConcurrentDictionary<string, long> heldUntil = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Creates a bounded retry policy; clock and delay injection allow deterministic offline transport coverage.
+    /// A <paramref name="serverWaitLimit"/> above zero makes the policy wait out throttling.
+    /// </summary>
     internal SharePointRestThrottlePolicy(int attemptLimit = DefaultAttemptLimit, TimeProvider clock = null,
-        Func<TimeSpan, CancellationToken, Task> delay = null)
+        Func<TimeSpan, CancellationToken, Task> delay = null, TimeSpan serverWaitLimit = default)
     {
         if (attemptLimit is < 1 or > MaximumAttemptLimit)
         {
             throw new ArgumentOutOfRangeException(nameof(attemptLimit));
         }
+        if (serverWaitLimit < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(serverWaitLimit));
+        }
         AttemptLimit = attemptLimit;
         Clock = clock ?? TimeProvider.System;
+        ServerWaitLimit = serverWaitLimit;
         this.delay = delay ?? ((duration, token) => Task.Delay(duration, token));
     }
 
     internal int AttemptLimit { get; }
     internal TimeProvider Clock { get; }
+
+    /// <summary>
+    /// Longest single server-directed wait this policy honors outside the request budget. Zero keeps every wait
+    /// inside the request budget.
+    /// </summary>
+    internal TimeSpan ServerWaitLimit { get; }
+
+    /// <summary>States whether a throttled request waits as long as the server directs before its next attempt.
+    /// </summary>
+    internal bool WaitsOutThrottling => ServerWaitLimit > TimeSpan.Zero;
+
+    /// <summary>
+    /// Holds every request of this policy to <paramref name="host"/> for <paramref name="duration"/>, at most
+    /// <see cref="ServerWaitLimit"/>, keeping the later end when the host is already held. The end is kept on the
+    /// monotonic clock. A policy that keeps waits inside the request budget holds nothing.
+    /// </summary>
+    internal void Hold(string host, TimeSpan duration)
+    {
+        if (!WaitsOutThrottling || string.IsNullOrEmpty(host) || duration <= TimeSpan.Zero) return;
+        TimeSpan bounded = duration < ServerWaitLimit ? duration : ServerWaitLimit;
+        long until = Clock.GetTimestamp() +
+                     (long)(bounded.Ticks * ((double)Clock.TimestampFrequency / TimeSpan.TicksPerSecond));
+        heldUntil.AddOrUpdate(host, until, (_, current) => current > until ? current : until);
+    }
+
+    /// <summary>
+    /// Returns how long requests to <paramref name="host"/> still hold; zero means a request may be sent.
+    /// </summary>
+    internal TimeSpan HoldRemaining(string host)
+    {
+        if (string.IsNullOrEmpty(host) || !heldUntil.TryGetValue(host, out long until)) return TimeSpan.Zero;
+        long now = Clock.GetTimestamp();
+        return until > now ? Clock.GetElapsedTime(now, until) : TimeSpan.Zero;
+    }
 
     /// <summary>Honors a server delta or HTTP-date without clamping; unusable supplied delays fail closed against the overall budget.</summary>
     internal TimeSpan GetRetryDelay(HttpResponseMessage response, DateTimeOffset receivedAtUtc, int attemptCount)

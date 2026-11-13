@@ -706,6 +706,15 @@ namespace PnP.Scanning.Core.Services
             // Skip the retries due to network issues (socket exceptions)
             if (eventName != null)
             {
+                // Folder listing sends its requests on its own transport. It leaves a throttled host alone for
+                // the time the server directed, the same as the request that was throttled here.
+                if (eventName.HttpStatusCode is 429 or 503 && eventName.Request is { IsAbsoluteUri: true } throttled)
+                {
+                    PnP.Scanning.Core.Discovery.SharePointRestThrottlePolicy.Collection.Hold(
+                        throttled.Authority,
+                        TimeSpan.FromSeconds(eventName.WaitTime));
+                }
+
                 if (eventName.Properties.TryGetValue(Constants.PnPContextPropertyScanId, out object scanIdObject) &&
                     Guid.TryParse(scanIdObject?.ToString(), out Guid scanId))
                 {

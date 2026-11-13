@@ -267,7 +267,33 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
     }
 
     /// <summary>
-    /// Captures bounded original source bytes and independent native role evidence for one physical file.
+    /// Records a registered list view or list form without requesting its source. Such a file belongs to the List
+    /// product family whatever its handler is, so its role evidence is retained and its handler stays unread.
+    /// </summary>
+    internal static AspxPageEvidence SourceNotRequested(
+        int? listTemplate,
+        bool? catalog,
+        bool? view,
+        bool? form,
+        string roleState,
+        DateTime observedAtUtc) =>
+        new(
+            ClassicAspxReadStates.NotRequested,
+            null,
+            null,
+            ClassicAspxReadStates.NotRequested,
+            null,
+            null,
+            listTemplate,
+            catalog,
+            view,
+            form,
+            roleState,
+            observedAtUtc);
+
+    /// <summary>
+    /// Captures independent native role evidence for one physical file, and its bounded original source bytes unless
+    /// the file is a registered list view or list form.
     /// </summary>
     internal async Task<string> ReadAsync(PhysicalFileFacts file, CancellationToken token)
     {
@@ -298,14 +324,19 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
             : rolesComplete && catalog != null
                 ? "Complete"
                 : "Partial";
+        if (PnP.Scanning.Core.ClassicPages.Analysis.Page.AspxPageClassifier.IsListFamily(view, form))
+            return JsonSerializer.Serialize(
+                SourceNotRequested(owner?.Template, catalog, view, form, roleState, DateTime.UtcNow));
         try
         {
-            PnP.Core.Model.SharePoint.IFile? source = await pnp.Web
-                .GetFileByIdAsync(file.FileUniqueId, f => f.UniqueId, f => f.Length)
+            AspxSourceObservation? observed = await AspxSourceReader.ReadAsync(
+                    pnp.RestClient.Client,
+                    request => pnp.AuthenticationProvider.AuthenticateRequestAsync(pnp.Uri, request),
+                    pnp.Uri,
+                    file.FileUniqueId,
+                    file.Length,
+                    token)
                 .ConfigureAwait(false);
-            if (source.UniqueId != file.FileUniqueId)
-                throw new InvalidDataException("ASPX source response has a different file identity.");
-            AspxSourceObservation? observed = await AspxSourceReader.ReadAsync(source, token).ConfigureAwait(false);
             return JsonSerializer.Serialize(
                 new AspxPageEvidence(
                     observed.State,

@@ -81,7 +81,12 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             throttlePolicy: throttlePolicy);
 
     // Thin fake-HTTP seam; production defaults to the owned no-redirect/no-cookie client above.
-    /// <summary>Enforces authenticated web-API scope, a default sixteen-MiB byte cap, and one deadline across fresh 429/503 attempts and server-directed delays.</summary>
+    /// <summary>
+    /// Enforces authenticated web-API scope, a default sixteen-MiB byte cap, and one deadline across fresh 429/503
+    /// attempts and server-directed delays. A policy that waits out throttling instead gives every attempt the full
+    /// deadline, waits as long as the server directs between attempts, and holds while its host is throttled; a
+    /// request it gives up still holds its host for the other requests of the policy.
+    /// </summary>
     internal static async Task<SharePointRestPage> ReadBoundedPageAsync(
         HttpClient client,
         Uri web,
@@ -122,12 +127,32 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
             ReceivedAtUtc: policy.Clock.GetUtcNow(),
             AttemptCount: 0,
             AttemptLimit: policy.AttemptLimit);
-        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(budget);
+        bool budgetRestarts = false;
         try
         {
             while (true)
             {
+                // A throttled host is left alone by every request of the policy, this one included, until the
+                // server-directed time has passed. The wait answers to the caller alone, outside the budget.
+                TimeSpan hold;
+                while ((hold = policy.HoldRemaining(uri.Authority)) > TimeSpan.Zero)
+                {
+                    await policy.DelayAsync(hold, cancellationToken).ConfigureAwait(false);
+                    budgetRestarts = true;
+                }
+
+                if (budgetRestarts)
+                {
+                    // The next attempt gets the full budget on a deadline the earlier one cannot have ended.
+                    deadline.Dispose();
+                    deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    deadline.CancelAfter(budget);
+                    started = policy.Clock.GetTimestamp();
+                    budgetRestarts = false;
+                }
+
                 deadline.Token.ThrowIfCancellationRequested();
                 if (policy.Clock.GetElapsedTime(started) >= budget)
                 {
@@ -177,7 +202,10 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                             "x-ms-correlation-request-id",
                             "client-request-id")
                     };
-                    deadline.Token.ThrowIfCancellationRequested();
+                    // A throttled response that a waiting policy received stands, whatever is left of the budget.
+                    bool waitsOut = policy.WaitsOutThrottling && response.StatusCode is
+                        HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable;
+                    (waitsOut ? cancellationToken : deadline.Token).ThrowIfCancellationRequested();
                     if ((int)response.StatusCode is >= 300 and <= 399 || response.RequestMessage?.RequestUri == null ||
                         !response.RequestMessage.RequestUri.IsAbsoluteUri || !string.Equals(
                             response.RequestMessage.RequestUri.AbsoluteUri,
@@ -213,11 +241,10 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                     {
                         if (evidence.AttemptCount >= policy.AttemptLimit)
                         {
-                            return JsonFailure(
-                                evidence,
-                                DiscoveryTerminalOutcome.Failed,
-                                JsonReadErrors.ThrottleExhausted,
-                                policy.Clock);
+                            policy.Hold(
+                                uri.Authority,
+                                policy.GetRetryDelay(response, evidence.ReceivedAtUtc, evidence.AttemptCount));
+                            return ThrottleFailure(evidence, JsonReadErrors.ThrottleExhausted, policy.Clock);
                         }
 
                         // No need to read or persist an error body before disposing the throttled response.
@@ -311,14 +338,32 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                     }
                 }
 
+                if (policy.WaitsOutThrottling)
+                {
+                    // A throttled response stands whatever is left of the budget. The host is held for the other
+                    // requests of the policy too, also when this request is given up.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    policy.Hold(uri.Authority, retryDelay);
+                    if (retryDelay > policy.ServerWaitLimit)
+                    {
+                        return ThrottleFailure(evidence, JsonReadErrors.ThrottleBudget, policy.Clock);
+                    }
+
+                    Serilog.Log.Warning(
+                        "[Throttling] listing request {Request} waits {Seconds} seconds after attempt " +
+                        "{Attempt} of {Limit}",
+                        uri,
+                        (int)Math.Ceiling(retryDelay.TotalSeconds),
+                        evidence.AttemptCount,
+                        evidence.AttemptLimit);
+                    budgetRestarts = true;
+                    continue;
+                }
+
                 deadline.Token.ThrowIfCancellationRequested();
                 if (retryDelay >= budget - policy.Clock.GetElapsedTime(started))
                 {
-                    return JsonFailure(
-                        evidence,
-                        DiscoveryTerminalOutcome.Failed,
-                        JsonReadErrors.ThrottleBudget,
-                        policy.Clock);
+                    return ThrottleFailure(evidence, JsonReadErrors.ThrottleBudget, policy.Clock);
                 }
 
                 await policy.DelayAsync(retryDelay, deadline.Token).ConfigureAwait(false);
@@ -348,11 +393,38 @@ internal sealed class PnPContextSharePointAspxRestClient : ISharePointAspxRestCl
                 JsonReadErrors.TransportFailure,
                 policy.Clock);
         }
+        finally
+        {
+            deadline.Dispose();
+        }
     }
 
     /// <summary>Identifies only explicit byte-cap truncation so partial responses and unrelated failures never trigger a smaller file page.</summary>
     internal static bool IsResponseSizeLimit(SharePointRestPage page) =>
         page is { Outcome: DiscoveryTerminalOutcome.Truncated, ErrorCode: JsonReadErrors.SizeLimit };
+
+    /// <summary>
+    /// Identifies a request given up because of throttling: its attempts ran out, or the server directed a wait the
+    /// policy does not honor. The files and folders it would have listed are unknown.
+    /// </summary>
+    internal static bool IsThrottleFailure(SharePointRestPage page) =>
+        page is
+        {
+            Outcome: DiscoveryTerminalOutcome.Failed,
+            ErrorCode: JsonReadErrors.ThrottleExhausted or JsonReadErrors.ThrottleBudget
+        };
+
+    /// <summary>Logs that a request was given up because of throttling and returns its failure receipt.</summary>
+    private static SharePointRestPage ThrottleFailure(SharePointRestPage evidence, string code, TimeProvider clock)
+    {
+        Serilog.Log.Warning(
+            "[Throttling] listing request {Request} was given up after attempt {Attempt} of {Limit}: {Code}",
+            evidence.RequestUri,
+            evidence.AttemptCount,
+            evidence.AttemptLimit,
+            code);
+        return JsonFailure(evidence, DiscoveryTerminalOutcome.Failed, code, clock);
+    }
 
     /// <summary>Preserves the final response receipt, or timestamps a response-free failure, without retaining source bytes.</summary>
     private static SharePointRestPage JsonFailure(

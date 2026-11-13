@@ -165,6 +165,18 @@ internal static class FilePageSourceReader
     }
 
     /// <summary>
+    /// Records a registered list view or list form that has no backing list item without contacting SharePoint. Such
+    /// a file has no item fields to read and belongs to the List product family, so its web parts are not requested.
+    /// </summary>
+    internal static FilePageEvidence ListViewOrFormEnrichment(WebFacts web, DiscoveryEvidence page) =>
+        UnavailableFileEnrichment(web, page, SourceReadState.NotAttempted) with
+        {
+            FileLevelOnly = true,
+            ListRootFolderUrls = [],
+            WebPartsState = new(ClassicAspxReadStates.NotRequested)
+        };
+
+    /// <summary>
     /// Constructs an unavailable page input without inventing successful metadata or web-part acquisition.
     /// </summary>
     internal static FilePageEvidence UnavailableFileEnrichment(
