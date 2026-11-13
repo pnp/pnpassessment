@@ -23,6 +23,42 @@ internal sealed class SharePointRestThrottlePolicy
         MaximumAttemptLimit,
         serverWaitLimit: CollectionServerWaitLimit);
 
+    /// <summary>
+    /// Holds the collection's listing requests to the host of a request the SDK reports as throttled (HTTP 429 or
+    /// 503), for the time the SDK waits before it sends that request again. Returns whether the host was held.
+    /// </summary>
+    internal static bool HoldCollectionFor(PnP.Core.Services.IRetryEvent retry)
+    {
+        Uri request = retry?.Request;
+        if (request == null || !request.IsAbsoluteUri || retry.HttpStatusCode is not (429 or 503) ||
+            retry.WaitTime <= 0)
+        {
+            return false;
+        }
+
+        Collection.Hold(request.Authority, TimeSpan.FromSeconds(retry.WaitTime));
+        return true;
+    }
+
+    /// <summary>
+    /// Makes the SDK report its throttled requests to the collection. A listener that is already registered stays
+    /// in place, and a session without an event hub has nothing to listen to.
+    /// </summary>
+    internal static void ListenForThrottling(PnP.Core.Services.EventHub events)
+    {
+        if (events == null || events.RequestRetry != null) return;
+        events.RequestRetry = retry =>
+        {
+            if (HoldCollectionFor(retry))
+            {
+                Serilog.Log.Warning(
+                    "[Throttling] request {Request} waits {Seconds} seconds and folder listing to its host waits too",
+                    retry.Request,
+                    retry.WaitTime);
+            }
+        };
+    }
+
     private readonly Func<TimeSpan, CancellationToken, Task> delay;
     private readonly ConcurrentDictionary<string, long> heldUntil = new(StringComparer.OrdinalIgnoreCase);
 

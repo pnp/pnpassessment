@@ -371,8 +371,8 @@ internal static class ClassicReportCsvProjection
         foreach (SPFile facts in source.Publication.Files.Where(IsAspx))
         {
             AspxCsvRow file = new(facts);
-            string? type = PageTypeForHandler(file.PageHandler);
-            if (file.NoExecute == true || type == null || file.IsListFamily) continue;
+            string? type = SelectedPageType(file);
+            if (type == null) continue;
             PageIdentity identity = PageIdentity.File(facts.SiteCollectionId, facts.FileUniqueId);
             if (!pages.TryGetValue(identity, out ClassicPageRow? page))
             {
@@ -435,6 +435,44 @@ internal static class ClassicReportCsvProjection
 
         omitted = left.OrderBy(row => row.ContentKey, StringComparer.Ordinal).ToArray();
         return kept.OrderBy(row => row.ContentKey, StringComparer.Ordinal).ToArray();
+    }
+
+    /// <summary>
+    /// Names the page label the report gives a physical file, or null for a file the report leaves out: one served
+    /// as a download, one with another handler than the four selected ones, and a list view or list form.
+    /// </summary>
+    internal static string? SelectedPageType(AspxCsvRow file)
+    {
+        string? type = PageTypeForHandler(file.PageHandler);
+        return file.NoExecute == true || file.IsListFamily ? null : type;
+    }
+
+    /// <summary>
+    /// Names the page label the report gives each stored physical file of an assessment, keyed by site collection
+    /// and file. Null means the assessment has no native analysis, so its stored page rows are the report.
+    /// </summary>
+    internal static Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string>? SelectedFilePageTypes(
+        ScanContext context) =>
+        context.PhaseRuns.AsNoTracking().Any(run => run.ModuleKey == ClassicPageModule.Key)
+            ? SelectedFilePageTypes(context.SPFiles.AsNoTracking())
+            : null;
+
+    /// <summary>
+    /// Names the page label the report gives each physical file, keyed by site collection and file. Files the
+    /// report leaves out have no entry. The files are read one at a time.
+    /// </summary>
+    internal static Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> SelectedFilePageTypes(
+        IEnumerable<SPFile> files)
+    {
+        Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> selected = [];
+        foreach (SPFile facts in files)
+        {
+            if (!IsAspx(facts)) continue;
+            string? type = SelectedPageType(new AspxCsvRow(facts));
+            if (type != null) selected[(facts.SiteCollectionId, facts.FileUniqueId)] = type;
+        }
+
+        return selected;
     }
 
     /// <summary>Maps exact fully qualified handler names to familiar page labels without guessing aliases or metadata types.</summary>

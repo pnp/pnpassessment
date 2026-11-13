@@ -38,6 +38,29 @@ namespace PnP.Scanning.Core.Services
             services = serviceProvider;
             pipeline = coordinator;
             legacyScanManager = new Lazy<ScanManager>(() => services.GetRequiredService<ScanManager>());
+            // A finished pipeline assessment sends the same done event a finished retained assessment sends.
+            pipeline.AssessmentFinished = assessmentId =>
+                SendTelemetryAsync(telemetry => telemetry.LogScanEndAsync(assessmentId));
+        }
+
+        /// <summary>
+        /// Sends one event through the existing telemetry service. A host without that service sends nothing, and a
+        /// failure to send is logged and leaves the calling command unaffected.
+        /// </summary>
+        private async Task SendTelemetryAsync(Func<TelemetryManager, Task> send)
+        {
+            try
+            {
+                TelemetryManager telemetry = services.GetService<TelemetryManager>();
+                if (telemetry != null)
+                {
+                    await send(telemetry);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Could not send telemetry event");
+            }
         }
 
         /// <summary>
@@ -68,7 +91,7 @@ namespace PnP.Scanning.Core.Services
                 all || request.Finished,
                 all || request.Terminated);
             reply.Status.AddRange(legacy.Status);
-            if (legacyScanManager.IsValueCreated) await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.List);
+            await SendTelemetryAsync(telemetry => telemetry.LogEventAsync(Guid.Empty, TelemetryEvent.List));
             return reply;
         }
 
@@ -97,6 +120,11 @@ namespace PnP.Scanning.Core.Services
                         await pipeline.PauseAsync(scanId, request.All, context.CancellationToken);
                         await responseStream.WriteAsync(
                             new PauseStatus { Status = "Pipeline phases paused at committed checkpoints" });
+                        if (!request.All)
+                        {
+                            await SendTelemetryAsync(telemetry =>
+                                telemetry.LogScanEventAsync(scanId, TelemetryEvent.Pause));
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -210,6 +238,8 @@ namespace PnP.Scanning.Core.Services
                             Status =
                                 $"Pipeline run {ticket.RunId} resumed with snapshot {ticket.SnapshotId} and rule {ticket.RuleVersion}"
                         });
+                    await SendTelemetryAsync(telemetry =>
+                        telemetry.LogScanEventAsync(scanId, TelemetryEvent.Restart));
                 }
                 catch (Exception ex)
                 {
@@ -235,6 +265,8 @@ namespace PnP.Scanning.Core.Services
                         {
                             Status = $"Assessment restarted. Source snapshot = {adopted.SnapshotId}",
                         });
+                    await SendTelemetryAsync(telemetry =>
+                        telemetry.LogScanEventAsync(scanId, TelemetryEvent.Restart));
                     return;
                 }
             }
@@ -294,8 +326,7 @@ namespace PnP.Scanning.Core.Services
             _ = Task.Run(async () =>
             {
                 await pipeline.StopAsync(CancellationToken.None);
-                if (legacyScanManager.IsValueCreated)
-                    await telemetryManager.LogEventAsync(Guid.Empty, TelemetryEvent.Stop);
+                await SendTelemetryAsync(telemetry => telemetry.LogEventAsync(Guid.Empty, TelemetryEvent.Stop));
                 await kestrelWebServer.StopAsync();
             });
             return new Empty();
@@ -338,6 +369,12 @@ namespace PnP.Scanning.Core.Services
                             Status = $"Sites to assess are queued up. Assessment id = {ticket.AssessmentId}. " +
                                      $"Source snapshot = {ticket.SnapshotId}. Analysis run = {ticket.AnalysisRunId}",
                         });
+                    if (Guid.TryParse(ticket.AssessmentId, out Guid assessmentId))
+                    {
+                        await SendTelemetryAsync(telemetry =>
+                            telemetry.LogScanEventAsync(assessmentId, TelemetryEvent.Start));
+                    }
+
                     return;
                 }
 
@@ -492,8 +529,7 @@ namespace PnP.Scanning.Core.Services
                     }
                 }
 
-                if (legacyScanManager.IsValueCreated)
-                    await telemetryManager.LogScanEventAsync(scanId, TelemetryEvent.Report);
+                await SendTelemetryAsync(telemetry => telemetry.LogScanEventAsync(scanId, TelemetryEvent.Report));
             }
             catch (Exception ex)
             {

@@ -458,6 +458,68 @@ public sealed class SharePointAspxRestTransportTests
     }
 
     /// <summary>
+    /// Holds folder listing to the host of a request the SDK reports as throttled, and to no other host.
+    /// </summary>
+    [Fact]
+    public void A_request_the_sdk_reports_as_throttled_holds_folder_listing_to_its_host()
+    {
+        string host = "throttled-" + Guid.NewGuid().ToString("N") + ".sharepoint.com";
+        string other = "other-" + Guid.NewGuid().ToString("N") + ".sharepoint.com";
+        Uri request = new Uri("https://" + host + "/sites/a/_api/web/GetFileById('x')/$value");
+
+        SharePointRestThrottlePolicy.HoldCollectionFor(null).Should().BeFalse();
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(request, 500, 30)).Should().BeFalse();
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(request, 429, 0)).Should().BeFalse();
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(null, 429, 30)).Should().BeFalse();
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(host).Should().Be(TimeSpan.Zero);
+
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(request, 503, 120)).Should().BeTrue();
+
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(host)
+            .Should()
+            .BeGreaterThan(TimeSpan.FromSeconds(60))
+            .And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(120));
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(other).Should().Be(TimeSpan.Zero);
+    }
+
+    /// <summary>
+    /// Registers the collection as the listener for the SDK's throttled requests only when there is none yet.
+    /// </summary>
+    [Fact]
+    public void The_collection_listens_for_throttled_sdk_requests_unless_a_listener_is_registered()
+    {
+        string host = "listener-" + Guid.NewGuid().ToString("N") + ".sharepoint.com";
+        Uri request = new Uri("https://" + host + "/_api/web");
+        global::PnP.Core.Services.EventHub events = new global::PnP.Core.Services.EventHub();
+
+        SharePointRestThrottlePolicy.ListenForThrottling(null);
+        SharePointRestThrottlePolicy.ListenForThrottling(events);
+        events.RequestRetry.Should().NotBeNull();
+        events.RequestRetry(new SdkRetry(request, 429, 90));
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(host).Should().BeGreaterThan(TimeSpan.FromSeconds(30));
+
+        int heard = 0;
+        global::PnP.Core.Services.EventHub taken = new global::PnP.Core.Services.EventHub
+        {
+            RequestRetry = _ => heard++
+        };
+        SharePointRestThrottlePolicy.ListenForThrottling(taken);
+        taken.RequestRetry(new SdkRetry(request, 429, 90));
+        heard.Should().Be(1);
+    }
+
+    /// <summary>Stands in for the retry notice the SDK raises for a request it sends again.</summary>
+    private sealed class SdkRetry(Uri request, int status, int waitSeconds) : global::PnP.Core.Services.IRetryEvent
+    {
+        public Uri Request { get; } = request;
+        public int HttpStatusCode { get; } = status;
+        public int WaitTime { get; } = waitSeconds;
+        public Exception Exception => null;
+
+        public IDictionary<string, object> Properties { get; } = new Dictionary<string, object>();
+    }
+
+    /// <summary>
     /// Keeps waits inside the request budget by default and reserves waiting out throttling for collection.
     /// </summary>
     [Fact]

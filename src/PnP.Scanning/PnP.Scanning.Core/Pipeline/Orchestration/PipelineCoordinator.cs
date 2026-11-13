@@ -31,6 +31,12 @@ internal sealed class PipelineCoordinator(
     internal int ActiveCount => active.Count;
 
     /// <summary>
+    /// Called with the assessment id once a run that collected and analyzed has settled as finished. The run is
+    /// complete before the call, and a failure of the call is logged and leaves the run finished.
+    /// </summary>
+    internal Func<Guid, Task>? AssessmentFinished { get; set; }
+
+    /// <summary>
     /// Checks whether the assessment currently owns an in-memory phase execution.
     /// </summary>
     internal bool IsActive(Guid assessmentId) => active.ContainsKey(assessmentId);
@@ -575,6 +581,7 @@ internal sealed class PipelineCoordinator(
             Serilog.Log.Error(ex, "Pipeline run {RunId} failed", root.RunId);
         }
 
+        bool finished = false;
         await execution.Control.WaitAsync();
         try
         {
@@ -586,6 +593,7 @@ internal sealed class PipelineCoordinator(
             execution.Settled = true;
             active.TryRemove(root.AssessmentId, out _);
             execution.Completion.TrySetResult(status);
+            finished = status == ScanStatus.Finished && root.Kind == PhaseKind.Pipeline;
         }
         catch (Exception ex)
         {
@@ -598,6 +606,21 @@ internal sealed class PipelineCoordinator(
         {
             execution.Control.Release();
             execution.Cancellation.Dispose();
+        }
+
+        if (finished && AssessmentFinished is { } notify)
+        {
+            try
+            {
+                await notify(root.AssessmentId);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(
+                    ex,
+                    "The finished notification of assessment {AssessmentId} failed",
+                    root.AssessmentId);
+            }
         }
     }
 
