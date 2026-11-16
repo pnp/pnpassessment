@@ -21,6 +21,7 @@ internal static class ClassicReportCsvProjection
     internal const string AspxCsv = "aspx.csv";
     internal const string PagesCsv = "classicpages.csv";
     internal const string SummaryJson = "classicpagessummary.json";
+    internal const string UsageCsv = "classicpageauditusage.csv";
     internal const string OmittedCsv = "classicpagesomitted.csv";
 
     /// <summary>
@@ -75,7 +76,9 @@ internal static class ClassicReportCsvProjection
                     0,
                     count,
                     0,
-                    0),
+                    0,
+                    null,
+                    null),
                 token);
             return;
         }
@@ -92,6 +95,7 @@ internal static class ClassicReportCsvProjection
             await csv.NextRecordAsync();
         }
 
+        string? usageStatus = source.Publication.Scope.Options.SkipUsageInformation ? null : UsageStatus(source);
         await WriteSummaryAsync(
             directory,
             new PageExportSummary(
@@ -108,7 +112,9 @@ internal static class ClassicReportCsvProjection
                 rows.LongCount(row => row.ObjectKind == nameof(PageObjectKind.File) && row.NoExecute == null),
                 0,
                 source.Publication.Files.LongCount(IsAspx),
-                omitted.LongLength),
+                omitted.LongLength,
+                usageStatus,
+                usageStatus == null ? null : UsageSkipReason(source, usageStatus)),
             token);
         await WriteRowsAsync(directory, OmittedCsv, omitted, configuration, token);
         await ExportRelatedAsync(context, source, rows, directory, configuration, token);
@@ -138,6 +144,104 @@ internal static class ClassicReportCsvProjection
         {
             return 0;
         }
+    }
+
+    /// <summary>
+    /// Reads the usage state and its reason that the export in this folder recorded for this assessment. A missing
+    /// summary, one written for another assessment, and an export without requested usage have neither.
+    /// </summary>
+    internal static (string? Status, string? Reason) ReadUsageState(string directory, Guid assessmentId)
+    {
+        string path = Path.Combine(directory, SummaryJson);
+        if (!File.Exists(path)) return (null, null);
+        try
+        {
+            using JsonDocument summary = JsonDocument.Parse(File.ReadAllText(path));
+            JsonElement root = summary.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty(nameof(PageExportSummary.ScanId), out JsonElement scan) ||
+                scan.ValueKind != JsonValueKind.String || !scan.TryGetGuid(out Guid id) || id != assessmentId)
+                return (null, null);
+            return (Text(root, nameof(PageExportSummary.UsageQueryStatus)),
+                Text(root, nameof(PageExportSummary.UsageSkipReason)));
+        }
+        catch (Exception error) when (error is IOException or JsonException)
+        {
+            return (null, null);
+        }
+
+        // Reads a text member; an absent member and one that holds no text have no value.
+        static string? Text(JsonElement owner, string name) =>
+            owner.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+    }
+
+    /// <summary>
+    /// Words the recorded usage state and its reason for the person reading the report. Complete usage, and usage
+    /// that was left out on request, have no message.
+    /// </summary>
+    internal static string? UsageWarning(string? status, string? reason)
+    {
+        string? message = status switch
+        {
+            null or "succeeded" => null,
+            "partial" => "Usage data covers only part of the audit window, so the usage counts in the report are " +
+                         "incomplete",
+            _ => "Usage data could not be read, so the usage columns in the report are empty",
+        };
+        return message == null || string.IsNullOrEmpty(reason) ? message : message + ". Reason: " + reason;
+    }
+
+    /// <summary>
+    /// Derives the export-wide usage state from the stored usage queries: <c>skipped</c> when usage was left out on
+    /// request or no query could be sent, <c>notcollected</c> without any query, <c>succeeded</c> when every query
+    /// succeeded, <c>partial</c> when some did, and <c>failed</c> otherwise.
+    /// </summary>
+    internal static string UsageStatus(ClassicReportSource source)
+    {
+        if (source.Publication.Scope.Options.SkipUsageInformation) return "skipped";
+        if (source.AuditChunks.Length == 0) return "notcollected";
+        int succeeded = source.AuditChunks.Count(chunk => chunk.Status == "succeeded");
+        return succeeded == source.AuditChunks.Length
+            ? "succeeded"
+            : succeeded > 0
+                ? "partial"
+                : source.AuditChunks.All(chunk => chunk.Status == "skipped")
+                    ? "skipped"
+                    : "failed";
+    }
+
+    /// <summary>
+    /// Gives the reason usage is missing or incomplete, from the reasons the usage queries recorded. Reasons of the
+    /// same kind (the text before the first colon) are listed once with the number of queries; up to three kinds
+    /// are listed and the remaining ones are counted. Each reason is one line of at most 200 characters. Complete
+    /// usage has no reason.
+    /// </summary>
+    internal static string? UsageSkipReason(ClassicReportSource source, string status)
+    {
+        if (status == "succeeded") return null;
+        string[] reasons = source.AuditChunks.Select(chunk => OneLine(chunk.Error))
+            .Where(reason => reason.Length > 0)
+            .GroupBy(reason => reason.Split(':')[0], StringComparer.Ordinal)
+            .OrderBy(kind => kind.Key, StringComparer.Ordinal)
+            .Select(kind => kind.Min(StringComparer.Ordinal) +
+                            (kind.Count() > 1 ? $" ({kind.Count()} queries)" : ""))
+            .ToArray();
+        if (reasons.Length == 0) return "No usage query result was recorded for this assessment";
+        string listed = string.Join("; ", reasons.Take(3));
+        return reasons.Length > 3 ? listed + $"; and {reasons.Length - 3} more" : listed;
+    }
+
+    /// <summary>Puts a recorded reason on one line and keeps its first 200 characters.</summary>
+    private static string OneLine(string? text)
+    {
+        string line = string.Join(
+            ' ',
+            (text ?? "").Split(
+                new[] { '\r', '\n', '\t' },
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        return line.Length <= 200 ? line : line[..200] + "...";
     }
 
     /// <summary>
@@ -249,9 +353,11 @@ internal static class ClassicReportCsvProjection
 
         await WriteRowsAsync(directory, "classicpublishingsitesummaries.csv", publishing, configuration, token);
         if (!source.Publication.Scope.Options.SkipUsageInformation)
+        {
+            string? skipReason = UsageSkipReason(source, UsageStatus(source));
             await WriteRowsAsync(
                 directory,
-                "classicpageauditusage.csv",
+                UsageCsv,
                 pages.Select(page => new
                 {
                     page.ScanId,
@@ -265,11 +371,11 @@ internal static class ClassicReportCsvProjection
                     page.AuditWindowEnd,
                     QueryStatus = page.UsageQueryStatus,
                     page.UsageAttributionState,
-                    SkipReason =
-                        page.UsageQueryStatus == "succeeded" ? null : "See native audit coverage and UsageQueryStatus.",
+                    SkipReason = page.UsageQueryStatus == "succeeded" ? null : skipReason,
                 }),
                 configuration,
                 token);
+        }
     }
 
     /// <summary>Writes a fixed related CSV schema from its selected native projection, including the header for empty results.</summary>
@@ -542,24 +648,15 @@ internal static class ClassicReportCsvProjection
         /// <summary>Derives the shared query status once and indexes statistics only when a succeeded chunk exists.</summary>
         internal static UsageIndex Create(ClassicReportSource source)
         {
-            if (source.Publication.Scope.Options.SkipUsageInformation) return new("skipped", null);
-            if (source.AuditChunks.Length == 0) return new("notcollected", null);
-            int succeeded = source.AuditChunks.Count(chunk => chunk.Status == "succeeded");
-            string status = succeeded == source.AuditChunks.Length
-                ? "succeeded"
-                : succeeded > 0
-                    ? "partial"
-                    : source.AuditChunks.All(chunk => chunk.Status == "skipped")
-                        ? "skipped"
-                        : "failed";
+            string status = UsageStatus(source);
             return new(
                 status,
-                succeeded == 0
-                    ? null
-                    : source.Publication.Audit.Where(stat => stat.PageUrl != null)
+                status is "succeeded" or "partial"
+                    ? source.Publication.Audit.Where(stat => stat.PageUrl != null)
                         .ToLookup(
                             stat => ClassicPageAuditAnalysis.LocatorKey(stat.PageUrl),
-                            StringComparer.Ordinal));
+                            StringComparer.Ordinal)
+                    : null);
         }
     }
 
@@ -586,7 +683,9 @@ internal static class ClassicReportCsvProjection
         long NoExecuteUnknownCount,
         long LegacyPageCount,
         long PhysicalAspxCount,
-        long OmittedPageCount);
+        long OmittedPageCount,
+        string? UsageQueryStatus,
+        string? UsageSkipReason);
 
     /// <summary>Counts every raw SQL ASPX row actually written, including blocked, allowed and unknown NoExecute observations.</summary>
     private sealed record AspxExportSummary(

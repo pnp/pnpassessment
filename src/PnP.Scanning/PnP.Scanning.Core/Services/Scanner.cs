@@ -496,6 +496,17 @@ namespace PnP.Scanning.Core.Services
                         scanId);
                 }
 
+                (string usageStatus, string usageReason) = PnP.Scanning.Core.ClassicPages.Compatibility
+                    .ClassicReportCsvProjection.ReadUsageState(dataExportPath, scanId);
+                string usageWarning = PnP.Scanning.Core.ClassicPages.Compatibility.ClassicReportCsvProjection
+                    .UsageWarning(usageStatus, usageReason);
+                if (usageWarning != null)
+                {
+                    await responseStream.WriteAsync(
+                        new ReportStatus { Status = usageWarning, Type = Constants.MessageWarning });
+                    Log.Warning("Usage data is missing or incomplete in the report for assessment {ScanId}", scanId);
+                }
+
                 ReportManager.IncompleteListings incomplete = await reportManager.CountIncompleteListingsAsync(scanId);
                 if (incomplete.Message != null)
                 {
