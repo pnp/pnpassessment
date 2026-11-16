@@ -4,7 +4,7 @@ So you've kicked off an assessment and want to followup on the assessment progre
 
 ## Listing the available assessments
 
- Assessment data is gathered inside folders underneath the folder hosting the Microsoft 365 Assessment tool and you can enumerate the done, running, paused and terminated assessments via the `list` action.
+ Assessment data is gathered inside folders underneath the folder hosting the Microsoft 365 Assessment tool and you can enumerate the done, running, paused and terminated assessments via the `list` action. An assessment folder whose data cannot be read is left out of the list and is kept on disk as it is; the log file names the folder and the reason.
 
 ### Sample list commands
 

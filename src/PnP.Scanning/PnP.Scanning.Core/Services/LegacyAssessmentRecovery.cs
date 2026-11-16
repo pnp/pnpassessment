@@ -12,30 +12,47 @@ internal sealed class LegacyAssessmentRecovery(PipelineStore store) : IHostedSer
 {
     /// <summary>
     /// Terminates interrupted historical running assessments while leaving pipeline recovery to its coordinator.
+    /// An assessment whose database cannot be opened or upgraded is logged and kept as it is, so the engine starts
+    /// with the assessments that can be read.
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         foreach (Guid assessmentId in store.AssessmentsOnDisk())
         {
-            await store.EnsureDatabaseAsync(assessmentId, cancellationToken);
-            using ScanContext db = store.CreateContext(assessmentId);
-            Storage.Scan scan = await db.Scans.SingleOrDefaultAsync(x => x.ScanId == assessmentId, cancellationToken);
-            if (scan == null || await db.PhaseRuns.AnyAsync(x => x.AssessmentId == assessmentId, cancellationToken) ||
-                scan.Status != ScanStatus.Running)
-                continue;
-            db.History.Add(
-                new History
-                {
-                    ScanId = assessmentId,
-                    Event = Constants.EventAssessmentStatusChange,
-                    EventDate = DateTime.Now,
-                    Message = $"From {ScanStatus.Running} to {ScanStatus.Terminated}",
-                });
-            scan.Status = ScanStatus.Terminated;
-            scan.EndDate = DateTime.Now;
-            await db.SaveChangesAsync(cancellationToken);
-            await db.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(RESTART);", cancellationToken);
+            try
+            {
+                await TerminateInterruptedAsync(assessmentId, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Serilog.Log.Warning(ex, "Assessment {ScanId} could not be read and is left as it is", assessmentId);
+            }
         }
+    }
+
+    /// <summary>
+    /// Marks one historical assessment that was still running when the engine stopped as terminated.
+    /// </summary>
+    private async Task TerminateInterruptedAsync(Guid assessmentId, CancellationToken cancellationToken)
+    {
+        await store.EnsureDatabaseAsync(assessmentId, cancellationToken);
+        using ScanContext db = store.CreateContext(assessmentId);
+        Storage.Scan scan = await db.Scans.SingleOrDefaultAsync(x => x.ScanId == assessmentId, cancellationToken);
+        if (scan == null || await db.PhaseRuns.AnyAsync(x => x.AssessmentId == assessmentId, cancellationToken) ||
+            scan.Status != ScanStatus.Running)
+            return;
+        db.History.Add(
+            new History
+            {
+                ScanId = assessmentId,
+                Event = Constants.EventAssessmentStatusChange,
+                EventDate = DateTime.Now,
+                Message = $"From {ScanStatus.Running} to {ScanStatus.Terminated}",
+            });
+        scan.Status = ScanStatus.Terminated;
+        scan.EndDate = DateTime.Now;
+        await db.SaveChangesAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(RESTART);", cancellationToken);
     }
 
     /// <summary>

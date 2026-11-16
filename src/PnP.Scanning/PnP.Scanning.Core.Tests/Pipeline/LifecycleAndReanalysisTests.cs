@@ -201,6 +201,91 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     /// <summary>
+    /// Verifies that an assessment whose database cannot be opened is left out of the listing and of the start-up
+    /// recovery and is kept on disk as it is, while the other assessments stay available.
+    /// </summary>
+    [Fact]
+    public async Task An_unreadable_assessment_database_is_left_out_and_the_others_stay_available()
+    {
+        using StoreCase data = new StoreCase("pipeline-unreadable-database");
+        (Guid readable, _, Guid run, _) = await data.UnsealedAsync();
+        const string content = "This file is not an assessment database.";
+        string path = data.Store.DatabasePath(Guid.NewGuid());
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, content);
+        PipelineStore restarted = new PipelineStore(data.DirectoryPath);
+
+        PhaseRunRow root = Assert.Single(await restarted.ListRootsAsync());
+        Assert.Equal(readable, root.AssessmentId);
+        Assert.Equal(run, root.RunId);
+        await new LegacyAssessmentRecovery(restarted).StartAsync(CancellationToken.None);
+        await restarted.MarkInterruptedRunsAsync(CancellationToken.None);
+
+        Assert.Equal(ScanStatus.Terminated, (await restarted.LatestRootAsync(readable))!.Status);
+        Assert.Equal(content, await File.ReadAllTextAsync(path));
+    }
+
+    /// <summary>
+    /// Verifies that stop completes and stores the run as terminated when its module does not settle in time, and
+    /// that the stop the host sends afterwards returns without settling the run a second time.
+    /// </summary>
+    [Fact]
+    public async Task Stop_completes_and_terminates_a_run_whose_module_does_not_settle()
+    {
+        using StoreCase data = new StoreCase("pipeline-stop-unsettled");
+        TaskCompletionSource entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ModuleRegistry registration = new ModuleRegistry(
+            [new(FixedSource.ModuleKey, FixedSource.InputVersion, () => new UnresponsiveCollector(entered, release))]);
+        PipelineCoordinator coordinator =
+            new PipelineCoordinator(data.Store, registration, new ForbiddenOnlineEnvironment())
+            {
+                SettlementTimeout = TimeSpan.FromMilliseconds(250),
+            };
+        PhaseReply ticket = await coordinator.CollectAsync(FixedSource.Request());
+        Guid id = Guid.Parse(ticket.AssessmentId);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            await coordinator.StopAsync(CancellationToken.None);
+            await coordinator.StopAsync(CancellationToken.None);
+            PhaseRunRow root = (await data.Store.LatestRootAsync(id))!;
+            Assert.Equal(ScanStatus.Terminated, root.Status);
+            Assert.Equal(1, root.ErrorCount);
+        }
+        finally
+        {
+            release.SetResult();
+        }
+
+        Assert.Equal(
+            ScanStatus.Terminated,
+            await coordinator.WaitForCompletionAsync(id).WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
+    /// <summary>
+    /// Stays in its read until the test releases it and takes no notice of the cancellation request.
+    /// </summary>
+    private sealed class UnresponsiveCollector(TaskCompletionSource entered, TaskCompletionSource release)
+        : ICollectionModule
+    {
+        public string ModuleKey => FixedSource.ModuleKey;
+        public string InputVersion => FixedSource.InputVersion;
+
+        /// <summary>
+        /// Signals that the read started, waits for the release, and ends without a record.
+        /// </summary>
+        public async IAsyncEnumerable<CollectionRecord> CollectAsync(
+            CollectionContext context,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            entered.TrySetResult();
+            await release.Task;
+            yield break;
+        }
+    }
+
+    /// <summary>
     /// Verifies that seal failure does not start analysis or force finished status.
     /// </summary>
     [Fact]
