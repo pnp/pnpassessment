@@ -612,6 +612,10 @@ public sealed class ClassicReportCsvProjectionTests
         string immutableReport = (await context.AnalysisReportRows.SingleAsync()).PayloadJson;
         string snapshotDigest = (await context.SourceSnapshots.SingleAsync()).ManifestDigest!;
         Assert.True(capturedParts > 0);
+        // The export keeps the modern page count the analysis stored for the web.
+        ClassicWebSummary storedWeb = await context.ClassicWebSummaries.SingleAsync();
+        storedWeb.ModernPages = 7;
+        await context.SaveChangesAsync();
         string directory = Path.Combine(data.DirectoryPath, "export");
         Directory.CreateDirectory(directory);
         await ReportManager.ExportClassicReportDataAsync(
@@ -673,7 +677,12 @@ public sealed class ClassicReportCsvProjectionTests
             ClassicWebSummary summary = Assert.Single(webs.GetRecords<ClassicWebSummary>());
             Assert.Equal(2, summary.ClassicPages);
             Assert.Equal(1, summary.ClassicLists);
+            Assert.Equal(7, summary.ModernPages);
         }
+
+        using (StreamReader siteText = new(Path.Combine(directory, "classicsitesummaries.csv")))
+        using (CsvReader sites = new(siteText, CultureInfo.InvariantCulture))
+            Assert.Equal(7, Assert.Single(sites.GetRecords<ClassicSiteSummary>()).ModernPages);
 
         AnalysisReportRowEntry report = await context.AnalysisReportRows.SingleAsync();
         report.PayloadJson = VersionedJson.From(new { corrupted = true }).Json;

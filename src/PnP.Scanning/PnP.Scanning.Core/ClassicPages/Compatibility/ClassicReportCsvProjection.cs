@@ -246,7 +246,8 @@ internal static class ClassicReportCsvProjection
 
     /// <summary>
     /// Rebuilds exported page-dependent rollups and part/usage inventories from the same selected Pages without writing database tables.
-    /// Retained non-page component counts and publishing master-page metadata are unchanged.
+    /// Retained non-page component counts, the stored modern page count and publishing master-page metadata are
+    /// unchanged.
     /// </summary>
     private static async Task ExportRelatedAsync(
         ScanContext context,
@@ -276,7 +277,6 @@ internal static class ClassicReportCsvProjection
             web.ClassicBlogPages = owned.Count(page => page.PageType == "BlogPage");
             web.ClassicWebPartPages = owned.Count(page => page.PageType == "WebPartPage");
             web.ClassicPublishingPages = owned.Count(page => page.PageType == "PublishingPage");
-            web.ModernPages = 0;
             ClassicPageCsvRow[] measured = owned.Where(page => page.WebPartCount > 0 && page.MappingPercentage.HasValue)
                 .ToArray();
             web.PagesWithWebParts = measured.Length;

@@ -292,7 +292,7 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
     }
 
     /// <summary>
-    /// Counts incomplete locations by the rule of the coverage summary, and the listing requests throttling stopped.
+    /// Counts the coverage rows that stayed incomplete, and the listing requests throttling stopped.
     /// </summary>
     [Fact]
     public async Task Incomplete_locations_and_throttled_listing_requests_are_counted_for_the_report_warning()
@@ -338,6 +338,83 @@ public sealed class AssessmentDiscoveryFailureTests : IClassFixture<ScanContextF
         none.Locations.Should().Be(0);
         none.ThrottledRequests.Should().Be(0);
         none.Message.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Leaves a file listing that the second listing completed, and a refusal a rule expects, out of the report
+    /// warning, and counts the same rows where neither applies.
+    /// </summary>
+    [Fact]
+    public async Task Listings_completed_by_the_second_listing_and_expected_refusals_are_not_counted()
+    {
+        Guid scan = Guid.NewGuid();
+        const string rule = "{\"applicabilityRuleId\":\"sharepoint-user-information-list-forms-http-400\"}";
+        ClassicPageDiscovery Row(
+            string key,
+            string scopeType,
+            string parent,
+            string method,
+            string status,
+            string evidence = null,
+            string web = Web) =>
+            new ClassicPageDiscovery
+            {
+                ScanId = scan,
+                SiteUrl = Site,
+                WebUrl = web,
+                RecordKey = key,
+                RowType = "Scope",
+                ScopeType = scopeType,
+                ParentScopeKey = parent,
+                ObservationMethod = method,
+                DiscoveryStatus = status,
+                EvidenceJson = evidence
+            };
+        ClassicPageDiscovery anotherScan = Row(
+            "surface:second-d",
+            "Surface",
+            "scope:d",
+            IncompleteListingRules.SecondFileListing,
+            "Complete");
+        anotherScan.ScanId = Guid.NewGuid();
+        await Writer()
+            .WriteAsync(
+                new[]
+                {
+                    // Covered: the second listing of the same folder finished, with files or without.
+                    Row("surface:first-a", "Surface", "scope:a", "DocumentLibraryFilesAuthority", "Failed"),
+                    Row("surface:second-a", "Surface", "scope:a", IncompleteListingRules.SecondFileListing, "Complete"),
+                    Row("surface:first-b", "Surface", "scope:b", "ListRootFilesAuthority", "Denied"),
+                    Row("surface:second-b", "Surface", "scope:b", IncompleteListingRules.SecondFileListing, "Empty"),
+                    // Counted: the second listing failed as well, so both rows stay.
+                    Row("surface:first-c", "Surface", "scope:c", "DocumentLibraryFilesAuthority", "Failed"),
+                    Row("surface:second-c", "Surface", "scope:c", IncompleteListingRules.SecondFileListing, "Failed"),
+                    // Counted: the completed second listing belongs to another assessment or another web.
+                    Row("surface:first-d", "Surface", "scope:d", "DocumentLibraryFilesAuthority", "Failed"),
+                    Row("surface:first-e", "Surface", "scope:e", "DocumentLibraryFilesAuthority", "Failed"),
+                    Row(
+                        "surface:second-e",
+                        "Surface",
+                        "scope:e",
+                        IncompleteListingRules.SecondFileListing,
+                        "Complete",
+                        web: "/sub"),
+                    // Covered: a refusal the rule expects, and the scope that failed only because of it.
+                    Row("scope:forms", "Folder", "scope:list", "ListFormBackingFiles", "Failed"),
+                    Row("surface:forms", "Surface", "scope:forms", "AllListFormsAuthority", "Failed", rule),
+                    anotherScan
+                });
+        using ScanContext db = database.CreateContext();
+
+        ReportManager.IncompleteListings counted = await ReportManager.CountIncompleteListingsAsync(db, scan);
+
+        counted.Locations.Should().Be(4);
+        counted.ThrottledRequests.Should().Be(0);
+        counted.Message.Should()
+            .StartWith("4 location(s) could not be listed completely")
+            .And.Contain("discovery.csv holds these locations among its rows");
+        // A throttled listing that the second listing completed leaves no location, so there is no warning.
+        new ReportManager.IncompleteListings(0, 1).Message.Should().BeNull();
     }
 
     /// <summary>Verifies failure to persist finalization is not reported as success.</summary>
