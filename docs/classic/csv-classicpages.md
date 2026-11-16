@@ -62,7 +62,7 @@ LayoutUrl | URL of the publishing page's referenced layout file, as stored in `P
 LayoutCustomizedPageStatus | SharePoint customization status of the referenced publishing layout file: `Uncustomized`, `Customized`, or `None`. Populated during post-scanning from referenced discovery rows; missing statuses (including `--homepageonly`) use a cached fallback with SDK retries. Conflicting observations retain the latest known status and record `changed_during_scan` in `discovery.csv`. Empty for non-publishing pages or when unavailable. Layout failures are recorded as `PageLayoutMetadata` without changing the page's `AssessmentStatus`.
 HomePage | True when this page is the web's home (welcome) page, False when it is not, or empty when the web's welcome page could not be resolved
 UncustomizedHomePage | Nullable authoritative primary API result, or the canonical true/false result when both sealed Web/file fallback receipts establish a completed fallback. Failed/unacquired fallback is empty, not false.
-ModifiedBy | Display name of the user who last modified the page (empty when `--skipuserinformation` was specified)
+ModifiedBy | Email address of the user who last modified the page, or the display name when the account has no email address (empty when `--skipuserinformation` was specified)
 WebPartCount | Actual part count when sealed acquisition and analysis provenance establish a successful read; a genuine empty read is 0. Unacquired/inapplicable values, including Posts, are empty.
 MappingPercentage | Measured readiness percentage only when actually calculated. File-only pages with a successful empty part read retain WebPartCount=0 but have an empty percentage and MappingReadState=WithheldFileOnlyEmpty. Real computed 0% and 100% remain numeric.
 UnmappedWebParts | Comma-separated list of the (short) web part type names on the page that do not have a known modern mapping
@@ -71,6 +71,13 @@ ScanId | Id of the assessment
 SiteUrl | Fully qualified site collection URL
 WebUrl | Relative URL of this web
 ObjectKind / ContentKey | Discriminated native file/item identity, not a URL/hash key.
+SourceKind | `File` for a page that is a physical .aspx file, `ListItem` for a blog post, which is a list item without a file of its own.
+ListTemplate | Template number of the list or library the page belongs to, such as `119` for a wiki page library, `101` for a document library, `850` for a publishing Pages library and `301` for a blog Posts list. Empty when the page belongs to no list.
+ContentReadState | `Available` when the source of the page file was read, `NotApplicable` for a blog post, and another read state when the source was not read.
+ProductFamily | Where the file belongs: `User` for a page that people author, `catalog_…` (for example `catalog_masterpage`) for a file in a gallery, and `Unknown` when the role of the file is not established, and for a blog post.
+Experience | `Classic` for a page file, `Unknown` when the role of the file is not established, and for a blog post.
+ImpactStatus / ImpactedBy | `Included` for a classic page that people author; `ImpactedBy` then links to the message center post that covers such pages. `Excluded` for a file in a gallery, `Unknown` when the classification is not established, and for a blog post; `ImpactedBy` is empty for both.
+ClassificationReason | The rule that gave the classification above, such as `ClassicUserPage;MC1464926`, `CatalogAsset;ExactClassicHandler` or `RoleEvidenceIncomplete`. A blog post names how it was observed, for example `ObservedListItemAndRendererDeclaration`.
 AnalysisRunId / SnapshotId | Exact immutable publication and source selected for this export.
 PageHandler / SourceSha256 / SourceReadState / HandlerResolution | Exact captured source evidence. Empty for independent items or unavailable source.
 NoExecute / NoExecuteRaw / NoExecuteReadState | Nullable trusted Boolean plus the original server text and read outcome. True excludes only the file branch; unknown remains unknown and is included when the handler qualifies.

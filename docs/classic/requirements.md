@@ -42,6 +42,7 @@ Argument | Description
 `--auditlogwindowdays` | Number of days back to query the audit log (1–180, default 14). Requires the `AuditLogsQuery-SharePoint.Read.All` permission. Audit Standard retention is 180 days; Audit Premium (E5) retains up to 1 year.
 `--skipuserinformation` | Skip collecting page user information (e.g. the page's *Modified By*).
 `--homepageonly` | Discover and assess only the configured home page of each web, rather than enumerating every physical ASPX file. Useful for a fast home-page modernization-readiness assessment. Omit this option when a complete physical ASPX inventory is required.
+`--excludesitetemplates` | Web templates to leave out of the page scan, as comma-separated patterns in which `*` and `?` are wildcards, for example `SPSPERS#*,APP#*,BLOG#0`. The default is `SPSPERS#*,APP#*`, which leaves out personal (OneDrive) sites and add-in webs. A value replaces the default, and `none` assesses webs of every template. Each web is matched on its own template, so a sub web with another template is still assessed. A web that is left out has a `PolicyExcluded` row in [discovery.csv](csv-discovery.md). Requires the `Pages` component.
 
 > [!Note]
 > To learn more about starting an assessment checkout the Microsoft 365 Assessment tool [Start documentation](../using-the-assessment-tool/assess-start.md).
