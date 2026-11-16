@@ -46,7 +46,8 @@ internal sealed class ClassicPageAuditCollector(
         {
             try
             {
-                await provider(token);
+                // The wait for a sign-in that is still pending ends with the collection.
+                await provider(token).WaitAsync(token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {

@@ -520,6 +520,12 @@ internal sealed class ClassicContentFixture : IClassicContentReader
         CancellationToken token)
     {
         Count("audit");
+        if (BlockAt == "audit")
+        {
+            Reached.TrySetResult();
+            await Task.Delay(Timeout.Infinite, token);
+        }
+
         if (AuditStatus == "succeeded")
             await journal.ReadOrAcquireAsync(
                 "AuditPage",

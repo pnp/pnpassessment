@@ -33,6 +33,7 @@ internal sealed class ClassicContentCollectionModule(
     /// <summary>
     /// Freezes typed Web scopes, then acquires each Web's file inventory, file enrichment, selected items, and audit receipts.
     /// Reports site collections expanded, then Webs read out of the frozen total, as live progress.
+    /// The usage queries are sent once the scope is frozen and are checked while the Webs are read.
     /// </summary>
     public async IAsyncEnumerable<CollectionRecord> CollectAsync(
         CollectionContext context,
@@ -80,6 +81,12 @@ internal sealed class ClassicContentCollectionModule(
             "assessment",
             () => Task.FromResult(scope),
             cancellationToken);
+        // The audit service takes minutes to answer a usage query. The queries are sent before the first Web is
+        // read and checked while the Webs are read, so that wait runs beside the reading. A new assessment has
+        // signed in to find its Webs by now, so the usage read asks for its access after that sign-in.
+        await using BackgroundRead? usage = scope.Options.SkipUsageInformation
+            ? null
+            : BackgroundRead.Start(token => reader.CollectAuditAsync(scope, journal, token), cancellationToken);
         int websTotal = webScopes.Count;
         int websRead = 0;
         object progressGate = new();
@@ -109,10 +116,11 @@ internal sealed class ClassicContentCollectionModule(
             await workers.Completion;
         }
 
-        if (!scope.Options.SkipUsageInformation)
+        if (usage != null)
         {
-            report?.Invoke(new(ReadingUsage));
-            await reader.CollectAuditAsync(scope, journal, cancellationToken);
+            // The Webs are read. What is left is the wait for usage queries that are still running.
+            if (!usage.IsCompleted) report?.Invoke(new(ReadingUsage));
+            await usage.WaitAsync();
         }
 
         yield return new(null, VersionedJson.From(new { stage = "ClassicObjectCollectionComplete" }));

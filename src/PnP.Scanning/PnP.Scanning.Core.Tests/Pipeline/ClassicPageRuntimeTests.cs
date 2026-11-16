@@ -338,6 +338,137 @@ public sealed class ClassicPageRuntimeTests
     }
 
     /// <summary>
+    /// Verifies that the usage queries are sent before the first Web is read, and that a pause and restart keep one
+    /// usage receipt.
+    /// </summary>
+    [Fact]
+    public async Task Usage_queries_are_sent_before_the_first_web_is_read()
+    {
+        using StoreCase? data = new StoreCase("classicpage-usage-first");
+        ClassicContentFixture? source =
+            new ClassicContentFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
+        PipelineCoordinator? coordinator = new PipelineCoordinator(
+            data.Store,
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        PhaseReply? ticket = await coordinator.CollectAsync(ClassicContentFixture.Request(usage: true));
+        Guid id = Guid.Parse(ticket.AssessmentId);
+        await source.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        // The first Web is held at its file listing, so only a usage read that runs beside it can have started.
+        for (int attempt = 0; attempt < 200 && !source.Calls.ContainsKey("audit"); attempt++) await Task.Delay(100);
+        Assert.True(source.Calls.ContainsKey("audit"), "The usage read did not start while the first Web was read.");
+
+        await coordinator.PauseAsync(id, false);
+        source.BlockAt = null;
+        PipelineCoordinator? reopened = new PipelineCoordinator(
+            new(data.DirectoryPath),
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        await reopened.RestartAsync(id);
+        ScanStatus status = await reopened.WaitForCompletionAsync(id);
+        Assert.True(status == ScanStatus.Finished, (await data.Store.LatestRootAsync(id))!.LastError);
+        using ScanContext? db = data.Store.CreateContext(id);
+        Core.Storage.Pipeline.SourceObservationRow chunk = Assert.Single(
+            await db.SourceObservations.AsNoTracking().ToListAsync(),
+            row => row.SourceIdentity.StartsWith("AuditChunk:", StringComparison.Ordinal));
+        Assert.Equal(AcquisitionStatus.Complete, chunk.AcquisitionStatus);
+    }
+
+    /// <summary>
+    /// Verifies that the Webs are read while a usage query is still running, that collection then waits for the
+    /// query under its own stage, and that a pause ends the waiting query.
+    /// </summary>
+    [Fact]
+    public async Task Collection_reads_the_webs_beside_a_running_usage_query_and_then_waits_for_it()
+    {
+        using StoreCase? data = new StoreCase("classicpage-usage-outlasts-sites");
+        ClassicContentFixture? source = new ClassicContentFixture { BlockAt = "audit", IncludePhysicalFacts = true };
+        PipelineCoordinator? coordinator = new PipelineCoordinator(
+            data.Store,
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        PhaseReply? ticket = await coordinator.CollectAsync(ClassicContentFixture.Request(usage: true));
+        Guid id = Guid.Parse(ticket.AssessmentId);
+        await source.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        string? stage = null;
+        for (int attempt = 0; attempt < 200 && stage != ClassicContentCollectionModule.ReadingUsage; attempt++)
+        {
+            await Task.Delay(100);
+            stage = (await coordinator.ListAsync(new ListRequest { Running = true })).Status
+                .FirstOrDefault(row => row.Id == id.ToString())
+                ?.Stage;
+        }
+
+        Assert.Equal(ClassicContentCollectionModule.ReadingUsage, stage);
+        Assert.True(source.Calls.ContainsKey("identity"), "No Web was read while the usage query was running.");
+        Assert.Equal(1, source.Calls["audit"]);
+
+        await coordinator.PauseAsync(id, false);
+        Assert.Equal(ScanStatus.Paused, await coordinator.WaitForCompletionAsync(id));
+        source.BlockAt = null;
+        PipelineCoordinator? reopened = new PipelineCoordinator(
+            new(data.DirectoryPath),
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        await reopened.RestartAsync(id);
+        ScanStatus status = await reopened.WaitForCompletionAsync(id);
+        Assert.True(status == ScanStatus.Finished, (await data.Store.LatestRootAsync(id))!.LastError);
+        Assert.Equal(2, source.Calls["audit"]);
+        using ScanContext? db = data.Store.CreateContext(id);
+        Assert.Single(
+            await db.SourceObservations.AsNoTracking().ToListAsync(),
+            row => row.SourceIdentity.StartsWith("AuditChunk:", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Verifies that a read running beside the collection reports its own failure to whoever waits for it, and
+    /// that disposal ends a read that is still running without reporting anything.
+    /// </summary>
+    [Fact]
+    public async Task A_read_beside_the_collection_reports_to_its_waiter_and_ends_on_disposal()
+    {
+        BackgroundRead failing = BackgroundRead.Start(
+            _ => Task.FromException(new InvalidDataException("fixture read failure")),
+            CancellationToken.None);
+        InvalidDataException failure = await Assert.ThrowsAsync<InvalidDataException>(() => failing.WaitAsync());
+        Assert.Equal("fixture read failure", failure.Message);
+        Assert.True(failing.IsCompleted);
+        await failing.DisposeAsync();
+
+        TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool cancelled = false;
+        BackgroundRead running = BackgroundRead.Start(
+            async token =>
+            {
+                started.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    cancelled = true;
+                    throw;
+                }
+            },
+            CancellationToken.None);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.False(running.IsCompleted);
+        await running.DisposeAsync();
+        Assert.True(running.IsCompleted);
+        Assert.True(cancelled);
+
+        using CancellationTokenSource collection = new();
+        await using BackgroundRead stopped = BackgroundRead.Start(
+            token => Task.Delay(Timeout.Infinite, token),
+            collection.Token);
+        collection.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stopped.WaitAsync());
+    }
+
+    /// <summary>
     /// Verifies that original source bytes survive storage and drive offline classification.
     /// </summary>
     [Fact]
