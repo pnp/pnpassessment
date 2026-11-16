@@ -24,6 +24,13 @@ internal sealed class FileInventoryReader(
     PublishingLayoutReader layoutReader)
 {
     /// <summary>
+    /// Tells whether a file's source needs no further read: its bytes were captured, or the file is a registered
+    /// list view or list form whose source is left unread.
+    /// </summary>
+    internal static bool IsSettledSource(string sourceReadState) =>
+        sourceReadState == ClassicAspxReadStates.Available || sourceReadState == ClassicAspxReadStates.NotRequested;
+
+    /// <summary>
     /// Acquires journaled physical-file and ASPX discovery evidence under the selected native Web scope.
     /// </summary>
     internal async Task<WebFileInventory> ReadAsync(WebFacts web, AcquisitionJournal journal, CancellationToken token)
@@ -80,7 +87,10 @@ internal sealed class FileInventoryReader(
             });
         Uri? uri = new Uri(web.SiteUrl.TrimEnd('/') + (web.WebUrl == "/" ? "" : web.WebUrl));
         using ClassicPageDiscoveryJournal? factory = new ClassicPageDiscoveryJournal(
-            new PnPContextSharePointAspxRestClientFactory(services.ContextFactory, auth),
+            new PnPContextSharePointAspxRestClientFactory(
+                services.ContextFactory,
+                auth,
+                throttlePolicy: SharePointRestThrottlePolicy.Collection),
             journal);
         using SharePointLiveAspxDiscoveryProvider? provider = new SharePointLiveAspxDiscoveryProvider(
             new(
@@ -120,8 +130,8 @@ internal sealed class FileInventoryReader(
                     file.SiteCollectionId.ToString("D") + "|" + file.FileUniqueId.ToString("D"),
                     () => enricher.ReadAsync(file, token),
                     token,
-                    json => System.Text.Json.JsonSerializer.Deserialize<AspxPageEvidence>(json)!.SourceReadState ==
-                            "Available"
+                    json => IsSettledSource(
+                        System.Text.Json.JsonSerializer.Deserialize<AspxPageEvidence>(json)!.SourceReadState)
                         ? AcquisitionStatus.Complete
                         : AcquisitionStatus.Partial);
         }

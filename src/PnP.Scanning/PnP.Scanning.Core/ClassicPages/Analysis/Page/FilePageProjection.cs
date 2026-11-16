@@ -102,6 +102,20 @@ internal static class FilePageProjection
             return new(null, [], row, false);
         }
 
+        if (source.FileLevelOnly && source.WebPartsState.Status == ClassicAspxReadStates.NotRequested)
+        {
+            // Collection recognized a registered list view or list form without a backing item and requested nothing
+            // more for it. It belongs to the List product family and is not a Page.
+            row.AssessmentStatus = "NotApplicable";
+            AddError(
+                row,
+                "PageItemMetadata",
+                new(
+                    FileLevelPageProjection.RegisteredListViewOrFormCode,
+                    "The file is a registered list view or list form; its web parts are not read."));
+            return new(null, [], row, false);
+        }
+
         if (source.FileLevelOnly)
         {
             FileLevelPageProjection.ListAssociationState association = FileLevelPageProjection.ClassifyListAssociation(

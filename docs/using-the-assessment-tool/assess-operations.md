@@ -36,9 +36,11 @@ Column | Description
 Id | The assessment id
 Mode | The assessment mode (e.g. Classic) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
-Progress | Shows how many site collections of the total in scope site collections are assessed
+Stage | What the assessment is doing, or where it stopped. A Classic assessment goes through `Finding sites`, `Reading sites`, `Reading usage data`, `Checking collected data`, `Analyzing` and `Preparing report data`, and ends as `Completed`; a paused or terminated Classic assessment shows `Collecting data` or `Analyzing`. Other modes show `Assessing sites` while they run
+Progress | How far the current stage is. A Classic assessment counts site collections while finding sites, webs while reading sites (e.g. `312 / 1,480 webs (21%)`) and items while analyzing; a dash marks a stage without a count. Other modes show how many site collections of the total in scope site collections are assessed
 Started at | When was this assessment for the first time started
 Ended at | When was this assessment finished
+Issues | What needs attention: the number of reads that stayed incomplete, the number of items that stayed unassessed and, for a terminated assessment, the reason it stopped. A dash means nothing needs attention
 
 ## Getting a live status overview of a running assessment
 
@@ -63,10 +65,12 @@ Column | Description
 Id | The assessment id
 Mode | The assessment mode (e.g. Classic) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
-Progress | Shows how many site collections of the total in scope site collections are assessed
-Retries | Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot)
+Stage | What the assessment is doing, or where it stopped. A Classic assessment goes through `Finding sites`, `Reading sites`, `Reading usage data`, `Checking collected data`, `Analyzing` and `Preparing report data`, and ends as `Completed`; a paused or terminated Classic assessment shows `Collecting data` or `Analyzing`. Other modes show `Assessing sites` while they run
+Progress | How far the current stage is. A Classic assessment counts site collections while finding sites, webs while reading sites (e.g. `312 / 1,480 webs (21%)`) and items while analyzing; a dash marks a stage without a count. Other modes show how many site collections of the total in scope site collections are assessed
+Retries | Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot). A Classic assessment shows a dash here
 Session start | When was this assessment run started. If you've restarted an assessment the restart time is shown here
 Session duration | How long has the current assessment session been running
+Issues | What needs attention: the number of reads that stayed incomplete, the number of items that stayed unassessed and, for a terminated assessment, the reason it stopped. A dash means nothing needs attention
 
 ### I'm scanning a huge number of site collections and the assessment seems to be stuck, what should I do?
 

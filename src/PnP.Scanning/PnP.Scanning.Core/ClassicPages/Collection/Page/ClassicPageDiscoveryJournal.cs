@@ -1,5 +1,6 @@
 using PnP.Scanning.Core.ClassicPages.Collection.Module;
 using PnP.Scanning.Core.Discovery;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
 
 #nullable enable
 
@@ -26,6 +27,23 @@ internal sealed class ClassicPageDiscoveryJournal(ISharePointAspxRestClientFacto
     /// <summary>
     /// Journals discovery operations while leaving cached transport ownership with its factory.
     /// </summary>
+    /// <summary>
+    /// Marks a listing page given up because of throttling as a partial read; every other page keeps its receipt
+    /// status.
+    /// </summary>
+    internal static AcquisitionStatus PageStatus(SharePointRestPage page) =>
+        PnPContextSharePointAspxRestClient.IsThrottleFailure(page)
+            ? AcquisitionStatus.Partial
+            : AcquisitionStatus.Complete;
+
+    /// <summary>
+    /// Names the listing request that was given up because of throttling; every other page has no acquisition error.
+    /// </summary>
+    internal static string? PageError(SharePointRestPage page) =>
+        PnPContextSharePointAspxRestClient.IsThrottleFailure(page)
+            ? "Throttling stopped a folder listing (" + page.ErrorCode + "): " + page.RequestUri.AbsolutePath
+            : null;
+
     private sealed class Client(ISharePointAspxRestClient inner, AcquisitionJournal journal) : ISharePointAspxRestClient
     {
         public Uri WebUrl => inner.WebUrl;
@@ -44,14 +62,17 @@ internal sealed class ClassicPageDiscoveryJournal(ISharePointAspxRestClientFacto
         private string Key(string operation, string locator) => WebUrl.AbsoluteUri + "|" + operation + "|" + locator;
 
         /// <summary>
-        /// Replays or acquires one original discovery REST page.
+        /// Replays or acquires one original discovery REST page. A page given up because of throttling is recorded
+        /// as an incomplete read, so the assessment counts it and names it as the latest issue.
         /// </summary>
         public Task<SharePointRestPage> GetPageAsync(Uri requestUri, CancellationToken cancellationToken = default) =>
-            journal.ReadOrAcquireAsync(
+            journal.ReadOrAcquireAsync<SharePointRestPage>(
                 "DiscoveryRequest",
                 Key("page", requestUri.AbsoluteUri),
                 () => inner.GetPageAsync(requestUri, cancellationToken),
-                cancellationToken);
+                cancellationToken,
+                PageStatus,
+                PageError);
 
         /// <summary>
         /// Replays or acquires a physical file resolution receipt.

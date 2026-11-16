@@ -321,10 +321,74 @@ public sealed class ClassicContentModelTests
     }
 
     /// <summary>
-    /// Verifies the URL-keyed legacy adapter reports collisions instead of silently merging distinct native item Pages.
+    /// Verifies a Posts list that declares no display form finishes the assessment: each post is addressed through
+    /// SharePoint's list form redirect and keeps its own report row.
     /// </summary>
     [Fact]
-    public async Task Legacy_url_collisions_preserve_native_publication_and_fail_materialization_atomically()
+    public async Task Posts_without_a_display_form_keep_a_report_row_through_the_list_form_redirect()
+    {
+        using StoreCase data = new("classic-posts-without-display-form");
+        ClassicContentFixture source = new() { IncludeBlog = true };
+        source.TransformQueries = scope => scope with
+        {
+            Queries = scope.Queries.Select(query => query with { DisplayFormUrl = null }).ToArray(),
+        };
+        TestExecution execution = await StartAsync(data, source);
+        await AssertStatusAsync(data, execution, ScanStatus.Finished);
+        using ScanContext db = data.Store.CreateContext(execution.AssessmentId);
+        List<ClassicPage> posts = await db.ClassicPages.Where(page => page.PageType == "BlogPage").ToListAsync();
+        Assert.Equal(2, posts.Count);
+        Assert.All(
+            posts,
+            post => Assert.StartsWith(
+                "/sites/a/_layouts/15/listform.aspx?PageType=4&ListId=" +
+                ClassicContentFixture.PostsListId.ToString("D") + "&ID=",
+                post.PageUrl));
+        Assert.Equal(2, posts.Select(post => post.PageUrl).Distinct(StringComparer.Ordinal).Count());
+    }
+
+    /// <summary>
+    /// Verifies the list form redirect is built from the observed web, list id and item id for a root web and a sub web.
+    /// </summary>
+    [Theory]
+    [InlineData("/", "/sites/a")]
+    [InlineData("/sub/blog", "/sites/a/sub/blog")]
+    public void A_post_without_a_display_form_is_addressed_by_its_web_list_and_item_ids(string webUrl, string webPath)
+    {
+        ClassicContentFixture source = new();
+        ListItemBatch batch = new(
+            ClassicContentFixture.Site,
+            webUrl,
+            ClassicContentFixture.PostsListId,
+            "Posts",
+            webPath + "/Lists/Posts",
+            [],
+            null,
+            SourceReadState.Complete,
+            ListItemQueryKind.Posts,
+            301);
+        Dictionary<string, SourceField> fields = new() { ["ID"] = SourceField.Of("Int32", 9) };
+        ClassicPageRow page = ListItemPageProjection.Analyze(
+            Guid.NewGuid(),
+            batch,
+            new ListItemFacts(9, fields),
+            source.Web(),
+            source.Options)!;
+        Assert.Equal(
+            webPath + "/_layouts/15/listform.aspx?PageType=4&ListId=" +
+            ClassicContentFixture.PostsListId.ToString("D") + "&ID=9",
+            page.PageUrl);
+        Assert.Equal("BlogPage", page.PageType);
+        Assert.Equal("Complete", page.AssessmentStatus);
+        Assert.Equal("ObservedListItemAndListFormRedirect", page.ClassificationReason);
+    }
+
+    /// <summary>
+    /// Verifies the URL-keyed legacy adapter leaves a colliding native item Page out and names it: distinct Pages are
+    /// never merged, the lowest content key keeps the row, and the assessment finishes.
+    /// </summary>
+    [Fact]
+    public async Task Legacy_url_collisions_preserve_native_publication_and_leave_the_colliding_page_out()
     {
         using StoreCase data = new("classic-legacy-key-collision");
         ClassicContentFixture source = new() { IncludeBlog = true, IncludeSecondBlog = true };
@@ -334,20 +398,29 @@ public sealed class ClassicContentModelTests
                 .ToArray(),
         };
         TestExecution execution = await StartAsync(data, source);
-        await AssertStatusAsync(data, execution, ScanStatus.Terminated);
+        await AssertStatusAsync(data, execution, ScanStatus.Finished);
         ClassicCompatibilityPayload publication = await PublicationAsync(data, execution.AssessmentId);
         ClassicPageRow first = publication.Pages.First(page => page.Identity!.ObjectKind == PageObjectKind.ListItem);
         ClassicPageRow second = publication.Pages.First(page =>
             page.Identity!.ObjectKind == PageObjectKind.ListItem && page.ListId != first.ListId);
         Assert.Equal(first.PageUrl, second.PageUrl);
-        SnapshotIntegrityException collision =
-            Assert.Throws<SnapshotIntegrityException>(() => ClassicCompatibility.LegacyPages([first, second]));
-        Assert.Contains("Distinct native content", collision.Message);
         Assert.NotEqual(first.Identity, second.Identity);
+        bool firstOwns = string.CompareOrdinal(first.Identity!.Key, second.Identity!.Key) < 0;
+        string owner = firstOwns ? first.Identity.Key : second.Identity.Key;
+        string other = firstOwns ? second.Identity.Key : first.Identity.Key;
+        ClassicPage kept = Assert.Single(
+            ClassicCompatibility.LegacyPages([first, second], out ClassicPageOmission[] omitted));
+        Assert.Equal(first.PageUrl, kept.PageUrl);
+        ClassicPageOmission left = Assert.Single(omitted);
+        Assert.Equal(ClassicPageOmission.SharedAddress, left.Reason);
+        Assert.Equal(other, left.ContentKey);
+        Assert.Equal(owner, left.SharesAddressWith);
+        Assert.Single(ClassicCompatibility.LegacyPages([second, first], out ClassicPageOmission[] reversed));
+        Assert.Equal(other, Assert.Single(reversed).ContentKey);
         ClassicCompatibilityPayload unchanged = await PublicationAsync(data, execution.AssessmentId);
         Assert.Equal(4, unchanged.Pages.Count(page => page.Identity!.ObjectKind == PageObjectKind.ListItem));
         using ScanContext db = data.Store.CreateContext(execution.AssessmentId);
-        Assert.Empty(await db.ClassicPages.ToListAsync());
+        Assert.Equal(2, await db.ClassicPages.CountAsync(page => page.PageType == "BlogPage"));
         Assert.True((await db.SourceSnapshots.SingleAsync()).IsSealed);
         Assert.Equal(
             ScanStatus.Finished,

@@ -180,6 +180,115 @@ public sealed class PipelineAnalysisTests
         Assert.Equal(report ? 1 : 0, await saved.AnalysisReportRows.CountAsync());
     }
 
+    [Fact]
+    public async Task ResultCommitChecksTheSealWithoutLoadingTheStoredManifest()
+    {
+        using var data = new PipelineStoreFixture();
+        await data.InitializeAsync();
+        var observations = new[] { PipelineStoreFixture.Observation(), PipelineStoreFixture.Observation() };
+        foreach (var observation in observations) await data.CommitAsync(observation, observations.Length);
+        await data.Writer.SealAsync(default);
+        var id = await data.StartAnalysisAsync();
+        var commands = new SnapshotCommands();
+        var store = new PipelineStore(data.Root, assessment => new ScanContext(new DbContextOptionsBuilder<ScanContext>()
+            .UseSqlite(new SqliteConnectionStringBuilder { DataSource = data.Store.DatabasePath(assessment), Pooling = false }.ToString())
+            .AddInterceptors(commands).Options));
+        var writer = store.ResultWriter(data.AssessmentId, id);
+        foreach (var observation in observations)
+            await writer.WriteAsync(new(observation.ObservationId, AnalysisOutcome.Analyzed, "fixture", VersionedJson.Empty), default);
+        Assert.Equal(observations.Length, commands.Text.Count);
+        Assert.All(commands.Text, text =>
+        {
+            Assert.DoesNotContain("ManifestJson", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("MemberIdsJson", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("ManifestDigest", text, StringComparison.Ordinal);
+        });
+        using var db = data.Store.CreateContext(data.AssessmentId, readOnly: true);
+        Assert.Equal(observations.Length, await db.AnalysisResults.CountAsync());
+        Assert.Equal(observations.Length, (await db.PhaseRuns.SingleAsync(x => x.RunId == id)).CompletedRecords);
+    }
+
+    [Theory]
+    [InlineData("unsealed")]
+    [InlineData("resealed")]
+    [InlineData("scope")]
+    [InlineData("module")]
+    public async Task PinnedReaderAndWriterRejectAChangedSeal(string fault)
+    {
+        using var data = new PipelineStoreFixture();
+        await data.InitializeAsync();
+        var observation = PipelineStoreFixture.Observation();
+        await data.CommitAsync(observation);
+        await data.Writer.SealAsync(default);
+        var id = await data.StartAnalysisAsync();
+        var reader = data.Reader;
+        await reader.OpenAsync(default);
+        var writer = data.Store.ResultWriter(data.AssessmentId, id);
+        await writer.GetCompletedObservationIdsAsync(default);
+        await data.MutateAsync(async db =>
+        {
+            var snapshot = await db.SourceSnapshots.SingleAsync();
+            switch (fault)
+            {
+                case "unsealed": snapshot.IsSealed = false; break;
+                case "resealed": snapshot.SealedAtUtc = snapshot.SealedAtUtc!.Value.AddSeconds(1); break;
+                case "scope": snapshot.ScopeJson = VersionedJson.From(new { scope = "changed" }).Json; break;
+                case "module": snapshot.ModuleKey = "changed"; break;
+            }
+        });
+        await Assert.ThrowsAsync<SnapshotIntegrityException>(() => reader.ReadAsync(observation.ObservationId, default));
+        await Assert.ThrowsAsync<SnapshotIntegrityException>(() => writer.WriteAsync(
+            new(observation.ObservationId, AnalysisOutcome.Analyzed, "fixture", VersionedJson.Empty), default));
+        using var saved = data.Store.CreateContext(data.AssessmentId, readOnly: true);
+        Assert.Empty(await saved.AnalysisResults.ToListAsync());
+        Assert.Equal(0, (await saved.PhaseRuns.SingleAsync(x => x.RunId == id)).CompletedRecords);
+    }
+
+    [Theory]
+    [InlineData("manifest")]
+    [InlineData("members")]
+    [InlineData("digest")]
+    public async Task StoredManifestChangesAreRejectedWhenThePhaseReopensItsInputAndFinishes(string fault)
+    {
+        using var data = new PipelineStoreFixture();
+        await data.InitializeAsync();
+        var observation = PipelineStoreFixture.Observation();
+        await data.CommitAsync(observation);
+        await data.Writer.SealAsync(default);
+        var id = await data.StartAnalysisAsync();
+        var reader = data.Reader;
+        await reader.OpenAsync(default);
+        await data.Store.ResultWriter(data.AssessmentId, id).WriteAsync(
+            new(observation.ObservationId, AnalysisOutcome.Analyzed, "fixture", VersionedJson.Empty), default);
+        await data.MutateAsync(async db =>
+        {
+            var snapshot = await db.SourceSnapshots.SingleAsync();
+            switch (fault)
+            {
+                case "manifest": snapshot.ManifestJson += " "; break;
+                case "members": snapshot.MemberIdsJson = "[]"; break;
+                case "digest": snapshot.ManifestDigest = new string('0', 64); break;
+            }
+        });
+        await Assert.ThrowsAsync<SnapshotIntegrityException>(() => reader.OpenAsync(default));
+        await Assert.ThrowsAsync<SnapshotIntegrityException>(() => data.Store.FinishAnalysisAsync(data.AssessmentId, id));
+        using var saved = data.Store.CreateContext(data.AssessmentId, readOnly: true);
+        Assert.Equal(ScanStatus.Running, (await saved.PhaseRuns.SingleAsync(x => x.RunId == id)).Status);
+    }
+
+    private sealed class SnapshotCommands : DbCommandInterceptor
+    {
+        internal List<string> Text { get; } = [];
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("FROM \"SourceSnapshots\"", StringComparison.Ordinal))
+                Text.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class FailAnalysisCommit(bool report) : DbTransactionInterceptor
     {
         private bool failed;

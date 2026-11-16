@@ -73,6 +73,13 @@ namespace PnP.Scanning.Core.Tests.Storage
         [InlineData("history", "EventDate")]
         [InlineData("webs", "StartDate")]
         [InlineData("webs", "EndDate")]
+        [InlineData("classicpages", "ModifiedAt")]
+        [InlineData("classiclists", "LastModifiedAt")]
+        [InlineData("workflows", "LastSubscriptionEdit")]
+        [InlineData("workflows", "LastDefinitionEdit")]
+        [InlineData("classicinfopath", "LastItemUserModifiedDate")]
+        [InlineData("classicwebsummaries", "LastItemUserModifiedDate")]
+        [InlineData("classicsitesummaries", "LastItemUserModifiedDate")]
         public void ClassicTemplate_StandardDateColumns_ParseWithExplicitCulture(string tableName, string columnName)
         {
             using var document = ReadEmbeddedClassicTemplate();
@@ -129,6 +136,134 @@ namespace PnP.Scanning.Core.Tests.Storage
                     .And.NotContain("classicaspx.csv")
                     .And.NotContain("classicaspxsummary.json");
             }
+        }
+
+        /// <summary>The ASPX tab reads the physical inventory as UTF-8, keeps quoted line breaks and decodes the null token.</summary>
+        [Fact]
+        public void ClassicTemplate_Aspx_ReadsPhysicalInventoryCsv()
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var lines = GetQueryLines(GetClassicTable(document, "aspx")).ToArray();
+            var source = lines.Single(line => line.Contains("Csv.Document(", StringComparison.Ordinal));
+
+            source.Should().Contain("aspx.csv").And.Contain("Encoding=65001");
+            source.Should().MatchRegex(@"QuoteStyle\s*=\s*QuoteStyle\.Csv");
+            lines.Any(line => line.Contains("\"\\N\",null", StringComparison.Ordinal)).Should().BeTrue();
+        }
+
+        /// <summary>The Pages tab reads the audit usage counts from the supported page CSV as whole numbers.</summary>
+        [Theory]
+        [InlineData("AuditViewsCount")]
+        [InlineData("AuditUniqueUsers")]
+        public void ClassicTemplate_ClassicPages_LoadsAuditUsage(string columnName)
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var table = GetClassicTable(document, "classicpages");
+            var column = table.GetProperty("columns")
+                .EnumerateArray()
+                .Single(value => value.GetProperty("name").GetString() == columnName);
+
+            column.GetProperty("dataType").GetString().Should().Be("int64");
+            GetQueryLines(table)
+                .Any(line => line.Contains($"{{\"{columnName}\", Int64.Type}}", StringComparison.Ordinal))
+                .Should()
+                .BeTrue();
+        }
+
+        /// <summary>An empty date in a classic CSV becomes a blank before the date conversion.</summary>
+        [Theory]
+        [InlineData("classicpages", "ModifiedAt")]
+        [InlineData("classiclists", "LastModifiedAt")]
+        [InlineData("workflows", "LastSubscriptionEdit")]
+        [InlineData("workflows", "LastDefinitionEdit")]
+        [InlineData("classicinfopath", "LastItemUserModifiedDate")]
+        [InlineData("classicwebsummaries", "LastItemUserModifiedDate")]
+        [InlineData("classicsitesummaries", "LastItemUserModifiedDate")]
+        public void ClassicTemplate_DateColumns_ReadEmptyValueAsBlank(string tableName, string columnName)
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var lines = GetQueryLines(GetClassicTable(document, tableName)).ToArray();
+            var blanks = Array.FindIndex(
+                lines,
+                line => line.Contains("Table.ReplaceValue(", StringComparison.Ordinal) &&
+                        line.Contains("\"\",null", StringComparison.Ordinal) &&
+                        line.Contains($"\"{columnName}\"", StringComparison.Ordinal));
+            var conversion = Array.FindIndex(
+                lines,
+                line => line.Contains($"{{\"{columnName}\", type datetime}}", StringComparison.Ordinal));
+
+            blanks.Should().NotBe(-1);
+            conversion.Should().BeGreaterThan(blanks);
+        }
+
+        /// <summary>Every date/time column of the model receives its values from a date conversion in the table's query.</summary>
+        [Fact]
+        public void ClassicTemplate_AllDateColumns_AreConvertedInTheirQuery()
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var loadedAsText = new List<string>();
+
+            foreach (var table in document.RootElement.GetProperty("model").GetProperty("tables").EnumerateArray())
+            {
+                if (!table.TryGetProperty("partitions", out var partitions) ||
+                    !partitions[0].GetProperty("source").TryGetProperty("expression", out var expression) ||
+                    expression.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                var query = string.Join("\n", expression.EnumerateArray().Select(line => line.GetString()));
+                foreach (var column in table.GetProperty("columns").EnumerateArray())
+                {
+                    if (column.TryGetProperty("type", out _) ||
+                        !column.TryGetProperty("dataType", out var dataType) ||
+                        dataType.GetString() != "dateTime")
+                    {
+                        continue;
+                    }
+
+                    var source = column.GetProperty("sourceColumn").GetString();
+                    if (!query.Contains($"{{\"{source}\", type datetime}}", StringComparison.Ordinal))
+                    {
+                        loadedAsText.Add($"{table.GetProperty("name").GetString()}.{source}");
+                    }
+                }
+            }
+
+            loadedAsText.Should().BeEmpty();
+        }
+
+        /// <summary>The report has an ASPX tab, and its Pages table shows audit usage in place of the remediation code.</summary>
+        [Fact]
+        public void ClassicTemplate_Layout_HasAspxTabAndPagesAuditColumns()
+        {
+            ReadEmbeddedClassicTabVisuals("ASPX").Should().Contain("aspx.AspxCategory");
+            ReadEmbeddedClassicTabVisuals("Pages").Should()
+                .Contain("classicpages.AuditViewsCount")
+                .And.Contain("classicpages.AuditUniqueUsers")
+                .And.Contain("MC1464926")
+                .And.NotContain("RemediationCode");
+        }
+
+        /// <summary>
+        /// The ASPX table tells how SharePoint serves each file: a download for NoExecute true and rendered for every other
+        /// file, an empty NoExecute included. The customization status stays in the CSV.
+        /// </summary>
+        [Fact]
+        public void ClassicTemplate_Layout_AspxTableShowsServedAs()
+        {
+            using var document = ReadEmbeddedClassicTemplate();
+            var served = GetQueryLines(GetClassicTable(document, "aspx"))
+                .Single(line => line.Contains("\"ServedAs\"", StringComparison.Ordinal));
+
+            served.Should()
+                .Contain("each if [NoExecute] = true then \"Download\" else \"Render\",")
+                .And.NotContain("May render")
+                .And.NotContain("Unknown");
+            ReadEmbeddedClassicTabVisuals("ASPX").Should()
+                .Contain("aspx.ServedAs")
+                .And.NotContain("aspx.NoExecute")
+                .And.NotContain("CustomizedPageStatus");
         }
 
         [Fact]
@@ -226,6 +361,27 @@ namespace PnP.Scanning.Core.Tests.Storage
             using var pbit = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
             pbit.Should().NotBeNull();
             return JsonDocument.Parse(ReadDataModelSchema(pbit));
+        }
+
+        // Returns the visual configurations of one report tab from the embedded template's layout.
+        private static string ReadEmbeddedClassicTabVisuals(string displayName)
+        {
+            const string resourceName = "PnP.Scanning.Core.Scanners.Classic.ClassicAssessmentReport.pbit";
+            using var pbit = typeof(ReportManager).Assembly.GetManifestResourceStream(resourceName);
+            pbit.Should().NotBeNull();
+            using var archive = new ZipArchive(pbit, ZipArchiveMode.Read);
+            var entry = archive.GetEntry("Report/Layout");
+            entry.Should().NotBeNull();
+            using var reader = new StreamReader(entry.Open(), Encoding.Unicode);
+            using var layout = JsonDocument.Parse(reader.ReadToEnd());
+
+            var tab = layout.RootElement.GetProperty("sections")
+                .EnumerateArray()
+                .Single(section => section.GetProperty("displayName").GetString() == displayName);
+            return string.Concat(
+                tab.GetProperty("visualContainers")
+                    .EnumerateArray()
+                    .Select(visual => visual.GetProperty("config").GetString()));
         }
 
         private static JsonElement GetClassicTable(JsonDocument document, string name)

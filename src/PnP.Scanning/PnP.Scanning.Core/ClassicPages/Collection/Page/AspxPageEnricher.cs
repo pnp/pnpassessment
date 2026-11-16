@@ -19,8 +19,14 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
     /// </summary>
     private sealed record ListContext(Guid Id, int Template, bool Catalog, string Root);
 
+    /// <summary>
+    /// Retains which list a registered view belongs to and whether SharePoint marks that view as hidden.
+    /// </summary>
+    internal sealed record ViewRegistration(Guid ListId, bool Hidden);
+
     private readonly Dictionary<Guid, ListContext> lists = [];
-    private readonly HashSet<string> views = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, System.Collections.Generic.List<ViewRegistration>> views =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> forms = new(StringComparer.OrdinalIgnoreCase);
     private readonly SharePointAspxUrlPolicy urls = new(site, web);
     private bool metadataComplete;
@@ -66,7 +72,7 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
                             includeFormObjects => ReadListRegistrationsAsync(list, includeFormObjects, token),
                             token)
                         .ConfigureAwait(false);
-                    foreach (View? view in list.Views) Add(views, view.ServerRelativeUrl);
+                    foreach (View? view in list.Views) AddView(list.Id, view.ServerRelativeUrl, view.Hidden);
                     if (usedDefaultForms)
                     {
                         Add(forms, list.DefaultDisplayFormUrl);
@@ -121,7 +127,7 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        csom.Load(list.Views, values => values.Include(v => v.ServerRelativeUrl));
+        csom.Load(list.Views, values => values.Include(v => v.ServerRelativeUrl, v => v.Hidden));
         csom.Load(
             list.ContentTypes,
             values => values.Include(c => c.DisplayFormUrl, c => c.EditFormUrl, c => c.NewFormUrl));
@@ -213,6 +219,40 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
     }
 
     /// <summary>
+    /// Adds an authority-checked view registration with its owning list and hidden state, or marks role coverage
+    /// incomplete.
+    /// </summary>
+    private void AddView(Guid listId, string? value, bool hidden)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!TryNormalizeRegistration(site, web, value, out string? normalized))
+        {
+            rolesComplete = false;
+            return;
+        }
+
+        if (!views.TryGetValue(normalized, out var registered))
+        {
+            registered = [];
+            views.Add(normalized, registered);
+        }
+
+        registered.Add(new(listId, hidden));
+    }
+
+    /// <summary>
+    /// Separates a list's own view page from a content page that hosts a list view web part. SharePoint registers a
+    /// hidden view on the source list for every list view web part placed on a page, and that view names the hosting
+    /// page. A page is a list view page when a visible view names it, or when a hidden view of the list that owns
+    /// the file names it and the file is one of that list's own pages rather than one of its items.
+    /// </summary>
+    internal static bool IsListViewPage(
+        IEnumerable<ViewRegistration> registrations,
+        Guid? owningListId,
+        bool isListItem) =>
+        registrations.Any(view => !view.Hidden || (!isListItem && view.ListId == owningListId));
+
+    /// <summary>
     /// Normalizes a declared role locator while rejecting foreign authorities.
     /// </summary>
     internal static bool TryNormalizeRegistration(Uri site, Uri web, string value, out string normalized)
@@ -227,7 +267,33 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
     }
 
     /// <summary>
-    /// Captures bounded original source bytes and independent native role evidence for one physical file.
+    /// Records a registered list view or list form without requesting its source. Such a file belongs to the List
+    /// product family whatever its handler is, so its role evidence is retained and its handler stays unread.
+    /// </summary>
+    internal static AspxPageEvidence SourceNotRequested(
+        int? listTemplate,
+        bool? catalog,
+        bool? view,
+        bool? form,
+        string roleState,
+        DateTime observedAtUtc) =>
+        new(
+            ClassicAspxReadStates.NotRequested,
+            null,
+            null,
+            ClassicAspxReadStates.NotRequested,
+            null,
+            null,
+            listTemplate,
+            catalog,
+            view,
+            form,
+            roleState,
+            observedAtUtc);
+
+    /// <summary>
+    /// Captures independent native role evidence for one physical file, and its bounded original source bytes unless
+    /// the file is a registered list view or list form.
     /// </summary>
     internal async Task<string> ReadAsync(PhysicalFileFacts file, CancellationToken token)
     {
@@ -241,7 +307,8 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
         string? normalized = urls.TryNormalizeDecodedPhysicalPath(file.ServerRelativeUrl, out string? path)
             ? path
             : null;
-        bool? view = normalized != null && views.Contains(normalized)
+        bool? view = normalized != null && views.TryGetValue(normalized, out var registered) &&
+                     IsListViewPage(registered, owner?.Id, file.ListItemId != null)
             ? true
             : rolesComplete
                 ? false
@@ -257,14 +324,19 @@ internal sealed class AspxPageEnricher(PnPContext pnp, ClientContext csom, Uri s
             : rolesComplete && catalog != null
                 ? "Complete"
                 : "Partial";
+        if (PnP.Scanning.Core.ClassicPages.Analysis.Page.AspxPageClassifier.IsListFamily(view, form))
+            return JsonSerializer.Serialize(
+                SourceNotRequested(owner?.Template, catalog, view, form, roleState, DateTime.UtcNow));
         try
         {
-            PnP.Core.Model.SharePoint.IFile? source = await pnp.Web
-                .GetFileByIdAsync(file.FileUniqueId, f => f.UniqueId, f => f.Length)
+            AspxSourceObservation? observed = await AspxSourceReader.ReadAsync(
+                    pnp.RestClient.Client,
+                    request => pnp.AuthenticationProvider.AuthenticateRequestAsync(pnp.Uri, request),
+                    pnp.Uri,
+                    file.FileUniqueId,
+                    file.Length,
+                    token)
                 .ConfigureAwait(false);
-            if (source.UniqueId != file.FileUniqueId)
-                throw new InvalidDataException("ASPX source response has a different file identity.");
-            AspxSourceObservation? observed = await AspxSourceReader.ReadAsync(source, token).ConfigureAwait(false);
             return JsonSerializer.Serialize(
                 new AspxPageEvidence(
                     observed.State,

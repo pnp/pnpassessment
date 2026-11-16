@@ -46,7 +46,7 @@ internal static class ClassicPageAuditClient
             // can outlive the initial token's ~1h lifetime while Graph queues/processes queries, so a
             // token captured once at the start would be expired by the time we fetch records (HTTP 401).
             // GetAccessTokenAsync is cache-backed, so this is cheap when the token is still valid.
-            string token = await tokenProvider(ct);
+            string token = await tokenProvider(ct).WaitAsync(ct);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             HttpResponseMessage response = await client.SendAsync(
                 request,

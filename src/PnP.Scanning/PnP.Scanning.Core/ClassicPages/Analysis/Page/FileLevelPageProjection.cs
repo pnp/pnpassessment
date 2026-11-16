@@ -13,6 +13,7 @@ internal static class FileLevelPageProjection
     internal const string OwningListUnresolvedCode = "owning_list_unresolved";
     internal const string ListAssociationUnknownCode = "list_association_unknown";
     internal const string SystemPageTemplateCode = "system_page_template";
+    internal const string RegisteredListViewOrFormCode = "registered_list_view_or_form";
 
     /// <summary>
     /// Distinguishes confirmed associations from unmatched owners and unknown list scope.

@@ -23,7 +23,7 @@ internal interface ICollectionModule
 }
 
 /// <summary>
-/// Binds fixed collection options, checkpoint, online capabilities, and assessment identity.
+/// Binds fixed collection options, checkpoint, online capabilities, assessment identity, and the live progress sink.
 /// </summary>
 internal sealed record CollectionContext(
     StartRequest Options,
@@ -31,7 +31,8 @@ internal sealed record CollectionContext(
     VersionedJson? Checkpoint,
     ICollectionEnvironment Environment,
     Guid AssessmentId = default,
-    ICollectionJournal? Journal = null);
+    ICollectionJournal? Journal = null,
+    Action<PhaseProgress>? Progress = null);
 
 /// <summary>
 /// Provides bound receipt commits and replay reads for one collection snapshot.

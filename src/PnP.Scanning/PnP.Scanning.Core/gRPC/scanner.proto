@@ -48,6 +48,12 @@ message ScanStatusReply {
     int32 RecordsTotal = 17;
     int32 ErrorCount = 18;
     string ErrorSummary = 19;
+    string Stage = 20;
+    int32 ProgressCompleted = 21;
+    int32 ProgressTotal = 22;
+    string ProgressUnit = 23;
+    int32 ReadIssues = 24;
+    int32 AnalysisIssues = 25;
 }
 
 // Start
@@ -120,6 +126,12 @@ message ListScanResponse {
     int32 RecordsTotal = 14;
     int32 ErrorCount = 15;
     string ErrorSummary = 16;
+    string Stage = 17;
+    int32 ProgressCompleted = 18;
+    int32 ProgressTotal = 19;
+    string ProgressUnit = 20;
+    int32 ReadIssues = 21;
+    int32 AnalysisIssues = 22;
 }
 
 // Pause

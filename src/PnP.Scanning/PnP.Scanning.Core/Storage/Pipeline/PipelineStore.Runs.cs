@@ -148,7 +148,8 @@ internal sealed partial class PipelineStore
             throw new SnapshotIntegrityException("The analysis run's pinned rule or parameters changed.");
         SourceSnapshotRow? snapshot =
             await db.SourceSnapshots.AsNoTracking().SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
-        PinnedManifest? pinned = new PinnedManifest(await ValidateSnapshotAsync(db, snapshot, token));
+        SnapshotManifest manifest = await ValidateSnapshotAsync(db, snapshot, token);
+        PinnedManifest? pinned = new PinnedManifest(manifest, snapshot.SealedAtUtc!.Value);
         if (pinned.Digest != run.ManifestDigest || run.ModuleKey != snapshot.ModuleKey)
             throw new SnapshotIntegrityException("The analysis run's pinned input differs from its selected snapshot.");
         return pinned;
@@ -172,8 +173,8 @@ internal sealed partial class PipelineStore
         AnalysisRunRow? run = await db.AnalysisRuns.SingleAsync(x => x.AnalysisRunId == runId, token);
         if (pinned.Digest != run.ManifestDigest)
             throw new SnapshotIntegrityException("The analysis input digest changed.");
-        SourceSnapshotRow? snapshot = await db.SourceSnapshots.SingleAsync(x => x.SnapshotId == run.SnapshotId, token);
-        await ReadSelectedObservationAsync(db, snapshot, result.ObservationId, pinned, token);
+        SnapshotSeal seal = await ReadSealAsync(db, run.SnapshotId, token);
+        await ReadSelectedObservationAsync(db, seal, result.ObservationId, pinned, token);
         AnalysisResultRow? previous = await db.AnalysisResults.SingleOrDefaultAsync(
             x => x.AnalysisRunId == runId && x.ObservationId == result.ObservationId,
             token);

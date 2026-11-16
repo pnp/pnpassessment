@@ -69,30 +69,71 @@ internal static class ClassicCompatibility
     }
 
     /// <summary>
-    /// Rejects unrepresentable or colliding legacy URL keys before writes; canonical native objects remain in immutable analysis publication.
+    /// Builds the legacy URL-keyed rows; canonical native objects remain in immutable analysis publication.
     /// </summary>
-    internal static ClassicPage[] LegacyPages(ClassicPageRow[] pages)
+    internal static ClassicPage[] LegacyPages(ClassicPageRow[] pages) => LegacyPages(pages, out _);
+
+    /// <summary>
+    /// Builds the legacy URL-keyed rows and names every Page they cannot carry: a Page without an address, and every
+    /// Page but one of those sharing a legacy URL key. Such a Page is left out and reported with its reason, so it
+    /// no longer stops the assessment; canonical native objects remain in immutable analysis publication.
+    /// </summary>
+    internal static ClassicPage[] LegacyPages(ClassicPageRow[] pages, out ClassicPageOmission[] omitted)
     {
-        Dictionary<(string Site, string Web, string Url), PageIdentity> legacyKeys = [];
+        (ClassicPageRow Page, PageIdentity Identity)[] classic = pages
+            .Where(page => page.PageType != ClassicPageRules.ModernPage)
+            .Select(page => (page,
+                page.Identity?.Validated() ??
+                throw new SnapshotIntegrityException("Compatibility output requires native Page identity.")))
+            .ToArray();
+        Dictionary<(string Site, string Web, string Url), PageIdentity> owners = AddressOwners(
+            classic.Select(row => (row.Identity, row.Page.SiteUrl, row.Page.WebUrl, row.Page.PageUrl)));
         List<ClassicPage> legacy = [];
-        foreach (ClassicPageRow page in pages.Where(page => page.PageType != ClassicPageRules.ModernPage))
+        List<ClassicPageOmission> left = [];
+        foreach ((ClassicPageRow page, PageIdentity identity) in classic)
         {
-            PageIdentity identity = page.Identity?.Validated() ??
-                                    throw new SnapshotIntegrityException(
-                                        "Compatibility output requires native Page identity.");
             if (string.IsNullOrWhiteSpace(page.PageUrl))
-                throw new SnapshotIntegrityException(
-                    $"The existing report contract cannot represent content {identity.Key} without an acquired locator; native evidence is retained.");
-            (string Site, string Web, string Url) key = (page.SiteUrl.ToUpperInvariant(),
-                page.WebUrl.ToUpperInvariant(), ClassicPageAuditAnalysis.LocatorKey(page.PageUrl));
-            if (legacyKeys.TryGetValue(key, out PageIdentity? previous) && previous != identity)
-                throw new SnapshotIntegrityException(
-                    $"Distinct native content {previous.Key} and {identity.Key} share one legacy URL key. The existing report contract cannot represent both; no object was discarded.");
-            legacyKeys.Add(key, identity);
+            {
+                left.Add(ClassicPageOmission.Of(page, identity, ClassicPageOmission.NoAddress));
+                continue;
+            }
+
+            PageIdentity owner = owners[AddressKey(page.SiteUrl, page.WebUrl, page.PageUrl)];
+            if (owner != identity)
+            {
+                left.Add(ClassicPageOmission.Of(page, identity, ClassicPageOmission.SharedAddress, owner));
+                continue;
+            }
+
             legacy.Add(ToLegacyPage(page));
         }
 
+        omitted = left.ToArray();
         return legacy.ToArray();
+    }
+
+    /// <summary>Builds the historical report key: site and web without case, path without case, query and fragment unchanged.</summary>
+    internal static (string Site, string Web, string Url) AddressKey(string siteUrl, string webUrl, string pageUrl) =>
+        (siteUrl.ToUpperInvariant(), webUrl.ToUpperInvariant(), ClassicPageAuditAnalysis.LocatorKey(pageUrl));
+
+    /// <summary>
+    /// Names the one native identity that keeps the report row for each legacy URL key: the lowest content key, so the
+    /// choice is the same for every reader of the same publication and independent of the order the Pages arrive in.
+    /// </summary>
+    internal static Dictionary<(string Site, string Web, string Url), PageIdentity> AddressOwners(
+        IEnumerable<(PageIdentity Identity, string SiteUrl, string WebUrl, string? PageUrl)> pages)
+    {
+        Dictionary<(string Site, string Web, string Url), PageIdentity> owners = [];
+        foreach ((PageIdentity identity, string siteUrl, string webUrl, string? pageUrl) in pages)
+        {
+            if (string.IsNullOrWhiteSpace(pageUrl)) continue;
+            (string Site, string Web, string Url) key = AddressKey(siteUrl, webUrl, pageUrl);
+            if (!owners.TryGetValue(key, out PageIdentity? owner) ||
+                string.CompareOrdinal(identity.Key, owner.Key) < 0)
+                owners[key] = identity;
+        }
+
+        return owners;
     }
 
     /// <summary>

@@ -171,6 +171,20 @@ public sealed class FileLevelPageProjectionTests
         if (status != "Complete") output.Page.AssessmentStatus.Should().Be("Failed");
     }
 
+    /// <summary>Keeps a registered list view or form that collection left unread out of the Pages, with its reason.</summary>
+    [Fact]
+    public void A_registered_list_view_or_form_left_unread_by_collection_is_not_a_page()
+    {
+        const string setupPath = "Features\\DocumentLibrary\\doclib\\Upload.aspx";
+        FilePageAnalysis output = Analyze(Row(setupPath), new(ClassicAspxReadStates.NotRequested));
+        output.Page.Should().BeNull();
+        output.Parts.Should().BeEmpty();
+        output.Error.Should().BeNull();
+        output.Discovery.AssessmentStatus.Should().Be("NotApplicable");
+        output.Discovery.ErrorCodes.Should().Be(FileLevelPageProjection.RegisteredListViewOrFormCode);
+        Analyze(Row(setupPath), SourceReadState.NotAttempted).Page.Should().NotBeNull();
+    }
+
     /// <summary>Builds native analysis inputs with no online context or fabricated list item.</summary>
     private static FilePageAnalysis Analyze(DiscoveryEvidence row, SourceReadState partsState)
     {

@@ -8,22 +8,27 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
     private readonly IAuthenticationProvider authenticationProvider;
     private readonly Guid? scanId;
     private readonly Func<PnPContext, HttpClient> jsonTransportFactory;
+    private readonly SharePointRestThrottlePolicy throttlePolicy;
     private readonly Dictionary<string, ISharePointAspxRestClient> clients = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Creates a per-web client cache, retaining caller ownership of any shared context or injected transport.</summary>
+    /// <summary>
+    /// Creates a per-web client cache, retaining caller ownership of any shared context or injected transport.
+    /// Every client it creates follows <paramref name="throttlePolicy"/>; without one, the default policy applies.
+    /// </summary>
     internal PnPContextSharePointAspxRestClientFactory(IPnPContextFactory contextFactory,
         IAuthenticationProvider authenticationProvider, Guid? scanId = null, PnPContext sharedContext = null,
-        Func<PnPContext, HttpClient> jsonTransportFactory = null)
+        Func<PnPContext, HttpClient> jsonTransportFactory = null, SharePointRestThrottlePolicy throttlePolicy = null)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         this.authenticationProvider = authenticationProvider ?? throw new ArgumentNullException(nameof(authenticationProvider));
         this.scanId = scanId;
         // Explicit borrowed transports retain caller ownership; no environment/test autodetection.
         this.jsonTransportFactory = jsonTransportFactory;
+        this.throttlePolicy = throttlePolicy;
         if (sharedContext != null)
             clients.Add(sharedContext.Uri.AbsoluteUri.TrimEnd('/'),
                 new PnPContextSharePointAspxRestClient(sharedContext, ownsContext: false,
-                    jsonTransport: jsonTransportFactory?.Invoke(sharedContext)));
+                    jsonTransport: jsonTransportFactory?.Invoke(sharedContext), throttlePolicy: throttlePolicy));
     }
 
     /// <summary>Reuses an exact cached web client or creates an authenticated scan-tagged context for that web.</summary>
@@ -41,7 +46,7 @@ internal sealed class PnPContextSharePointAspxRestClientFactory : ISharePointAsp
         var context = await contextFactory.CreateAsync(webUrl, authenticationProvider, cancellationToken,
             contextOptions).ConfigureAwait(false);
         var client = new PnPContextSharePointAspxRestClient(context,
-            jsonTransport: jsonTransportFactory?.Invoke(context));
+            jsonTransport: jsonTransportFactory?.Invoke(context), throttlePolicy: throttlePolicy);
         clients.Add(key, client);
         return client;
     }

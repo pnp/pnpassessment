@@ -67,6 +67,9 @@ internal sealed class CollectionEnvironment(
             Serilog.Log.Information("Collection authentication: {Message}", result.Message);
             return Task.CompletedTask;
         });
-        return new(authentication, contextFactory(), siteEnumeration());
+        // A session that only runs this pipeline has no other listener for the SDK's throttled requests.
+        IPnPContextFactory factory = contextFactory();
+        SharePointRestThrottlePolicy.ListenForThrottling(factory.EventHub);
+        return new(authentication, factory, siteEnumeration());
     }
 }

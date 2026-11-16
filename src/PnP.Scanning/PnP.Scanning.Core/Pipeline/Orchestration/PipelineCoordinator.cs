@@ -31,6 +31,12 @@ internal sealed class PipelineCoordinator(
     internal int ActiveCount => active.Count;
 
     /// <summary>
+    /// Called with the assessment id once a run that collected and analyzed has settled as finished. The run is
+    /// complete before the call, and a failure of the call is logged and leaves the run finished.
+    /// </summary>
+    internal Func<Guid, Task>? AssessmentFinished { get; set; }
+
+    /// <summary>
     /// Checks whether the assessment currently owns an in-memory phase execution.
     /// </summary>
     internal bool IsActive(Guid assessmentId) => active.ContainsKey(assessmentId);
@@ -508,12 +514,16 @@ internal sealed class PipelineCoordinator(
                     phase.CheckpointJson == null ? null : new VersionedJson(phase.CheckpointJson),
                     collectionEnvironment,
                     root.AssessmentId,
-                    journal);
+                    journal,
+                    progress => execution.Progress = progress);
                 await foreach (CollectionRecord? record in module.CollectAsync(context, token).WithCancellation(token))
                     await writer.CommitAsync(record, token);
                 token.ThrowIfCancellationRequested();
+                execution.Progress = new(PhaseStages.Checking);
                 if (module is ICollectionSnapshotValidator validator) await validator.ValidateAsync(journal, token);
                 await writer.SealAsync(token);
+                // Analysis progress is the persisted record count, so the live collection step ends here.
+                execution.Progress = null;
             }
 
             if (root.Kind != PhaseKind.Collection)
@@ -540,6 +550,7 @@ internal sealed class PipelineCoordinator(
                         new VersionedJson(PipelineRunSettings.Read(root).AnalysisParametersJson),
                         PipelineRunSettings.Read(root).Threads,
                         token);
+                    execution.Progress = new(PhaseStages.PreparingReport);
                     if (module is IAnalysisFinalizer finalizer)
                     {
                         await finalizer.FinalizeAsync(
@@ -556,6 +567,7 @@ internal sealed class PipelineCoordinator(
                 else
                     await store.OpenSnapshotAsync(root.AssessmentId, root.SnapshotId, token);
 
+                execution.Progress = new(PhaseStages.PreparingReport);
                 if (root.ModuleKey == ClassicPageModule.Key)
                     await store.MaterializeClassicAsync(root.AssessmentId, phase.RunId, token);
             }
@@ -569,6 +581,7 @@ internal sealed class PipelineCoordinator(
             Serilog.Log.Error(ex, "Pipeline run {RunId} failed", root.RunId);
         }
 
+        bool finished = false;
         await execution.Control.WaitAsync();
         try
         {
@@ -580,6 +593,7 @@ internal sealed class PipelineCoordinator(
             execution.Settled = true;
             active.TryRemove(root.AssessmentId, out _);
             execution.Completion.TrySetResult(status);
+            finished = status == ScanStatus.Finished && root.Kind == PhaseKind.Pipeline;
         }
         catch (Exception ex)
         {
@@ -592,6 +606,21 @@ internal sealed class PipelineCoordinator(
         {
             execution.Control.Release();
             execution.Cancellation.Dispose();
+        }
+
+        if (finished && AssessmentFinished is { } notify)
+        {
+            try
+            {
+                await notify(root.AssessmentId);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(
+                    ex,
+                    "The finished notification of assessment {AssessmentId} failed",
+                    root.AssessmentId);
+            }
         }
     }
 
@@ -630,7 +659,8 @@ internal sealed class PipelineCoordinator(
     }
 
     /// <summary>
-    /// Projects persisted root phases into existing assessment list responses.
+    /// Projects persisted root phases into existing assessment list responses, with the stage, countable progress
+    /// and per-phase issue counts shown to the person waiting.
     /// </summary>
     internal async Task<ListReply> ListAsync(ListRequest request, CancellationToken token = default)
     {
@@ -643,6 +673,8 @@ internal sealed class PipelineCoordinator(
                   request.Finished && run.Status == ScanStatus.Finished ||
                   request.Terminated && run.Status == ScanStatus.Terminated))
                 continue;
+            PhaseProgress progress = DescribeProgress(run);
+            IReadOnlyList<PhaseRunRow> runs = await store.GetRunsAsync(run.AssessmentId, token);
             reply.Status.Add(
                 new ListScanResponse
                 {
@@ -658,6 +690,12 @@ internal sealed class PipelineCoordinator(
                     RecordsTotal = run.TotalRecords,
                     ErrorCount = run.ErrorCount,
                     ErrorSummary = run.LastError ?? "",
+                    Stage = progress.Stage,
+                    ProgressCompleted = progress.Completed,
+                    ProgressTotal = progress.Total,
+                    ProgressUnit = progress.Unit,
+                    ReadIssues = IssueCount(runs, run, PhaseKind.Collection),
+                    AnalysisIssues = IssueCount(runs, run, PhaseKind.Analysis),
                     // SQLite stores the UTC value but does not preserve DateTime.Kind on materialization.
                     ScanStarted = Timestamp.FromDateTime(DateTime.SpecifyKind(run.CreatedAtUtc, DateTimeKind.Utc)),
                     ScanEnded = Timestamp.FromDateTime(
@@ -667,6 +705,28 @@ internal sealed class PipelineCoordinator(
 
         return reply;
     }
+
+    /// <summary>
+    /// Names a root run's stage and countable progress: the live step while it executes, otherwise its persisted phase.
+    /// </summary>
+    private PhaseProgress DescribeProgress(PhaseRunRow run)
+    {
+        if (run.Status == ScanStatus.Finished) return new(PhaseStages.Completed);
+        if (active.TryGetValue(run.AssessmentId, out ActiveExecution? execution) &&
+            execution.Root.RunId == run.RunId && execution.Progress is { } live)
+            return live;
+        return run.CurrentPhase == PhaseKind.Analysis
+            ? new(PhaseStages.Analyzing, run.CompletedRecords, run.TotalRecords, "items")
+            : new(PhaseStages.Collecting);
+    }
+
+    /// <summary>
+    /// Counts the records one phase could not complete, from the phase's own row rather than the root's mirror.
+    /// </summary>
+    private static int IssueCount(IReadOnlyList<PhaseRunRow> runs, PhaseRunRow root, PhaseKind kind) =>
+        root.Kind == kind
+            ? root.ErrorCount
+            : runs.Where(x => x.ParentRunId == root.RunId && x.Kind == kind).Sum(x => x.ErrorCount);
 
     /// <summary>
     /// Projects active phase progress without misrepresenting record counts as legacy site counts.
@@ -693,6 +753,12 @@ internal sealed class PipelineCoordinator(
                     RecordsTotal = row.RecordsTotal,
                     ErrorCount = row.ErrorCount,
                     ErrorSummary = row.ErrorSummary,
+                    Stage = row.Stage,
+                    ProgressCompleted = row.ProgressCompleted,
+                    ProgressTotal = row.ProgressTotal,
+                    ProgressUnit = row.ProgressUnit,
+                    ReadIssues = row.ReadIssues,
+                    AnalysisIssues = row.AnalysisIssues,
                     Started = row.ScanStarted,
                     Duration = Duration.FromTimeSpan(DateTime.UtcNow - started),
                 });
@@ -780,5 +846,8 @@ internal sealed class PipelineCoordinator(
 
         internal ScanStatus? RequestedStatus { get; set; }
         internal bool Settled { get; set; }
+
+        /// <summary>The live step reported by the executing phase; absent while persisted counters describe it.</summary>
+        internal volatile PhaseProgress? Progress;
     }
 }

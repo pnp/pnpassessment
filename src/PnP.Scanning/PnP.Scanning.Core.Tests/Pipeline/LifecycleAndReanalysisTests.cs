@@ -127,6 +127,59 @@ public sealed class LifecycleAndReanalysisTests
     }
 
     /// <summary>
+    /// Verifies that a run announces its assessment once, when it finishes after collecting and analyzing, that a
+    /// terminated run announces nothing, and that a failing listener leaves the run finished.
+    /// </summary>
+    [Fact]
+    public async Task Only_a_finished_collection_and_analysis_run_announces_its_assessment_once()
+    {
+        using StoreCase? data = new StoreCase("pipeline-finished-notification");
+        ForbiddenOnlineEnvironment? environment = new ForbiddenOnlineEnvironment();
+        FixtureControl? control = new FixtureControl();
+        ModuleRegistry? registration = new ModuleRegistry(
+            [new(FixedSource.ModuleKey, FixedSource.InputVersion, () => new InterruptedCollector())],
+            [
+                new(
+                    FixedSource.ModuleKey,
+                    FixedSource.Rule1,
+                    [FixedSource.InputVersion],
+                    () => control.CreateAnalyzer(FixedSource.Rule1))
+            ],
+            new Dictionary<string, string> { [FixedSource.ModuleKey] = FixedSource.Rule1 });
+        List<Guid> announced = new List<Guid>();
+        TaskCompletionSource<Guid> finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task Announce(Guid assessment)
+        {
+            lock (announced) announced.Add(assessment);
+            finished.TrySetResult(assessment);
+            throw new InvalidOperationException("fixture listener failure");
+        }
+
+        PipelineCoordinator? failed = new PipelineCoordinator(data.Store, registration, environment)
+        {
+            AssessmentFinished = Announce
+        };
+        PhaseReply? ticket = await failed.StartPipelineAsync(new() { Collection = FixedSource.Request() });
+        Guid id = Guid.Parse(ticket.AssessmentId);
+        Assert.Equal(ScanStatus.Terminated, await failed.WaitForCompletionAsync(id));
+        PipelineCoordinator? resumed = new PipelineCoordinator(
+            new PipelineStore(data.DirectoryPath),
+            FixedSource.Registry(control),
+            environment) { AssessmentFinished = Announce };
+        await resumed.RestartAsync(id);
+        Assert.Equal(ScanStatus.Finished, await resumed.WaitForCompletionAsync(id));
+        Assert.Equal(id, await finished.Task.WaitAsync(TimeSpan.FromSeconds(30)));
+        lock (announced)
+        {
+            Guid only = Assert.Single(announced);
+            Assert.Equal(id, only);
+        }
+
+        using ScanContext? read = data.Store.CreateContext(id);
+        Assert.Equal(ScanStatus.Finished, (await read.Scans.SingleAsync()).Status);
+    }
+
+    /// <summary>
     /// Emits one recorded receipt before a controlled infrastructure failure.
     /// </summary>
     private sealed class InterruptedCollector : ICollectionModule

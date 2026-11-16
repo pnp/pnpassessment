@@ -7,7 +7,7 @@ using System.CommandLine;
 namespace PnP.Scanning.Process.Commands
 {
     /// <summary>
-    /// Displays running assessment status and phase progress through the existing command.
+    /// Displays the status, stage, progress and issues of running assessments through the existing command.
     /// </summary>
     internal sealed class StatusCommandHandler
     {
@@ -30,7 +30,7 @@ namespace PnP.Scanning.Process.Commands
         }
 
         /// <summary>
-        /// Reads and displays current assessment and internal phase progress.
+        /// Reads and displays each running assessment's stage, progress and issues, refreshed every second.
         /// </summary>
         private async Task HandleStatusAsync()
         {
@@ -41,14 +41,13 @@ namespace PnP.Scanning.Process.Commands
             // Add some columns
             table.AddColumn(new TableColumn("Id").Centered());
             table.AddColumn(new TableColumn("Mode").Centered());
-            table.AddColumn("Path / phase");
             table.AddColumn(new TableColumn("Status").Centered());
+            table.AddColumn("Stage");
             table.AddColumn(new TableColumn("Progress").Centered());
             table.AddColumn(new TableColumn("Retries").Centered());
             table.AddColumn(new TableColumn("Session start").Centered());
             table.AddColumn(new TableColumn("Session duration").Centered());
-            table.AddColumn("Snapshot / run / analysis");
-            table.AddColumn("Errors");
+            table.AddColumn("Issues");
 
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Live running Microsoft 365 Assessment status. Press [yellow]ESC[/] to exit");
@@ -103,8 +102,14 @@ namespace PnP.Scanning.Process.Commands
                                             $"{item.SiteCollectionsScanned}/{item.SiteCollectionsToScan} ({procentDone}%)");
                                     }
 
-                                    if (item.ExecutionPath == "pipeline")
-                                        procent = new Markup($"{item.RecordsCompleted}/{item.RecordsTotal} records");
+                                    bool pipeline = item.ExecutionPath == "pipeline";
+                                    if (pipeline)
+                                        procent = new Markup(
+                                            Markup.Escape(
+                                                AssessmentProgressText.Progress(
+                                                    item.ProgressCompleted,
+                                                    item.ProgressTotal,
+                                                    item.ProgressUnit)));
 
                                     //if (item.RetryingRequestAt.ToDateTime() != DateTime.MinValue)
                                     //{
@@ -117,25 +122,30 @@ namespace PnP.Scanning.Process.Commands
 
                                     //if (throttling == null)
                                     //{
-                                    throttling = new Markup(
-                                        $"{item.RequestsThrottled} / {item.RequestsRetriedDueToNetworkError}");
+                                    // Retry counts are reported for site-based assessments only; a dash marks the rest.
+                                    throttling = pipeline
+                                        ? new Markup("-")
+                                        : new Markup(
+                                            $"{item.RequestsThrottled} / {item.RequestsRetriedDueToNetworkError}");
                                     //}
 
                                     table.AddRow(
                                         new Markup($"{item.Id}"),
                                         new Markup($"{item.Mode}"),
-                                        new Markup(
-                                            Markup.Escape(
-                                                $"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
                                         status,
+                                        new Markup(
+                                            Markup.Escape(AssessmentProgressText.Stage(item.Stage, item.Status))),
                                         procent,
                                         throttling,
                                         new Markup($"{item.Started.ToDateTime().ToLocalTime()}"),
                                         new Markup(item.Duration.ToTimeSpan().ToString(@"dd\:hh\:mm\:ss")),
                                         new Markup(
-                                            Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
-                                        new Markup(
-                                            Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}")));
+                                            Markup.Escape(
+                                                AssessmentProgressText.Issues(
+                                                    item.Status,
+                                                    item.ReadIssues,
+                                                    item.AnalysisIssues,
+                                                    item.ErrorSummary))));
                                 }
                             }
                             else

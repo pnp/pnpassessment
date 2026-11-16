@@ -1,5 +1,7 @@
 using FluentAssertions;
+using PnP.Scanning.Core.ClassicPages.Collection.Page;
 using PnP.Scanning.Core.Discovery;
+using PnP.Scanning.Core.Pipeline.Contracts.Module;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -295,6 +297,261 @@ public sealed class SharePointAspxRestTransportTests
         fixture.Authenticated.Should().BeEmpty();
         fixture.Handler.Requests.Should().BeEmpty();
         fixture.Delays.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Waits a server-directed time longer than the request budget and gives the next attempt the full budget.
+    /// </summary>
+    [Theory]
+    [InlineData("120")]
+    [InlineData("600")]
+    public async Task A_policy_that_waits_out_throttling_honors_a_server_wait_longer_than_the_request_budget(
+        string retryAfter)
+    {
+        TimeSpan wait = TimeSpan.FromSeconds(int.Parse(retryAfter));
+        using var fixture = new TransportFixture(serverWaitLimit: TimeSpan.FromMinutes(10));
+        fixture.Enqueue(HttpStatusCode.TooManyRequests, retryAfter: retryAfter);
+        fixture.Enqueue(HttpStatusCode.OK);
+        fixture.Handler.BeforeSend = index =>
+        {
+            if (index == 2) fixture.Clock.Advance(TimeSpan.FromSeconds(19));
+        };
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        page.ErrorCode.Should().BeNull();
+        page.AttemptCount.Should().Be(2);
+        page.Items.Should().ContainSingle();
+        fixture.Delays.Should().Equal(wait);
+        fixture.Handler.SendTimes.Should().Equal(TimeSpan.Zero, wait);
+        PnPContextSharePointAspxRestClient.IsThrottleFailure(page).Should().BeFalse();
+        ClassicPageDiscoveryJournal.PageStatus(page).Should().Be(AcquisitionStatus.Complete);
+        ClassicPageDiscoveryJournal.PageError(page).Should().BeNull();
+    }
+
+    /// <summary>
+    /// Gives a request up, without waiting, when the server directs a wait the policy does not honor, and holds the
+    /// host for the other requests of the policy.
+    /// </summary>
+    [Theory]
+    [InlineData("601")]
+    [InlineData("999999999999999999999999999999")]
+    [InlineData("invalid-retry-after")]
+    public async Task A_server_wait_above_the_limit_of_the_policy_gives_the_request_up(string retryAfter)
+    {
+        using var fixture = new TransportFixture(serverWaitLimit: TimeSpan.FromMinutes(10));
+        fixture.Enqueue(HttpStatusCode.TooManyRequests, retryAfter: retryAfter);
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Failed);
+        page.ErrorCode.Should().Be("json_throttle_delay_exceeds_budget");
+        page.AttemptCount.Should().Be(1);
+        fixture.Delays.Should().BeEmpty();
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Policy.HoldRemaining(Web.Authority).Should().Be(TimeSpan.FromMinutes(10));
+        PnPContextSharePointAspxRestClient.IsThrottleFailure(page).Should().BeTrue();
+        ClassicPageDiscoveryJournal.PageStatus(page).Should().Be(AcquisitionStatus.Partial);
+        ClassicPageDiscoveryJournal.PageError(page)
+            .Should()
+            .Contain("json_throttle_delay_exceeds_budget")
+            .And.Contain("/sites/reuse/_api/Web/Lists");
+    }
+
+    /// <summary>
+    /// Spends every attempt of a waiting policy on the server-directed waits before giving the request up.
+    /// </summary>
+    [Fact]
+    public async Task A_policy_that_waits_out_throttling_gives_a_request_up_after_its_last_attempt()
+    {
+        using var fixture = new TransportFixture(attemptLimit: 5, serverWaitLimit: TimeSpan.FromMinutes(10));
+        for (int attempt = 0; attempt < 5; attempt++) fixture.Enqueue(HttpStatusCode.TooManyRequests, retryAfter: "60");
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Failed);
+        page.ErrorCode.Should().Be("json_throttle_attempts_exhausted");
+        page.AttemptCount.Should().Be(5);
+        page.AttemptLimit.Should().Be(5);
+        fixture.Delays.Should().HaveCount(4).And.OnlyContain(delay => delay == TimeSpan.FromSeconds(60));
+        fixture.Handler.SendTimes.Should()
+            .Equal(
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(60),
+                TimeSpan.FromSeconds(120),
+                TimeSpan.FromSeconds(180),
+                TimeSpan.FromSeconds(240));
+        fixture.Policy.HoldRemaining(Web.Authority).Should().Be(TimeSpan.FromSeconds(60));
+        PnPContextSharePointAspxRestClient.IsThrottleFailure(page).Should().BeTrue();
+        ClassicPageDiscoveryJournal.PageStatus(page).Should().Be(AcquisitionStatus.Partial);
+        ClassicPageDiscoveryJournal.PageError(page).Should().Contain("json_throttle_attempts_exhausted");
+    }
+
+    /// <summary>
+    /// Holds every request of a waiting policy to a throttled host until the latest server-directed time.
+    /// </summary>
+    [Fact]
+    public async Task A_throttled_host_holds_every_request_of_a_policy_that_waits_out_throttling()
+    {
+        using var fixture = new TransportFixture(serverWaitLimit: TimeSpan.FromMinutes(10));
+        fixture.Enqueue(HttpStatusCode.TooManyRequests, retryAfter: "30");
+        fixture.Enqueue(HttpStatusCode.OK);
+        fixture.Enqueue(HttpStatusCode.OK);
+
+        var first = await fixture.ReadAsync();
+
+        first.AttemptCount.Should().Be(2);
+        fixture.Policy.HoldRemaining(Web.Authority).Should().Be(TimeSpan.Zero);
+        fixture.Policy.Hold(Web.Authority, TimeSpan.FromSeconds(45));
+        fixture.Policy.Hold(Web.Authority, TimeSpan.FromSeconds(10));
+        fixture.Policy.HoldRemaining(Web.Authority).Should().Be(TimeSpan.FromSeconds(45));
+        fixture.Policy.HoldRemaining("fabrikam.sharepoint.com").Should().Be(TimeSpan.Zero);
+
+        var second = await fixture.ReadAsync(uri: new Uri(WebUrl + "/_api/Web/Folders?$select=Name"));
+
+        second.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        second.AttemptCount.Should().Be(1);
+        fixture.Delays.Should().Equal(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(45));
+        fixture.Handler.SendTimes.Should().Equal(TimeSpan.Zero, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(75));
+        fixture.Policy.Hold(Web.Authority, TimeSpan.FromHours(1));
+        fixture.Policy.HoldRemaining(Web.Authority).Should().Be(TimeSpan.FromMinutes(10));
+    }
+
+    /// <summary>
+    /// Gives the attempt after a zero server wait the full budget, although no time was spent waiting.
+    /// </summary>
+    [Fact]
+    public async Task A_policy_that_waits_out_throttling_restarts_the_budget_after_a_zero_server_wait()
+    {
+        using var fixture = new TransportFixture(serverWaitLimit: TimeSpan.FromMinutes(10));
+        fixture.Enqueue(HttpStatusCode.ServiceUnavailable, retryAfter: "0");
+        fixture.Enqueue(HttpStatusCode.OK);
+        fixture.Handler.BeforeSend = _ => fixture.Clock.Advance(TimeSpan.FromSeconds(15));
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Complete);
+        page.AttemptCount.Should().Be(2);
+        fixture.Delays.Should().BeEmpty();
+        fixture.Handler.SendTimes.Should().Equal(TimeSpan.Zero, TimeSpan.FromSeconds(15));
+    }
+
+    /// <summary>Propagates caller cancellation from a server-directed wait outside the request budget.</summary>
+    [Fact]
+    public async Task Caller_cancellation_during_a_wait_outside_the_budget_propagates_and_never_retries()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var fixture = new TransportFixture(serverWaitLimit: TimeSpan.FromMinutes(10));
+        fixture.Enqueue(HttpStatusCode.TooManyRequests, retryAfter: "120");
+        fixture.DelayOverride = (_, _) =>
+        {
+            cancellation.Cancel();
+            return Task.CompletedTask;
+        };
+
+        Func<Task> read = () => fixture.ReadAsync(cancellationToken: cancellation.Token);
+        await read.Should().ThrowAsync<OperationCanceledException>();
+
+        fixture.Handler.Requests.Should().ContainSingle();
+        fixture.Delays.Should().ContainSingle();
+    }
+
+    /// <summary>
+    /// Holds folder listing to the host of a request the SDK reports as throttled, and to no other host.
+    /// </summary>
+    [Fact]
+    public void A_request_the_sdk_reports_as_throttled_holds_folder_listing_to_its_host()
+    {
+        string host = "throttled-" + Guid.NewGuid().ToString("N") + ".sharepoint.com";
+        string other = "other-" + Guid.NewGuid().ToString("N") + ".sharepoint.com";
+        Uri request = new Uri("https://" + host + "/sites/a/_api/web/GetFileById('x')/$value");
+
+        SharePointRestThrottlePolicy.HoldCollectionFor(null).Should().BeFalse();
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(request, 500, 30)).Should().BeFalse();
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(request, 429, 0)).Should().BeFalse();
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(null, 429, 30)).Should().BeFalse();
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(host).Should().Be(TimeSpan.Zero);
+
+        SharePointRestThrottlePolicy.HoldCollectionFor(new SdkRetry(request, 503, 120)).Should().BeTrue();
+
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(host)
+            .Should()
+            .BeGreaterThan(TimeSpan.FromSeconds(60))
+            .And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(120));
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(other).Should().Be(TimeSpan.Zero);
+    }
+
+    /// <summary>
+    /// Registers the collection as the listener for the SDK's throttled requests only when there is none yet.
+    /// </summary>
+    [Fact]
+    public void The_collection_listens_for_throttled_sdk_requests_unless_a_listener_is_registered()
+    {
+        string host = "listener-" + Guid.NewGuid().ToString("N") + ".sharepoint.com";
+        Uri request = new Uri("https://" + host + "/_api/web");
+        global::PnP.Core.Services.EventHub events = new global::PnP.Core.Services.EventHub();
+
+        SharePointRestThrottlePolicy.ListenForThrottling(null);
+        SharePointRestThrottlePolicy.ListenForThrottling(events);
+        events.RequestRetry.Should().NotBeNull();
+        events.RequestRetry(new SdkRetry(request, 429, 90));
+        SharePointRestThrottlePolicy.Collection.HoldRemaining(host).Should().BeGreaterThan(TimeSpan.FromSeconds(30));
+
+        int heard = 0;
+        global::PnP.Core.Services.EventHub taken = new global::PnP.Core.Services.EventHub
+        {
+            RequestRetry = _ => heard++
+        };
+        SharePointRestThrottlePolicy.ListenForThrottling(taken);
+        taken.RequestRetry(new SdkRetry(request, 429, 90));
+        heard.Should().Be(1);
+    }
+
+    /// <summary>Stands in for the retry notice the SDK raises for a request it sends again.</summary>
+    private sealed class SdkRetry(Uri request, int status, int waitSeconds) : global::PnP.Core.Services.IRetryEvent
+    {
+        public Uri Request { get; } = request;
+        public int HttpStatusCode { get; } = status;
+        public int WaitTime { get; } = waitSeconds;
+        public Exception Exception => null;
+
+        public IDictionary<string, object> Properties { get; } = new Dictionary<string, object>();
+    }
+
+    /// <summary>
+    /// Keeps waits inside the request budget by default and reserves waiting out throttling for collection.
+    /// </summary>
+    [Fact]
+    public void Only_a_policy_with_a_server_wait_limit_holds_a_host()
+    {
+        var bounded = new SharePointRestThrottlePolicy();
+        bounded.WaitsOutThrottling.Should().BeFalse();
+        bounded.Hold(Web.Authority, TimeSpan.FromSeconds(30));
+        bounded.HoldRemaining(Web.Authority).Should().Be(TimeSpan.Zero);
+        SharePointRestThrottlePolicy.Default.WaitsOutThrottling.Should().BeFalse();
+
+        SharePointRestThrottlePolicy.Collection.WaitsOutThrottling.Should().BeTrue();
+        SharePointRestThrottlePolicy.Collection.AttemptLimit.Should().Be(5);
+        SharePointRestThrottlePolicy.Collection.ServerWaitLimit.Should().Be(TimeSpan.FromMinutes(10));
+
+        Action negative = () => new SharePointRestThrottlePolicy(serverWaitLimit: TimeSpan.FromSeconds(-1));
+        negative.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    /// <summary>Keeps the receipt of a listing page that failed for another reason than throttling as it was.</summary>
+    [Fact]
+    public async Task A_listing_page_that_failed_for_another_reason_keeps_its_receipt_status()
+    {
+        using var fixture = new TransportFixture(serverWaitLimit: TimeSpan.FromMinutes(10));
+        fixture.Enqueue(HttpStatusCode.InternalServerError);
+
+        var page = await fixture.ReadAsync();
+
+        page.Outcome.Should().Be(DiscoveryTerminalOutcome.Failed);
+        PnPContextSharePointAspxRestClient.IsThrottleFailure(page).Should().BeFalse();
+        ClassicPageDiscoveryJournal.PageStatus(page).Should().Be(AcquisitionStatus.Complete);
+        ClassicPageDiscoveryJournal.PageError(page).Should().BeNull();
     }
 
     /// <summary>Never retries denials, redirects, or unrelated HTTP failures even when Retry-After is present.</summary>
@@ -808,11 +1065,12 @@ public sealed class SharePointAspxRestTransportTests
         internal Func<TimeSpan, CancellationToken, Task> DelayOverride { get; set; }
 
         /// <summary>Connects a scripted handler and deterministic delay to the real bounded-reader seam.</summary>
-        internal TransportFixture(int attemptLimit = SharePointRestThrottlePolicy.DefaultAttemptLimit)
+        internal TransportFixture(int attemptLimit = SharePointRestThrottlePolicy.DefaultAttemptLimit,
+            TimeSpan serverWaitLimit = default)
         {
             Handler = new QueueHandler(Clock);
             Http = new HttpClient(Handler);
-            Policy = new SharePointRestThrottlePolicy(attemptLimit, Clock, DelayAsync);
+            Policy = new SharePointRestThrottlePolicy(attemptLimit, Clock, DelayAsync, serverWaitLimit);
         }
 
         /// <summary>Queues a disposable in-memory JSON response with optional untrusted Retry-After header evidence.</summary>

@@ -307,7 +307,10 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.All(rows, row => Assert.Equal("succeeded", row.UsageQueryStatus));
     }
 
-    /// <summary>Distinct native identities and identical source hashes remain separate; legacy URL collisions still fail explicitly.</summary>
+    /// <summary>
+    /// Distinct native identities and identical source hashes remain separate. Of two Pages sharing one legacy URL key
+    /// the lowest content key keeps the row and the other is left out and named, never merged.
+    /// </summary>
     [Fact]
     public void Native_identity_is_not_URL_or_hash_deduplication()
     {
@@ -319,7 +322,72 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.Equal(2, selected.Length);
         Assert.Equal(selected[0].SourceSha256, selected[1].SourceSha256);
         source.Publication.Pages[1].PageUrl = source.Publication.Pages[0].PageUrl;
-        Assert.Throws<SnapshotIntegrityException>(() => ClassicReportCsvProjection.SelectPages(source));
+        ClassicPageCsvRow kept = Assert.Single(
+            ClassicReportCsvProjection.SelectPages(source, out ClassicPageOmission[] omitted));
+        ClassicPageOmission left = Assert.Single(omitted);
+        Assert.Equal(selected[0].ContentKey, kept.ContentKey);
+        Assert.Equal(selected[1].ContentKey, left.ContentKey);
+        Assert.Equal(ClassicPageOmission.SharedAddress, left.Reason);
+        Assert.Equal(kept.ContentKey, left.SharesAddressWith);
+    }
+
+    /// <summary>
+    /// A selected file with no analyzed Page and a post with no address are left out and named with their reason;
+    /// the remaining Pages are still exported.
+    /// </summary>
+    [Fact]
+    public void Pages_the_report_cannot_carry_are_left_out_and_named()
+    {
+        Guid assessment = Guid.NewGuid();
+        SPFile analyzed = File(assessment, 1, Handlers[0], false, false);
+        SPFile unanalyzed = File(assessment, 2, Handlers[0], false, false);
+        ClassicReportSource source = Source([analyzed, unanalyzed]);
+        ClassicPageRow post = Post(assessment, ListId, 10);
+        post.PageUrl = null;
+        source = source with
+        {
+            Publication = source.Publication with { Pages = [source.Publication.Pages[0], post] }
+        };
+        ClassicPageCsvRow exported = Assert.Single(
+            ClassicReportCsvProjection.SelectPages(source, out ClassicPageOmission[] omitted));
+        Assert.Equal(analyzed.FileUniqueId, exported.FileUniqueId);
+        Assert.Equal(2, omitted.Length);
+        ClassicPageOmission missingPage = Assert.Single(
+            omitted,
+            entry => entry.Reason == ClassicPageOmission.NotAnalyzed);
+        Assert.Equal(unanalyzed.FileUniqueId, missingPage.FileUniqueId);
+        Assert.Equal(unanalyzed.ServerRelativeUrl, missingPage.PageUrl);
+        Assert.Equal("WikiPage", missingPage.PageType);
+        ClassicPageOmission missingAddress = Assert.Single(
+            omitted,
+            entry => entry.Reason == ClassicPageOmission.NoAddress);
+        Assert.Equal(10, missingAddress.ListItemId);
+        Assert.Equal("BlogPage", missingAddress.PageType);
+        Assert.Single(ClassicReportCsvProjection.SelectPages(source));
+    }
+
+    /// <summary>The report command reads the left-out count only from the summary written for the same assessment.</summary>
+    [Fact]
+    public void Omitted_page_count_is_read_from_the_summary_of_the_same_assessment()
+    {
+        string directory = Directory.CreateTempSubdirectory("classic-omitted-").FullName;
+        try
+        {
+            Guid assessment = Guid.NewGuid();
+            string summary = Path.Combine(directory, ClassicReportCsvProjection.SummaryJson);
+            Assert.Equal(0L, ClassicReportCsvProjection.ReadOmittedPageCount(directory, assessment));
+            System.IO.File.WriteAllText(
+                summary,
+                JsonSerializer.Serialize(new { ScanId = assessment, OmittedPageCount = 3 }));
+            Assert.Equal(3L, ClassicReportCsvProjection.ReadOmittedPageCount(directory, assessment));
+            Assert.Equal(0L, ClassicReportCsvProjection.ReadOmittedPageCount(directory, Guid.NewGuid()));
+            System.IO.File.WriteAllText(summary, "not json");
+            Assert.Equal(0L, ClassicReportCsvProjection.ReadOmittedPageCount(directory, assessment));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
     }
 
     /// <summary>Preserves the shared nullable-text wire contract used by the physical ASPX inventory.</summary>
@@ -454,6 +522,10 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.True(System.IO.File.Exists(Path.Combine(directory, "aspxsummary.json")));
         Assert.True(System.IO.File.Exists(Path.Combine(directory, "classicpagessummary.json")));
         Assert.True(System.IO.File.Exists(Path.Combine(directory, "discovery.csv")));
+        Assert.Equal(
+            "ScanId,SiteUrl,WebUrl,PageUrl,PageName,PageType,ObjectKind,ContentKey,ListId,ListItemId,FileUniqueId,Reason,SharesAddressWith",
+            (await System.IO.File.ReadAllLinesAsync(Path.Combine(directory, "classicpagesomitted.csv"))).Single());
+        Assert.Equal(0L, ClassicReportCsvProjection.ReadOmittedPageCount(directory, assessment));
         Assert.False(System.IO.File.Exists(Path.Combine(directory, "classicpageauditusage.csv")));
         Assert.Equal(canonicalPages, await context.ClassicPages.CountAsync());
         Assert.Equal(capturedParts, await context.ClassicPageWebParts.CountAsync());

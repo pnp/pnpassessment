@@ -320,7 +320,8 @@ internal sealed partial class PipelineStore
                     run.EndedAtUtc = DateTime.UtcNow;
                     if (error != null)
                     {
-                        run.ErrorCount++;
+                        // The settlement is counted once, on the root; a child keeps the count of its own records.
+                        if (run == root) run.ErrorCount++;
                         run.LastError = error;
                     }
                 }

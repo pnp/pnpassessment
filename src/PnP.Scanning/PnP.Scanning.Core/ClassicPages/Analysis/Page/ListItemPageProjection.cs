@@ -12,7 +12,10 @@ namespace PnP.Scanning.Core.ClassicPages.Analysis.Page;
 /// <summary>Projects real Posts items into native Pages without assigning their renderer's physical identity.</summary>
 internal static class ListItemPageProjection
 {
-    /// <summary>Requires observed Posts ownership and item identity, retaining an unknown locator when no renderer was acquired.</summary>
+    /// <summary>
+    /// Requires observed Posts ownership and item identity. When no renderer was acquired the item is addressed through
+    /// SharePoint's list form redirect, so every post keeps an address and a report row.
+    /// </summary>
     internal static ClassicPageRow? Analyze(
         Guid assessmentId,
         ListItemBatch batch,
@@ -34,10 +37,10 @@ internal static class ListItemPageProjection
             ?.FormUrl ?? batch.DisplayFormUrl;
         if (renderer != null && (!renderer.StartsWith('/') || renderer.StartsWith("//", StringComparison.Ordinal)))
             throw new SnapshotIntegrityException("The captured renderer is not a normalized declaration.");
-        string? locator = renderer == null
-            ? null
-            : renderer + (renderer.Contains('?') ? "&" : "?") + "ID=" +
-              item.ListItemId.ToString(CultureInfo.InvariantCulture);
+        string itemId = item.ListItemId.ToString(CultureInfo.InvariantCulture);
+        string locator = renderer == null
+            ? ListFormRedirect(batch.SiteUrl, batch.WebUrl, batch.ListId, itemId)
+            : renderer + (renderer.Contains('?') ? "&" : "?") + "ID=" + itemId;
         return new ClassicPageRow
         {
             Identity = PageIdentity.Item(web.SiteCollectionId, batch.ListId, item.ListItemId),
@@ -51,15 +54,17 @@ internal static class ListItemPageProjection
             ListTitle = batch.ListTitle,
             ListUrl = batch.ListUrl,
             ListTemplate = batch.ListTemplate,
-            PageUrl = locator!,
+            PageUrl = locator,
             PageName = fields.GetValueOrDefault("Title")?.Text ?? "",
             PageType = ClassicPageRules.BlogPage,
             AssessmentPageType = ClassicPageRules.BlogPage,
             SourceKind = "ListItem",
             ContentReadState = "NotApplicable",
-            ClassificationReason = "ObservedListItemAndRendererDeclaration",
+            ClassificationReason = renderer == null
+                ? "ObservedListItemAndListFormRedirect"
+                : "ObservedListItemAndRendererDeclaration",
             DiscoveryStatus = "Discovered",
-            AssessmentStatus = locator == null ? "Unknown" : "Complete",
+            AssessmentStatus = "Complete",
             HomePage = false,
             ModifiedAt =
                 fields.TryGetValue("Modified", out SourceField? modified) && modified.ToValue() is DateTime date
@@ -68,5 +73,16 @@ internal static class ListItemPageProjection
             ModifiedBy = FilePageProjection.ModifiedBy(fields, options.SkipUserInformation),
             RemediationCode = "CP4",
         };
+    }
+
+    /// <summary>
+    /// Builds the server-relative address of SharePoint's list form redirect to one item's display form, from the
+    /// observed web, list id and item id only. It is used when the list declares no usable display form.
+    /// </summary>
+    internal static string ListFormRedirect(string siteUrl, string webUrl, Guid listId, string itemId)
+    {
+        string web = webUrl.Trim('/');
+        return new Uri(siteUrl).AbsolutePath.TrimEnd('/') + (web.Length == 0 ? "" : "/" + web) +
+               "/_layouts/15/listform.aspx?PageType=4&ListId=" + listId.ToString("D") + "&ID=" + itemId;
     }
 }

@@ -70,7 +70,11 @@ namespace PnP.Scanning.Core.Services
                 return;
             }
 
-            await InitializeTelemetryDataAsync(scanId);
+            Storage.Scan scan = await InitializeTelemetryDataAsync(scanId);
+            if (scan == null)
+            {
+                return;
+            }
 
             try
             {
@@ -78,10 +82,10 @@ namespace PnP.Scanning.Core.Services
                 Dictionary<string, string> properties = new();
 
                 // Populate the default properties
-                PopulateDefaultProperties(properties);
+                PopulateDefaultProperties(properties, scan, Version);
 
                 // Send the event
-                telemetryClient.TrackEvent($"{Scan.CLIMode}{TelemetryEvent.Skip}", properties);
+                telemetryClient.TrackEvent($"{scan.CLIMode}{TelemetryEvent.Skip}", properties);
             }
             catch (Exception ex)
             {
@@ -98,6 +102,10 @@ namespace PnP.Scanning.Core.Services
             }
 
             await InitializeTelemetryAsync(scanId);
+            if (skipTelemetry)
+            {
+                return;
+            }
 
             try
             {
@@ -116,14 +124,24 @@ namespace PnP.Scanning.Core.Services
 
         internal async Task LogScanEventAsync(Guid scanId, TelemetryEvent telemetryEvent)
         {
-            if (telemetryClient == null || skipTelemetry)
+            // An opted-out session still reaches the initialization below until its one skip event is sent.
+            if (telemetryClient == null || (skipTelemetry && skipTelemetryEventSent))
             {
                 return;
             }
 
             await InitializeTelemetryAsync(scanId);
+            if (skipTelemetry)
+            {
+                return;
+            }
 
-            await InitializeTelemetryDataAsync(scanId);
+            // The event describes this assessment only, also while another assessment sends its own event.
+            Storage.Scan scan = await InitializeTelemetryDataAsync(scanId);
+            if (scan == null)
+            {
+                return;
+            }
 
             try
             {
@@ -132,13 +150,13 @@ namespace PnP.Scanning.Core.Services
                 Dictionary<string, double> metrics = new();
 
                 // Populate the default properties
-                PopulateDefaultProperties(properties);
+                PopulateDefaultProperties(properties, scan, Version);
 
                 // Populate event properties (if any)
-                PopulateScanProperties(properties, scanId);
+                PopulateScanProperties(properties, scanId, scan);
 
                 // Send the event
-                telemetryClient.TrackEvent($"{Scan.CLIMode}{telemetryEvent}", properties, metrics);
+                telemetryClient.TrackEvent($"{scan.CLIMode}{telemetryEvent}", properties, metrics);
             }
             catch (Exception ex)
             {
@@ -148,14 +166,24 @@ namespace PnP.Scanning.Core.Services
 
         internal async Task LogScanEndAsync(Guid scanId)
         {
-            if (telemetryClient == null || skipTelemetry)
+            // An opted-out session still reaches the initialization below until its one skip event is sent.
+            if (telemetryClient == null || (skipTelemetry && skipTelemetryEventSent))
             {
                 return;
             }
 
             await InitializeTelemetryAsync(scanId);
+            if (skipTelemetry)
+            {
+                return;
+            }
 
-            await InitializeTelemetryDataAsync(scanId);
+            // The event describes this assessment only, also while another assessment sends its own event.
+            Storage.Scan scan = await InitializeTelemetryDataAsync(scanId);
+            if (scan == null)
+            {
+                return;
+            }
 
             try
             {
@@ -164,10 +192,10 @@ namespace PnP.Scanning.Core.Services
                 Dictionary<string, double> metrics = new();
 
                 // Populate the default properties
-                PopulateDefaultProperties(properties);
+                PopulateDefaultProperties(properties, scan, Version);
 
                 // Populate event properties (if any)
-                PopulateScanProperties(properties, scanId);
+                PopulateScanProperties(properties, scanId, scan);
 
                 // Populate generic scan properties (if any)
                 await PopulatePropertiesAsync(scanId, properties);
@@ -183,29 +211,29 @@ namespace PnP.Scanning.Core.Services
                 //    await PopulateSyntexMetricsAsync(scanId, metrics);
                 //}
                 //else 
-                if (Scan.CLIMode.Equals(Mode.Workflow.ToString()))
+                if (scan.CLIMode.Equals(Mode.Workflow.ToString()))
                 {
                     await PopulateWorkflowMetricsAsync(scanId, metrics);
                 }
-                else if (Scan.CLIMode.Equals(Mode.InfoPath.ToString()))
+                else if (scan.CLIMode.Equals(Mode.InfoPath.ToString()))
                 {
                     await PopulateInfoPathMetricsAsync(scanId, metrics);
                 }
-                else if (Scan.CLIMode.Equals(Mode.AddInsACS.ToString()))
+                else if (scan.CLIMode.Equals(Mode.AddInsACS.ToString()))
                 {
                     await PopulateAddInsACSMetricsAsync(scanId, metrics);
                 }
-                else if (Scan.CLIMode.Equals(Mode.Alerts.ToString()))
+                else if (scan.CLIMode.Equals(Mode.Alerts.ToString()))
                 {
                     await PopulateAlertsMetricsAsync(scanId, metrics);
                 }
-                else if (Scan.CLIMode.Equals(Mode.Classic.ToString()))
+                else if (scan.CLIMode.Equals(Mode.Classic.ToString()))
                 {
                     await PopulateClassicMetricsAsync(scanId, metrics);
                 }
 
                 // Send the event
-                telemetryClient.TrackEvent($"{Scan.CLIMode}{TelemetryEvent.Done}", properties, metrics);
+                telemetryClient.TrackEvent($"{scan.CLIMode}{TelemetryEvent.Done}", properties, metrics);
             }
             catch (Exception ex)
             {
@@ -259,9 +287,32 @@ namespace PnP.Scanning.Core.Services
         /// transformation readiness) from the scan's stored page inventory. Pure over the
         /// <see cref="ScanContext"/> (no network, no scan-status gating) so it can be unit-tested
         /// against the in-memory SQLite fixture — same testability split as the storage/export cores.
+        /// For an assessment with a native analysis the stored inventory holds every analyzed classic page, so the
+        /// payload counts the pages the report selects, under the page type the report gives them, and the web
+        /// parts on those pages. The metric names and their meaning stay the same.
         /// </summary>
         internal static void BuildClassicMetrics(ScanContext dbContext, Dictionary<string, double> metric)
         {
+            BuildClassicMetrics(
+                dbContext,
+                metric,
+                PnP.Scanning.Core.ClassicPages.Compatibility.ClassicReportCsvProjection.SelectedFilePageTypes(
+                    dbContext));
+        }
+
+        /// <summary>
+        /// Builds the classic page-scan telemetry payload from the stored page inventory. With
+        /// <paramref name="reportedFiles"/>, only the pages the report selects are counted; without it (null), every
+        /// stored page row is a reported page.
+        /// </summary>
+        internal static void BuildClassicMetrics(
+            ScanContext dbContext,
+            Dictionary<string, double> metric,
+            Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> reportedFiles)
+        {
+            HashSet<(string SiteUrl, string WebUrl, string PageUrl)> reportedPages = new();
+            HashSet<string> reportedWebPartTypes = new(StringComparer.Ordinal);
+
             // Page type distribution (the DB only holds classic pages — modern pages are not persisted).
             int pageCount = 0;
             int wikiPageCount = 0;
@@ -283,9 +334,21 @@ namespace PnP.Scanning.Core.Services
 
             foreach (ClassicPage page in dbContext.ClassicPages)
             {
+                string pageType = page.PageType;
+                if (reportedFiles != null)
+                {
+                    pageType = ReportedPageType(page, reportedFiles);
+                    if (pageType == null)
+                    {
+                        continue;
+                    }
+
+                    reportedPages.Add((page.SiteUrl, page.WebUrl, page.PageUrl));
+                }
+
                 pageCount++;
 
-                switch (page.PageType)
+                switch (pageType)
                 {
                     case ClassicPageRules.WikiPage:
                         wikiPageCount++;
@@ -336,6 +399,16 @@ namespace PnP.Scanning.Core.Services
             int webPartCount = 0;
             foreach (ClassicPageWebPart webPart in dbContext.ClassicPageWebParts)
             {
+                if (reportedFiles != null)
+                {
+                    if (!reportedPages.Contains((webPart.SiteUrl, webPart.WebUrl, webPart.PageUrl)))
+                    {
+                        continue;
+                    }
+
+                    reportedWebPartTypes.Add(webPart.WebPartType);
+                }
+
                 webPartCount++;
             }
 
@@ -345,6 +418,11 @@ namespace PnP.Scanning.Core.Services
             int unmappedWebPartTypeCount = 0;
             foreach (ClassicWebPartUnique unique in dbContext.ClassicWebPartUniques)
             {
+                if (reportedFiles != null && !reportedWebPartTypes.Contains(unique.WebPartType))
+                {
+                    continue;
+                }
+
                 uniqueWebPartTypeCount++;
                 if (unique.InMappingFile)
                 {
@@ -378,6 +456,25 @@ namespace PnP.Scanning.Core.Services
             metric.Add("ClassicPageUniqueWebPartTypeCount", uniqueWebPartTypeCount);
             metric.Add("ClassicPageMappableWebPartTypeCount", mappableWebPartTypeCount);
             metric.Add("ClassicPageUnmappedWebPartTypeCount", unmappedWebPartTypeCount);
+        }
+
+        /// <summary>
+        /// Names the page type the report gives a stored page row of an assessment with a native analysis, or null
+        /// for a row the report leaves out. A file page takes the type of its selected file; a row without a file is
+        /// a post and is always reported as a blog page.
+        /// </summary>
+        internal static string ReportedPageType(
+            ClassicPage page,
+            Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> reportedFiles)
+        {
+            if (page.FileUniqueId is not Guid file)
+            {
+                return ClassicPageRules.BlogPage;
+            }
+
+            return page.SiteCollectionId is Guid site && reportedFiles.TryGetValue((site, file), out string type)
+                ? type
+                : null;
         }
 
         /// <summary>Populates the existing Add-ins and ACS telemetry counts from stored assessment facts.</summary>
@@ -1188,24 +1285,38 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        private void PopulateScanProperties(Dictionary<string, string> properties, Guid scanId)
+        /// <summary>
+        /// Adds the existing per-assessment event properties for <paramref name="scan"/>. The tenant name, the site
+        /// list, the site file and the certificate location are sent as whether they were used, never as their value.
+        /// </summary>
+        internal static void PopulateScanProperties(
+            Dictionary<string, string> properties,
+            Guid scanId,
+            Storage.Scan scan)
         {
             properties.Add("ScanId", scanId.ToString());
-            properties.Add(UsesTenant, (!string.IsNullOrEmpty(Scan.CLITenant)).ToString());
-            properties.Add(TenantEnvironment, Scan.CLIEnvironment);
-            properties.Add(AuthMode, Scan.CLIAuthMode);
-            properties.Add(UsesSitesList, (!string.IsNullOrEmpty(Scan.CLISiteList)).ToString());
-            properties.Add(UsesSitesFile, (!string.IsNullOrEmpty(Scan.CLISiteFile)).ToString());
-            properties.Add(Threads, Scan.CLIThreads.ToString());
-            properties.Add(UsesCertPath, (!string.IsNullOrEmpty(Scan.CLICertPath)).ToString());
-            properties.Add(UsesCertFile, (!string.IsNullOrEmpty(Scan.CLICertFile)).ToString());
+            properties.Add(UsesTenant, (!string.IsNullOrEmpty(scan.CLITenant)).ToString());
+            properties.Add(TenantEnvironment, scan.CLIEnvironment);
+            properties.Add(AuthMode, scan.CLIAuthMode);
+            properties.Add(UsesSitesList, (!string.IsNullOrEmpty(scan.CLISiteList)).ToString());
+            properties.Add(UsesSitesFile, (!string.IsNullOrEmpty(scan.CLISiteFile)).ToString());
+            properties.Add(Threads, scan.CLIThreads.ToString());
+            properties.Add(UsesCertPath, (!string.IsNullOrEmpty(scan.CLICertPath)).ToString());
+            properties.Add(UsesCertFile, (!string.IsNullOrEmpty(scan.CLICertFile)).ToString());
         }
 
-        private void PopulateDefaultProperties(Dictionary<string, string> properties)
+        /// <summary>
+        /// Adds the existing properties every assessment event carries: tool version, tenant id and assessment mode
+        /// of <paramref name="scan"/>.
+        /// </summary>
+        internal static void PopulateDefaultProperties(
+            Dictionary<string, string> properties,
+            Storage.Scan scan,
+            string version)
         {
-            properties.Add(EngineVersion, Version);
-            properties.Add(AADTenantId, TenantId.ToString());
-            properties.Add(ScanMode, Scan.CLIMode);
+            properties.Add(EngineVersion, version);
+            properties.Add(AADTenantId, Guid.Parse(scan.CLITenantId).ToString());
+            properties.Add(ScanMode, scan.CLIMode);
         }
 
         private async Task InitializeTelemetryAsync(Guid scanId)
@@ -1225,9 +1336,17 @@ namespace PnP.Scanning.Core.Services
             }
         }
 
-        /// <summary>Initializes scan-scoped telemetry dimensions from persisted assessment metadata.</summary>
-        private async Task InitializeTelemetryDataAsync(Guid scanId)
+        /// <summary>
+        /// Initializes scan-scoped telemetry dimensions from persisted assessment metadata and returns the assessment
+        /// an event describes. An assessment without a tenant id returns null and sends no event.
+        /// </summary>
+        private async Task<Storage.Scan> InitializeTelemetryDataAsync(Guid scanId)
         {
+            if (string.IsNullOrEmpty(Version))
+            {
+                Version = VersionManager.GetCurrentVersion();
+            }
+
             var scan = await StorageManager.GetTelemetryScanInformationAsync(scanId);
             if (!string.IsNullOrEmpty(scan.CLITenantId) && Guid.TryParse(scan.CLITenantId, out Guid tenantId))
             {
@@ -1236,18 +1355,13 @@ namespace PnP.Scanning.Core.Services
                 Log.Information(
                     "Tenant id for this assessment session {ScanId} is {TenantId}. Assessment mode = {Mode}",
                     scanId,
-                    TenantId,
-                    Scan.CLIMode);
-            }
-            else
-            {
-                Log.Warning("Tenant id was not retrieved for this assessment session");
+                    tenantId,
+                    scan.CLIMode);
+                return scan;
             }
 
-            if (string.IsNullOrEmpty(Version))
-            {
-                Version = VersionManager.GetCurrentVersion();
-            }
+            Log.Warning("Tenant id was not retrieved for this assessment session");
+            return null;
         }
     }
 }

@@ -4,7 +4,7 @@
 
 `aspx.csv` exports the assessment's SQL `SPFile` facts in native `(SiteCollectionId, FileUniqueId)` order, with one row per observed native site/file pair. Selection uses the physical `.aspx` extension in the stored filename or path. Every matching observation is included across NoExecute values, handlers, experiences, product families, official states, catalog/list roles, backing-item availability and acquisition outcomes.
 
-Blocked, modern, catalog, registered view/form, denied, incomplete and unknown ASPX observations remain visible. The population consists of observed physical ASPX files within the requested assessment scope. Consult [discovery.csv](csv-discovery.md) for scope, reference, pagination, gap and coverage evidence, including inaccessible scopes and files.
+Files served as a download (NoExecute `true`), modern, catalog, registered view/form, denied, incomplete and unknown ASPX observations remain visible. The population consists of observed physical ASPX files within the requested assessment scope. Consult [discovery.csv](csv-discovery.md) for scope, reference, pagination, gap and coverage evidence, including inaccessible scopes and files.
 
 ## Columns and evidence
 
@@ -14,7 +14,7 @@ The following flattened columns expose the recorded evidence alongside its origi
 
 Column | Meaning
 -------|--------
-NoExecute | `true` for trusted server `1`, `false` for trusted `0`, empty for unavailable, invalid or conflicting evidence. Unknown values retain their nullable state.
+NoExecute | How SharePoint serves the file: `true` (trusted server `1`) returns it as a download, `false` (trusted `0`) may render it. Empty covers unavailable, invalid or conflicting evidence and leaves the serving behavior unknown; SharePoint exposes the value through the linked list item, so a file without one stays empty. Unknown values retain their nullable state.
 PageHandler | Exact fully qualified handler parsed from captured original bytes, or a previously captured handler when bytes are unavailable. Handler identity comes from the recorded source evidence.
 SourceSha256 | Digest of captured source bytes, when available.
 SourceReadState / SourceError | Original source acquisition outcome and error.
@@ -38,4 +38,4 @@ Within captured typed item-field JSON, an omitted optional user/lookup property 
 
 [classicpages.csv](csv-classicpages.md) contains the selected union of qualifying physical ASPX Pages and independent Posts items. [discovery.csv](csv-discovery.md) records physical-file discovery, references, scopes, pagination, gaps and coverage.
 
-The intended Power BI ASPX tab uses all rows from `aspx.csv` before an explicit user-selected visual filter. This revision retains the existing PBIT assets; the matching ASPX tab layout remains a separate report-template update.
+The Power BI ASPX tab shows all rows from `aspx.csv`; its slicers are the reader's own filters. Its Category column places each file in one group: `Classic page` for the files selected into [classicpages.csv](csv-classicpages.md), and `List view or form`, `Modern page`, `Other handler`, `Handler not read` or `Served as download (NoExecute)` for the files that stay on the ASPX tab only. Its Served as column reads NoExecute: `Download` when SharePoint returns the file as a download (`true`), `May render` when SharePoint may render the file (`false`) and `Unknown` when SharePoint exposes no value for the file.

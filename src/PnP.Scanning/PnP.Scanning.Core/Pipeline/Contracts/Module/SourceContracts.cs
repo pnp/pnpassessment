@@ -7,6 +7,22 @@ namespace PnP.Scanning.Core.Pipeline.Contracts.Module;
 internal enum AcquisitionStatus { Complete, Partial, Denied, NotAttempted, Failed, Unknown, NotReturned }
 internal enum PhaseKind { Pipeline, Collection, Analysis }
 
+/// <summary>
+/// Names the step a running phase is in and, when countable, how far it is, in terms shown to the person waiting.
+/// A total of zero means the step has no known size.
+/// </summary>
+internal sealed record PhaseProgress(string Stage, int Completed = 0, int Total = 0, string Unit = "");
+
+/// <summary>Stage names shared by every module; a collector adds the names of its own collection steps.</summary>
+internal static class PhaseStages
+{
+    internal const string Collecting = "Collecting data";
+    internal const string Checking = "Checking collected data";
+    internal const string Analyzing = "Analyzing";
+    internal const string PreparingReport = "Preparing report data";
+    internal const string Completed = "Completed";
+}
+
 internal sealed record CollectedObservation(
     Guid ObservationId, string SourceIdentity, string? SourceRevision,
     AcquisitionStatus AcquisitionStatus, VersionedJson Metadata, byte[]? RawBytes,

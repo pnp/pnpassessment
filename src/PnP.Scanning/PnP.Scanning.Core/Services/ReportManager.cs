@@ -437,6 +437,49 @@ namespace PnP.Scanning.Core.Services
         }
 
         /// <summary>
+        /// Counts what the stored discovery evidence of an assessment says stayed incomplete.
+        /// </summary>
+        internal async Task<IncompleteListings> CountIncompleteListingsAsync(Guid scanId)
+        {
+            using (var dbContext = await StorageManager.GetScanContextForDataExportAsync(scanId))
+            {
+                return await CountIncompleteListingsAsync(dbContext, scanId);
+            }
+        }
+
+        /// <summary>
+        /// Counts the locations whose content could not be listed completely, by the rule the coverage summary in
+        /// <c>discovery.csv</c> uses, and the listing requests that throttling stopped.
+        /// </summary>
+        internal static async Task<IncompleteListings> CountIncompleteListingsAsync(ScanContext dbContext, Guid scanId)
+        {
+            int locations = await dbContext.ClassicPageDiscoveries.AsNoTracking()
+                .CountAsync(row => row.ScanId == scanId && (row.RowType == "Scope" || row.RowType == "Gap") &&
+                                   row.DiscoveryStatus != "Complete" && row.DiscoveryStatus != "Empty" &&
+                                   row.DiscoveryStatus != "PolicyExcluded");
+            int throttled = await dbContext.ClassicPageDiscoveries.AsNoTracking()
+                .CountAsync(row => row.ScanId == scanId && row.RowType == "Pagination" &&
+                                   row.ErrorCodes != null && row.ErrorCodes.Contains("json_throttle_"));
+            return new IncompleteListings(locations, throttled);
+        }
+
+        /// <summary>
+        /// States how many locations stayed incompletely listed and how many listing requests throttling stopped.
+        /// </summary>
+        internal sealed record IncompleteListings(int Locations, int ThrottledRequests)
+        {
+            /// <summary>
+            /// Words the counts for the person reading the report; nothing incomplete has no message.
+            /// </summary>
+            internal string Message =>
+                Locations == 0 && ThrottledRequests == 0
+                    ? null
+                    : $"{Locations} location(s) could not be listed completely, so files in them may be missing " +
+                      $"from the report. Throttling stopped {ThrottledRequests} listing request(s). " +
+                      "discovery.csv marks each location with a DiscoveryStatus other than Complete or Empty";
+        }
+
+        /// <summary>
         /// Exports the Classic scan-mode tables to CSV. Split out from <see cref="ExportReportDataAsync"/>
         /// as a testable static core (same pattern as the StorageManager rollup cores) so the page-scan
         /// exports — including the T11 <c>classicpagewebparts.csv</c> / <c>classicwebpartunique.csv</c> and

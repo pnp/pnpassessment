@@ -68,7 +68,7 @@ namespace PnP.Scanning.Process.Commands
         }
 
         /// <summary>
-        /// Calls the existing list RPC and renders requested lifecycle and phase progress.
+        /// Calls the existing list RPC and renders each assessment's status, stage, progress and issues.
         /// </summary>
         private async Task HandleStartAsync(bool running, bool paused, bool finished, bool terminated)
         {
@@ -89,13 +89,12 @@ namespace PnP.Scanning.Process.Commands
                 // Add some columns
                 table.AddColumn("Id ");
                 table.AddColumn("Mode");
-                table.AddColumn("Path / phase");
                 table.AddColumn(new TableColumn("Status").Centered());
+                table.AddColumn("Stage");
                 table.AddColumn(new TableColumn("Progress").Centered());
                 table.AddColumn("Started at");
                 table.AddColumn("Ended at");
-                table.AddColumn("Snapshot / run / analysis");
-                table.AddColumn("Errors");
+                table.AddColumn("Issues");
 
                 foreach (Core.Services.ListScanResponse item in listResult.Status)
                 {
@@ -141,7 +140,12 @@ namespace PnP.Scanning.Process.Commands
                     }
 
                     if (item.ExecutionPath == "pipeline")
-                        procent = new Markup($"{item.RecordsCompleted}/{item.RecordsTotal} records");
+                        procent = new Markup(
+                            Markup.Escape(
+                                AssessmentProgressText.Progress(
+                                    item.ProgressCompleted,
+                                    item.ProgressTotal,
+                                    item.ProgressUnit)));
 
                     Markup endedAt;
                     if (item.ScanEnded.ToDateTime() == DateTime.MinValue)
@@ -156,15 +160,18 @@ namespace PnP.Scanning.Process.Commands
                     table.AddRow(
                         new Markup($"{item.Id}"),
                         new Markup($"{item.Mode}"),
-                        new Markup(
-                            Markup.Escape(
-                                $"{(string.IsNullOrEmpty(item.ExecutionPath) ? "legacy" : item.ExecutionPath)} {item.Phase}")),
                         status,
+                        new Markup(Markup.Escape(AssessmentProgressText.Stage(item.Stage, item.Status))),
                         procent,
                         new Markup($"{item.ScanStarted.ToDateTime().ToLocalTime()}"),
                         endedAt,
-                        new Markup(Markup.Escape($"{item.SnapshotId}\n{item.RunId}\n{item.AnalysisRunId}")),
-                        new Markup(Markup.Escape($"{item.ErrorCount} {item.ErrorSummary.Split('\n')[0]}")));
+                        new Markup(
+                            Markup.Escape(
+                                AssessmentProgressText.Issues(
+                                    item.Status,
+                                    item.ReadIssues,
+                                    item.AnalysisIssues,
+                                    item.ErrorSummary))));
                 }
 
                 AnsiConsole.Write(table);

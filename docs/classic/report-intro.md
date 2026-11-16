@@ -10,7 +10,7 @@ When using the report from Power BI Desktop there are some things to understand:
 
 The report is driven by the exported CSV files. Even if you do not use Power BI, the CSV files contain the full assessment data — use the left navigation to learn more about each one:
 
-- [aspx.csv](csv-aspx.md) — all observed physical ASPX SQL facts, without business admission filters; includes blocked, modern, catalog, role and unknown observations.
+- [aspx.csv](csv-aspx.md) — all observed physical ASPX SQL facts, without business admission filters; includes files served as a download (NoExecute), modern, catalog, role and unknown observations.
 - [classicpages.csv](csv-classicpages.md) — one row per classic page, including its modernization-readiness columns.
 - [classicpagewebparts.csv](csv-classicpagewebparts.md) — one row per web part found on a classic page.
 - [classicwebpartunique.csv](csv-classicwebpartunique.md) — one row per unique web part type encountered across the assessment.
@@ -18,4 +18,4 @@ The report is driven by the exported CSV files. Even if you do not use Power BI,
 - [classicsitesummaries.csv](csv-classicsitesummaries.md) — per-site-collection readiness roll-up.
 - [classicpublishingsitesummaries.csv](csv-classicpublishingsitesummaries.md) — per-publishing-portal roll-up of master pages and page layouts.
 
-The updated native Pages CSV applies the exact handler/NoExecute predicate described in [classicpages.csv](csv-classicpages.md), while its related exported summaries use the same selected Page set. The new Power BI ASPX tab is intended to show all raw ASPX rows. A corresponding replacement PBIT/layout has **not** been promoted here: the user's authoritative unsaved layout was not available, so the existing PBIT binaries remain unchanged. CSV implementation is not evidence that the old visuals, measures and filters were already updated.
+The native Pages CSV applies the selection described in [classicpages.csv](csv-classicpages.md), and its related exported summaries use the same selected Page set. The report's Pages tab reads that CSV: it refers to [MC1464926](https://msmessagecenter.com/MC1464926/), keeps the familiar page types (`WikiPage`, `WebPartPage`, `PublishingPage`, `BlogPage`, `ASPXPage`) and shows the audit views and unique users of each page. The ASPX tab shows all rows of [aspx.csv](csv-aspx.md) with a category per file.

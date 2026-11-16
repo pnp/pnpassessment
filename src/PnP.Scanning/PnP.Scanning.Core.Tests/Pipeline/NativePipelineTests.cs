@@ -305,6 +305,55 @@ public sealed class NativePipelineTests
     }
 
     /// <summary>
+    /// Verifies that status and list name the stage of a Classic assessment and count Webs while its sites are read.
+    /// </summary>
+    [Fact]
+    public async Task Status_and_list_name_the_stage_and_count_webs()
+    {
+        using StoreCase? data = new StoreCase("classic-native-progress");
+        ClassicContentFixture? source =
+            new ClassicContentFixture { BlockAt = "discovery", IncludePhysicalFacts = true };
+        await using NativePipelineHost? host = await NativePipelineHost.StartAsync(
+            data.Store,
+            ClassicPageModule.Registry(source.OpenAsync),
+            new ForbiddenOnlineEnvironment());
+        using (AsyncServerStreamingCall<StartStatus>? call = host.Client.Start(ClassicContentFixture.MakeOptions()))
+            await foreach (StartStatus? message in call.ResponseStream.ReadAllAsync())
+                Assert.NotEqual(Constants.MessageError, message.Type);
+        await source.Reached.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        Guid id = Assert.Single(data.Store.AssessmentsOnDisk());
+
+        StatusReply? status = await host.Client.StatusAsync(new StatusRequest());
+        ScanStatusReply? running = Assert.Single(status.Status, x => x.Id == id.ToString());
+        Assert.Equal("Reading sites", running.Stage);
+        Assert.Equal("webs", running.ProgressUnit);
+        Assert.Equal(0, running.ProgressCompleted);
+        Assert.Equal(1, running.ProgressTotal);
+
+        using (AsyncServerStreamingCall<PauseStatus>? call = host.Client.Pause(new PauseRequest { Id = id.ToString() }))
+            await foreach (PauseStatus? message in call.ResponseStream.ReadAllAsync())
+                Assert.NotEqual(Constants.MessageError, message.Type);
+        Assert.Equal(ScanStatus.Paused, await host.Coordinator!.WaitForCompletionAsync(id));
+        ListScanResponse? paused = Assert.Single(
+            (await host.Client.ListAsync(new ListRequest())).Status,
+            x => x.Id == id.ToString());
+        Assert.Equal("Collecting data", paused.Stage);
+        Assert.Equal(0, paused.ProgressTotal);
+
+        source.BlockAt = null;
+        using (AsyncServerStreamingCall<RestartStatus>? call =
+               host.Client.Restart(new RestartRequest { Id = id.ToString(), Threads = 1 }))
+            await foreach (RestartStatus? message in call.ResponseStream.ReadAllAsync())
+                Assert.NotEqual(Constants.MessageError, message.Type);
+        Assert.Equal(ScanStatus.Finished, await host.Coordinator.WaitForCompletionAsync(id));
+        ListScanResponse? finished = Assert.Single(
+            (await host.Client.ListAsync(new ListRequest())).Status,
+            x => x.Id == id.ToString());
+        Assert.Equal("Completed", finished.Stage);
+        Assert.Equal("Finished", finished.Status);
+    }
+
+    /// <summary>
     /// Verifies that existing stop rpc settles new collection before stopping the engine.
     /// </summary>
     [Fact]
