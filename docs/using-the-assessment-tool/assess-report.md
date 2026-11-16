@@ -43,3 +43,7 @@ When exporting the CSV files, which are used as data source for the Power BI rep
 ## Controlling the Power BI report opening via `--open`
 
 By default the generated Power BI report will open in Power BI Desktop. If you prefer to not open the report you can specify that via the `--open` argument. A sample: `--open:$false`.
+
+## Warnings after the export
+
+For a Classic assessment the `report` command prints a warning after the export in two cases. Pages that the report cannot show are counted and listed in `classicpagesomitted.csv`, see [Pages left out of the report](../classic/csv-classicpages.md#pages-left-out-of-the-report). Locations whose files could not be listed completely are counted together with the listing requests that throttling stopped, see [Listing under throttling](../classic/csv-discovery.md#listing-under-throttling).

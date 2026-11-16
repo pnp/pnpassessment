@@ -15,6 +15,11 @@ The file is only generated when audit log usage collection runs — that is, whe
 is **not** specified and the Entra app has the `AuditLogsQuery-SharePoint.Read.All` Microsoft Graph
 application permission (see [requirements](requirements.md)).
 
+The assessment sends its usage queries once it has found the sites, before it reads the first one, and checks
+them once a minute while it reads the sites. The audit window ends when the assessment starts. A query that the
+audit service has not finished 90 minutes after it was sent is recorded as failed, and its part of the window
+has empty counts.
+
 > [!NOTE]
 > Audit events are typically available in the log 60–90 minutes after they occur, so very recent activity
 > may not yet be reflected. The counts are a de-duplicated activity signal (for example a page view is not
