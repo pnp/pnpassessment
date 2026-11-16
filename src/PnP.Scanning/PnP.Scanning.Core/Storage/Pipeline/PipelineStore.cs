@@ -1,6 +1,5 @@
 #nullable enable
 using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PnP.Scanning.Core.Pipeline.Contracts.Module;
@@ -29,14 +28,8 @@ internal sealed partial class PipelineStore
         return Path.Combine(RootDirectory, assessmentId.ToString(), StorageManager.DbName);
     }
 
-    /// <summary>Creates an assessment-bound SQLite context with local timing records attributed to the caller.</summary>
-    internal ScanContext
-        CreateContext(
-            Guid assessmentId,
-            bool readOnly = false,
-            [CallerMemberName] string operation = "",
-            [CallerFilePath] string file = "",
-            [CallerLineNumber] int line = 0) =>
+    /// <summary>Creates an assessment-bound SQLite context, read-only on request.</summary>
+    internal ScanContext CreateContext(Guid assessmentId, bool readOnly = false) =>
         !readOnly && writeContextFactory != null
             ? writeContextFactory(assessmentId)
             : new ScanContext(
@@ -47,55 +40,44 @@ internal sealed partial class PipelineStore
                             Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate,
                             Pooling = false,
                         }.ToString())
-                    .Options,
-                new SqlLifecycleLogger(operation, file, operation, line));
+                    .Options);
 
-    /// <summary>Times the caller's serialized write and commits its existing atomic transaction after successful cancellation checks.</summary>
+    /// <summary>
+    /// Serializes the caller's write and commits its atomic transaction after successful cancellation checks.
+    /// </summary>
     private async Task<T> WriteAsync<T>(
         Guid assessmentId,
         Func<ScanContext, Task<T>> action,
         CancellationToken token,
-        bool create = false,
-        [CallerMemberName] string operation = "",
-        [CallerFilePath] string file = "",
-        [CallerLineNumber] int line = 0)
+        bool create = false)
     {
-        return await SqlOperationScope.RunAsync(
-            async () =>
+        string path = DatabasePath(assessmentId);
+        SemaphoreSlim gate = Gates.GetOrAdd(path, _ => new(1, 1));
+        await gate.WaitAsync(token);
+        try
+        {
+            if (!create && !File.Exists(path))
+                throw new KeyNotFoundException($"Assessment '{assessmentId}' is unknown.");
+            if (create) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using ScanContext db = CreateContext(assessmentId);
+            if (!migrated.ContainsKey(assessmentId))
             {
-                string path = DatabasePath(assessmentId);
-                SemaphoreSlim gate = Gates.GetOrAdd(path, _ => new(1, 1));
-                await gate.WaitAsync(token);
-                try
-                {
-                    if (!create && !File.Exists(path))
-                        throw new KeyNotFoundException($"Assessment '{assessmentId}' is unknown.");
-                    if (create) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                    using ScanContext db = CreateContext(assessmentId);
-                    if (!migrated.ContainsKey(assessmentId))
-                    {
-                        await db.Database.MigrateAsync(token);
-                        migrated.TryAdd(assessmentId, true);
-                    }
+                await db.Database.MigrateAsync(token);
+                migrated.TryAdd(assessmentId, true);
+            }
 
-                    await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction =
-                        await db.Database.BeginTransactionAsync(token);
-                    T result = await action(db);
-                    await db.SaveChangesAsync(token);
-                    token.ThrowIfCancellationRequested();
-                    await transaction.CommitAsync(token);
-                    return result;
-                }
-                finally
-                {
-                    gate.Release();
-                }
-            },
-            operation,
-            "pipelineWrite",
-            file,
-            operation,
-            line);
+            await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction =
+                await db.Database.BeginTransactionAsync(token);
+            T result = await action(db);
+            await db.SaveChangesAsync(token);
+            token.ThrowIfCancellationRequested();
+            await transaction.CommitAsync(token);
+            return result;
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     internal async Task<IReadOnlyList<PhaseRunRow>> GetRunsAsync(Guid assessmentId, CancellationToken token = default)
