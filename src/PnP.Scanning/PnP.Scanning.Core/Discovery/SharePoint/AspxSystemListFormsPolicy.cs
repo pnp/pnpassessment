@@ -7,6 +7,9 @@ internal static class AspxSystemListFormsPolicy
     internal const string RuleVersion = "v1";
     internal const string ReasonCode = "system_list_forms_http_400_reference_unknown";
 
+    /// <summary>Names the rule version and the date it was reviewed.</summary>
+    internal const string ReviewRef = RuleId + "/" + RuleVersion + "@2026-09-12";
+
     internal static AspxSurfaceDispositionRule Create(IReadOnlyDictionary<string, string> metadata,
         string rootFolder, string platformBuildRef)
     {
@@ -20,13 +23,13 @@ internal static class AspxSystemListFormsPolicy
         var material = string.Join('|', RuleId, RuleVersion, UserInformationListTemplate,
             "/_catalogs/users", 400, "http_400", platform,
             "SystemOrVirtualOnly", "Failed", "expectedCount=Unknown", "historical/system/virtual applicability explicit");
-        return new(RuleId, RuleVersion, DiscoveryHash.Of(material), "CCD-726+CCD-734@2026-09-12",
+        // The review reference and the evidence list are written to discovery.csv, so they name the rule and the
+        // platform build only.
+        return new(RuleId, RuleVersion, DiscoveryHash.Of(material), ReviewRef,
             platform, 400, null, ReasonCode,
             "system-or-virtual-applicability-explicit;http-400-failed;historical-virtual-unknown",
             new[]
             {
-                "sealed-run:62dbcc5b-80fd-4055-b528-745f9451ef2a",
-                "kb:dev.titao@4c91e3a3e0544d871c7faad9f5d029b7ce55e035",
                 $"platform-build:{platform}",
             });
     }
