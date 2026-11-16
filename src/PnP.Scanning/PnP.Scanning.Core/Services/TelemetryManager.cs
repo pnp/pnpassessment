@@ -13,9 +13,8 @@ namespace PnP.Scanning.Core.Services
     internal sealed class TelemetryManager
     {
         private bool skipTelemetry;
-        private bool skipTelemetryEventSent;
         private readonly TelemetryClient telemetryClient;
-        private readonly TelemetryConfiguration telemetryConfiguration = TelemetryConfiguration.CreateDefault();
+        private readonly TelemetryConfiguration telemetryConfiguration;
 
         private const string EngineVersion = "Version";
         private const string AADTenantId = "AADTenantId";
@@ -33,8 +32,16 @@ namespace PnP.Scanning.Core.Services
         {
             StorageManager = storageManager;
 
+            // A session that starts opted out creates no telemetry client at all.
+            if (IsDisabled(Environment.GetEnvironmentVariable(DisableTelemetryVariable)))
+            {
+                skipTelemetry = true;
+                return;
+            }
+
             try
             {
+                telemetryConfiguration = TelemetryConfiguration.CreateDefault();
 #if DEBUG
                 telemetryConfiguration.ConnectionString =
  "InstrumentationKey=e9f3c71a-c861-44b1-8e35-b513e101f743;IngestionEndpoint=https://westus2-2.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=367148dd-e9be-4dd5-a93c-4343906f39fa";
@@ -63,48 +70,40 @@ namespace PnP.Scanning.Core.Services
 
         internal string Version { get; set; }
 
-        internal async Task LogSkipTelemetryAsync(Guid scanId)
+        /// <summary>
+        /// Names the environment variable that turns telemetry off for the session when it holds any value.
+        /// </summary>
+        internal const string DisableTelemetryVariable = "PNP_DISABLETELEMETRY";
+
+        /// <summary>
+        /// Reads the opt-out setting; the environment variable <see cref="DisableTelemetryVariable"/> by default.
+        /// </summary>
+        internal Func<string> DisableTelemetrySetting { get; init; } =
+            () => Environment.GetEnvironmentVariable(DisableTelemetryVariable);
+
+        /// <summary>Checks whether a value of the opt-out setting turns telemetry off: any value does.</summary>
+        internal static bool IsDisabled(string setting) => !string.IsNullOrEmpty(setting);
+
+        /// <summary>
+        /// Checks whether this session sends no telemetry: the opt-out setting holds a value, or the telemetry
+        /// client could not be created. An opted-out session sends no event at all and stays opted out.
+        /// </summary>
+        internal bool TelemetryIsOff()
         {
-            if (telemetryClient == null)
+            if (!skipTelemetry && IsDisabled(DisableTelemetrySetting()))
             {
-                return;
+                skipTelemetry = true;
             }
 
-            Storage.Scan scan = await InitializeTelemetryDataAsync(scanId);
-            if (scan == null)
-            {
-                return;
-            }
-
-            try
-            {
-                // Prepare event data
-                Dictionary<string, string> properties = new();
-
-                // Populate the default properties
-                PopulateDefaultProperties(properties, scan, Version);
-
-                // Send the event
-                telemetryClient.TrackEvent($"{scan.CLIMode}{TelemetryEvent.Skip}", properties);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Could not send telemetry event");
-            }
+            return skipTelemetry || telemetryClient == null;
         }
 
         /// <summary>Sends the existing assessment telemetry event without altering its metric contract.</summary>
-        internal async Task LogEventAsync(Guid scanId, TelemetryEvent telemetryEvent)
+        internal Task LogEventAsync(Guid scanId, TelemetryEvent telemetryEvent)
         {
-            if (telemetryClient == null || skipTelemetry)
+            if (TelemetryIsOff())
             {
-                return;
-            }
-
-            await InitializeTelemetryAsync(scanId);
-            if (skipTelemetry)
-            {
-                return;
+                return Task.CompletedTask;
             }
 
             try
@@ -119,19 +118,14 @@ namespace PnP.Scanning.Core.Services
             {
                 Log.Warning(ex, "Could not send telemetry event");
             }
+
+            return Task.CompletedTask;
         }
 
 
         internal async Task LogScanEventAsync(Guid scanId, TelemetryEvent telemetryEvent)
         {
-            // An opted-out session still reaches the initialization below until its one skip event is sent.
-            if (telemetryClient == null || (skipTelemetry && skipTelemetryEventSent))
-            {
-                return;
-            }
-
-            await InitializeTelemetryAsync(scanId);
-            if (skipTelemetry)
+            if (TelemetryIsOff())
             {
                 return;
             }
@@ -166,14 +160,7 @@ namespace PnP.Scanning.Core.Services
 
         internal async Task LogScanEndAsync(Guid scanId)
         {
-            // An opted-out session still reaches the initialization below until its one skip event is sent.
-            if (telemetryClient == null || (skipTelemetry && skipTelemetryEventSent))
-            {
-                return;
-            }
-
-            await InitializeTelemetryAsync(scanId);
-            if (skipTelemetry)
+            if (TelemetryIsOff())
             {
                 return;
             }
@@ -289,15 +276,90 @@ namespace PnP.Scanning.Core.Services
         /// against the in-memory SQLite fixture — same testability split as the storage/export cores.
         /// For an assessment with a native analysis the stored inventory holds every analyzed classic page, so the
         /// payload counts the pages the report selects, under the page type the report gives them, and the web
-        /// parts on those pages. The metric names and their meaning stay the same.
+        /// parts on those pages. The metric names and their meaning stay the same. Such an assessment also reports
+        /// how its .aspx files divide over their page handlers, see <see cref="AddHandlerMetrics"/>.
         /// </summary>
         internal static void BuildClassicMetrics(ScanContext dbContext, Dictionary<string, double> metric)
         {
-            BuildClassicMetrics(
-                dbContext,
-                metric,
+            Dictionary<string, int> handlers = new(StringComparer.Ordinal);
+            Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> reportedFiles =
                 PnP.Scanning.Core.ClassicPages.Compatibility.ClassicReportCsvProjection.SelectedFilePageTypes(
-                    dbContext));
+                    dbContext,
+                    handlers);
+            BuildClassicMetrics(dbContext, metric, reportedFiles);
+            if (reportedFiles != null)
+            {
+                AddHandlerMetrics(metric, handlers);
+            }
+        }
+
+        /// <summary>
+        /// Names the page handlers that are counted one by one, with the name each has in its metric. All of them
+        /// ship with SharePoint or ASP.NET.
+        /// </summary>
+        private static readonly (string Handler, string Name)[] CountedHandlers =
+        {
+            ("Microsoft.SharePoint.WebPartPages.WikiEditPage", "WikiEditPage"),
+            ("Microsoft.SharePoint.WebPartPages.WebPartPage", "WebPartPage"),
+            ("Microsoft.SharePoint.Publishing.TemplateRedirectionPage", "TemplateRedirectionPage"),
+            ("Microsoft.SharePoint.Publishing.PublishingLayoutPage", "PublishingLayoutPage"),
+            ("Microsoft.SharePoint.WebControls.ClientSidePage", "ClientSidePage"),
+            ("Microsoft.SharePoint.Publishing.Internal.WebControls.MappingsFileBasePage", "MappingsFileBasePage"),
+            ("Microsoft.SharePoint.MobileControls.SPMobilePage", "SPMobilePage"),
+            ("System.Web.UI.Page", "SystemWebUIPage"),
+        };
+
+        /// <summary>
+        /// Adds how the .aspx files of an assessment with a native analysis divide over their page handlers, the
+        /// PageHandler column of <c>aspx.csv</c>. <paramref name="handlers"/> holds the number of files per handler
+        /// name, with the empty name for a file whose handler is unknown. Only counts leave: a handler in
+        /// <see cref="CountedHandlers"/> has its own metric, any other handler in a Microsoft or System namespace is
+        /// counted as other Microsoft, and every remaining handler as custom, so a handler name an organization
+        /// chose is never sent.
+        /// </summary>
+        internal static void AddHandlerMetrics(
+            Dictionary<string, double> metric,
+            IReadOnlyDictionary<string, int> handlers)
+        {
+            Dictionary<string, int> counted = CountedHandlers.ToDictionary(
+                handler => handler.Handler,
+                _ => 0,
+                StringComparer.Ordinal);
+            int total = 0;
+            int otherMicrosoft = 0;
+            int custom = 0;
+            int unknown = 0;
+            foreach (KeyValuePair<string, int> handler in handlers)
+            {
+                total += handler.Value;
+                if (string.IsNullOrEmpty(handler.Key))
+                {
+                    unknown += handler.Value;
+                }
+                else if (counted.ContainsKey(handler.Key))
+                {
+                    counted[handler.Key] += handler.Value;
+                }
+                else if (handler.Key.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
+                         handler.Key.StartsWith("System.", StringComparison.OrdinalIgnoreCase))
+                {
+                    otherMicrosoft += handler.Value;
+                }
+                else
+                {
+                    custom += handler.Value;
+                }
+            }
+
+            metric.Add("ClassicAspxFileCount", total);
+            foreach ((string Handler, string Name) handler in CountedHandlers)
+            {
+                metric.Add($"ClassicAspxHandler{handler.Name}Count", counted[handler.Handler]);
+            }
+
+            metric.Add("ClassicAspxHandlerOtherMicrosoftCount", otherMicrosoft);
+            metric.Add("ClassicAspxHandlerCustomCount", custom);
+            metric.Add("ClassicAspxHandlerUnknownCount", unknown);
         }
 
         /// <summary>
@@ -996,16 +1058,41 @@ namespace PnP.Scanning.Core.Services
                 // Scan properties
                 foreach (var scanProperty in dbContext.Properties)
                 {
-                    // Telemetry processing picks up "syntexdeepscan", so ensure we always send this property using that name
-                    if (scanProperty.Name.Equals(Constants.StartSyntexFull, StringComparison.OrdinalIgnoreCase))
-                    {
-                        properties.Add("syntexdeepscan", scanProperty.Value);
-                    }
-                    else
-                    {
-                        properties.Add(scanProperty.Name, scanProperty.Value);
-                    }
+                    AddStoredSetting(properties, scanProperty.Name, scanProperty.Value);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Names the stored settings that stay on the machine: the two inventory declarations the tool writes
+        /// itself and the site template patterns the operator typed.
+        /// </summary>
+        private static readonly HashSet<string> SettingsNotSent = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ClassicAspxProjectionContract.PropertyName,
+            ClassicAspxProjectionContract.ScopeModePropertyName,
+            Constants.StartExcludeSiteTemplates,
+        };
+
+        /// <summary>
+        /// Adds one stored assessment setting to the properties of the done event, under its existing name. The
+        /// settings in <see cref="SettingsNotSent"/> are left out.
+        /// </summary>
+        internal static void AddStoredSetting(Dictionary<string, string> properties, string name, string value)
+        {
+            if (SettingsNotSent.Contains(name))
+            {
+                return;
+            }
+
+            // Telemetry processing picks up "syntexdeepscan", so ensure we always send this property using that name
+            if (name.Equals(Constants.StartSyntexFull, StringComparison.OrdinalIgnoreCase))
+            {
+                properties.Add("syntexdeepscan", value);
+            }
+            else
+            {
+                properties.Add(name, value);
             }
         }
 
@@ -1317,23 +1404,6 @@ namespace PnP.Scanning.Core.Services
             properties.Add(EngineVersion, version);
             properties.Add(AADTenantId, Guid.Parse(scan.CLITenantId).ToString());
             properties.Add(ScanMode, scan.CLIMode);
-        }
-
-        private async Task InitializeTelemetryAsync(Guid scanId)
-        {
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PNP_DISABLETELEMETRY")))
-            {
-                skipTelemetry = true;
-            }
-
-            if (skipTelemetry && !skipTelemetryEventSent)
-            {
-                if (scanId != Guid.Empty)
-                {
-                    skipTelemetryEventSent = true;
-                    await LogSkipTelemetryAsync(scanId);
-                }
-            }
         }
 
         /// <summary>

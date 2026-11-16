@@ -557,25 +557,37 @@ internal static class ClassicReportCsvProjection
     /// <summary>
     /// Names the page label the report gives each stored physical file of an assessment, keyed by site collection
     /// and file. Null means the assessment has no native analysis, so its stored page rows are the report.
+    /// <paramref name="handlers"/>, when given, receives the number of .aspx files per page handler.
     /// </summary>
     internal static Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string>? SelectedFilePageTypes(
-        ScanContext context) =>
+        ScanContext context,
+        Dictionary<string, int>? handlers = null) =>
         context.PhaseRuns.AsNoTracking().Any(run => run.ModuleKey == ClassicPageModule.Key)
-            ? SelectedFilePageTypes(context.SPFiles.AsNoTracking())
+            ? SelectedFilePageTypes(context.SPFiles.AsNoTracking(), handlers)
             : null;
 
     /// <summary>
     /// Names the page label the report gives each physical file, keyed by site collection and file. Files the
-    /// report leaves out have no entry. The files are read one at a time.
+    /// report leaves out have no entry. The files are read one at a time. <paramref name="handlers"/>, when given,
+    /// receives the number of .aspx files per page handler, the PageHandler column of <c>aspx.csv</c>, with the
+    /// empty name for a file whose handler is unknown.
     /// </summary>
     internal static Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> SelectedFilePageTypes(
-        IEnumerable<SPFile> files)
+        IEnumerable<SPFile> files,
+        Dictionary<string, int>? handlers = null)
     {
         Dictionary<(Guid SiteCollectionId, Guid FileUniqueId), string> selected = [];
         foreach (SPFile facts in files)
         {
             if (!IsAspx(facts)) continue;
-            string? type = SelectedPageType(new AspxCsvRow(facts));
+            AspxCsvRow row = new(facts);
+            if (handlers != null)
+            {
+                string handler = row.PageHandler ?? "";
+                handlers[handler] = handlers.GetValueOrDefault(handler) + 1;
+            }
+
+            string? type = SelectedPageType(row);
             if (type != null) selected[(facts.SiteCollectionId, facts.FileUniqueId)] = type;
         }
 

@@ -193,9 +193,20 @@ namespace PnP.Scanning.Core.Tests.Services
                 false);
             SPFile document = NewFile(scanId, site, siteUrl, "/Pages/d.docx", wikiHandler, false, false);
 
+            Dictionary<string, int> handlers = new Dictionary<string, int>();
             var reported = ClassicReportCsvProjection.SelectedFilePageTypes(
-                new[] { wiki, webPart, download, listView, layout, document });
+                new[] { wiki, webPart, download, listView, layout, document },
+                handlers);
 
+            // Every .aspx file counts under its handler, also the files the report leaves out.
+            handlers.Should()
+                .BeEquivalentTo(
+                    new Dictionary<string, int>
+                    {
+                        [wikiHandler] = 1,
+                        [webPartHandler] = 3,
+                        ["Microsoft.SharePoint.Publishing.PublishingLayoutPage"] = 1,
+                    });
             reported.Should().HaveCount(2);
             reported[(site, wiki.FileUniqueId)].Should().Be(ClassicPageRules.WikiPage);
             reported[(site, webPart.FileUniqueId)].Should().Be(ClassicPageRules.WebPartPage);
@@ -322,6 +333,112 @@ namespace PnP.Scanning.Core.Tests.Services
                 .NotContain(value =>
                     value.Contains("contoso") || value.Contains("megan") || value.Contains("certificate") ||
                     value.Contains("application-id"));
+        }
+
+        /// <summary>
+        /// Verifies that the handler distribution names only handlers that ship with SharePoint or ASP.NET, and
+        /// counts every other handler by kind without its name.
+        /// </summary>
+        [Fact]
+        public void Telemetry_HandlerMetrics_CountNamedHandlersAndTheRestByKind()
+        {
+            Dictionary<string, int> handlers = new Dictionary<string, int>
+            {
+                ["Microsoft.SharePoint.WebPartPages.WikiEditPage"] = 5,
+                ["Microsoft.SharePoint.WebPartPages.WebPartPage"] = 4,
+                ["Microsoft.SharePoint.Publishing.TemplateRedirectionPage"] = 3,
+                ["Microsoft.SharePoint.WebControls.ClientSidePage"] = 2,
+                ["System.Web.UI.Page"] = 1,
+                ["Microsoft.SharePoint.ApplicationPages.SomeOtherPage"] = 6,
+                ["system.web.ui.MobilePage"] = 1,
+                ["Contoso.Intranet.Pages.NewsPage"] = 7,
+                ["Fabrikam.Portal.HomePage"] = 1,
+                [""] = 9,
+            };
+            Dictionary<string, double> metric = new Dictionary<string, double>();
+
+            TelemetryManager.AddHandlerMetrics(metric, handlers);
+
+            metric.Should()
+                .BeEquivalentTo(
+                    new Dictionary<string, double>
+                    {
+                        ["ClassicAspxFileCount"] = 39,
+                        ["ClassicAspxHandlerWikiEditPageCount"] = 5,
+                        ["ClassicAspxHandlerWebPartPageCount"] = 4,
+                        ["ClassicAspxHandlerTemplateRedirectionPageCount"] = 3,
+                        ["ClassicAspxHandlerPublishingLayoutPageCount"] = 0,
+                        ["ClassicAspxHandlerClientSidePageCount"] = 2,
+                        ["ClassicAspxHandlerMappingsFileBasePageCount"] = 0,
+                        ["ClassicAspxHandlerSPMobilePageCount"] = 0,
+                        ["ClassicAspxHandlerSystemWebUIPageCount"] = 1,
+                        ["ClassicAspxHandlerOtherMicrosoftCount"] = 7,
+                        ["ClassicAspxHandlerCustomCount"] = 8,
+                        ["ClassicAspxHandlerUnknownCount"] = 9,
+                    });
+            metric.Keys.Should().NotContain(name => name.Contains("Contoso") || name.Contains("Fabrikam"));
+
+            // No files still gives every metric, so the event keeps one shape.
+            Dictionary<string, double> none = new Dictionary<string, double>();
+            TelemetryManager.AddHandlerMetrics(none, new Dictionary<string, int>());
+            none.Keys.Should().BeEquivalentTo(metric.Keys);
+            none.Values.Should().OnlyContain(value => value == 0);
+        }
+
+        /// <summary>
+        /// Verifies that the inventory declarations and the site template patterns stay out of the done event, and
+        /// that every other stored setting keeps its existing name.
+        /// </summary>
+        [Fact]
+        public void Telemetry_StoredSettings_LeaveOutTheInventoryDeclarationsAndTheSiteTemplatePatterns()
+        {
+            Dictionary<string, string> properties = new Dictionary<string, string>();
+
+            TelemetryManager.AddStoredSetting(properties, "AspxProjectionContract", "aspx-inventory/v1");
+            TelemetryManager.AddStoredSetting(properties, "AspxScopeMode", "DeclaredFullInventory");
+            TelemetryManager.AddStoredSetting(properties, "excludesitetemplates", "CONTOSOHR#*,SPSPERS#*");
+            TelemetryManager.AddStoredSetting(properties, "ExcludeSiteTemplates", "CONTOSOHR#*");
+            TelemetryManager.AddStoredSetting(properties, "homepageonly", "True");
+            TelemetryManager.AddStoredSetting(properties, "auditlogwindowdays", "14");
+            TelemetryManager.AddStoredSetting(properties, "syntexfull", "True");
+
+            properties.Should()
+                .BeEquivalentTo(
+                    new Dictionary<string, string>
+                    {
+                        ["homepageonly"] = "True", ["auditlogwindowdays"] = "14", ["syntexdeepscan"] = "True",
+                    });
+        }
+
+        /// <summary>Verifies that any value of the opt-out setting turns telemetry off.</summary>
+        [Theory]
+        [InlineData("true", true)]
+        [InlineData("1", true)]
+        [InlineData("false", true)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void Telemetry_OptOut_AnyValueTurnsTelemetryOff(string setting, bool expected)
+        {
+            TelemetryManager.IsDisabled(setting).Should().Be(expected);
+        }
+
+        /// <summary>
+        /// Verifies that an opted-out session sends no event: every send returns before the assessment is read,
+        /// which the absent storage of this manager would fail.
+        /// </summary>
+        [Fact]
+        public async Task Telemetry_OptOut_SendsNoEventAndReadsNoAssessment()
+        {
+            TelemetryManager telemetry = new TelemetryManager(null) { DisableTelemetrySetting = () => "true" };
+            Guid assessment = Guid.NewGuid();
+
+            telemetry.TelemetryIsOff().Should().BeTrue();
+            await telemetry.LogScanEventAsync(assessment, TelemetryEvent.Start);
+            await telemetry.LogScanEventAsync(assessment, TelemetryEvent.Report);
+            await telemetry.LogScanEndAsync(assessment);
+            await telemetry.LogEventAsync(Guid.Empty, TelemetryEvent.List);
+
+            telemetry.TelemetryIsOff().Should().BeTrue();
         }
 
         /// <summary>Builds a stored physical file with its handler, served-as flag and list view evidence.</summary>

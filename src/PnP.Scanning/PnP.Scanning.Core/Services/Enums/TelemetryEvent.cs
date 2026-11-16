@@ -7,7 +7,6 @@
         Restart,
         Stop,
         List,
-        Skip,
         Done,
         Report
     }
