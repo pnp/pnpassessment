@@ -77,7 +77,7 @@
 
 <h2 id="physical-aspx-inventory">Physical ASPX inventory</h2>
 <p><code>aspx.csv</code> exports the assessment's SQL <code>SPFile</code> facts in native <code>(SiteCollectionId, FileUniqueId)</code> order, with one row per observed native site/file pair. Selection uses the physical <code>.aspx</code> extension in the stored filename or path. Every matching observation is included across NoExecute values, handlers, experiences, product families, official states, catalog/list roles, backing-item availability and acquisition outcomes.</p>
-<p>Blocked, modern, catalog, registered view/form, denied, incomplete and unknown ASPX observations remain visible. The population consists of observed physical ASPX files within the requested assessment scope. Consult <a href="csv-discovery.html">discovery.csv</a> for scope, reference, pagination, gap and coverage evidence, including inaccessible scopes and files.</p>
+<p>Files served as a download (NoExecute <code>true</code>), modern, catalog, registered view/form, denied, incomplete and unknown ASPX observations remain visible. The population consists of observed physical ASPX files within the requested assessment scope. Consult <a href="csv-discovery.html">discovery.csv</a> for scope, reference, pagination, gap and coverage evidence, including inaccessible scopes and files.</p>
 <h2 id="columns-and-evidence">Columns and evidence</h2>
 <p>Every stored physical-file property is retained: assessment/native site, Web, list, folder, file and backing-item IDs; original server-relative path and filename; length, content type, customization and setup-path values; read/coverage/error states; observation timestamps; typed item-field states; original NoExecute text/source/read state; provenance JSON; and original <code>AspxEvidenceJson</code>.</p>
 <p>The following flattened columns expose the recorded evidence alongside its original source:</p>
@@ -91,7 +91,7 @@
 <tbody>
 <tr>
 <td>NoExecute</td>
-<td><code>true</code> for trusted server <code>1</code>, <code>false</code> for trusted <code>0</code>, empty for unavailable, invalid or conflicting evidence. Unknown values retain their nullable state.</td>
+<td>How SharePoint serves the file: <code>true</code> (trusted server <code>1</code>) returns it as a download, <code>false</code> (trusted <code>0</code>) may render it. Empty covers unavailable, invalid or conflicting evidence and leaves the serving behavior unknown; SharePoint exposes the value through the linked list item, so a file without one stays empty. Unknown values retain their nullable state.</td>
 </tr>
 <tr>
 <td>PageHandler</td>
@@ -134,7 +134,7 @@
 <p><code>aspxsummary.json</code> counts the rows actually written and their true/false/unknown NoExecute distribution. These counts describe the exported physical inventory. <a href="csv-discovery.html">discovery.csv</a> supplies the assessment's coverage evidence.</p>
 <h2 id="other-outputs-and-power-bi">Other outputs and Power BI</h2>
 <p><a href="csv-classicpages.html">classicpages.csv</a> contains the selected union of qualifying physical ASPX Pages and independent Posts items. <a href="csv-discovery.html">discovery.csv</a> records physical-file discovery, references, scopes, pagination, gaps and coverage.</p>
-<p>The intended Power BI ASPX tab uses all rows from <code>aspx.csv</code> before an explicit user-selected visual filter. This revision retains the existing PBIT assets; the matching ASPX tab layout remains a separate report-template update.</p>
+<p>The Power BI ASPX tab shows all rows from <code>aspx.csv</code>; its slicers are the reader's own filters. Its Category column places each file in one group: <code>Classic page</code> for the files selected into <a href="csv-classicpages.html">classicpages.csv</a>, and <code>List view or form</code>, <code>Modern page</code>, <code>Other handler</code>, <code>Handler not read</code> or <code>Served as download (NoExecute)</code> for the files that stay on the ASPX tab only. Its Served as column reads NoExecute: <code>Download</code> when SharePoint returns the file as a download (<code>true</code>), <code>May render</code> when SharePoint may render the file (<code>false</code>) and <code>Unknown</code> when SharePoint exposes no value for the file.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

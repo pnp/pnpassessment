@@ -127,8 +127,12 @@
 <td>The assessment status: <code>finished</code> is a successfully ended assessment, <code>paused</code> is a paused assessment, <code>running</code> is an assessment that still is in progress and <code>terminated</code> means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)</td>
 </tr>
 <tr>
+<td>Stage</td>
+<td>What the assessment is doing, or where it stopped. A Classic assessment goes through <code>Finding sites</code>, <code>Reading sites</code>, <code>Reading usage data</code>, <code>Checking collected data</code>, <code>Analyzing</code> and <code>Preparing report data</code>, and ends as <code>Completed</code>; a paused or terminated Classic assessment shows <code>Collecting data</code> or <code>Analyzing</code>. Other modes show <code>Assessing sites</code> while they run</td>
+</tr>
+<tr>
 <td>Progress</td>
-<td>Shows how many site collections of the total in scope site collections are assessed</td>
+<td>How far the current stage is. A Classic assessment counts site collections while finding sites, webs while reading sites (e.g. <code>312 / 1,480 webs (21%)</code>) and items while analyzing; a dash marks a stage without a count. Other modes show how many site collections of the total in scope site collections are assessed</td>
 </tr>
 <tr>
 <td>Started at</td>
@@ -137,6 +141,10 @@
 <tr>
 <td>Ended at</td>
 <td>When was this assessment finished</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td>What needs attention: the number of reads that stayed incomplete, the number of items that stayed unassessed and, for a terminated assessment, the reason it stopped. A dash means nothing needs attention</td>
 </tr>
 </tbody>
 </table>
@@ -182,12 +190,16 @@
 <td>The assessment status: <code>finished</code> is a successfully ended assessment, <code>paused</code> is a paused assessment, <code>running</code> is an assessment that still is in progress and <code>terminated</code> means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)</td>
 </tr>
 <tr>
+<td>Stage</td>
+<td>What the assessment is doing, or where it stopped. A Classic assessment goes through <code>Finding sites</code>, <code>Reading sites</code>, <code>Reading usage data</code>, <code>Checking collected data</code>, <code>Analyzing</code> and <code>Preparing report data</code>, and ends as <code>Completed</code>; a paused or terminated Classic assessment shows <code>Collecting data</code> or <code>Analyzing</code>. Other modes show <code>Assessing sites</code> while they run</td>
+</tr>
+<tr>
 <td>Progress</td>
-<td>Shows how many site collections of the total in scope site collections are assessed</td>
+<td>How far the current stage is. A Classic assessment counts site collections while finding sites, webs while reading sites (e.g. <code>312 / 1,480 webs (21%)</code>) and items while analyzing; a dash marks a stage without a count. Other modes show how many site collections of the total in scope site collections are assessed</td>
 </tr>
 <tr>
 <td>Retries</td>
-<td>Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot)</td>
+<td>Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot). A Classic assessment shows a dash here</td>
 </tr>
 <tr>
 <td>Session start</td>
@@ -196,6 +208,10 @@
 <tr>
 <td>Session duration</td>
 <td>How long has the current assessment session been running</td>
+</tr>
+<tr>
+<td>Issues</td>
+<td>What needs attention: the number of reads that stayed incomplete, the number of items that stayed unassessed and, for a terminated assessment, the reason it stopped. A dash means nothing needs attention</td>
 </tr>
 </tbody>
 </table>
