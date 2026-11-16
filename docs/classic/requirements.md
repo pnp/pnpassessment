@@ -25,7 +25,7 @@ Application | **Microsoft Graph:** AuditLogsQuery-SharePoint.Read.All
 To add this permission: go to the Entra Portal → **App registrations** → select your app → **API permissions** → **Add a permission** → **Microsoft Graph** → **Application permissions** → search for `AuditLogsQuery` → select `AuditLogsQuery-SharePoint.Read.All` → **Add permissions** → **Grant admin consent**.
 
 > [!Note]
-> If this permission is missing, audit log collection fails and the `classicpageauditusage.csv` rows will show `QueryStatus=failed` and `SkipReason=NoPermission: ...` (a description of the missing permission). The rest of the assessment (page discovery, web part mapping, etc.) is not affected.
+> If this permission is missing, audit log collection fails and the `classicpageauditusage.csv` rows will show `QueryStatus=failed` and `SkipReason=NoPermission: ...` (the name of the missing permission), and the `report` command prints a warning with that reason. The rest of the assessment (page discovery, web part mapping, etc.) is not affected.
 
 > [!Note]
 > Audit logging must be enabled for the tenant before running the assessment. Go to [Microsoft Purview compliance portal](https://compliance.microsoft.com) → **Audit** → click **Start recording user and admin activity** if not already enabled. Audit events are available in the log approximately 60–90 minutes after they occur.

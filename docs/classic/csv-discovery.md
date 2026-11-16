@@ -33,7 +33,14 @@ Code | Meaning
 `json_throttle_attempts_exhausted` | SharePoint throttled every attempt.
 `json_throttle_delay_exceeds_budget` | SharePoint directed a wait longer than the request honors, or a wait the request cannot read.
 
-Each request given up this way counts as an incomplete read in the Issues column of `status` and `list`. The `report` command prints how many locations stayed incompletely listed, by the rule of `incompleteScopeCount` in the Summary evidence, and how many listing requests throttling stopped. A new assessment lists those locations again.
+Each request given up this way counts as an incomplete read in the Issues column of `status` and `list`. The `report` command prints how many locations stayed incompletely listed and how many listing requests throttling stopped, as long as at least one location is counted. A new assessment lists those locations again.
+
+The count holds the `Scope` and `Gap` rows with a `DiscoveryStatus` other than `Complete`, `Empty` or `PolicyExcluded`, with two kinds of rows left out because no file is missing behind them:
+
+- A file listing that failed while the second, reduced listing of the same folder finished. The second listing is the `Surface` row with `ObservationMethod` `PhysicalFolderFilesAuthorityFallback` and the same `ParentScopeKey`. It returns every file of the folder.
+- A request that SharePoint refuses on every site collection, such as the forms of the User Information List, together with the scope that failed only because of it. The `EvidenceJson` of such a row names the rule in `applicabilityRuleId`.
+
+`incompleteScopeCount` in the Summary evidence and the Summary verdict count those rows as well, so a `Summary` row can read `Incomplete` while the `report` command prints no warning.
 
 ## Columns
 
