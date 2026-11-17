@@ -4,6 +4,8 @@
 
 For native pipeline reports, this file has one row per **selected** [classicpages.csv](csv-classicpages.md) object when usage was requested. It retains the full Posts locator including `?ID=...`, never the shared renderer's usage. Failed, unsupported and uncollected queries have **empty counts**, not successful zeroes; partial counts remain labelled `partial`. Intentionally specifying `--skipusageinformation` keeps the existing no-usage-file behavior; `classicpages.csv` still carries `UsageQueryStatus=skipped` and nullable counts. Legacy assessments retain the historical behavior described below.
 
+When version 1.17.0 reports an assessment collected by 1.16.x, it also adds retained audit counts and `UsageQueryStatus` to `classicpages.csv` for the current Power BI template. The original page fields and standalone audit CSV are preserved; no new query or native analysis is performed. Matching uses the same assessment, site and complete page locator. Failed, skipped, missing or ambiguous measurements stay empty, partial counts keep their status, and a shared blog renderer is never assigned to an individual Post. A successful empty-site coverage record can establish zero for a physical file, but not for a query-addressed object whose events the historical collector might not have retained.
+
 The reducer checks the event URI's **path** for the ASPX extension and preserves the complete original absolute or server-relative locator, including its query, as the aggregation key. `UsageAttributionState` is independent of query coverage: a Posts item with no actual item-specific record has `ItemLocatorNotObserved` and null counts, even when the query succeeded. It is not assigned the renderer's events or asserted to have zero activity.
 
 This csv file contains one row per classic page for which audit log activity was collected, plus (when a
@@ -29,7 +31,7 @@ has empty counts.
 
 Column|Description
 ------|-----------
-PageUrl | Server-relative URL of the classic page (e.g. `/sites/team/SitePages/Home.aspx`). This matches the `Url` column in [classicpages.csv](csv-classicpages.md), so the two files can be joined on this value. On a site-level summary row (see `QueryStatus`), this is the server-relative site URL.
+PageUrl | Server-relative URL of the classic page (e.g. `/sites/team/SitePages/Home.aspx`). This matches the `PageUrl` column in [classicpages.csv](csv-classicpages.md); join using `ScanId`, `SiteUrl` and the complete `PageUrl`, not the page address alone. On a site-level summary row (see `QueryStatus`), this is the server-relative site URL.
 AuditViewsCount | Number of `ClassicPageViewed` events for this page within the audit window.
 AuditCreatesCount | Number of `ClassicPageCreated` events for this page within the audit window.
 AuditEditsCount | Number of `ClassicPageEdited` events for this page within the audit window.
