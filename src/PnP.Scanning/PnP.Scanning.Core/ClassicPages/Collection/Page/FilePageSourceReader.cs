@@ -90,7 +90,7 @@ internal static class FilePageSourceReader
         {
             try
             {
-                Microsoft.SharePoint.Client.ListItem? item = csom.Web.GetFileByServerRelativeUrl(page.Url)
+                Microsoft.SharePoint.Client.ListItem? item = CsomFileLocator.GetFile(csom.Web, page.Url)
                     .ListItemAllFields;
                 csom.Load(item.ContentType, ct => ct.DisplayFormTemplateName);
                 await csom.ExecuteQueryAsync();

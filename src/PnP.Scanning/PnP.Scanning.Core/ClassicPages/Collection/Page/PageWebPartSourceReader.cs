@@ -34,7 +34,7 @@ internal static class PageWebPartSourceReader
             ? WikiContentParser.Parse(fields.GetValueOrDefault("WikiField")?.Text).Placeholders
             : null;
         if (placeholders?.Count == 0) return (properties, []);
-        Microsoft.SharePoint.Client.File? file = context.Web.GetFileByServerRelativeUrl(pageUrl);
+        Microsoft.SharePoint.Client.File? file = CsomFileLocator.GetFile(context.Web, pageUrl);
         LimitedWebPartManager? manager = file.GetLimitedWebPartManager(PersonalizationScope.Shared);
         if (pageType == ClassicPageRules.WikiPage)
         {

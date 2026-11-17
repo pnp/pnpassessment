@@ -31,6 +31,11 @@ internal sealed class PipelineCoordinator(
     internal int ActiveCount => active.Count;
 
     /// <summary>
+    /// The time a stop or pause request waits for the active module to settle before the run is terminated.
+    /// </summary>
+    internal TimeSpan SettlementTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Called with the assessment id once a run that collected and analyzed has settled as finished. The run is
     /// complete before the call, and a failure of the call is logged and leaves the run finished.
     /// </summary>
@@ -64,7 +69,8 @@ internal sealed class PipelineCoordinator(
     public Task StartAsync(CancellationToken cancellationToken) => store.MarkInterruptedRunsAsync(cancellationToken);
 
     /// <summary>
-    /// Stops admission, cancels active phases, and waits for durable settlement.
+    /// Stops admission, cancels active phases, and waits for durable settlement. A run whose module does not settle
+    /// in time is stored as terminated and logged, and the stop continues with the next active run.
     /// </summary>
     public async Task StopAsync(CancellationToken cancellationToken)
     {
@@ -76,7 +82,19 @@ internal sealed class PipelineCoordinator(
         }
 
         foreach (ActiveExecution? execution in executions)
-            await RequestStopAsync(execution, ScanStatus.Terminated, cancellationToken);
+        {
+            try
+            {
+                await RequestStopAsync(execution, ScanStatus.Terminated, cancellationToken);
+            }
+            catch (TimeoutException ex)
+            {
+                Serilog.Log.Warning(
+                    ex,
+                    "Pipeline run {RunId} did not settle in time and is stored as terminated",
+                    execution.Root.RunId);
+            }
+        }
     }
 
     /// <summary>
@@ -400,7 +418,8 @@ internal sealed class PipelineCoordinator(
         await execution.Control.WaitAsync(token);
         try
         {
-            if (execution.Settled) return;
+            // A run already stored as terminated after a timeout keeps that outcome; a later request returns at once.
+            if (execution.Settled || execution.SettlementTimedOut) return;
             execution.RequestedStatus = desired;
             execution.Cancellation.Cancel();
             await store.SetPausingAsync(execution.Root.AssessmentId, execution.Root.RunId, token);
@@ -412,7 +431,7 @@ internal sealed class PipelineCoordinator(
 
         try
         {
-            await execution.Completion.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+            await execution.Completion.Task.WaitAsync(SettlementTimeout, token);
         }
         catch (TimeoutException)
         {
@@ -425,8 +444,9 @@ internal sealed class PipelineCoordinator(
                     execution.Root.AssessmentId,
                     execution.Root.RunId,
                     ScanStatus.Terminated,
-                    "A module did not settle cancellation within 30 seconds.",
+                    $"A module did not settle cancellation within {SettlementTimeout.TotalSeconds:0} seconds.",
                     token);
+                execution.SettlementTimedOut = true;
             }
             finally
             {
@@ -846,6 +866,11 @@ internal sealed class PipelineCoordinator(
 
         internal ScanStatus? RequestedStatus { get; set; }
         internal bool Settled { get; set; }
+
+        /// <summary>
+        /// Set once a stop or pause request stored the run as terminated because its module did not settle in time.
+        /// </summary>
+        internal bool SettlementTimedOut { get; set; }
 
         /// <summary>The live step reported by the executing phase; absent while persisted counters describe it.</summary>
         internal volatile PhaseProgress? Progress;

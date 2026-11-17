@@ -15,6 +15,11 @@ The file is only generated when audit log usage collection runs — that is, whe
 is **not** specified and the Entra app has the `AuditLogsQuery-SharePoint.Read.All` Microsoft Graph
 application permission (see [requirements](requirements.md)).
 
+The assessment sends its usage queries once it has found the sites, before it reads the first one, and checks
+them once a minute while it reads the sites. The audit window ends when the assessment starts. A query that the
+audit service has not finished 90 minutes after it was sent is recorded as failed, and its part of the window
+has empty counts.
+
 > [!NOTE]
 > Audit events are typically available in the log 60–90 minutes after they occur, so very recent activity
 > may not yet be reflected. The counts are a de-duplicated activity signal (for example a page view is not
@@ -31,8 +36,9 @@ AuditEditsCount | Number of `ClassicPageEdited` events for this page within the 
 AuditUniqueUsers | Approximate number of distinct users across all of the above operations for this page. Capped for very heavily-used pages (the exact count saturates once a page's tracked-user set reaches the internal cap).
 AuditWindowStart | Start of the queried audit window (UTC).
 AuditWindowEnd | End of the queried audit window (UTC).
-QueryStatus | Coverage status for this row. `succeeded` = the audit window was queried in full. `partial` = one or more sub-windows failed, so this page's counts are a floor (some days may be missing). `failed` = audit collection failed for this site (for example a missing permission or a query error); counts are 0. `skipped` = audit collection was intentionally not run for this site (for example an unsupported/sovereign cloud).
-SkipReason | Populated when `QueryStatus` is not `succeeded`. A human-readable reason, e.g. `NoPermission: The Entra app is missing the 'AuditLogsQuery-SharePoint.Read.All' application permission...`, `PartialData: 2/7 chunk(s) failed — ...`, or a query/timeout error. Empty on successful rows.
+QueryStatus | Coverage status for this row. `succeeded` = the audit window was queried in full. `partial` = one or more sub-windows failed, so this page's counts are a floor (some days may be missing). `failed` = audit collection failed for this site (for example a missing permission or a query error); counts are empty. `skipped` = audit collection was intentionally not run for this site (for example an unsupported/sovereign cloud).
+UsageAttributionState | How the counts were matched to the page. `ExactContentLocator` = events for the address of this page were found. `CoveredFileNoEvents` = the queries that succeeded hold no event for the page. `ItemLocatorNotObserved` = a blog post for which no event carried its own address; its counts are empty. `NotAcquired` = usage data was not read, see `QueryStatus`.
+SkipReason | Populated when `QueryStatus` is not `succeeded`: the reasons the usage queries recorded. A reason starts with what stopped the query: `NoPermission: AuditLogsQuery-SharePoint.Read.All` (the application permission is missing), `SovereignCloud` (usage is not queried in this cloud), `TokenError`, `SubmitError`, `PollError`, `QueryFailed`, `QueryTimeout`, `RecordsError` or `ParseError`, followed by a detail. Reasons of the same kind are written once with the number of queries, each reason is one line of at most 200 characters, and up to three kinds are written out while the remaining kinds are counted. Empty on successful rows. An assessment collected by version 1.16.x keeps the reason text of that version.
 ScanId | Id of the assessment.
 SiteUrl | Fully qualified site collection URL that owns this page.
 
@@ -40,4 +46,6 @@ SiteUrl | Fully qualified site collection URL that owns this page.
 > If the audit query for a site fails or returns partially, that site's affected rows carry
 > `QueryStatus=failed`/`partial` with the reason in `SkipReason`. In particular, a missing
 > `AuditLogsQuery-SharePoint.Read.All` permission produces `QueryStatus=failed` with
-> `SkipReason=NoPermission: ...` — check this column if audit counts are unexpectedly 0.
+> `SkipReason=NoPermission: ...` — check this column if audit counts are unexpectedly empty.
+> For an assessment collected by version 1.17.0 or later, the `report` command prints a warning
+> with the reason when usage data is missing or incomplete.

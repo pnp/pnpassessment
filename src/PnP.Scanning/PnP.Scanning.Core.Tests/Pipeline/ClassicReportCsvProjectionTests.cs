@@ -366,6 +366,109 @@ public sealed class ClassicReportCsvProjectionTests
         Assert.Single(ClassicReportCsvProjection.SelectPages(source));
     }
 
+    /// <summary>The report command reads the usage state only from the summary of the same assessment.</summary>
+    [Fact]
+    public void Usage_state_is_read_from_the_summary_of_the_same_assessment()
+    {
+        string directory = Directory.CreateTempSubdirectory("classic-usage-state-").FullName;
+        try
+        {
+            Guid assessment = Guid.NewGuid();
+            string summary = Path.Combine(directory, ClassicReportCsvProjection.SummaryJson);
+            AssertNoUsageState(directory, assessment);
+            System.IO.File.WriteAllText(
+                summary,
+                JsonSerializer.Serialize(
+                    new { ScanId = assessment, UsageQueryStatus = "failed", UsageSkipReason = "QueryTimeout: a" }));
+            (string? status, string? reason) = ClassicReportCsvProjection.ReadUsageState(directory, assessment);
+            Assert.Equal("failed", status);
+            Assert.Equal("QueryTimeout: a", reason);
+            AssertNoUsageState(directory, Guid.NewGuid());
+            System.IO.File.WriteAllText(
+                summary,
+                JsonSerializer.Serialize(new { ScanId = assessment, UsageQueryStatus = (string?)null }));
+            AssertNoUsageState(directory, assessment);
+            System.IO.File.WriteAllText(summary, "not json");
+            AssertNoUsageState(directory, assessment);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    /// <summary>Asserts that the summary in the folder holds no usage state and no reason for the assessment.</summary>
+    private static void AssertNoUsageState(string directory, Guid assessment)
+    {
+        (string? status, string? reason) = ClassicReportCsvProjection.ReadUsageState(directory, assessment);
+        Assert.Null(status);
+        Assert.Null(reason);
+    }
+
+    /// <summary>Complete and unrequested usage have no warning; missing and incomplete usage each have one.</summary>
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("succeeded", null)]
+    [InlineData("partial", "covers only part of the audit window")]
+    [InlineData("failed", "could not be read")]
+    [InlineData("skipped", "could not be read")]
+    [InlineData("notcollected", "could not be read")]
+    public void Usage_warning_follows_the_recorded_usage_state(string? status, string? expected)
+    {
+        string? warning = ClassicReportCsvProjection.UsageWarning(status, "QueryTimeout: a");
+        if (expected == null)
+        {
+            Assert.Null(warning);
+            Assert.Null(ClassicReportCsvProjection.UsageWarning(status, null));
+            return;
+        }
+
+        Assert.Contains(expected, warning);
+        Assert.EndsWith(". Reason: QueryTimeout: a", warning);
+        Assert.DoesNotContain("Reason", ClassicReportCsvProjection.UsageWarning(status, null));
+    }
+
+    /// <summary>The usage reason lists each kind of recorded reason once and counts the remaining kinds.</summary>
+    [Fact]
+    public void Usage_reason_lists_the_recorded_reasons()
+    {
+        ClassicReportSource source = Source([File(Guid.NewGuid(), 1, Handlers[0], null, null)], usage: true);
+        Assert.Null(ClassicReportCsvProjection.UsageSkipReason(source, "succeeded"));
+        source = source with { AuditChunks = [] };
+        Assert.Equal("notcollected", ClassicReportCsvProjection.UsageStatus(source));
+        Assert.Equal(
+            "No usage query result was recorded for this assessment",
+            ClassicReportCsvProjection.UsageSkipReason(source, "notcollected"));
+        source = source with
+        {
+            AuditChunks =
+            [
+                new(0, DateTime.UnixEpoch, DateTime.UnixEpoch.AddDays(2), "b", "failed", "QueryTimeout: b"),
+                new(1, DateTime.UnixEpoch.AddDays(2), DateTime.UnixEpoch.AddDays(4), "a", "failed", "QueryTimeout: a"),
+                new(2, DateTime.UnixEpoch.AddDays(4), DateTime.UnixEpoch.AddDays(6), "c", "failed", "QueryTimeout: c"),
+                new(3, DateTime.UnixEpoch.AddDays(6), DateTime.UnixEpoch.AddDays(8), null, "failed", null)
+            ]
+        };
+        Assert.Equal("failed", ClassicReportCsvProjection.UsageStatus(source));
+        Assert.Equal("QueryTimeout: a (3 queries)", ClassicReportCsvProjection.UsageSkipReason(source, "failed"));
+        string body = "PollError: {\"error\":\r\n\t\"" + new string('x', 400) + "\"}";
+        source = source with
+        {
+            AuditChunks =
+            [
+                .. source.AuditChunks,
+                new(4, DateTime.UnixEpoch.AddDays(8), DateTime.UnixEpoch.AddDays(10), "d", "failed", body),
+                new(5, DateTime.UnixEpoch.AddDays(10), DateTime.UnixEpoch.AddDays(12), null, "failed", "SubmitError"),
+                new(6, DateTime.UnixEpoch.AddDays(12), DateTime.UnixEpoch.AddDays(14), null, "failed", "RecordsError")
+            ]
+        };
+        string reason = ClassicReportCsvProjection.UsageSkipReason(source, "failed")!;
+        Assert.StartsWith("PollError: {\"error\": \"xxx", reason);
+        Assert.EndsWith("xxx...; QueryTimeout: a (3 queries); RecordsError; and 1 more", reason);
+        Assert.DoesNotContain("\n", reason);
+        Assert.Equal(203 + "; QueryTimeout: a (3 queries); RecordsError; and 1 more".Length, reason.Length);
+    }
+
     /// <summary>The report command reads the left-out count only from the summary written for the same assessment.</summary>
     [Fact]
     public void Omitted_page_count_is_read_from_the_summary_of_the_same_assessment()
@@ -509,6 +612,10 @@ public sealed class ClassicReportCsvProjectionTests
         string immutableReport = (await context.AnalysisReportRows.SingleAsync()).PayloadJson;
         string snapshotDigest = (await context.SourceSnapshots.SingleAsync()).ManifestDigest!;
         Assert.True(capturedParts > 0);
+        // The export keeps the modern page count the analysis stored for the web.
+        ClassicWebSummary storedWeb = await context.ClassicWebSummaries.SingleAsync();
+        storedWeb.ModernPages = 7;
+        await context.SaveChangesAsync();
         string directory = Path.Combine(data.DirectoryPath, "export");
         Directory.CreateDirectory(directory);
         await ReportManager.ExportClassicReportDataAsync(
@@ -527,6 +634,7 @@ public sealed class ClassicReportCsvProjectionTests
             (await System.IO.File.ReadAllLinesAsync(Path.Combine(directory, "classicpagesomitted.csv"))).Single());
         Assert.Equal(0L, ClassicReportCsvProjection.ReadOmittedPageCount(directory, assessment));
         Assert.False(System.IO.File.Exists(Path.Combine(directory, "classicpageauditusage.csv")));
+        AssertNoUsageState(directory, assessment);
         Assert.Equal(canonicalPages, await context.ClassicPages.CountAsync());
         Assert.Equal(capturedParts, await context.ClassicPageWebParts.CountAsync());
         Assert.Equal(capturedFiles, await context.SPFiles.CountAsync());
@@ -569,7 +677,12 @@ public sealed class ClassicReportCsvProjectionTests
             ClassicWebSummary summary = Assert.Single(webs.GetRecords<ClassicWebSummary>());
             Assert.Equal(2, summary.ClassicPages);
             Assert.Equal(1, summary.ClassicLists);
+            Assert.Equal(7, summary.ModernPages);
         }
+
+        using (StreamReader siteText = new(Path.Combine(directory, "classicsitesummaries.csv")))
+        using (CsvReader sites = new(siteText, CultureInfo.InvariantCulture))
+            Assert.Equal(7, Assert.Single(sites.GetRecords<ClassicSiteSummary>()).ModernPages);
 
         AnalysisReportRowEntry report = await context.AnalysisReportRows.SingleAsync();
         report.PayloadJson = VersionedJson.From(new { corrupted = true }).Json;

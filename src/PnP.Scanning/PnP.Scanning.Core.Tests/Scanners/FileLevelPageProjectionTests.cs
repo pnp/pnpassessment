@@ -185,8 +185,39 @@ public sealed class FileLevelPageProjectionTests
         Analyze(Row(setupPath), SourceReadState.NotAttempted).Page.Should().NotBeNull();
     }
 
+    /// <summary>Reports a page whose stored web part data cannot be interpreted as failed and keeps the page.</summary>
+    [Fact]
+    public void Unreadable_web_part_data_fails_the_page_and_keeps_it()
+    {
+        ClassicPageWebPartSource part = new(
+            Guid.NewGuid(),
+            null,
+            "Left",
+            0,
+            "Unreadable",
+            false,
+            false,
+            "All",
+            [],
+            "<webParts><webPart",
+            SourceReadState.Complete);
+        FilePageAnalysis output = Analyze(Row("SiteTemplates\\STS\\default.aspx"), SourceReadState.Complete, [part]);
+        output.Page.Should().NotBeNull();
+        output.Page.AssessmentStatus.Should().Be("Failed");
+        output.Page.WebPartCount.Should().Be(0);
+        output.Parts.Should().BeEmpty();
+        output.Error.Should().StartWith("XmlException: ");
+        output.Discovery.AssessmentStatus.Should().Be("Failed");
+        output.Discovery.ErrorStage.Should().Contain("WebPartAssessment");
+        output.Discovery.ErrorCodes.Should().Contain("Failed");
+        output.Discovery.ErrorDetail.Should().Contain("XmlException: ");
+    }
+
     /// <summary>Builds native analysis inputs with no online context or fabricated list item.</summary>
-    private static FilePageAnalysis Analyze(DiscoveryEvidence row, SourceReadState partsState)
+    private static FilePageAnalysis Analyze(
+        DiscoveryEvidence row,
+        SourceReadState partsState,
+        ClassicPageWebPartSource[] webParts = null)
     {
         WebFacts web = new(
             Site,
@@ -215,7 +246,7 @@ public sealed class FileLevelPageProjectionTests
             null,
             [],
             [],
-            [],
+            webParts ?? [],
             SourceReadState.NotAttempted,
             partsState,
             null,

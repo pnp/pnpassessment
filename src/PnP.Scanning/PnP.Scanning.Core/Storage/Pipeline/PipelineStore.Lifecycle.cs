@@ -71,15 +71,24 @@ internal sealed partial class PipelineStore
                 .Where(id => File.Exists(DatabasePath(id)));
 
     /// <summary>
-    /// Reads persisted root phases in creation order across local assessment databases.
+    /// Reads persisted root phases in creation order across local assessment databases. An assessment whose
+    /// database cannot be opened or upgraded is logged and left out, and its folder is kept as it is, so the
+    /// assessments that can be read stay available.
     /// </summary>
     internal async Task<IReadOnlyList<PhaseRunRow>> ListRootsAsync(CancellationToken token = default)
     {
         List<PhaseRunRow>? result = new List<PhaseRunRow>();
         foreach (Guid id in AssessmentsOnDisk())
         {
-            await EnsureDatabaseAsync(id, token);
-            result.AddRange((await GetRunsAsync(id, token)).Where(x => x.ParentRunId == null));
+            try
+            {
+                await EnsureDatabaseAsync(id, token);
+                result.AddRange((await GetRunsAsync(id, token)).Where(x => x.ParentRunId == null));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Serilog.Log.Warning(ex, "Assessment {ScanId} could not be read and is left out", id);
+            }
         }
 
         return result.OrderBy(x => x.CreatedAtUtc).ToArray();

@@ -515,7 +515,7 @@ internal sealed class ClassicContentReader(CollectionContext context, Collection
             layoutUrl,
             async path =>
             {
-                Microsoft.SharePoint.Client.File? file = csom.Site.RootWeb.GetFileByServerRelativeUrl(path);
+                Microsoft.SharePoint.Client.File? file = CsomFileLocator.GetFile(csom.Site.RootWeb, path);
                 csom.Load(file, value => value.CustomizedPageStatus);
                 await csom.ExecuteQueryAsync();
                 return file.CustomizedPageStatus.ToString();

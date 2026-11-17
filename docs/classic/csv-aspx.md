@@ -17,12 +17,31 @@ Column | Meaning
 NoExecute | How SharePoint serves the file: `true` (trusted server `1`) returns it as a download, `false` (trusted `0`) may render it. Empty covers unavailable, invalid or conflicting evidence and leaves the serving behavior unknown; SharePoint exposes the value through the linked list item, so a file without one stays empty. Unknown values retain their nullable state.
 PageHandler | Exact fully qualified handler parsed from captured original bytes, or a previously captured handler when bytes are unavailable. Handler identity comes from the recorded source evidence.
 SourceSha256 | Digest of captured source bytes, when available.
-SourceReadState / SourceError | Original source acquisition outcome and error.
+SourceReadState / SourceError | Original source acquisition outcome and error. `NotRequested` marks a registered list view or list form, whose source is left unread.
 HandlerResolution / PageDeclaration | Source parser outcome and original Page declaration.
 ListTemplate | Observed owning-list template, when available.
 IsCatalog / IsListView / IsListForm | Independent captured native role evidence; unavailable values stay empty.
 RoleReadState | Completeness of role acquisition, independent of source and item acquisition.
 Official / OfficialReadState | Authoritative official-file evidence has its own fields. The current acquisition state is `NotAcquired`, with an empty Official value. SetupPath, catalog role and handler identity retain their independent meanings.
+
+### List view pages and pages that host a list view
+
+`IsListView` is true for a list's own view page. A file is a list's own view page in two cases:
+
+- A visible view names the file.
+- A hidden view of the list that owns the file names it, and the file is one of that list's own pages rather than one of its items.
+
+SharePoint also registers a hidden view on the source list for every list view web part placed on a page, and that view names the hosting page. A wiki, web part or publishing page that hosts a list view web part is a content page: its `IsListView` is false and it stays eligible for [classicpages.csv](csv-classicpages.md). The same holds for a page at the root of a web and for a page stored as an item of the library it shows.
+
+`IsListView` is captured during collection. An assessment that an earlier version collected, or started collecting and a later version resumed, keeps the values captured at that time; start a new assessment to apply this rule to every file.
+
+### Source of list views and list forms
+
+A registered list view or list form belongs to the List product family whatever its handler is, so collection records it from its role evidence alone. Such a row has `SourceReadState` and `HandlerResolution` set to `NotRequested`, empty `PageHandler`, `SourceSha256` and `PageDeclaration`, and its `IsListView` / `IsListForm` values. Every other `.aspx` file has its source read in one request addressed by the file's unique id.
+
+A list view or list form that has no backing list item is also recorded without a second read for item fields and web parts; [discovery.csv](csv-discovery.md) shows it as `NotApplicable` with the code `registered_list_view_or_form`. A view or form that is a list item keeps its item read, which supplies its `NoExecute` value.
+
+An assessment that an earlier version collected, or started collecting and a later version resumed, keeps the source and web parts captured at that time.
 
 `AspxEvidenceJson` retains the recorded source evidence, including original bytes when acquired. Treat exported source and error details as assessment data. Repository examples use synthetic data.
 
@@ -38,4 +57,4 @@ Within captured typed item-field JSON, an omitted optional user/lookup property 
 
 [classicpages.csv](csv-classicpages.md) contains the selected union of qualifying physical ASPX Pages and independent Posts items. [discovery.csv](csv-discovery.md) records physical-file discovery, references, scopes, pagination, gaps and coverage.
 
-The Power BI ASPX tab shows all rows from `aspx.csv`; its slicers are the reader's own filters. Its Category column places each file in one group: `Classic page` for the files selected into [classicpages.csv](csv-classicpages.md), and `List view or form`, `Modern page`, `Other handler`, `Handler not read` or `Served as download (NoExecute)` for the files that stay on the ASPX tab only. Its Served as column reads NoExecute: `Download` when SharePoint returns the file as a download (`true`), `May render` when SharePoint may render the file (`false`) and `Unknown` when SharePoint exposes no value for the file.
+The Power BI ASPX tab shows all rows from `aspx.csv`; its slicers are the reader's own filters. Its Category column places each file in one group: `Classic page` for the files selected into [classicpages.csv](csv-classicpages.md), and `List view or form`, `Modern page`, `Other handler`, `Handler not read` or `Served as download (NoExecute)` for the files that stay on the ASPX tab only. Its Served as column reads NoExecute: `Download` when SharePoint returns the file as a download (NoExecute `true`) and `Render` for every other file, including a file whose NoExecute value is empty. Its Handler column is empty for a list view or form, whose source is left unread.

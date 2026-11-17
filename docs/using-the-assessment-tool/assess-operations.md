@@ -4,7 +4,7 @@ So you've kicked off an assessment and want to followup on the assessment progre
 
 ## Listing the available assessments
 
- Assessment data is gathered inside folders underneath the folder hosting the Microsoft 365 Assessment tool and you can enumerate the done, running, paused and terminated assessments via the `list` action.
+ Assessment data is gathered inside folders underneath the folder hosting the Microsoft 365 Assessment tool and you can enumerate the done, running, paused and terminated assessments via the `list` action. An assessment folder whose data cannot be read is left out of the list and is kept on disk as it is; the log file names the folder and the reason.
 
 ### Sample list commands
 
@@ -36,7 +36,7 @@ Column | Description
 Id | The assessment id
 Mode | The assessment mode (e.g. Classic) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
-Stage | What the assessment is doing, or where it stopped. A Classic assessment goes through `Finding sites`, `Reading sites`, `Reading usage data`, `Checking collected data`, `Analyzing` and `Preparing report data`, and ends as `Completed`; a paused or terminated Classic assessment shows `Collecting data` or `Analyzing`. Other modes show `Assessing sites` while they run
+Stage | What the assessment is doing, or where it stopped. A Classic assessment goes through `Finding sites`, `Reading sites`, `Reading usage data`, `Checking collected data`, `Analyzing` and `Preparing report data`, and ends as `Completed`. Usage data is requested before the sites are read, so `Reading usage data` shows only while the assessment waits for usage queries that are still running after the sites are read; a paused or terminated Classic assessment shows `Collecting data` or `Analyzing`. Other modes show `Assessing sites` while they run
 Progress | How far the current stage is. A Classic assessment counts site collections while finding sites, webs while reading sites (e.g. `312 / 1,480 webs (21%)`) and items while analyzing; a dash marks a stage without a count. Other modes show how many site collections of the total in scope site collections are assessed
 Started at | When was this assessment for the first time started
 Ended at | When was this assessment finished
@@ -65,7 +65,7 @@ Column | Description
 Id | The assessment id
 Mode | The assessment mode (e.g. Classic) defines the adoption or deprecation scenario the assessment is targeting
 Status | The assessment status: `finished` is a successfully ended assessment, `paused` is a paused assessment, `running` is an assessment that still is in progress and `terminated` means that the assessment was interrupted (e.g. when the computer running the assessment was shut down)
-Stage | What the assessment is doing, or where it stopped. A Classic assessment goes through `Finding sites`, `Reading sites`, `Reading usage data`, `Checking collected data`, `Analyzing` and `Preparing report data`, and ends as `Completed`; a paused or terminated Classic assessment shows `Collecting data` or `Analyzing`. Other modes show `Assessing sites` while they run
+Stage | What the assessment is doing, or where it stopped. A Classic assessment goes through `Finding sites`, `Reading sites`, `Reading usage data`, `Checking collected data`, `Analyzing` and `Preparing report data`, and ends as `Completed`. Usage data is requested before the sites are read, so `Reading usage data` shows only while the assessment waits for usage queries that are still running after the sites are read; a paused or terminated Classic assessment shows `Collecting data` or `Analyzing`. Other modes show `Assessing sites` while they run
 Progress | How far the current stage is. A Classic assessment counts site collections while finding sites, webs while reading sites (e.g. `312 / 1,480 webs (21%)`) and items while analyzing; a dash marks a stage without a count. Other modes show how many site collections of the total in scope site collections are assessed
 Retries | Whenever a request is queued for retry a counter will increased. Throttled requests are counted in the first section (1 in the screenshot), requests failed due to network issues are listed in the second section (0 in the screenshot). A Classic assessment shows a dash here
 Session start | When was this assessment run started. If you've restarted an assessment the restart time is shown here
@@ -85,18 +85,6 @@ If the log file is not showing any meaningful updates for a long time then the a
 - Continue with pausing the assessment via `microsoft365-assessment.exe pause --id <assessment id>`. See next chapters for details
 - Stop all assessment processes `microsoft365-assessment.exe stop`. See [here](assess-stop.md) for details
 - Restart the assessment via `microsoft365-assessment.exe restart --id <assessment id>`. See next chapters for details
-
-## Local database timing logs
-
-The scanner host writes `sql_yyyyMMdd_HHmm.jsonl` beside the executable, separately from the normal process and assessment logs. Each line is a Serilog JSON event with `Properties.SqlLifecycle = true` and a structured `Properties.Sql` timing record. These records are local only, are not sent to Application Insights, and are excluded from the normal logs and Debug console. Writes are buffered with a one-second flush interval and flushed on normal host shutdown; abrupt termination can lose buffered records.
-
-Records contain `TimestampUtc`, `Operation`, `OperationId`, `ParentOperationId`, `Phase`, `Kind`, `Member`, repository-relative `File`, `Line`, `ElapsedMs`, `Outcome` and optional `ErrorType`. They identify the operation and static code location, not individual SQL text or input data. SQL, parameter values, connection strings, exception messages and assessment payloads are not recorded.
-
-`Kind = operation` measures a complete wrapped operation: pipeline writes include gate waiting, migration when needed, query consumption, writes and commit; bulk inserts are timed as whole batches without changing their algorithm. Outcomes are `success`, `error` or `canceled`; the original exceptions still propagate. A manually scoped operation records `finished`, which does not imply success.
-
-EF accesses on `ScanContext` also record command execution and observed context lifetime. `Kind = command` with `readerReturned` measures only `ExecuteReader`, not full query consumption; `Kind = context` with `finished` includes the observed lifetime through disposal, including result consumption. `Kind = transaction` measures the observed lifetime from EF starting/adopting a transaction until commit, rollback or disposal; `transactionOperation` measures the separate provider commit/rollback operation. A disposal or context finish is not reported as a successful commit or business operation.
-
-All existing database entry paths are timed: synchronous/asynchronous EF and EF raw SQL through `ScanContext`, pipeline write operations, and the five direct-provider `BulkInsertAsync` call sites in `StorageManager` and `ClassicScanner`. Bulk internals and SQLite-internal statements are intentionally not traced individually. Group records by `Kind`, `Operation`, `Member`, `File` and `Line` to find long or repeated access patterns. Operation/context/command/transaction timings can overlap, so do not sum different kinds as independent elapsed time. The static location is the wrapper call or context creation site, not a captured stack trace.
 
 ## Pausing a running assessment
 

@@ -448,15 +448,42 @@ namespace PnP.Scanning.Core.Services
         }
 
         /// <summary>
-        /// Counts the locations whose content could not be listed completely, by the rule the coverage summary in
-        /// <c>discovery.csv</c> uses, and the listing requests that throttling stopped.
+        /// Counts the locations whose content could not be listed completely and the listing requests that
+        /// throttling stopped. A location is a coverage row of <c>discovery.csv</c> with a status other than
+        /// Complete, Empty or PolicyExcluded that <see cref="IncompleteListingRules"/> keeps.
         /// </summary>
         internal static async Task<IncompleteListings> CountIncompleteListingsAsync(ScanContext dbContext, Guid scanId)
         {
-            int locations = await dbContext.ClassicPageDiscoveries.AsNoTracking()
-                .CountAsync(row => row.ScanId == scanId && (row.RowType == "Scope" || row.RowType == "Gap") &&
-                                   row.DiscoveryStatus != "Complete" && row.DiscoveryStatus != "Empty" &&
-                                   row.DiscoveryStatus != "PolicyExcluded");
+            List<IncompleteListingRules.OpenRow> open = await dbContext.ClassicPageDiscoveries.AsNoTracking()
+                .Where(row => row.ScanId == scanId && (row.RowType == "Scope" || row.RowType == "Gap") &&
+                              row.DiscoveryStatus != "Complete" && row.DiscoveryStatus != "Empty" &&
+                              row.DiscoveryStatus != "PolicyExcluded")
+                .Select(row => new IncompleteListingRules.OpenRow(
+                    row.SiteUrl,
+                    row.WebUrl,
+                    row.RecordKey,
+                    row.ParentScopeKey,
+                    row.ScopeType,
+                    row.ObservationMethod,
+                    row.EvidenceJson))
+                .ToListAsync();
+            HashSet<(string SiteUrl, string WebUrl, string ParentScopeKey)> secondListingCompleted = new();
+            if (open.Count > 0)
+            {
+                var completed = await dbContext.ClassicPageDiscoveries.AsNoTracking()
+                    .Where(row => row.ScanId == scanId && row.RowType == "Scope" &&
+                                  row.ObservationMethod == IncompleteListingRules.SecondFileListing &&
+                                  row.ParentScopeKey != null &&
+                                  (row.DiscoveryStatus == "Complete" || row.DiscoveryStatus == "Empty"))
+                    .Select(row => new { row.SiteUrl, row.WebUrl, row.ParentScopeKey })
+                    .ToListAsync();
+                foreach (var row in completed)
+                {
+                    secondListingCompleted.Add((row.SiteUrl, row.WebUrl, row.ParentScopeKey));
+                }
+            }
+
+            int locations = IncompleteListingRules.CountLocations(open, secondListingCompleted);
             int throttled = await dbContext.ClassicPageDiscoveries.AsNoTracking()
                 .CountAsync(row => row.ScanId == scanId && row.RowType == "Pagination" &&
                                    row.ErrorCodes != null && row.ErrorCodes.Contains("json_throttle_"));
@@ -469,14 +496,16 @@ namespace PnP.Scanning.Core.Services
         internal sealed record IncompleteListings(int Locations, int ThrottledRequests)
         {
             /// <summary>
-            /// Words the counts for the person reading the report; nothing incomplete has no message.
+            /// Words the counts for the person reading the report. There is a message only while a location is
+            /// counted: a listing request that throttling stopped and a second listing completed leaves none.
             /// </summary>
             internal string Message =>
-                Locations == 0 && ThrottledRequests == 0
+                Locations == 0
                     ? null
                     : $"{Locations} location(s) could not be listed completely, so files in them may be missing " +
                       $"from the report. Throttling stopped {ThrottledRequests} listing request(s). " +
-                      "discovery.csv marks each location with a DiscoveryStatus other than Complete or Empty";
+                      "discovery.csv holds these locations among its rows with a DiscoveryStatus other than " +
+                      "Complete or Empty";
         }
 
         /// <summary>

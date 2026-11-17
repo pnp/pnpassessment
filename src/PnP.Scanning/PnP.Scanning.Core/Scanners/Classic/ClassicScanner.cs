@@ -657,9 +657,7 @@ namespace PnP.Scanning.Core.Scanners
                                     })
                                 .ToList();
                             if (errorRecords.Count > 0)
-                                await SqlOperationScope.RunAsync(
-                                    () => dbContext.BulkInsertAsync(errorRecords),
-                                    "BulkInsert");
+                                await dbContext.BulkInsertAsync(errorRecords);
                         }
                         catch (Exception writeEx)
                         {

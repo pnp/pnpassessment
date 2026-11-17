@@ -319,13 +319,22 @@ namespace PnP.Scanning.Core.Services
 
         /// <summary>
         /// Terminates the requested assessment or schedules engine shutdown after settling active pipeline work.
+        /// The engine shuts down also when the active work could not be settled.
         /// </summary>
         public override async Task<Empty> Stop(StopRequest request, ServerCallContext context)
         {
             // Run the stop in a separate thread so that the GRPc client still gets a response
             _ = Task.Run(async () =>
             {
-                await pipeline.StopAsync(CancellationToken.None);
+                try
+                {
+                    await pipeline.StopAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Active assessments could not be settled before the engine stops");
+                }
+
                 await SendTelemetryAsync(telemetry => telemetry.LogEventAsync(Guid.Empty, TelemetryEvent.Stop));
                 await kestrelWebServer.StopAsync();
             });
@@ -485,6 +494,17 @@ namespace PnP.Scanning.Core.Services
                         "{Count} classic page(s) were left out of the report for assessment {ScanId}",
                         omittedPages,
                         scanId);
+                }
+
+                (string usageStatus, string usageReason) = PnP.Scanning.Core.ClassicPages.Compatibility
+                    .ClassicReportCsvProjection.ReadUsageState(dataExportPath, scanId);
+                string usageWarning = PnP.Scanning.Core.ClassicPages.Compatibility.ClassicReportCsvProjection
+                    .UsageWarning(usageStatus, usageReason);
+                if (usageWarning != null)
+                {
+                    await responseStream.WriteAsync(
+                        new ReportStatus { Status = usageWarning, Type = Constants.MessageWarning });
+                    Log.Warning("Usage data is missing or incomplete in the report for assessment {ScanId}", scanId);
                 }
 
                 ReportManager.IncompleteListings incomplete = await reportManager.CountIncompleteListingsAsync(scanId);

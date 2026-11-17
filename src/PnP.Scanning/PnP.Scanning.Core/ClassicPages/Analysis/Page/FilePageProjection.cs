@@ -125,10 +125,24 @@ internal static class FilePageProjection
             ClassicPageRow? filePage = FileLevelPageProjection.Project(row, association);
             if (filePage == null) return new(null, [], row, false);
             ClassicPageWebPartRow[] fileParts = [];
+            string? fileError = null;
             if (source.WebPartsState.Succeeded)
             {
-                fileParts = PageWebPartProjection.Build(filePage, source, options.ExportWebPartProperties).ToArray();
-                if (fileParts.Length > 0) PageMappingCalculator.ApplyMapping(filePage, fileParts, mapping);
+                try
+                {
+                    fileParts = PageWebPartProjection.Build(filePage, source, options.ExportWebPartProperties)
+                        .ToArray();
+                    if (fileParts.Length > 0) PageMappingCalculator.ApplyMapping(filePage, fileParts, mapping);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Stored web part data that cannot be interpreted fails this page only. The page stays in the
+                    // result without web parts, counts as an analysis issue, and the analysis continues.
+                    fileParts = [];
+                    fileError = ex.GetType().Name + ": " + ex.Message;
+                    row.AssessmentStatus = "Failed";
+                    AddError(row, "WebPartAssessment", new("Failed", fileError));
+                }
             }
             else
             {
@@ -139,7 +153,7 @@ internal static class FilePageProjection
             filePage.AssessmentStatus = row.AssessmentStatus;
             if (filePage.HomePage == true && web.CanModernizeState.Succeeded)
                 filePage.UncustomizedHomePage = web.CanModernizeHomepage == true;
-            return new(filePage, fileParts, row, false);
+            return new(filePage, fileParts, row, false, fileError);
         }
 
         if (row.ListId == null || row.ListItemId == null)

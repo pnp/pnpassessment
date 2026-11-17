@@ -25,7 +25,7 @@ Start a new classic pages assessment (application permissions) for a complete te
 Start a classic pages assessment for a set of site collections | microsoft365-assessment.exe start --mode Classic --classicinclude Pages --authmode interactive <br> --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --siteslist "https://bertonline.sharepoint.com/sites/ussales,https://bertonline.sharepoint.com/sites/europesales"
 Assess only the home page of each web, exporting web part properties | microsoft365-assessment.exe start --mode Classic --classicinclude Pages --homepageonly --exportwebpartproperties <br> --authmode application --tenant bertonline.sharepoint.com --applicationid c545f9ce-1c11-440b-812b-0b35217d9e83 <br> --certpath "My&#124;CurrentUser&#124;b133d1cb4d19ce539986c7ac67de005481084c84"
 
-See the [requirements](requirements.md) page for the full list of classic page-scan arguments (`--exportwebpartproperties`, `--skipusageinformation`, `--skipuserinformation`, `--homepageonly`).
+See the [requirements](requirements.md) page for the full list of classic page-scan arguments (`--exportwebpartproperties`, `--skipusageinformation`, `--auditlogwindowdays`, `--skipuserinformation`, `--homepageonly`, `--excludesitetemplates`).
 
 `--homepageonly` applies to both discovery and page assessment. The tool resolves each web's configured welcome page directly and assesses that physical file, without enumerating every list, folder, form and view in the web. Omit `--homepageonly` when the report must include the complete physical ASPX inventory for the selected tenant or sites.
 
