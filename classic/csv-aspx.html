@@ -103,7 +103,7 @@
 </tr>
 <tr>
 <td>SourceReadState / SourceError</td>
-<td>Original source acquisition outcome and error.</td>
+<td>Original source acquisition outcome and error. <code>NotRequested</code> marks a registered list view or list form, whose source is left unread.</td>
 </tr>
 <tr>
 <td>HandlerResolution / PageDeclaration</td>
@@ -127,6 +127,18 @@
 </tr>
 </tbody>
 </table>
+<h3 id="list-view-pages-and-pages-that-host-a-list-view">List view pages and pages that host a list view</h3>
+<p><code>IsListView</code> is true for a list's own view page. A file is a list's own view page in two cases:</p>
+<ul>
+<li>A visible view names the file.</li>
+<li>A hidden view of the list that owns the file names it, and the file is one of that list's own pages rather than one of its items.</li>
+</ul>
+<p>SharePoint also registers a hidden view on the source list for every list view web part placed on a page, and that view names the hosting page. A wiki, web part or publishing page that hosts a list view web part is a content page: its <code>IsListView</code> is false and it stays eligible for <a href="csv-classicpages.html">classicpages.csv</a>. The same holds for a page at the root of a web and for a page stored as an item of the library it shows.</p>
+<p><code>IsListView</code> is captured during collection. An assessment that an earlier version collected, or started collecting and a later version resumed, keeps the values captured at that time; start a new assessment to apply this rule to every file.</p>
+<h3 id="source-of-list-views-and-list-forms">Source of list views and list forms</h3>
+<p>A registered list view or list form belongs to the List product family whatever its handler is, so collection records it from its role evidence alone. Such a row has <code>SourceReadState</code> and <code>HandlerResolution</code> set to <code>NotRequested</code>, empty <code>PageHandler</code>, <code>SourceSha256</code> and <code>PageDeclaration</code>, and its <code>IsListView</code> / <code>IsListForm</code> values. Every other <code>.aspx</code> file has its source read in one request addressed by the file's unique id.</p>
+<p>A list view or list form that has no backing list item is also recorded without a second read for item fields and web parts; <a href="csv-discovery.html">discovery.csv</a> shows it as <code>NotApplicable</code> with the code <code>registered_list_view_or_form</code>. A view or form that is a list item keeps its item read, which supplies its <code>NoExecute</code> value.</p>
+<p>An assessment that an earlier version collected, or started collecting and a later version resumed, keeps the source and web parts captured at that time.</p>
 <p><code>AspxEvidenceJson</code> retains the recorded source evidence, including original bytes when acquired. Treat exported source and error details as assessment data. Repository examples use synthetic data.</p>
 <p>Captured bytes take precedence over older flattened handler/declaration values. Malformed or unresolved bytes produce an unknown handler, with <code>HandlerResolution</code>/<code>SourceError</code> exposing the parser result. The original acquisition can still be <code>Available</code> when byte reading succeeded and parsing failed. The raw row is retained in all of these cases.</p>
 <p>Nullable text uses the existing <code>BackslashNullV1</code> encoding: after normal CSV unquoting, <code>\N</code> is null, an empty field is a known empty string, and a leading backslash in a real value is escaped with one extra backslash. Nullable Boolean, integer and GUID fields use empty values for unknown observations.</p>
@@ -134,7 +146,7 @@
 <p><code>aspxsummary.json</code> counts the rows actually written and their true/false/unknown NoExecute distribution. These counts describe the exported physical inventory. <a href="csv-discovery.html">discovery.csv</a> supplies the assessment's coverage evidence.</p>
 <h2 id="other-outputs-and-power-bi">Other outputs and Power BI</h2>
 <p><a href="csv-classicpages.html">classicpages.csv</a> contains the selected union of qualifying physical ASPX Pages and independent Posts items. <a href="csv-discovery.html">discovery.csv</a> records physical-file discovery, references, scopes, pagination, gaps and coverage.</p>
-<p>The Power BI ASPX tab shows all rows from <code>aspx.csv</code>; its slicers are the reader's own filters. Its Category column places each file in one group: <code>Classic page</code> for the files selected into <a href="csv-classicpages.html">classicpages.csv</a>, and <code>List view or form</code>, <code>Modern page</code>, <code>Other handler</code>, <code>Handler not read</code> or <code>Served as download (NoExecute)</code> for the files that stay on the ASPX tab only. Its Served as column reads NoExecute: <code>Download</code> when SharePoint returns the file as a download (<code>true</code>), <code>May render</code> when SharePoint may render the file (<code>false</code>) and <code>Unknown</code> when SharePoint exposes no value for the file.</p>
+<p>The Power BI ASPX tab shows all rows from <code>aspx.csv</code>; its slicers are the reader's own filters. Its Category column places each file in one group: <code>Classic page</code> for the files selected into <a href="csv-classicpages.html">classicpages.csv</a>, and <code>List view or form</code>, <code>Modern page</code>, <code>Other handler</code>, <code>Handler not read</code> or <code>Served as download (NoExecute)</code> for the files that stay on the ASPX tab only. Its Served as column reads NoExecute: <code>Download</code> when SharePoint returns the file as a download (NoExecute <code>true</code>) and <code>Render</code> for every other file, including a file whose NoExecute value is empty. Its Handler column is empty for a list view or form, whose source is left unread.</p>
 </article>
           </div>
           <div class="hidden-sm col-md-2" role="complementary">

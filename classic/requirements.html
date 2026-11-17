@@ -119,7 +119,7 @@
 <p>To add this permission: go to the Entra Portal → <strong>App registrations</strong> → select your app → <strong>API permissions</strong> → <strong>Add a permission</strong> → <strong>Microsoft Graph</strong> → <strong>Application permissions</strong> → search for <code>AuditLogsQuery</code> → select <code>AuditLogsQuery-SharePoint.Read.All</code> → <strong>Add permissions</strong> → <strong>Grant admin consent</strong>.</p>
 <div class="NOTE">
 <h5>Note</h5>
-<p>If this permission is missing, audit log collection fails and the <code>classicpageauditusage.csv</code> rows will show <code>QueryStatus=failed</code> and <code>SkipReason=NoPermission: ...</code> (a description of the missing permission). The rest of the assessment (page discovery, web part mapping, etc.) is not affected.</p>
+<p>If this permission is missing, audit log collection fails and the <code>classicpageauditusage.csv</code> rows will show <code>QueryStatus=failed</code> and <code>SkipReason=NoPermission: ...</code> (the name of the missing permission), and the <code>report</code> command prints a warning with that reason. The rest of the assessment (page discovery, web part mapping, etc.) is not affected.</p>
 </div>
 <div class="NOTE">
 <h5>Note</h5>
@@ -158,6 +158,10 @@
 <tr>
 <td><code>--homepageonly</code></td>
 <td>Discover and assess only the configured home page of each web, rather than enumerating every physical ASPX file. Useful for a fast home-page modernization-readiness assessment. Omit this option when a complete physical ASPX inventory is required.</td>
+</tr>
+<tr>
+<td><code>--excludesitetemplates</code></td>
+<td>Web templates to leave out of the page scan, as comma-separated patterns in which <code>*</code> and <code>?</code> are wildcards, for example <code>SPSPERS#*,APP#*,BLOG#0</code>. The default is <code>SPSPERS#*,APP#*</code>, which leaves out personal (OneDrive) sites and add-in webs. A value replaces the default, and <code>none</code> assesses webs of every template. Each web is matched on its own template, so a sub web with another template is still assessed. A web that is left out has a <code>PolicyExcluded</code> row in <a href="csv-discovery.html">discovery.csv</a>. Requires the <code>Pages</code> component.</td>
 </tr>
 </tbody>
 </table>

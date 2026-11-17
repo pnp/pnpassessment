@@ -85,6 +85,10 @@ based on data from the <strong>Microsoft Graph audit log</strong> (<code>securit
 <p>The file is only generated when audit log usage collection runs — that is, when <code>--skipusageinformation</code>
 is <strong>not</strong> specified and the Entra app has the <code>AuditLogsQuery-SharePoint.Read.All</code> Microsoft Graph
 application permission (see <a href="requirements.html">requirements</a>).</p>
+<p>The assessment sends its usage queries once it has found the sites, before it reads the first one, and checks
+them once a minute while it reads the sites. The audit window ends when the assessment starts. A query that the
+audit service has not finished 90 minutes after it was sent is recorded as failed, and its part of the window
+has empty counts.</p>
 <div class="NOTE">
 <h5>Note</h5>
 <p>Audit events are typically available in the log 60–90 minutes after they occur, so very recent activity
@@ -130,11 +134,15 @@ re-logged for the same user and page within a short window), not a raw hit count
 </tr>
 <tr>
 <td>QueryStatus</td>
-<td>Coverage status for this row. <code>succeeded</code> = the audit window was queried in full. <code>partial</code> = one or more sub-windows failed, so this page's counts are a floor (some days may be missing). <code>failed</code> = audit collection failed for this site (for example a missing permission or a query error); counts are 0. <code>skipped</code> = audit collection was intentionally not run for this site (for example an unsupported/sovereign cloud).</td>
+<td>Coverage status for this row. <code>succeeded</code> = the audit window was queried in full. <code>partial</code> = one or more sub-windows failed, so this page's counts are a floor (some days may be missing). <code>failed</code> = audit collection failed for this site (for example a missing permission or a query error); counts are empty. <code>skipped</code> = audit collection was intentionally not run for this site (for example an unsupported/sovereign cloud).</td>
+</tr>
+<tr>
+<td>UsageAttributionState</td>
+<td>How the counts were matched to the page. <code>ExactContentLocator</code> = events for the address of this page were found. <code>CoveredFileNoEvents</code> = the queries that succeeded hold no event for the page. <code>ItemLocatorNotObserved</code> = a blog post for which no event carried its own address; its counts are empty. <code>NotAcquired</code> = usage data was not read, see <code>QueryStatus</code>.</td>
 </tr>
 <tr>
 <td>SkipReason</td>
-<td>Populated when <code>QueryStatus</code> is not <code>succeeded</code>. A human-readable reason, e.g. <code>NoPermission: The Entra app is missing the 'AuditLogsQuery-SharePoint.Read.All' application permission...</code>, <code>PartialData: 2/7 chunk(s) failed — ...</code>, or a query/timeout error. Empty on successful rows.</td>
+<td>Populated when <code>QueryStatus</code> is not <code>succeeded</code>: the reasons the usage queries recorded. A reason starts with what stopped the query: <code>NoPermission: AuditLogsQuery-SharePoint.Read.All</code> (the application permission is missing), <code>SovereignCloud</code> (usage is not queried in this cloud), <code>TokenError</code>, <code>SubmitError</code>, <code>PollError</code>, <code>QueryFailed</code>, <code>QueryTimeout</code>, <code>RecordsError</code> or <code>ParseError</code>, followed by a detail. Reasons of the same kind are written once with the number of queries, each reason is one line of at most 200 characters, and up to three kinds are written out while the remaining kinds are counted. Empty on successful rows. An assessment collected by version 1.16.x keeps the reason text of that version.</td>
 </tr>
 <tr>
 <td>ScanId</td>
@@ -151,7 +159,9 @@ re-logged for the same user and page within a short window), not a raw hit count
 <p>If the audit query for a site fails or returns partially, that site's affected rows carry
 <code>QueryStatus=failed</code>/<code>partial</code> with the reason in <code>SkipReason</code>. In particular, a missing
 <code>AuditLogsQuery-SharePoint.Read.All</code> permission produces <code>QueryStatus=failed</code> with
-<code>SkipReason=NoPermission: ...</code> — check this column if audit counts are unexpectedly 0.</p>
+<code>SkipReason=NoPermission: ...</code> — check this column if audit counts are unexpectedly empty.
+For an assessment collected by version 1.17.0 or later, the <code>report</code> command prints a warning
+with the reason when usage data is missing or incomplete.</p>
 </div>
 </article>
           </div>

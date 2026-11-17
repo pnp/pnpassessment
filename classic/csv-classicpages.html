@@ -82,17 +82,43 @@
 <ul>
 <li><strong>NoExecute not equal to true</strong> (both null and false are included).</li>
 <li>An exact source handler in <code>Microsoft.SharePoint.WebPartPages.WikiEditPage</code>, <code>Microsoft.SharePoint.WebPartPages.WebPartPage</code>, <code>Microsoft.SharePoint.Publishing.TemplateRedirectionPage</code>, or <code>System.Web.UI.Page</code>. A source with no <code>Inherits</code> declaration resolves to <code>System.Web.UI.Page</code>.</li>
-<li><strong>Outside the List product family.</strong> A file registered as a list view or list form (<code>IsListView</code> or <code>IsListForm</code> is true) belongs to the List product family and is reported in <a href="csv-aspx.html">aspx.csv</a> only. Files with unknown (empty) list-role evidence are included.</li>
+<li><strong>Outside the List product family.</strong> A file registered as a list view or list form (<code>IsListView</code> or <code>IsListForm</code> is true) belongs to the List product family and is reported in <a href="csv-aspx.html">aspx.csv</a> only. Files with unknown (empty) list-role evidence are included. A content page that hosts a list view web part keeps <code>IsListView</code> false and is included; see <a href="csv-aspx.html#list-view-pages-and-pages-that-host-a-list-view">List view pages and pages that host a list view</a>.</li>
 </ul>
 </li>
 <li>Actual independent list items from the observed Posts template <strong>301</strong>. They are not subject to the ASPX handler/NoExecute gate.</li>
 </ul>
 <p>The List product family is the only product-family condition. Experience, official state, catalog role and backing-item availability are reported as columns and leave the selection unchanged. Unknown handlers are not guessed from metadata or short names. <a href="csv-aspx.html">aspx.csv</a> independently retains <strong>all</strong> physical ASPX facts, including those excluded here.</p>
-<p>File identity is <code>(SiteCollectionId, FileUniqueId)</code>; Posts identity is <code>(SiteCollectionId, ListId, ListItemId)</code>, inside the assessment. A shared display-form renderer is not item identity and does not donate its usage to every post. Equal hashes do not merge different native files. Distinct native objects colliding on the historical report URL key fail explicitly; no URL <code>Distinct</code> silently drops them.</p>
-<p><code>classicpagessummary.json</code> records the same written Page count, file/Posts counts, the physical ASPX denominator, and true/false/unknown NoExecute counts for the file branch. Exported page-dependent Web/site/publishing summaries, web-part inventories and usage rows are recomputed from this same selected set, without changing SQL assessment tables. Retained non-page component counts are unchanged.</p>
+<p>File identity is <code>(SiteCollectionId, FileUniqueId)</code>; Posts identity is <code>(SiteCollectionId, ListId, ListItemId)</code>, inside the assessment. A shared display-form renderer is not item identity and does not donate its usage to every post. Equal hashes do not merge different native files. Distinct native objects that share one historical report URL key are never merged: the object with the lowest <code>ContentKey</code> keeps the row and each other object is listed in <code>classicpagesomitted.csv</code> (see <a href="#pages-left-out-of-the-report">Pages left out of the report</a>).</p>
+<p><code>classicpagessummary.json</code> records the same written Page count, file/Posts counts, the physical ASPX denominator, true/false/unknown NoExecute counts for the file branch, and <code>OmittedPageCount</code>, the number of rows in <code>classicpagesomitted.csv</code>. Exported page-dependent Web/site/publishing summaries, web-part inventories and usage rows are recomputed from this same selected set, without changing SQL assessment tables. Retained non-page component counts are unchanged.</p>
 <p>These related CSVs are selected-Page views, not deletion of captured evidence. The complete original parts, native file facts, component rows, immutable source/analysis publication and existing SQL tables remain intact. Discovery coverage remains a separate observed-acquisition denominator rather than being rewritten to claim that filtered-out files were absent.</p>
 <p>Historical assessments with no native pipeline keep their existing legacy CSV contract. Their summary explicitly says <code>LegacyContract;NativeSourceUnavailable</code>; it does not claim that missing original source was acquired or that the native predicate was proved. An incomplete newer native analysis cannot fall back to older report rows.</p>
 <p>A page whose list item could not be read — a web's root <code>default.aspx</code> and other files that have no backing list item at all — is still assessed from its file alone: its web parts are read through the file's web part manager. The columns that come from the list item (<code>ListUrl</code>, <code>ListTitle</code>, <code>ListId</code>, <code>ListItemId</code>, <code>ModifiedAt</code>, <code>ModifiedBy</code>) are then empty rather than filled with a stand-in, and <a href="csv-discovery.html">discovery.csv</a> records why in <code>ErrorCodes</code>.</p>
+<h2 id="pages-left-out-of-the-report">Pages left out of the report</h2>
+<p>Every post has an address. A Posts list that declares a display form uses it, for example <code>/sites/a/Lists/Posts/Post.aspx?ID=7</code>. A Posts list with no usable display form is addressed through SharePoint's list form redirect, <code>&lt;web&gt;/_layouts/15/listform.aspx?PageType=4&amp;ListId=&lt;list id&gt;&amp;ID=&lt;item id&gt;</code>, built from the observed list id and item id, so the post keeps its row. Usage counts for such a post are filled when the audit log holds that exact address and stay empty (<code>ItemLocatorNotObserved</code>) otherwise.</p>
+<p>The report identifies a page by its site, web and address. A selected page that this key cannot carry is left out of <code>classicpages.csv</code> and of the summaries built from it, and is written to <code>classicpagesomitted.csv</code> with its reason. The assessment and the export complete, and the <code>report</code> command prints how many pages were left out.</p>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NoAddress</td>
+<td>The page has no address the report can show.</td>
+</tr>
+<tr>
+<td>SharedAddress</td>
+<td>Another page in the same web has the same address. The page with the lowest <code>ContentKey</code> keeps the row, and <code>SharesAddressWith</code> holds that page's <code>ContentKey</code>.</td>
+</tr>
+<tr>
+<td>NotAnalyzed</td>
+<td>The file meets the selection above and the assessment holds no analyzed page for it.</td>
+</tr>
+</tbody>
+</table>
+<p><code>classicpagesomitted.csv</code> has the columns <code>ScanId</code>, <code>SiteUrl</code>, <code>WebUrl</code>, <code>PageUrl</code>, <code>PageName</code>, <code>PageType</code>, <code>ObjectKind</code>, <code>ContentKey</code>, <code>ListId</code>, <code>ListItemId</code>, <code>FileUniqueId</code>, <code>Reason</code> and <code>SharesAddressWith</code>. It is written for every native pipeline assessment and holds only its header when every selected page is in <code>classicpages.csv</code>. The same rule fills the assessment's report tables at the end of a run, where the log records the count for each reason. The native publication and <a href="csv-aspx.html">aspx.csv</a> keep every one of these objects.</p>
 <h2 id="columns">Columns</h2>
 <p>The following columns are included:</p>
 <table>
@@ -185,7 +211,7 @@
 </tr>
 <tr>
 <td>ModifiedBy</td>
-<td>Display name of the user who last modified the page (empty when <code>--skipuserinformation</code> was specified)</td>
+<td>Email address of the user who last modified the page, or the display name when the account has no email address (empty when <code>--skipuserinformation</code> was specified)</td>
 </tr>
 <tr>
 <td>WebPartCount</td>
@@ -218,6 +244,34 @@
 <tr>
 <td>ObjectKind / ContentKey</td>
 <td>Discriminated native file/item identity, not a URL/hash key.</td>
+</tr>
+<tr>
+<td>SourceKind</td>
+<td><code>File</code> for a page that is a physical .aspx file, <code>ListItem</code> for a blog post, which is a list item without a file of its own.</td>
+</tr>
+<tr>
+<td>ListTemplate</td>
+<td>Template number of the list or library the page belongs to, such as <code>119</code> for a wiki page library, <code>101</code> for a document library, <code>850</code> for a publishing Pages library and <code>301</code> for a blog Posts list. Empty when the page belongs to no list.</td>
+</tr>
+<tr>
+<td>ContentReadState</td>
+<td><code>Available</code> when the source of the page file was read, <code>NotApplicable</code> for a blog post, and another read state when the source was not read.</td>
+</tr>
+<tr>
+<td>ProductFamily</td>
+<td>Where the file belongs: <code>User</code> for a page that people author, <code>catalog_…</code> (for example <code>catalog_masterpage</code>) for a file in a gallery, and <code>Unknown</code> when the role of the file is not established, and for a blog post.</td>
+</tr>
+<tr>
+<td>Experience</td>
+<td><code>Classic</code> for a page file, <code>Unknown</code> when the role of the file is not established, and for a blog post.</td>
+</tr>
+<tr>
+<td>ImpactStatus / ImpactedBy</td>
+<td><code>Included</code> for a classic page that people author; <code>ImpactedBy</code> then links to the message center post that covers such pages. <code>Excluded</code> for a file in a gallery, <code>Unknown</code> when the classification is not established, and for a blog post; <code>ImpactedBy</code> is empty for both.</td>
+</tr>
+<tr>
+<td>ClassificationReason</td>
+<td>The rule that gave the classification above, such as <code>ClassicUserPage;MC1464926</code>, <code>CatalogAsset;ExactClassicHandler</code> or <code>RoleEvidenceIncomplete</code>. A blog post names how it was observed, for example <code>ObservedListItemAndRendererDeclaration</code>.</td>
 </tr>
 <tr>
 <td>AnalysisRunId / SnapshotId</td>

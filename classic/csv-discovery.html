@@ -111,6 +111,34 @@
 </tr>
 </tbody>
 </table>
+<h2 id="listing-under-throttling">Listing under throttling</h2>
+<p>Collection lists the files and folders of each web with its own requests. When SharePoint throttles one of them (HTTP 429 or 503), the request waits for the time SharePoint directs, up to 10 minutes per wait, and is then sent again, for up to five attempts. Every other listing request to the same SharePoint host holds for the same time. The hold also applies when SharePoint throttles another request of the assessment, such as a file download. The log records each wait in a line that starts with <code>[Throttling]</code>.</p>
+<p>A listing request that is still throttled at its last attempt, or that SharePoint directs to wait longer than 10 minutes, is given up. Its <code>Pagination</code> row has <code>DiscoveryStatus</code> <code>Failed</code> and one of the codes below, and the scope it belongs to is <code>Failed</code>, so the inventory holds only the files that other requests returned for that location.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>json_throttle_attempts_exhausted</code></td>
+<td>SharePoint throttled every attempt.</td>
+</tr>
+<tr>
+<td><code>json_throttle_delay_exceeds_budget</code></td>
+<td>SharePoint directed a wait longer than the request honors, or a wait the request cannot read.</td>
+</tr>
+</tbody>
+</table>
+<p>Each request given up this way counts as an incomplete read in the Issues column of <code>status</code> and <code>list</code>. The <code>report</code> command prints how many locations stayed incompletely listed and how many listing requests throttling stopped, as long as at least one location is counted. A new assessment lists those locations again.</p>
+<p>The count holds the <code>Scope</code> and <code>Gap</code> rows with a <code>DiscoveryStatus</code> other than <code>Complete</code>, <code>Empty</code> or <code>PolicyExcluded</code>, with two kinds of rows left out because no file is missing behind them:</p>
+<ul>
+<li>A file listing that failed while the second, reduced listing of the same folder finished. The second listing is the <code>Surface</code> row with <code>ObservationMethod</code> <code>PhysicalFolderFilesAuthorityFallback</code> and the same <code>ParentScopeKey</code>. It returns every file of the folder.</li>
+<li>A request that SharePoint refuses on every site collection, such as the forms of the User Information List, together with the scope that failed only because of it. The <code>EvidenceJson</code> of such a row names the rule in <code>applicabilityRuleId</code>.</li>
+</ul>
+<p><code>incompleteScopeCount</code> in the Summary evidence and the Summary verdict count those rows as well, so a <code>Summary</code> row can read <code>Incomplete</code> while the <code>report</code> command prints no warning.</p>
 <h2 id="columns">Columns</h2>
 <p>The following columns are included:</p>
 <table>
@@ -195,7 +223,7 @@
 </tr>
 <tr>
 <td>AssessmentStatus</td>
-<td>Page enrichment result: <code>Complete</code>, <code>NotSelected</code>, <code>NotApplicable</code> or <code>Failed</code>. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as <code>NotSelected</code>. A file whose list item could not be read is still assessed from the file alone, with the inapplicable item-dependent operations recorded in <code>ErrorCodes</code>: <code>list_association_absent</code> when the file belongs to no list, which is the normal state of a web-root file; <code>list_item_absent</code> for a confirmed absence of any backing item; <code>owning_list_unresolved</code> when the file names an owning list that was not matched in the web; <code>list_association_unknown</code> when the file lies inside a loaded list, so it is list-backed, but no observation of it reported a list association — the identity is unknown rather than absent; and <code>system_page_template</code> when <code>SetupPath</code> proves the file ghosts from the stock list view or list form template and therefore carries no page content of its own. The first two are confirmed structural absences and do not make the page a failure. The next two are read gaps and leave the assessment <code>Failed</code>, because the item metadata may exist and was simply unreachable.</td>
+<td>Page enrichment result: <code>Complete</code>, <code>NotSelected</code>, <code>NotApplicable</code> or <code>Failed</code>. Empty for Scope rows. A home-page-only run discovers only the selected welcome pages rather than emitting every other page as <code>NotSelected</code>. A file whose list item could not be read is still assessed from the file alone, with the inapplicable item-dependent operations recorded in <code>ErrorCodes</code>: <code>list_association_absent</code> when the file belongs to no list, which is the normal state of a web-root file; <code>list_item_absent</code> for a confirmed absence of any backing item; <code>owning_list_unresolved</code> when the file names an owning list that was not matched in the web; <code>list_association_unknown</code> when the file lies inside a loaded list, so it is list-backed, but no observation of it reported a list association — the identity is unknown rather than absent; and <code>system_page_template</code> when <code>SetupPath</code> proves the file ghosts from the stock list view or list form template and therefore carries no page content of its own. The first two are confirmed structural absences and do not make the page a failure. The next two are read gaps and leave the assessment <code>Failed</code>, because the item metadata may exist and was simply unreachable. <code>registered_list_view_or_form</code> marks a file without a backing item that is a registered list view or list form: its web parts are left unread and it is <code>NotApplicable</code>.</td>
 </tr>
 <tr>
 <td>ExpectedChildCount</td>
