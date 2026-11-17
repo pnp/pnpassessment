@@ -26,7 +26,7 @@ internal static class ClassicReportCsvProjection
 
     /// <summary>
     /// Writes all physical ASPX SQL facts and then exports Pages from the latest verified native publication.
-    /// Historical assessments without a pipeline retain their existing labelled legacy CSV, never a fabricated native result.
+    /// Historical assessments retain their legacy inventory with stored audit measurements, never a fabricated native result.
     /// </summary>
     internal static async Task ExportAsync(
         ScanContext context,
@@ -39,13 +39,15 @@ internal static class ClassicReportCsvProjection
         ClassicReportSource? source = await PipelineStore.ReadClassicReportSourceAsync(context, assessmentId, token);
         if (source == null)
         {
+            LegacyClassicPageAuditProjection legacyUsage =
+                await LegacyClassicPageAuditProjection.LoadAsync(context, assessmentId, token);
             long count = 0;
             await using StreamWriter legacyWriter = new(
                 Path.Combine(directory, PagesCsv),
                 false,
                 new UTF8Encoding(false));
             using CsvWriter legacyCsv = new(legacyWriter, configuration);
-            legacyCsv.WriteHeader<ClassicPage>();
+            legacyCsv.WriteHeader<LegacyClassicPageCsvRow>();
             await legacyCsv.NextRecordAsync();
             await foreach (ClassicPage page in context.ClassicPages.AsNoTracking()
                                .Where(page => page.ScanId == assessmentId)
@@ -55,7 +57,7 @@ internal static class ClassicReportCsvProjection
                                .AsAsyncEnumerable()
                                .WithCancellation(token))
             {
-                legacyCsv.WriteRecord(page);
+                legacyCsv.WriteRecord(legacyUsage.Project(page));
                 await legacyCsv.NextRecordAsync();
                 count++;
             }
